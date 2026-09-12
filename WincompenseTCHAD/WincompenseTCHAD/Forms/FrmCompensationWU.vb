@@ -250,6 +250,12 @@ Public Class FrmCompensationWU
         If dgvControle.Columns.Contains("TauxSA") Then
             dgvControle.Columns("TauxSA").DefaultCellStyle.Format = "P1"
         End If
+
+        ' L'écart d'arrondi est un montant entier en FCFA (0 ou ±1 en fonctionnement normal).
+        If dgvControle.Columns.Contains("EcartArrondi") Then
+            dgvControle.Columns("EcartArrondi").DefaultCellStyle.Format = "N0"
+            dgvControle.Columns("EcartArrondi").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+        End If
     End Sub
 
     ''' <summary>Masque les colonnes techniques utilisées uniquement pour la mise en évidence des anomalies.</summary>
@@ -272,6 +278,7 @@ Public Class FrmCompensationWU
             Dim donneesManquantes As Boolean = Convert.ToBoolean(ligne.Cells("DonneesManquantes").Value)
             Dim type As String = Convert.ToString(ligne.Cells("Type").Value)
             Dim solde As Decimal = Convert.ToDecimal(ligne.Cells("Solde").Value)
+            Dim ecartArrondi As Long = Convert.ToInt64(ligne.Cells("EcartArrondi").Value)
 
             If erreurSql Then
                 ligne.DefaultCellStyle.BackColor = Color.MistyRose
@@ -280,6 +287,9 @@ Public Class FrmCompensationWU
                 ligne.DefaultCellStyle.BackColor = Color.LightYellow
             ElseIf donneesManquantes Then
                 ligne.DefaultCellStyle.BackColor = Color.Gainsboro
+            ElseIf Math.Abs(ecartArrondi) > ConstantesWU.SEUIL_ECART_LIGNE_ANORMAL Then
+                ' Écart trop important pour un simple arrondi : paramétrage probablement incomplet.
+                ligne.DefaultCellStyle.BackColor = Color.LightSalmon
             ElseIf solde <> 0D Then
                 ligne.DefaultCellStyle.BackColor = Color.Khaki
             Else

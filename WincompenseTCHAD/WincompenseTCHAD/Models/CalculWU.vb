@@ -83,6 +83,17 @@ Public Class CalculWU
     Public Property TotalCredit As Decimal = 0D
     Public Property Solde As Decimal = 0D
 
+    ''' <summary>
+    ''' Écart d'arrondi généré par cet Account dans la pièce comptable : différence entre la
+    ''' ligne de mouvement arrondie et la somme de ses contreparties arrondies (compte courant
+    ''' WU, commissions, taxes). En valeurs exactes cet écart est nul par construction ; il ne
+    ''' provient que des arrondis FCFA effectués ligne par ligne (ArrondiFCFA).
+    ''' La SOMME de ces écarts sur tous les Accounts est égale à l'écart global de la pièce,
+    ''' celui absorbé par le compte d'attente (section 14).
+    ''' Renseigné par PieceComptableService (CreerTableControle et GenererPieceComptable).
+    ''' </summary>
+    Public Property EcartArrondi As Long = 0L
+
 #End Region
 
 #Region "Indicateurs d'anomalie (mise en évidence dans la grille)"

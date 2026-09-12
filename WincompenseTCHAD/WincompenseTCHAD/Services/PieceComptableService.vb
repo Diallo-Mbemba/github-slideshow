@@ -58,6 +58,7 @@ Public NotInheritable Class PieceComptableService
         dt.Columns.Add("TotalDebit", GetType(Decimal))
         dt.Columns.Add("TotalCredit", GetType(Decimal))
         dt.Columns.Add("Solde", GetType(Decimal))
+        dt.Columns.Add("EcartArrondi", GetType(Long))
         dt.Columns.Add("ErreurSQL", GetType(Boolean))
         dt.Columns.Add("DonneesManquantes", GetType(Boolean))
 
@@ -93,6 +94,7 @@ Public NotInheritable Class PieceComptableService
             ligne("TotalDebit") = calc.TotalDebit
             ligne("TotalCredit") = calc.TotalCredit
             ligne("Solde") = calc.Solde
+            ligne("EcartArrondi") = CalculerEcartArrondi(calc)
             ligne("ErreurSQL") = calc.ErreurSQL
             ligne("DonneesManquantes") = calc.DonneesManquantes
 
@@ -157,6 +159,9 @@ Public NotInheritable Class PieceComptableService
             Dim netMouvement As Decimal = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes) - calc.PrincipalPaye
             Dim netCompteCourant As Decimal = netMouvement - totalCommissionsEtTaxes
 
+            ' Mémorise l'écart d'arrondi apporté par cet Account (visible dans la grille de contrôle).
+            CalculerEcartArrondi(calc)
+
             ' 1) Ligne de mouvement (compte de compensation du point de vente).
             AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement)
 
@@ -191,6 +196,60 @@ Public NotInheritable Class PieceComptableService
         Next
 
         Return dt
+    End Function
+
+    ''' <summary>
+    ''' Calcule — et mémorise sur le CalculWU — l'écart d'arrondi que cet Account apporte à la
+    ''' pièce comptable : montant arrondi de sa ligne de mouvement MOINS la somme des montants
+    ''' arrondis de ses contreparties (compte courant WU, commissions banque et sous-agent,
+    ''' taxes). En valeurs exactes la différence est nulle par construction ; seul l'arrondi
+    ''' FCFA ligne par ligne la rend non nulle (typiquement 0 ou ±1 FCFA par Account).
+    '''
+    ''' Par construction, la somme de ces écarts sur l'ensemble des Accounts est exactement
+    ''' égale à l'écart global Débit − Crédit de la pièce, celui que VerifierEquilibrePiece
+    ''' affecte au compte d'attente (section 14). Cela permet de tracer, ligne par ligne, d'où
+    ''' provient l'écart global.
+    '''
+    ''' IMPORTANT : les arrondis reproduits ici doivent rester strictement alignés sur ceux
+    ''' réellement posés par GenererPieceComptable (y compris la condition sur CompteCommission
+    ''' pour les commissions sous-agent). Toute modification de l'une doit être répercutée ici.
+    ''' </summary>
+    ''' <returns>L'écart d'arrondi en FCFA (positif, négatif ou nul).</returns>
+    Private Shared Function CalculerEcartArrondi(calc As CalculWU) As Long
+
+        If calc Is Nothing Then Return 0L
+
+        Dim totalCommissionsEtTaxes As Decimal =
+            calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
+            calc.CommissionTransfertSA + calc.CommissionPaiementSA + calc.CommissionEnvoiSA +
+            calc.TaxeEnvoi + calc.TVA + calc.TTAEnvoi + calc.TTAReception
+
+        Dim netMouvement As Decimal = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes) - calc.PrincipalPaye
+        Dim netCompteCourant As Decimal = netMouvement - totalCommissionsEtTaxes
+
+        ' Commissions sous-agent : postées uniquement si le CompteCommission est renseigné
+        ' (même condition que dans GenererPieceComptable).
+        Dim commissionsSA As Long = 0L
+        If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
+           Not String.IsNullOrWhiteSpace(calc.CompteCommission) Then
+            commissionsSA = WUCalculationService.ArrondiFCFA(calc.CommissionTransfertSA) +
+                            WUCalculationService.ArrondiFCFA(calc.CommissionPaiementSA) +
+                            WUCalculationService.ArrondiFCFA(calc.CommissionEnvoiSA)
+        End If
+
+        Dim contrepartiesArrondies As Long =
+            WUCalculationService.ArrondiFCFA(netCompteCourant) +
+            WUCalculationService.ArrondiFCFA(calc.CommissionTransfertBanque) +
+            WUCalculationService.ArrondiFCFA(calc.CommissionEnvoiBanque) +
+            WUCalculationService.ArrondiFCFA(calc.CommissionPaiementBanque) +
+            commissionsSA +
+            WUCalculationService.ArrondiFCFA(calc.TaxeEnvoi) +
+            WUCalculationService.ArrondiFCFA(calc.TVA) +
+            WUCalculationService.ArrondiFCFA(calc.TTAEnvoi) +
+            WUCalculationService.ArrondiFCFA(calc.TTAReception)
+
+        calc.EcartArrondi = WUCalculationService.ArrondiFCFA(netMouvement) - contrepartiesArrondies
+        Return calc.EcartArrondi
     End Function
 
     ''' <summary>

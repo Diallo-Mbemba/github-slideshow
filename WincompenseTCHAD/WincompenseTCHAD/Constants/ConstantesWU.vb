@@ -105,6 +105,15 @@ Public NotInheritable Class ConstantesWU
     ''' <summary>Seuil de tolérance (en FCFA) au-delà duquel la génération de la pièce est bloquée.</summary>
     Public Const SEUIL_ECART_TOLERE As Decimal = 1000D
 
+    ''' <summary>
+    ''' Seuil (en FCFA) au-delà duquel l'écart d'arrondi d'UNE ligne (un Account) est considéré
+    ''' comme anormal et mis en évidence dans la grille de contrôle. Un Account génère au plus
+    ''' une dizaine de lignes arrondies : son écart d'arrondi légitime reste de quelques FCFA.
+    ''' Un écart nettement supérieur trahit un paramétrage incomplet (typiquement un sous-agent
+    ''' sans CompteCommission, dont les commissions ne peuvent donc pas être passées).
+    ''' </summary>
+    Public Const SEUIL_ECART_LIGNE_ANORMAL As Long = 10L
+
 #End Region
 
 #Region "Colonnes attendues dans les rapports"
