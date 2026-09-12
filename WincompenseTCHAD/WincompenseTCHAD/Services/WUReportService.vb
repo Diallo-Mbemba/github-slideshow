@@ -428,6 +428,80 @@ Public NotInheritable Class WUReportService
     End Function
 
     ''' <summary>
+    ''' Reconstitue une date à partir d'un triplet de colonnes Année/Mois/Jour préfixées
+    ''' (ex. SetDateLOCYear / SetDateLOCMonth / SetDateLOCDay). Retourne Nothing si les trois
+    ''' colonnes ne sont pas toutes présentes, ou si aucune ligne ne porte une date valide
+    ''' (les rapports contiennent des triplets neutres "0/0/0" pour les transactions non encore
+    ''' payées : ces lignes sont ignorées).
+    ''' </summary>
+    Public Shared Function ObtenirDateDepuisComposants(table As DataTable, prefixe As String) As Date?
+
+        If table Is Nothing Then Return Nothing
+
+        Dim colAnnee As String = prefixe & ConstantesWU.SUFFIXE_DATE_ANNEE
+        Dim colMois As String = prefixe & ConstantesWU.SUFFIXE_DATE_MOIS
+        Dim colJour As String = prefixe & ConstantesWU.SUFFIXE_DATE_JOUR
+
+        If Not (table.Columns.Contains(colAnnee) AndAlso
+                table.Columns.Contains(colMois) AndAlso
+                table.Columns.Contains(colJour)) Then
+            Return Nothing
+        End If
+
+        For Each row As DataRow In table.Rows
+            Dim annee, mois, jour As Integer
+            If Integer.TryParse(ObtenirValeurTexte(row, colAnnee), annee) AndAlso
+               Integer.TryParse(ObtenirValeurTexte(row, colMois), mois) AndAlso
+               Integer.TryParse(ObtenirValeurTexte(row, colJour), jour) Then
+
+                If annee > 0 AndAlso mois >= 1 AndAlso mois <= 12 AndAlso jour >= 1 AndAlso jour <= 31 Then
+                    Try
+                        Return New Date(annee, mois, jour)
+                    Catch ex As ArgumentOutOfRangeException
+                        ' Triplet incohérent (ex. 31 février) : on poursuit avec les lignes suivantes.
+                    End Try
+                End If
+            End If
+        Next
+
+        Return Nothing
+    End Function
+
+    ''' <summary>
+    ''' Détermine la date du rapport d'activité : colonne de date simple (txnDateLOC) en priorité,
+    ''' puis reconstitution depuis les colonnes Année/Mois/Jour. Retourne Nothing si aucune date
+    ''' exploitable n'a pu être trouvée.
+    ''' </summary>
+    Public Shared Function ObtenirDateActivite(table As DataTable) As Date?
+        Dim resultat As Date? = ObtenirDateRapport(table, ConstantesWU.COLONNE_DATE_ACTIVITE)
+        If resultat.HasValue Then Return resultat
+
+        For Each prefixe As String In ConstantesWU.PrefixesDateActivite
+            resultat = ObtenirDateDepuisComposants(table, prefixe)
+            If resultat.HasValue Then Return resultat
+        Next
+
+        Return Nothing
+    End Function
+
+    ''' <summary>
+    ''' Détermine la date du rapport de règlement. Ce rapport ne comportant pas de colonne de date
+    ''' simple, la date est reconstituée depuis les colonnes Année/Mois/Jour de la date de règlement
+    ''' locale (SetDateLOC), puis à défaut de la date d'édition du rapport (RepDate).
+    ''' </summary>
+    Public Shared Function ObtenirDateReglement(table As DataTable) As Date?
+        Dim resultat As Date? = ObtenirDateRapport(table, ConstantesWU.COLONNE_DATE_REGLEMENT)
+        If resultat.HasValue Then Return resultat
+
+        For Each prefixe As String In ConstantesWU.PrefixesDateReglement
+            resultat = ObtenirDateDepuisComposants(table, prefixe)
+            If resultat.HasValue Then Return resultat
+        Next
+
+        Return Nothing
+    End Function
+
+    ''' <summary>
     ''' Vérifie que le rapport d'activité et le rapport de règlement correspondent à la même journée.
     ''' Si la colonne de date n'existe pas côté règlement, la vérification est ignorée avec un avertissement
     ''' (le traitement n'est pas bloqué dans ce cas, faute d'information comparable).
@@ -438,14 +512,15 @@ Public NotInheritable Class WUReportService
 
         messageAvertissement = String.Empty
 
-        Dim dateActivite As Date? = ObtenirDateRapport(dtActivite, ConstantesWU.COLONNE_DATE_ACTIVITE)
+        Dim dateActivite As Date? = ObtenirDateActivite(dtActivite)
 
         If dateActivite Is Nothing Then
-            messageAvertissement = "Impossible de déterminer la date du rapport d'activité (colonne txnDateLOC absente ou illisible)."
+            messageAvertissement = "Impossible de déterminer la date du rapport d'activité " &
+                                    "(colonne txnDateLOC et colonnes Année/Mois/Jour absentes ou illisibles)."
             Return True ' Non bloquant : on ne peut simplement pas comparer.
         End If
 
-        Dim dateReglement As Date? = ObtenirDateRapport(dtReglement, ConstantesWU.COLONNE_DATE_REGLEMENT)
+        Dim dateReglement As Date? = ObtenirDateReglement(dtReglement)
 
         If dateReglement Is Nothing Then
             messageAvertissement = $"Date d'activité détectée : {dateActivite.Value:dd/MM/yyyy}. " &

@@ -175,11 +175,37 @@ Public NotInheritable Class ConstantesWU
     Public Const COLONNE_DATE_ACTIVITE As String = "txnDateLOC"
 
     ''' <summary>
-    ''' Nom présumé de la colonne de date dans le rapport de règlement.
-    ''' À CONFIRMER : si cette colonne n'existe pas sous ce nom, la comparaison
-    ''' de cohérence des dates est simplement ignorée (avec avertissement).
+    ''' Nom de la colonne de date dans le rapport de règlement. Cette colonne n'existe en réalité
+    ''' dans aucun format de rapport de règlement connu : la date y est reconstituée à partir des
+    ''' colonnes Année/Mois/Jour (voir PrefixesDateReglement). Le nom est conservé pour le cas où
+    ''' Western Union ajouterait une colonne de date simple à un format ultérieur.
     ''' </summary>
     Public Const COLONNE_DATE_REGLEMENT As String = "txnDateLOC"
+
+    ''' <summary>
+    ''' Préfixes des triplets de colonnes Année/Mois/Jour permettant de reconstituer la date du
+    ''' rapport d'ACTIVITÉ lorsque la colonne de date simple est absente ou illisible.
+    ''' "TXNDATELOC" -> TXNDATELOCYEAR / TXNDATELOCMONTH / TXNDATELOCDAY (nouveau format) ;
+    ''' "TxnDate"    -> TxnDateYear / TxnDateMonth / TxnDateDay (ancien format).
+    ''' Essayés dans l'ordre, recherche de colonne insensible à la casse.
+    ''' </summary>
+    Public Shared ReadOnly PrefixesDateActivite As String() = {"TXNDATELOC", "TxnDate"}
+
+    ''' <summary>
+    ''' Préfixes des triplets de colonnes Année/Mois/Jour permettant de reconstituer la date du
+    ''' rapport de RÈGLEMENT, qui ne comporte aucune colonne de date simple.
+    ''' "SetDateLOC" (date de règlement locale) puis "RepDate" (date d'édition du rapport) :
+    ''' ces deux dates portent une valeur unique correspondant à la journée traitée, dans
+    ''' l'ancien comme dans le nouveau format, ce qui en fait les seules comparables à la date
+    ''' d'activité. Les dates d'émission (RecDateLOC) et de paiement (PayDateLOC) sont au
+    ''' contraire étalées sur plusieurs jours et ne conviennent donc pas à ce contrôle.
+    ''' </summary>
+    Public Shared ReadOnly PrefixesDateReglement As String() = {"SetDateLOC", "RepDate"}
+
+    ''' <summary>Suffixes composant un triplet de colonnes de date (Année, Mois, Jour).</summary>
+    Public Const SUFFIXE_DATE_ANNEE As String = "Year"
+    Public Const SUFFIXE_DATE_MOIS As String = "Month"
+    Public Const SUFFIXE_DATE_JOUR As String = "Day"
 
 #End Region
 

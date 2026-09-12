@@ -57,8 +57,10 @@ Scripts/
    l'unité près sur l'exemple disponible ; *le cas d'une agence propre "EC" reste à valider faute
    d'exemple de référence pour ce type de PDV.*
 4. **Solde par Account** (grille de contrôle) = `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes)`.
-5. **Colonne de date côté règlement** : si absente, la vérification de cohérence de date n'est pas
-   bloquante (avertissement affiché dans le StatusStrip).
+5. **Cohérence des dates** : la date du rapport d'activité (`txnDateLOC`) est comparée à celle du
+   rapport de règlement, reconstituée depuis `SetDateLOCYear/Month/Day` (à défaut `RepDate`).
+   Une divergence bloque le traitement. Si aucune date n'est exploitable d'un côté, la
+   vérification est ignorée sans bloquer (avertissement affiché dans le StatusStrip).
 6. **Compte d'attente `XXXXXXXXXX`** : valeur littérale provisoire (`ConstantesWU.CPT_ATTENTE`),
    à remplacer par le numéro de compte réel avant mise en production.
 7. **Export Excel** : réalisé en liaison tardive (late binding, `Option Strict Off` isolé dans
@@ -80,6 +82,7 @@ sont absorbées automatiquement.
 | Casse des colonnes | `Status`, `txnDateLOC` | `STATUS`, `TXNDATELOC` | `DataTable.Columns` est insensible à la casse |
 | Colonne `STATUS` | absente | `S` / `C` / `W` | Les lignes annulées (`C`) sont exclues de l'agrégation (`InclureLigneActivite`) ; absence de la colonne = comportement historique |
 | Format de date | `20210102` | `20260530` | `yyyyMMdd` analysé explicitement (`ConstantesWU.FormatsDateRapport`) |
+| Date du rapport de règlement | colonnes `SetDateLOCYear/Month/Day` | idem | Reconstituée depuis ces colonnes (`ObtenirDateReglement`), ce qui rend enfin opérationnelle la validation croisée de la section 16 |
 | Colonnes ajoutées | — | `Tax1REC`, `Tax2REC`, `Tax3REC`, `TotalChargesPAY`, `Assigned_Account_Name` | Ignorées par le lecteur (aucun impact) |
 
 **Non-régression vérifiée** : relu par le code actuel, le rapport du 02/01/2021 restitue très
@@ -87,20 +90,28 @@ exactement les valeurs de référence du cahier des charges pour `AHB020200` (Pr
 5 966 388 ; PrincipalPaye 7 522 117,45 ; ChargeEnvoi 340 000 ; Taxes 82 075 ; CommissionPaiement
 98 104,93).
 
-### Piste d'amélioration non retenue à ce stade
+### Les taxes détaillées confirment les taux du cahier des charges
 
-Le nouveau rapport d'activité fournit le détail des taxes (`Tax1REC` ≈ TVA à 19,25 %,
-`Tax3REC` ≈ TTA à 0,2 %, `Tax2REC` = solde), là où le code les recalcule par application des
-taux. Sur le fichier du 30/05/2026, l'écart entre taxes fournies et recalculées atteint ~5 %
-(TVA : 332 469 fournie contre 324 748 recalculée). Utiliser les valeurs fournies fiabiliserait
-le calcul, mais **modifierait les règles du cahier des charges** : à arbitrer avec la Direction
-Comptable.
+Le nouveau rapport d'activité fournit le détail des taxes (`Tax1REC`, `Tax2REC`, `Tax3REC`,
+dont la somme vaut exactement `TaxesREC`), là où le code les recalcule par application des taux.
+Le rapprochement, effectué ligne à ligne sur le fichier du 30/05/2026 (95 lignes d'envoi, hors
+annulations), **valide les formules du cahier des charges** :
+
+| Taxe fournie | Formule du code | Lignes conformes | Écart total |
+|---|---|---|---|
+| `Tax1REC` | `ChargeEnvoi × 19,25 %` (TVA) | **95 / 95** | +20,50 FCFA |
+| `Tax3REC` | `PrincipalEnvoi × 0,2 %` (TTA Envoi) | **95 / 95** | −1,79 FCFA |
+| `Tax2REC` | `Taxes − TVA − TTAEnvoi` (Solde de taxes) | — | −18,71 FCFA |
+
+Les écarts résiduels (une vingtaine de francs sur ~460 000 FCFA de taxes) ne sont que les
+arrondis à l'unité pratiqués par Western Union. **Aucune modification des formules n'est donc
+justifiée** : les remplacer par les valeurs fournies modifierait les règles du cahier des
+charges pour un gain nul.
 
 ## Points restant à confirmer
 
 - Structure des écritures pour une **agence propre "EC"** dans la pièce comptable (aucun exemple
   de référence de ce type disponible à ce jour ; seul un exemple sous-agent "SA" a pu être validé).
-- Nom exact de la colonne de date dans le rapport de règlement.
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré).
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.
 - Traitement définitif souhaité des Accounts `INCONNU` dans la pièce comptable.
