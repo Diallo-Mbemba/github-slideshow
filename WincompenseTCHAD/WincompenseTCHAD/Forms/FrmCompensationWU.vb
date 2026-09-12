@@ -15,6 +15,11 @@ Imports System.Linq
 ''' </summary>
 Public Class FrmCompensationWU
 
+    ''' <summary>Constructeur requis par le Concepteur Windows Forms : initialise tous les contrôles.</summary>
+    Public Sub New()
+        InitializeComponent()
+    End Sub
+
 #Region "État interne du formulaire"
 
     Private _cheminActivite As String = String.Empty
