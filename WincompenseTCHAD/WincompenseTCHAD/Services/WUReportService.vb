@@ -151,7 +151,7 @@ Public NotInheritable Class WUReportService
 
         texte = texte.Trim()
         ' Supprime les espaces (séparateurs de milliers éventuels) et les espaces insécables.
-        texte = texte.Replace(" "c, ""c).Replace(Convert.ToChar(&HA0), ""c)
+        texte = texte.Replace(" ", "").Replace(Convert.ToChar(&HA0).ToString(), "")
 
         Dim resultat As Decimal
 
