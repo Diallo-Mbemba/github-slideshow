@@ -1,0 +1,14 @@
+# Dossiers de compilation Visual Studio
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+
+# Fichiers d'état utilisateur / solution Visual Studio (ne doivent jamais être partagés)
+.vs/
+*.user
+*.suo
+
+# Fichiers temporaires divers
+*.tmp
+*.cache
