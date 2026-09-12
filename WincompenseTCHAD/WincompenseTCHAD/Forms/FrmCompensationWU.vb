@@ -27,6 +27,13 @@ Public Class FrmCompensationWU
     Private _listeCalculs As List(Of CalculWU)
     Private _dtPieceGeneree As DataTable
 
+    ''' <summary>
+    ''' Message technique du dernier échec de connexion à SQL Server, vide si la connexion a
+    ''' abouti. Mémorisé pour être présenté à l'utilisateur : sans ce détail, un « base SQL
+    ''' inaccessible » ne permet pas de distinguer un service arrêté d'une base absente.
+    ''' </summary>
+    Private _messageErreurConnexionSql As String = String.Empty
+
 #End Region
 
 #Region "Chargement des fichiers"
@@ -133,6 +140,26 @@ Public Class FrmCompensationWU
             btnPieceAccount.Enabled = _listeCalculs.Count > 0
             progressBarTraitement.Value = 100
 
+            ' La base est facultative pour calculer, mais indispensable pour identifier les points
+            ' de vente : sans elle, tous les Accounts restent INCONNU et la pièce comptable ne peut
+            ' pas utiliser leurs comptes de compensation et de commission. L'utilisateur doit donc
+            ' en être averti explicitement, avec le détail technique permettant de diagnostiquer.
+            If Not String.IsNullOrEmpty(_messageErreurConnexionSql) Then
+                tsslStatut.Text = "Calcul effectué SANS les paramètres SQL Server (base inaccessible)."
+                MessageBox.Show(
+                    _messageErreurConnexionSql & Environment.NewLine & Environment.NewLine &
+                    "Le calcul a tout de même été effectué, mais aucun Account n'a pu être identifié :" &
+                    Environment.NewLine &
+                    "ils apparaissent tous en INCONNU et la pièce comptable utilisera le compte courant WU" & Environment.NewLine &
+                    "au lieu des comptes de compensation et de commission des sous-agents." & Environment.NewLine & Environment.NewLine &
+                    "À vérifier :" & Environment.NewLine &
+                    "  1. le service SQL Server (SQLEXPRESS) est démarré ;" & Environment.NewLine &
+                    "  2. le nom de l'instance est correct dans le fichier App.config ;" & Environment.NewLine &
+                    "  3. la base GWC_WINCOMPENSE existe (scripts du dossier Scripts\ exécutés) ;" & Environment.NewLine &
+                    "  4. votre compte Windows a accès à cette base.",
+                    "Base SQL Server inaccessible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End If
+
         Catch ex As RapportInvalideException
             MessageBox.Show(ex.Message, "Anomalie de rapport", MessageBoxButtons.OK, MessageBoxIcon.Error)
             tsslStatut.Text = "Erreur : " & ex.Message
@@ -170,6 +197,7 @@ Public Class FrmCompensationWU
         Dim connexion As SqlConnection = Nothing
         Dim connexionOuverte As Boolean = False
         Dim messageErreurConnexion As String = String.Empty
+        _messageErreurConnexionSql = String.Empty
 
         Try
             connexion = WURepository.CreerConnexion()
@@ -178,6 +206,7 @@ Public Class FrmCompensationWU
         Catch ex As Exception
             ' Base SQL inaccessible (section 15) : on ne bloque pas le traitement, on continue en mode dégradé.
             messageErreurConnexion = $"Connexion à SQL Server ({WURepository.ObtenirChaineConnexion()}) impossible : {ex.Message}"
+            _messageErreurConnexionSql = messageErreurConnexion
         End Try
 
         Try
