@@ -107,21 +107,24 @@ Public NotInheritable Class PieceComptableService
 
     ''' <summary>
     ''' Construit la DataTable dtPiece (Compte, Libelle, Debit, Credit) à partir de la liste
-    ''' des CalculWU, en reproduisant la logique du modèle PieceComptabilsationTchad.xlsx.
+    ''' des CalculWU, en reproduisant la structure du classeur de référence
+    ''' PieceComptabilsationTchad.xlsx (validée sur un exemple réel de sous-agent) :
     '''
-    ''' HYPOTHÈSE (à valider contre le classeur de référence, non disponible à la rédaction) :
-    ''' pour chaque Account, le "compte de mouvement" (CompteMouvement) est :
-    '''   - le CompteCompense du sous-agent si TypePdv = "SA" et qu'il est renseigné,
-    '''   - le compte courant WU (32100003292) sinon (agence propre "EC" ou Account "INCONNU").
-    ''' Ce compte reçoit :
-    '''   - un DÉBIT du PrincipalPaye (somme décaissée pour les paiements),
-    '''   - un CRÉDIT du PrincipalEnvoi + ChargeEnvoi + Taxes (somme encaissée pour les envois).
-    ''' Toutes les commissions et taxes sont ensuite débitées sur ce même compte de mouvement,
-    ''' en contrepartie créditée sur le compte de destination approprié (compte de commission
-    ''' banque, compte de commission du sous-agent, ou compte de taxe). Cette construction en
-    ''' partie double garantit que seule la différence entre PrincipalPaye et
-    ''' (PrincipalEnvoi + ChargeEnvoi + Taxes), cumulée sur tous les Accounts, peut générer un
-    ''' écart global — ce qui est cohérent avec le mécanisme du compte d'attente (section 14).
+    '''   - UNE SEULE ligne de mouvement (Débit si positif, Crédit si négatif) sur le compte
+    '''     de compensation du point de vente (CompteCompense du sous-agent, ou le compte
+    '''     courant WU pour une agence propre / Account non paramétré), pour le montant net :
+    '''         NetMouvement = (PrincipalEnvoi + ChargeEnvoi + Taxes) − PrincipalPaye
+    '''   - UNE SEULE ligne en contrepartie sur le compte courant WU (32100003292), pour la
+    '''     part nette revenant à la banque une fois les commissions et taxes affectées :
+    '''         NetCompteCourant = NetMouvement − (toutes commissions + toutes taxes)
+    '''   - Les commissions (banque et sous-agent) et les taxes sont des lignes de CRÉDIT
+    '''     uniquement (aucune ligne de débit miroir individuelle) : leur contrepartie débit
+    '''     est absorbée globalement par la ligne de mouvement ci-dessus.
+    '''
+    ''' Cette structure a été vérifiée par rapprochement algébrique avec un exemple réel du
+    ''' classeur de référence (agence BOLOLO) : les lignes de commissions/taxes et les
+    ''' comptes correspondent à l'unité près, aux arrondis près (écart résiduel ≤ 1 FCFA dans
+    ''' l'exemple, absorbé par le mécanisme du compte d'attente, section 14).
     ''' </summary>
     Public Shared Function GenererPieceComptable(listeCalculs As IEnumerable(Of CalculWU)) As DataTable
 
@@ -143,53 +146,66 @@ Public NotInheritable Class PieceComptableService
                 compteMouvement = ConstantesWU.CPT_COMPTE_COURANT
             End If
 
-            Dim libelleCompte As String = $"{ConstantesWU.LIB_COMPTE_COURANT} - {calc.Account} {calc.Designation}".Trim()
+            Dim libelleMouvement As String = String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, calc.Designation).Trim()
 
-            ' 1) Mouvement principal : décaissement des paiements / encaissement des envois.
-            AjouterLigneSiNonNul(dt, compteMouvement, libelleCompte, calc.PrincipalPaye, 0D)
-            AjouterLigneSiNonNul(dt, compteMouvement, libelleCompte, 0D, calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes)
+            Dim totalCommissionsEtTaxes As Decimal =
+                calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
+                calc.CommissionTransfertSA + calc.CommissionPaiementSA + calc.CommissionEnvoiSA +
+                calc.TaxeEnvoi + calc.TVA + calc.TTAEnvoi + calc.TTAReception
 
-            ' 2) Commissions part Banque (toujours postées, quel que soit le type de PDV).
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_COMMISSION_TRANSFERT_ENVOI_BANQUE,
-                             ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, calc.CommissionTransfertBanque)
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_COMMISSION_TRANSFERT_ENVOI_BANQUE,
-                             ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, calc.CommissionEnvoiBanque)
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_COMMISSION_PAIEMENT_BANQUE,
-                             ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, calc.CommissionPaiementBanque)
+            Dim netMouvement As Decimal = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes) - calc.PrincipalPaye
+            Dim netCompteCourant As Decimal = netMouvement - totalCommissionsEtTaxes
 
-            ' 3) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
+            ' 1) Ligne de mouvement (compte de compensation du point de vente).
+            AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement)
+
+            ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
+            AjouterLigneSigneAuto(dt, ConstantesWU.CPT_COMPTE_COURANT, ConstantesWU.LIB_COMPTE_COURANT, -netCompteCourant)
+
+            ' 3) Commissions part Banque (toujours créditées, quel que soit le type de PDV).
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_COMMISSION_TRANSFERT_ENVOI_BANQUE,
+                                 ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, 0D, calc.CommissionTransfertBanque)
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_COMMISSION_TRANSFERT_ENVOI_BANQUE,
+                                 ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque)
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_COMMISSION_PAIEMENT_BANQUE,
+                                 ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, 0D, calc.CommissionPaiementBanque)
+
+            ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCommission) Then
 
-                AjouterEcriture(dt, compteMouvement, calc.CompteCommission,
-                                 ConstantesWU.LIB_COMMISSION_TRANSFERT_SA, calc.CommissionTransfertSA)
-                AjouterEcriture(dt, compteMouvement, calc.CompteCommission,
-                                 ConstantesWU.LIB_COMMISSION_PAIEMENT_SA, calc.CommissionPaiementSA)
-                AjouterEcriture(dt, compteMouvement, calc.CompteCommission,
-                                 ConstantesWU.LIB_COMMISSION_ENVOI_SA, calc.CommissionEnvoiSA)
+                AjouterLigneSiNonNul(dt, calc.CompteCommission,
+                                     $"{ConstantesWU.LIB_COMMISSION_TRANSFERT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionTransfertSA)
+                AjouterLigneSiNonNul(dt, calc.CompteCommission,
+                                     $"{ConstantesWU.LIB_COMMISSION_PAIEMENT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionPaiementSA)
+                AjouterLigneSiNonNul(dt, calc.CompteCommission,
+                                     $"{ConstantesWU.LIB_COMMISSION_ENVOI_SA} {calc.Designation}".Trim(), 0D, calc.CommissionEnvoiSA)
             End If
 
-            ' 4) Taxes (impôts, TVA, TTA) : toujours à la charge de la banque.
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_IMPOTS_TAXE_ENVOI,
-                             ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, calc.TaxeEnvoi)
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_TVA_COLLECTEE,
-                             ConstantesWU.LIB_TVA, calc.TVA)
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_TTA_ENVOI,
-                             ConstantesWU.LIB_TTA_ENVOI, calc.TTAEnvoi)
-            AjouterEcriture(dt, compteMouvement, ConstantesWU.CPT_TTA_RECEPTION,
-                             ConstantesWU.LIB_TTA_RECEPTION, calc.TTAReception)
+            ' 5) Taxes (impôts, TVA, TTA) : toujours créditées, à la charge de la banque.
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_IMPOTS_TAXE_ENVOI, ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, 0D, calc.TaxeEnvoi)
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_TVA_COLLECTEE, ConstantesWU.LIB_TVA, 0D, calc.TVA)
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_TTA_ENVOI, ConstantesWU.LIB_TTA_ENVOI, 0D, calc.TTAEnvoi)
+            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_TTA_RECEPTION, ConstantesWU.LIB_TTA_RECEPTION, 0D, calc.TTAReception)
         Next
 
         Return dt
     End Function
 
-    ''' <summary>Ajoute une écriture en partie double (Debit compteDebit / Credit compteCredit) si le montant n'est pas nul une fois arrondi.</summary>
-    Private Shared Sub AjouterEcriture(dt As DataTable, compteDebit As String, compteCredit As String, libelle As String, montant As Decimal)
+    ''' <summary>
+    ''' Ajoute une ligne unique dont le sens (Débit/Crédit) est déterminé automatiquement par
+    ''' le signe du montant : Débit si positif, Crédit si négatif. Rien n'est ajouté si le
+    ''' montant arrondi est nul.
+    ''' </summary>
+    Private Shared Sub AjouterLigneSigneAuto(dt As DataTable, compte As String, libelle As String, montant As Decimal)
         Dim montantArrondi As Long = WUCalculationService.ArrondiFCFA(montant)
         If montantArrondi = 0L Then Return
 
-        AjouterLigne(dt, compteDebit, libelle, montantArrondi, 0L)
-        AjouterLigne(dt, compteCredit, libelle, 0L, montantArrondi)
+        If montantArrondi > 0L Then
+            AjouterLigne(dt, compte, libelle, montantArrondi, 0L)
+        Else
+            AjouterLigne(dt, compte, libelle, 0L, -montantArrondi)
+        End If
     End Sub
 
     ''' <summary>Ajoute une ligne simple (Debit ou Credit) si le montant n'est pas nul une fois arrondi.</summary>

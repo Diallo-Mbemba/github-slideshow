@@ -48,9 +48,14 @@ Scripts/
 2. **Comptes INCONNU** : toujours affichés dans la grille de contrôle (jamais ignorés) ; pour la
    pièce comptable, traités par défaut comme une agence propre (100 % banque, compte courant WU),
    avec surlignage d'anomalie. *À confirmer.*
-3. **Structure des écritures de la pièce comptable** : reconstruite selon une logique de partie
-   double auto-cohérente (voir commentaires dans `PieceComptableService.GenererPieceComptable`),
-   faute d'accès au classeur `PieceComptabilsationTchad.xlsx`. *À valider contre le modèle réel.*
+3. **Structure des écritures de la pièce comptable** : validée par rapprochement algébrique avec
+   un exemple réel du classeur `PieceComptabilsationTchad.xlsx` (agence sous-agent "BOLOLO").
+   Une seule ligne de mouvement net (`NetMouvement = PrincipalEnvoi+ChargeEnvoi+Taxes−PrincipalPaye`,
+   Débit si positif) sur le `CompteCompense` du PDV, en contrepartie du compte courant WU pour la
+   part nette bancaire ; commissions et taxes sont des lignes de crédit uniquement, sans ligne de
+   débit miroir individuelle (voir commentaires détaillés dans `GenererPieceComptable`). Vérifié à
+   l'unité près sur l'exemple disponible ; *le cas d'une agence propre "EC" reste à valider faute
+   d'exemple de référence pour ce type de PDV.*
 4. **Solde par Account** (grille de contrôle) = `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes)`.
 5. **Colonne de date côté règlement** : si absente, la vérification de cohérence de date n'est pas
    bloquante (avertissement affiché dans le StatusStrip).
@@ -62,7 +67,8 @@ Scripts/
 
 ## Points restant à confirmer
 
-- Détail exact des écritures du modèle `PieceComptabilsationTchad.xlsx`.
+- Structure des écritures pour une **agence propre "EC"** dans la pièce comptable (aucun exemple
+  de référence de ce type disponible à ce jour ; seul un exemple sous-agent "SA" a pu être validé).
 - Nom exact de la colonne de date dans le rapport de règlement.
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré).
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.

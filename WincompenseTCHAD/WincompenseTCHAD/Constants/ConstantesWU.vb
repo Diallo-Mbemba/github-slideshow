@@ -86,8 +86,17 @@ Public NotInheritable Class ConstantesWU
     Public Const LIB_IMPOTS_TAXE_ENVOI As String = "IMPOTS ET TAXE SUR ENVOI"
     Public Const LIB_TVA As String = "TVA COLLECTEES WESTERN UNION"
     Public Const LIB_TTA_ENVOI As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
-    Public Const LIB_TTA_RECEPTION As String = "TTA (TAXE SUR RECEPTION DE FONDS WU)"
+    ' Double espace avant "DE" : reproduit fidèlement le libellé du classeur de référence
+    ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception).
+    Public Const LIB_TTA_RECEPTION As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU)"
     Public Const LIB_ECART_ATTENTE As String = "ECART D'ARRONDI - COMPTE D'ATTENTE PROVISOIRE"
+
+    ''' <summary>
+    ''' Gabarit du libellé de la ligne de mouvement (activité) du point de vente, tel que
+    ''' constaté dans le classeur de référence : "CCS_BOLOLO ACTIVITE WU" pour l'agence BOLOLO.
+    ''' {0} est remplacé par la Designation de l'Account.
+    ''' </summary>
+    Public Const LIB_MOUVEMENT_ACTIVITE_FORMAT As String = "CCS_{0} ACTIVITE WU"
 
 #End Region
 
