@@ -363,7 +363,17 @@ Public NotInheritable Class PieceComptableService
             Dim cheminTemp As String = Path.Combine(Path.GetTempPath(), $"PieceWU_{Date.Now:yyyyMMdd_HHmmss}.xlsx")
             classeur.SaveAs(cheminTemp)
 
-            excelApp.Activate()
+            ' Mise au premier plan de la fenêtre Excel : purement cosmétique, et volontairement
+            ' protégée par un Try/Catch silencieux. L'objet Application n'expose pas Activate()
+            ' (ce membre appartient à Workbook / Window) et Windows peut refuser à un processus
+            ' d'arrière-plan de prendre le focus : dans les deux cas la pièce est déjà ouverte,
+            ' l'échec ne doit donc pas remonter comme une erreur à l'utilisateur.
+            Try
+                excelApp.WindowState = -4137 ' xlMaximized
+                classeur.Activate()
+            Catch
+                ' Ignoré volontairement : Excel est ouvert, seule la mise au premier plan a échoué.
+            End Try
 
             Return cheminTemp
 
