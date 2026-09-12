@@ -7,6 +7,7 @@ Option Explicit On
 
 Imports System.Data
 Imports System.Globalization
+Imports System.IO
 Imports System.Linq
 
 ''' <summary>
@@ -306,24 +307,7 @@ Public NotInheritable Class PieceComptableService
 
             classeur = excelApp.Workbooks.Add()
             feuille = classeur.Worksheets(1)
-            feuille.Name = "Piece WU"
-
-            ' En-têtes.
-            feuille.Cells(1, 1).Value = "Compte"
-            feuille.Cells(1, 2).Value = "Libelle"
-            feuille.Cells(1, 3).Value = "Debit"
-            feuille.Cells(1, 4).Value = "Credit"
-
-            Dim ligneExcel As Integer = 2
-            For Each ligne As DataRow In dtPiece.Rows
-                feuille.Cells(ligneExcel, 1).Value = Convert.ToString(ligne("Compte"))
-                feuille.Cells(ligneExcel, 2).Value = Convert.ToString(ligne("Libelle"))
-                feuille.Cells(ligneExcel, 3).Value = Convert.ToInt64(ligne("Debit"))
-                feuille.Cells(ligneExcel, 4).Value = Convert.ToInt64(ligne("Credit"))
-                ligneExcel += 1
-            Next
-
-            feuille.Columns.AutoFit()
+            RemplirFeuillePiece(feuille, dtPiece)
             classeur.SaveAs(cheminFichier)
 
         Finally
@@ -340,6 +324,92 @@ Public NotInheritable Class PieceComptableService
             If classeur IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(classeur)
             If excelApp IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(excelApp)
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' Génère la pièce comptable et l'ouvre DIRECTEMENT dans Microsoft Excel (fenêtre visible),
+    ''' sans passer par une boîte de dialogue d'enregistrement. Le classeur est sauvegardé dans
+    ''' un fichier temporaire (pour avoir un nom et être persisté sur disque) puis laissé OUVERT
+    ''' pour consultation/impression/enregistrement manuel immédiat par l'utilisateur.
+    ''' Nécessite Microsoft Excel installé sur le poste ; utilise la liaison tardive comme
+    ''' ExporterPieceExcel (voir remarque sur Option Strict Off en tête de fichier).
+    ''' </summary>
+    ''' <param name="dtPiece">Pièce comptable à ouvrir (générée par GenererPieceComptable).</param>
+    ''' <returns>Chemin du fichier temporaire dans lequel le classeur a été sauvegardé.</returns>
+    Public Shared Function OuvrirPieceComptableExcel(dtPiece As DataTable) As String
+
+        If dtPiece Is Nothing OrElse dtPiece.Rows.Count = 0 Then
+            Throw New InvalidOperationException("Aucune donnée à afficher : générez la pièce comptable avant de l'ouvrir.")
+        End If
+
+        Dim excelApp As Object = Nothing
+        Dim classeur As Object = Nothing
+        Dim feuille As Object = Nothing
+
+        Try
+            Dim typeExcel As Type = Type.GetTypeFromProgID("Excel.Application")
+            If typeExcel Is Nothing Then
+                Throw New InvalidOperationException("Microsoft Excel n'est pas installé sur ce poste.")
+            End If
+
+            excelApp = Activator.CreateInstance(typeExcel)
+            excelApp.Visible = True
+            excelApp.DisplayAlerts = False
+
+            classeur = excelApp.Workbooks.Add()
+            feuille = classeur.Worksheets(1)
+            RemplirFeuillePiece(feuille, dtPiece)
+
+            Dim cheminTemp As String = Path.Combine(Path.GetTempPath(), $"PieceWU_{Date.Now:yyyyMMdd_HHmmss}.xlsx")
+            classeur.SaveAs(cheminTemp)
+
+            excelApp.Activate()
+
+            Return cheminTemp
+
+        Catch
+            ' En cas d'échec, on ferme proprement ce qui a pu être ouvert avant de relancer l'erreur
+            ' (contrairement au cas nominal, ici Excel ne doit pas rester ouvert sur un classeur en échec).
+            Try
+                If classeur IsNot Nothing Then classeur.Close(False)
+            Catch
+            End Try
+            Try
+                If excelApp IsNot Nothing Then excelApp.Quit()
+            Catch
+            End Try
+            Throw
+
+        Finally
+            ' NOTE : contrairement à ExporterPieceExcel, on ne ferme PAS le classeur et on ne quitte
+            ' PAS Excel ici en cas de succès : c'est tout l'intérêt de cette méthode, laisser la
+            ' pièce ouverte et visible pour l'utilisateur. Seules les références COM intermédiaires
+            ' (feuille, classeur) sont libérées ; excelApp reste actif tant que sa fenêtre est ouverte.
+            If feuille IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(feuille)
+            If classeur IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(classeur)
+        End Try
+    End Function
+
+    ''' <summary>Écrit les en-têtes et les lignes de dtPiece dans une feuille Excel (late binding).</summary>
+    Private Shared Sub RemplirFeuillePiece(feuille As Object, dtPiece As DataTable)
+        feuille.Name = "Piece WU"
+
+        feuille.Cells(1, 1).Value = "Compte"
+        feuille.Cells(1, 2).Value = "Libelle"
+        feuille.Cells(1, 3).Value = "Debit"
+        feuille.Cells(1, 4).Value = "Credit"
+        feuille.Range("A1:D1").Font.Bold = True
+
+        Dim ligneExcel As Integer = 2
+        For Each ligne As DataRow In dtPiece.Rows
+            feuille.Cells(ligneExcel, 1).Value = Convert.ToString(ligne("Compte"))
+            feuille.Cells(ligneExcel, 2).Value = Convert.ToString(ligne("Libelle"))
+            feuille.Cells(ligneExcel, 3).Value = Convert.ToInt64(ligne("Debit"))
+            feuille.Cells(ligneExcel, 4).Value = Convert.ToInt64(ligne("Credit"))
+            ligneExcel += 1
+        Next
+
+        feuille.Columns.AutoFit()
     End Sub
 
 #End Region

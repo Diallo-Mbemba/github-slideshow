@@ -316,11 +316,7 @@ Public Class FrmCompensationWU
             _dtPieceGeneree = dtPiece
             tsslStatut.Text = messageControle
 
-            MessageBox.Show(
-                $"Pièce comptable générée avec succès ({dtPiece.Rows.Count} lignes)." & Environment.NewLine & messageControle,
-                "Pièce comptable", MessageBoxButtons.OK, MessageBoxIcon.Information)
-
-            ProposerExportExcel()
+            OuvrirPieceDansExcel()
 
         Catch ex As Exception
             MessageBox.Show("Erreur lors de la génération de la pièce comptable : " & ex.Message,
@@ -331,28 +327,23 @@ Public Class FrmCompensationWU
     End Sub
 
     ''' <summary>
-    ''' Propose à l'utilisateur d'exporter la pièce comptable générée vers Excel (facultatif).
-    ''' Un échec de l'export Excel n'invalide jamais la pièce comptable déjà générée en mémoire.
+    ''' Ouvre directement la pièce comptable générée dans Microsoft Excel (fenêtre visible),
+    ''' sans boîte de dialogue d'enregistrement — le classeur est sauvegardé dans un fichier
+    ''' temporaire et laissé ouvert pour consultation/impression/enregistrement immédiat.
+    ''' Un échec (Excel absent du poste, etc.) n'invalide jamais la pièce comptable déjà
+    ''' générée en mémoire : un message d'avertissement est affiché à la place.
     ''' </summary>
-    Private Sub ProposerExportExcel()
+    Private Sub OuvrirPieceDansExcel()
         If _dtPieceGeneree Is Nothing OrElse _dtPieceGeneree.Rows.Count = 0 Then Return
 
-        If MessageBox.Show("Souhaitez-vous exporter la pièce comptable vers un fichier Excel ?",
-                            "Export Excel", MessageBoxButtons.YesNo, MessageBoxIcon.Question) <> DialogResult.Yes Then
-            Return
-        End If
-
-        If sfdPieceExcel.ShowDialog() <> DialogResult.OK Then Return
-
         Try
-            PieceComptableService.ExporterPieceExcel(_dtPieceGeneree, sfdPieceExcel.FileName)
-            MessageBox.Show("Export Excel réalisé avec succès : " & sfdPieceExcel.FileName,
-                             "Export Excel", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Dim cheminTemp As String = PieceComptableService.OuvrirPieceComptableExcel(_dtPieceGeneree)
+            tsslStatut.Text = $"Pièce comptable ouverte dans Excel ({_dtPieceGeneree.Rows.Count} lignes) : {cheminTemp}"
         Catch ex As Exception
             MessageBox.Show(
-                "L'export Excel a échoué : " & ex.Message & Environment.NewLine &
+                "Impossible d'ouvrir la pièce comptable dans Excel : " & ex.Message & Environment.NewLine &
                 "La pièce comptable reste disponible (DataTable dtPiece en mémoire).",
-                "Export Excel", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                "Ouverture Excel", MessageBoxButtons.OK, MessageBoxIcon.Warning)
         End Try
     End Sub
 
