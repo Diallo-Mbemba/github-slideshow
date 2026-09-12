@@ -38,6 +38,11 @@ Public Class FrmCompensationWU
 
 #Region "Chargement des fichiers"
 
+    ''' <summary>
+    ''' Sélection du rapport d'activité. Le fichier retenu peut être l'archive ZIP livrée par
+    ''' Western Union (qui porte le nom du rapport qu'elle contient) comme le fichier texte déjà
+    ''' décompressé : la décompression éventuelle est faite à la lecture, par WUReportService.
+    ''' </summary>
     Private Sub btnActivite_Click(sender As Object, e As EventArgs) Handles btnActivite.Click
         If ofdActivite.ShowDialog() = DialogResult.OK Then
             _cheminActivite = ofdActivite.FileName
@@ -48,6 +53,10 @@ Public Class FrmCompensationWU
         End If
     End Sub
 
+    ''' <summary>
+    ''' Sélection du rapport de règlement. Comme pour l'activité, l'archive ZIP est acceptée
+    ''' directement et décompressée en mémoire au moment de la lecture.
+    ''' </summary>
     Private Sub btnReglement_Click(sender As Object, e As EventArgs) Handles btnReglement.Click
         If ofdReglement.ShowDialog() = DialogResult.OK Then
             _cheminReglement = ofdReglement.FileName

@@ -176,13 +176,13 @@ Partial Class FrmCompensationWU
         '
         'ofdActivite
         '
-        Me.ofdActivite.Filter = "Fichiers texte (*.txt)|*.txt|Tous les fichiers (*.*)|*.*"
-        Me.ofdActivite.Title = "Sélectionner le rapport d'activité Western Union"
+        Me.ofdActivite.Filter = "Rapports Western Union (*.zip;*.txt)|*.zip;*.txt|Archives ZIP (*.zip)|*.zip|Fichiers texte (*.txt)|*.txt|Tous les fichiers (*.*)|*.*"
+        Me.ofdActivite.Title = "Sélectionner le rapport d'activité Western Union (archive ZIP ou fichier texte)"
         '
         'ofdReglement
         '
-        Me.ofdReglement.Filter = "Fichiers texte (*.txt)|*.txt|Tous les fichiers (*.*)|*.*"
-        Me.ofdReglement.Title = "Sélectionner le rapport de règlement Western Union"
+        Me.ofdReglement.Filter = "Rapports Western Union (*.zip;*.txt)|*.zip;*.txt|Archives ZIP (*.zip)|*.zip|Fichiers texte (*.txt)|*.txt|Tous les fichiers (*.*)|*.*"
+        Me.ofdReglement.Title = "Sélectionner le rapport de règlement Western Union (archive ZIP ou fichier texte)"
         '
         'sfdPieceExcel
         '

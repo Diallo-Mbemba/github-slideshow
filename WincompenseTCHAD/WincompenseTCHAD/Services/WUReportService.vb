@@ -4,6 +4,8 @@ Option Explicit On
 Imports System.Data
 Imports System.Globalization
 Imports System.IO
+Imports System.IO.Compression
+Imports System.Linq
 Imports System.Text
 
 ''' <summary>
@@ -49,8 +51,16 @@ Public NotInheritable Class WUReportService
 #Region "Lecture de fichier"
 
     ''' <summary>
-    ''' Lit un rapport Western Union au format texte séparé par tabulations (encodage Windows/ANSI)
-    ''' et retourne son contenu sous forme de DataTable (première ligne = en-têtes).
+    ''' Lit un rapport Western Union et retourne son contenu sous forme de DataTable
+    ''' (première ligne = en-têtes, colonnes séparées par des tabulations, encodage Windows/ANSI).
+    '''
+    ''' Le fichier peut être fourni indifféremment sous deux formes :
+    '''   - une ARCHIVE ZIP contenant le rapport (forme livrée par Western Union) : le rapport en
+    '''     est extrait et lu directement en mémoire, sans écrire de fichier temporaire ;
+    '''   - le fichier TEXTE déjà décompressé.
+    ''' La distinction se fait sur le contenu réel du fichier (signature "PK" des archives ZIP) et
+    ''' non sur son extension, car les archives livrées portent le nom du rapport qu'elles
+    ''' contiennent et peuvent donc prêter à confusion.
     ''' </summary>
     ''' <param name="cheminFichier">Chemin complet du fichier à charger.</param>
     ''' <exception cref="RapportInvalideException">
@@ -68,8 +78,10 @@ Public NotInheritable Class WUReportService
 
         Dim lignes As String()
         Try
-            ' Encodage Windows/ANSI conforme aux exports Western Union.
-            lignes = File.ReadAllLines(cheminFichier, Encoding.Default)
+            lignes = LireLignesRapport(cheminFichier)
+        Catch ex As InvalidDataException
+            Throw New RapportInvalideException(
+                $"L'archive '{Path.GetFileName(cheminFichier)}' est illisible ou endommagée.", ex)
         Catch ex As IOException
             Throw New RapportInvalideException(
                 $"Impossible de lire le fichier '{Path.GetFileName(cheminFichier)}'. " &
@@ -127,6 +139,85 @@ Public NotInheritable Class WUReportService
         Next
 
         Return table
+    End Function
+
+    ''' <summary>
+    ''' Retourne les lignes du rapport, que le fichier fourni soit une archive ZIP ou le fichier
+    ''' texte lui-même. Dans le cas d'une archive, le rapport est lu directement depuis le flux
+    ''' compressé : aucun fichier temporaire n'est créé, donc rien à nettoyer ensuite.
+    ''' </summary>
+    Private Shared Function LireLignesRapport(cheminFichier As String) As String()
+
+        If Not EstArchiveZip(cheminFichier) Then
+            ' Encodage Windows/ANSI conforme aux exports Western Union.
+            Return File.ReadAllLines(cheminFichier, Encoding.Default)
+        End If
+
+        Using fluxArchive As FileStream = File.OpenRead(cheminFichier)
+            Using archive As New ZipArchive(fluxArchive, ZipArchiveMode.Read)
+
+                Dim entree As ZipArchiveEntry = ChoisirEntreeRapport(archive)
+                If entree Is Nothing Then
+                    Throw New RapportInvalideException(
+                        $"L'archive '{Path.GetFileName(cheminFichier)}' ne contient aucun fichier exploitable.")
+                End If
+
+                Dim lignes As New List(Of String)
+                Using lecteur As New StreamReader(entree.Open(), Encoding.Default)
+                    While Not lecteur.EndOfStream
+                        lignes.Add(lecteur.ReadLine())
+                    End While
+                End Using
+
+                Return lignes.ToArray()
+            End Using
+        End Using
+    End Function
+
+    ''' <summary>
+    ''' Indique si le fichier est une archive ZIP, d'après sa signature binaire ("PK", soit les
+    ''' octets 0x50 0x4B) et non d'après son extension : les archives livrées par Western Union
+    ''' portent le nom du rapport qu'elles contiennent, l'extension n'est donc pas fiable.
+    ''' Retourne False sur toute erreur de lecture : le fichier sera alors traité comme du texte
+    ''' et l'erreur remontera, plus explicite, lors de la lecture proprement dite.
+    ''' </summary>
+    Private Shared Function EstArchiveZip(cheminFichier As String) As Boolean
+
+        Try
+            Using flux As FileStream = File.OpenRead(cheminFichier)
+                If flux.Length < 4 Then Return False
+
+                Dim signature(1) As Byte
+                If flux.Read(signature, 0, 2) < 2 Then Return False
+
+                Return signature(0) = &H50 AndAlso signature(1) = &H4B
+            End Using
+        Catch
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Choisit, parmi les entrées d'une archive, celle qui constitue le rapport : le fichier .txt
+    ''' le plus volumineux, ou à défaut le fichier le plus volumineux quelle que soit son extension.
+    ''' Les répertoires (entrées sans nom de fichier) sont ignorés. Ce choix par la taille évite de
+    ''' retenir par erreur un éventuel fichier annexe (accusé de réception, notice) joint au rapport.
+    ''' </summary>
+    Private Shared Function ChoisirEntreeRapport(archive As ZipArchive) As ZipArchiveEntry
+
+        Dim fichiers As List(Of ZipArchiveEntry) =
+            archive.Entries.Where(Function(e) Not String.IsNullOrEmpty(e.Name)).ToList()
+
+        If fichiers.Count = 0 Then Return Nothing
+
+        Dim textes As List(Of ZipArchiveEntry) =
+            fichiers.Where(Function(e) e.Name.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).ToList()
+
+        If textes.Count > 0 Then
+            Return textes.OrderByDescending(Function(e) e.Length).First()
+        End If
+
+        Return fichiers.OrderByDescending(Function(e) e.Length).First()
     End Function
 
 #End Region

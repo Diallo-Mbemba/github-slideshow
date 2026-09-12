@@ -26,7 +26,7 @@ WincompenseTCHAD/
     ├── Constants/ConstantesWU.vb           ' Taux, comptes comptables, libellés, colonnes attendues
     ├── Models/CalculWU.vb                  ' Classe métier par Account
     ├── Services/
-    │   ├── WUReportService.vb              ' Lecture fichiers, parsing, agrégation, dates
+    │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
     │   ├── WURepository.vb                 ' Accès SQL Server (T_Pdv_SA / T_Pdv_EC)
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
@@ -66,6 +66,30 @@ Scripts/
 7. **Export Excel** : réalisé en liaison tardive (late binding, `Option Strict Off` isolé dans
    `PieceComptableService.vb`) afin de ne pas imposer de référence COM Excel obligatoire au
    projet. Toute la logique métier fonctionne sans Excel installé.
+
+## Chargement des rapports : archives ZIP
+
+Western Union livre désormais ses rapports **sous forme d'archives ZIP** portant exactement le
+nom du fichier texte qu'elles contiennent (`..._ACTIVITY_REPORT_....txt`, etc.). Les deux boutons
+de chargement (**1. Rapport d'activité** et **2. Rapport de règlement**) acceptent donc
+indifféremment :
+
+- l'**archive ZIP** telle qu'elle est reçue — elle est décompressée **en mémoire** au moment de la
+  lecture, sans création de fichier temporaire (donc rien à nettoyer ensuite) ;
+- le **fichier texte** déjà décompressé, pour les rapports plus anciens ou décompressés à la main.
+
+Détails d'implémentation (`WUReportService`) :
+
+| Point | Traitement |
+|---|---|
+| Détection | Signature binaire `PK` (0x50 0x4B) en tête de fichier, **jamais** l'extension : les archives portant le nom du rapport `.txt`, l'extension n'est pas fiable |
+| Entrée retenue dans l'archive | Le fichier `.txt` le plus volumineux ; à défaut, l'entrée la plus volumineuse (`ChoisirEntreeRapport`) |
+| Encodage | `Encoding.Default` (Windows/ANSI), identique à la lecture d'un fichier texte |
+| Archive vide | `RapportInvalideException` : « ne contient aucun fichier exploitable » |
+| Archive endommagée | `InvalidDataException` convertie en `RapportInvalideException` : « illisible ou endommagée » |
+
+Aucune étape de traitement en aval n'est modifiée : une fois les lignes obtenues, le parsing,
+l'agrégation, les calculs et la génération de la pièce comptable sont strictement identiques.
 
 ## Compatibilité avec les formats de rapport Western Union
 
