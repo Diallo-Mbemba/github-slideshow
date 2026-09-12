@@ -65,6 +65,37 @@ Scripts/
    `PieceComptableService.vb`) afin de ne pas imposer de référence COM Excel obligatoire au
    projet. Toute la logique métier fonctionne sans Excel installé.
 
+## Compatibilité avec les formats de rapport Western Union
+
+Western Union a refondu le format de ses rapports (comparaison faite entre un rapport du
+02/01/2021 et un rapport du 30/05/2026). **L'application traite indifféremment les deux
+formats** : aucune colonne utilisée par les calculs n'a disparu, et les différences de contenu
+sont absorbées automatiquement.
+
+| Élément | Ancien format | Nouveau format | Traitement |
+|---|---|---|---|
+| `PayCountry` (pays local) | `TCHAD` | `CHAD` | Les deux graphies sont acceptées (`ConstantesWU.PaysPaiementLocal`) |
+| Devise des montants LOC | `EUR` | `XAF` | Conversion pilotée par `LOCCurrencyCode` : ×655,957 si EUR, aucune conversion si XAF (`WUReportService.ObtenirFacteurConversion`) |
+| Séparateur décimal | virgule (`1493,91`) | point (`-250000.0000`) | Détecté par position du symbole, jamais par une culture supposée (`ToDecimalSafe`) |
+| Casse des colonnes | `Status`, `txnDateLOC` | `STATUS`, `TXNDATELOC` | `DataTable.Columns` est insensible à la casse |
+| Colonne `STATUS` | absente | `S` / `C` / `W` | Les lignes annulées (`C`) sont exclues de l'agrégation (`InclureLigneActivite`) ; absence de la colonne = comportement historique |
+| Format de date | `20210102` | `20260530` | `yyyyMMdd` analysé explicitement (`ConstantesWU.FormatsDateRapport`) |
+| Colonnes ajoutées | — | `Tax1REC`, `Tax2REC`, `Tax3REC`, `TotalChargesPAY`, `Assigned_Account_Name` | Ignorées par le lecteur (aucun impact) |
+
+**Non-régression vérifiée** : relu par le code actuel, le rapport du 02/01/2021 restitue très
+exactement les valeurs de référence du cahier des charges pour `AHB020200` (PrincipalEnvoi
+5 966 388 ; PrincipalPaye 7 522 117,45 ; ChargeEnvoi 340 000 ; Taxes 82 075 ; CommissionPaiement
+98 104,93).
+
+### Piste d'amélioration non retenue à ce stade
+
+Le nouveau rapport d'activité fournit le détail des taxes (`Tax1REC` ≈ TVA à 19,25 %,
+`Tax3REC` ≈ TTA à 0,2 %, `Tax2REC` = solde), là où le code les recalcule par application des
+taux. Sur le fichier du 30/05/2026, l'écart entre taxes fournies et recalculées atteint ~5 %
+(TVA : 332 469 fournie contre 324 748 recalculée). Utiliser les valeurs fournies fiabiliserait
+le calcul, mais **modifierait les règles du cahier des charges** : à arbitrer avec la Direction
+Comptable.
+
 ## Points restant à confirmer
 
 - Structure des écritures pour une **agence propre "EC"** dans la pièce comptable (aucun exemple

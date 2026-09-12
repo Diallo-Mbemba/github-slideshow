@@ -15,7 +15,13 @@ Public NotInheritable Class ConstantesWU
 
 #Region "Taux de conversion et de commissions"
 
-    ''' <summary>Taux de conversion des montants en devise locale de règlement (LOC) vers le FCFA.</summary>
+    ''' <summary>
+    ''' Taux de conversion EUR vers FCFA (parité fixe). Il ne s'applique QUE lorsque les montants
+    ''' LOC du rapport de règlement sont libellés en EUR : c'était le cas des rapports Western
+    ''' Union jusqu'à la refonte de leur format (LOCCurrencyCode = EUR). Depuis, les montants LOC
+    ''' sont directement en XAF (LOCCurrencyCode = XAF) et aucune conversion ne doit être appliquée.
+    ''' La devise réelle de chaque ligne pilote ce choix : voir WUReportService.ObtenirFacteurConversion.
+    ''' </summary>
     Public Const TAUX_CONVERSION As Decimal = 655.957D
 
     ''' <summary>Taux de commission sur les envois (20,5 %).</summary>
@@ -37,8 +43,22 @@ Public NotInheritable Class ConstantesWU
 
 #Region "Pays de référence"
 
-    ''' <summary>Pays de paiement retenu pour le calcul de la commission de paiement (règlement).</summary>
-    Public Const PAYS_TCHAD As String = "TCHAD"
+    ''' <summary>
+    ''' Libellés acceptés pour le pays de paiement local dans le rapport de règlement.
+    ''' Western Union a renommé "TCHAD" en "CHAD" lors de la refonte du format des rapports :
+    ''' les deux graphies sont acceptées afin de pouvoir traiter indifféremment un fichier
+    ''' à l'ancien ou au nouveau format. Comparaison insensible à la casse.
+    ''' </summary>
+    Public Shared ReadOnly PaysPaiementLocal As String() = {"CHAD", "TCHAD"}
+
+    ''' <summary>Nom de la colonne portant la devise des montants LOC du rapport de règlement.</summary>
+    Public Const COLONNE_DEVISE_LOC As String = "LOCCurrencyCode"
+
+    ''' <summary>Code ISO du franc CFA (BEAC) : montants LOC déjà exprimés en FCFA, aucune conversion.</summary>
+    Public Const DEVISE_FCFA As String = "XAF"
+
+    ''' <summary>Code ISO de l'euro : montants LOC à convertir en FCFA via TAUX_CONVERSION.</summary>
+    Public Const DEVISE_EURO As String = "EUR"
 
 #End Region
 
@@ -129,6 +149,27 @@ Public NotInheritable Class ConstantesWU
         "Account", "TransactionType", "PayCountry", "ClearChargesLOC",
         "ClearFXLOC", "SendPayIndicator"
     }
+
+    ''' <summary>
+    ''' Nom de la colonne portant le statut de la transaction dans le rapport d'activité.
+    ''' Absente des rapports à l'ancien format : son absence n'est donc jamais bloquante.
+    ''' </summary>
+    Public Const COLONNE_STATUS_ACTIVITE As String = "STATUS"
+
+    ''' <summary>
+    ''' Statuts dont les lignes sont EXCLUES de l'agrégation du rapport d'activité.
+    ''' "C" = transaction annulée (CANCELLED) : règle métier validée avec la Direction Comptable.
+    ''' Les autres statuts rencontrés ("S" = réglée, "W" = en attente) sont conservés.
+    ''' Comparaison insensible à la casse. Voir WUReportService.InclureLigneActivite.
+    ''' </summary>
+    Public Shared ReadOnly StatutsActiviteExclus As String() = {"C"}
+
+    ''' <summary>
+    ''' Formats de date acceptés dans les rapports, essayés dans cet ordre avant de retomber
+    ''' sur une analyse selon la culture. "yyyyMMdd" est le format effectivement produit par
+    ''' Western Union (ex. 20260530), à l'ancien comme au nouveau format de rapport.
+    ''' </summary>
+    Public Shared ReadOnly FormatsDateRapport As String() = {"yyyyMMdd", "dd/MM/yyyy", "yyyy-MM-dd"}
 
     ''' <summary>Nom de la colonne de date dans le rapport d'activité.</summary>
     Public Const COLONNE_DATE_ACTIVITE As String = "txnDateLOC"

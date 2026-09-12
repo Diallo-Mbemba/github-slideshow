@@ -134,8 +134,17 @@ Public NotInheritable Class WUReportService
 #Region "Parsing robuste"
 
     ''' <summary>
-    ''' Convertit une valeur quelconque (chaîne, DBNull, objet) en Decimal de façon robuste.
-    ''' Tente d'abord le format français (virgule décimale), puis le format invariant (point décimal).
+    ''' Convertit une valeur quelconque (chaîne, DBNull, objet) en Decimal de façon robuste,
+    ''' quel que soit le format du rapport Western Union :
+    '''   - ancien format, séparateur décimal VIRGULE  : "1493,91" ;
+    '''   - nouveau format, séparateur décimal POINT   : "-250000.0000".
+    '''
+    ''' Le séparateur décimal est déterminé par la position des symboles plutôt que par une
+    ''' culture supposée : c'est TOUJOURS le dernier symbole rencontré ("." ou ","), l'éventuel
+    ''' autre symbole étant alors un séparateur de milliers, supprimé avant l'analyse. Sans cette
+    ''' précaution, une valeur comme "1.234" serait lue 1234 par la culture fr-FR (qui prend le
+    ''' point pour un séparateur de milliers), soit une erreur d'un facteur 1000.
+    '''
     ''' Retourne 0 (jamais d'exception) si la valeur ne peut pas être interprétée.
     ''' </summary>
     Public Shared Function ToDecimalSafe(value As Object) As Decimal
@@ -153,15 +162,25 @@ Public NotInheritable Class WUReportService
         ' Supprime les espaces (séparateurs de milliers éventuels) et les espaces insécables.
         texte = texte.Replace(" ", "").Replace(Convert.ToChar(&HA0).ToString(), "")
 
-        Dim resultat As Decimal
+        Dim posPoint As Integer = texte.LastIndexOf("."c)
+        Dim posVirgule As Integer = texte.LastIndexOf(","c)
 
-        ' 1) Tentative au format français (virgule décimale).
-        If Decimal.TryParse(texte, NumberStyles.Any, New CultureInfo("fr-FR"), resultat) Then
-            Return resultat
+        If posPoint >= 0 AndAlso posVirgule >= 0 Then
+            ' Les deux symboles sont présents : le dernier est le séparateur décimal,
+            ' le premier n'est qu'un séparateur de milliers et doit disparaître.
+            If posVirgule > posPoint Then
+                texte = texte.Replace(".", "").Replace(","c, "."c)
+            Else
+                texte = texte.Replace(",", "")
+            End If
+        ElseIf posVirgule >= 0 Then
+            ' Seule la virgule est présente : c'est le séparateur décimal (ancien format).
+            texte = texte.Replace(","c, "."c)
         End If
+        ' Seul le point présent (nouveau format), ou aucun séparateur : rien à normaliser.
 
-        ' 2) Tentative au format invariant (point décimal).
-        If Decimal.TryParse(texte, NumberStyles.Any, CultureInfo.InvariantCulture, resultat) Then
+        Dim resultat As Decimal
+        If Decimal.TryParse(texte, NumberStyles.Float, CultureInfo.InvariantCulture, resultat) Then
             Return resultat
         End If
 
@@ -198,9 +217,40 @@ Public NotInheritable Class WUReportService
 #Region "Agrégation du rapport d'activité"
 
     ''' <summary>
+    ''' Détermine si une ligne du rapport d'activité doit être incluse dans l'agrégation.
+    ''' Sont exclues les lignes sans Account, ainsi que celles dont la colonne STATUS figure
+    ''' dans ConstantesWU.StatutsActiviteExclus (aujourd'hui "C" = transaction ANNULÉE).
+    ''' La colonne STATUS n'existe que dans le nouveau format de rapport Western Union : si elle
+    ''' est absente (ancien format), aucune ligne n'est écartée à ce titre et le comportement
+    ''' historique est conservé à l'identique.
+    ''' </summary>
+    Public Shared Function InclureLigneActivite(row As DataRow) As Boolean
+
+        If row Is Nothing Then Return False
+
+        If String.IsNullOrWhiteSpace(ObtenirValeurTexte(row, "Account")) Then
+            Return False
+        End If
+
+        Dim statut As String = ObtenirValeurTexte(row, ConstantesWU.COLONNE_STATUS_ACTIVITE).Trim()
+        If statut.Length = 0 Then
+            Return True ' Colonne absente ou non renseignée : ligne conservée.
+        End If
+
+        For Each statutExclu As String In ConstantesWU.StatutsActiviteExclus
+            If String.Equals(statut, statutExclu, StringComparison.OrdinalIgnoreCase) Then
+                Return False
+            End If
+        Next
+
+        Return True
+    End Function
+
+    ''' <summary>
     ''' Agrège le rapport d'activité par Account.
     ''' SendPayIndicator = "S" (Envoi) alimente PrincipalEnvoi / ChargeEnvoi / Taxes.
     ''' SendPayIndicator = "P" (Paiement) alimente PrincipalPaye.
+    ''' Seules les lignes retenues par InclureLigneActivite sont agrégées.
     ''' Les valeurs sont conservées en Decimal, sans arrondi intermédiaire.
     ''' </summary>
     Public Shared Function CalculerActivite(dtActivite As DataTable) As Dictionary(Of String, ActiviteAgregat)
@@ -211,11 +261,12 @@ Public NotInheritable Class WUReportService
 
         For Each row As DataRow In dtActivite.Rows
 
-            Dim account As String = ObtenirValeurTexte(row, "Account")
-            If String.IsNullOrWhiteSpace(account) Then
-                ' Account vide : ligne ignorée pour l'agrégation, mais ne fait pas planter le traitement.
+            ' Account vide ou transaction annulée : ligne ignorée, sans faire échouer le traitement.
+            If Not InclureLigneActivite(row) Then
                 Continue For
             End If
+
+            Dim account As String = ObtenirValeurTexte(row, "Account")
 
             If Not resultat.ContainsKey(account) Then
                 resultat(account) = New ActiviteAgregat()
@@ -266,9 +317,47 @@ Public NotInheritable Class WUReportService
     End Function
 
     ''' <summary>
-    ''' Agrège le rapport de règlement par Account pour calculer la commission de paiement (Tchad).
-    ''' CommissionPaiement += Abs(ClearChargesLOC + ClearFXLOC) * TAUX_CONVERSION, uniquement
-    ''' pour les lignes dont PayCountry = "TCHAD" et pour lesquelles InclureLigneReglement retourne True.
+    ''' Détermine le facteur à appliquer aux montants LOC d'une ligne de règlement pour les
+    ''' exprimer en FCFA, d'après la devise déclarée par la ligne (colonne LOCCurrencyCode) :
+    '''   - XAF : montants déjà en FCFA, aucune conversion (facteur 1) — nouveau format WU ;
+    '''   - EUR : conversion par TAUX_CONVERSION (655,957) — ancien format WU ;
+    '''   - colonne absente : TAUX_CONVERSION, afin de reproduire à l'identique le comportement
+    '''     historique sur un fichier qui ne déclarerait pas sa devise ;
+    '''   - toute autre devise : facteur 1, les montants étant alors pris tels quels (cas non
+    '''     rencontré à ce jour, la devise LOC étant celle du pays de l'agent). À surveiller.
+    ''' </summary>
+    Public Shared Function ObtenirFacteurConversion(row As DataRow) As Decimal
+
+        If row Is Nothing OrElse Not row.Table.Columns.Contains(ConstantesWU.COLONNE_DEVISE_LOC) Then
+            Return ConstantesWU.TAUX_CONVERSION
+        End If
+
+        Dim devise As String = ObtenirValeurTexte(row, ConstantesWU.COLONNE_DEVISE_LOC).Trim()
+
+        If String.Equals(devise, ConstantesWU.DEVISE_EURO, StringComparison.OrdinalIgnoreCase) Then
+            Return ConstantesWU.TAUX_CONVERSION
+        End If
+
+        Return 1D
+    End Function
+
+    ''' <summary>Indique si la ligne concerne un paiement effectué dans le pays local (Tchad).</summary>
+    Private Shared Function EstPaiementLocal(payCountry As String) As Boolean
+        For Each pays As String In ConstantesWU.PaysPaiementLocal
+            If String.Equals(payCountry, pays, StringComparison.OrdinalIgnoreCase) Then
+                Return True
+            End If
+        Next
+        Return False
+    End Function
+
+    ''' <summary>
+    ''' Agrège le rapport de règlement par Account pour calculer la commission de paiement locale.
+    ''' CommissionPaiement += Abs(ClearChargesLOC + ClearFXLOC) * facteur de conversion, uniquement
+    ''' pour les lignes payées au Tchad (PayCountry = "CHAD" ou "TCHAD" selon le format du rapport)
+    ''' et retenues par InclureLigneReglement. Le facteur de conversion dépend de la devise déclarée
+    ''' par la ligne (voir ObtenirFacteurConversion) : les montants LOC du nouveau format sont déjà
+    ''' en FCFA et ne doivent donc plus être multipliés par 655,957.
     ''' </summary>
     Public Shared Function CalculerReglement(dtReglement As DataTable) As Dictionary(Of String, ReglementAgregat)
 
@@ -285,7 +374,7 @@ Public NotInheritable Class WUReportService
             Dim account As String = ObtenirValeurTexte(row, "Account")
             Dim payCountry As String = ObtenirValeurTexte(row, "PayCountry").Trim()
 
-            If Not String.Equals(payCountry, ConstantesWU.PAYS_TCHAD, StringComparison.OrdinalIgnoreCase) Then
+            If Not EstPaiementLocal(payCountry) Then
                 Continue For
             End If
 
@@ -296,7 +385,7 @@ Public NotInheritable Class WUReportService
             Dim clearCharges As Decimal = ToDecimalSafe(ObtenirValeur(row, "ClearChargesLOC"))
             Dim clearFX As Decimal = ToDecimalSafe(ObtenirValeur(row, "ClearFXLOC"))
 
-            resultat(account).CommissionPaiement += Math.Abs(clearCharges + clearFX) * ConstantesWU.TAUX_CONVERSION
+            resultat(account).CommissionPaiement += Math.Abs(clearCharges + clearFX) * ObtenirFacteurConversion(row)
         Next
 
         Return resultat
@@ -321,6 +410,14 @@ Public NotInheritable Class WUReportService
             If String.IsNullOrWhiteSpace(texte) Then Continue For
 
             Dim dateValeur As Date
+
+            ' Formats produits par Western Union, essayés en premier : "20260530" (yyyyMMdd) n'est
+            ' reconnu par aucune culture et échouerait silencieusement avec un simple TryParse.
+            If Date.TryParseExact(texte, ConstantesWU.FormatsDateRapport, CultureInfo.InvariantCulture,
+                                  DateTimeStyles.None, dateValeur) Then
+                Return dateValeur.Date
+            End If
+
             If Date.TryParse(texte, CultureInfo.CurrentCulture, DateTimeStyles.None, dateValeur) OrElse
                Date.TryParse(texte, CultureInfo.InvariantCulture, DateTimeStyles.None, dateValeur) Then
                 Return dateValeur.Date
