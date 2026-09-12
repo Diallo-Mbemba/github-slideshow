@@ -29,6 +29,7 @@ Partial Class FrmCompensationWU
         Me.btnReglement = New System.Windows.Forms.Button()
         Me.btnAfficher = New System.Windows.Forms.Button()
         Me.btnGenererPiece = New System.Windows.Forms.Button()
+        Me.btnPieceAccount = New System.Windows.Forms.Button()
         Me.lblActivite = New System.Windows.Forms.Label()
         Me.lblReglement = New System.Windows.Forms.Label()
         Me.dgvControle = New System.Windows.Forms.DataGridView()
@@ -82,6 +83,16 @@ Partial Class FrmCompensationWU
         Me.btnGenererPiece.TabIndex = 3
         Me.btnGenererPiece.Text = "Générer pièce comptable"
         Me.btnGenererPiece.UseVisualStyleBackColor = True
+        '
+        'btnPieceAccount
+        '
+        Me.btnPieceAccount.Enabled = False
+        Me.btnPieceAccount.Location = New System.Drawing.Point(952, 12)
+        Me.btnPieceAccount.Name = "btnPieceAccount"
+        Me.btnPieceAccount.Size = New System.Drawing.Size(210, 32)
+        Me.btnPieceAccount.TabIndex = 4
+        Me.btnPieceAccount.Text = "Pièce de l'Account sélectionné"
+        Me.btnPieceAccount.UseVisualStyleBackColor = True
         '
         'lblActivite
         '
@@ -188,6 +199,7 @@ Partial Class FrmCompensationWU
         Me.Controls.Add(Me.dgvControle)
         Me.Controls.Add(Me.lblReglement)
         Me.Controls.Add(Me.lblActivite)
+        Me.Controls.Add(Me.btnPieceAccount)
         Me.Controls.Add(Me.btnGenererPiece)
         Me.Controls.Add(Me.btnAfficher)
         Me.Controls.Add(Me.btnReglement)
@@ -208,6 +220,7 @@ Partial Class FrmCompensationWU
     Friend WithEvents btnReglement As System.Windows.Forms.Button
     Friend WithEvents btnAfficher As System.Windows.Forms.Button
     Friend WithEvents btnGenererPiece As System.Windows.Forms.Button
+    Friend WithEvents btnPieceAccount As System.Windows.Forms.Button
     Friend WithEvents lblActivite As System.Windows.Forms.Label
     Friend WithEvents lblReglement As System.Windows.Forms.Label
     Friend WithEvents dgvControle As System.Windows.Forms.DataGridView

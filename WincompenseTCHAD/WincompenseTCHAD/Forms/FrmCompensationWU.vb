@@ -56,12 +56,14 @@ Public Class FrmCompensationWU
         btnAfficher.Enabled = Not String.IsNullOrWhiteSpace(_cheminActivite) AndAlso
                                Not String.IsNullOrWhiteSpace(_cheminReglement)
         btnGenererPiece.Enabled = False
+        btnPieceAccount.Enabled = False
     End Sub
 
     ''' <summary>Réinitialise les résultats de calcul lorsqu'un nouveau fichier est sélectionné.</summary>
     Private Sub ReinitialiserResultats()
         _listeCalculs = Nothing
         _dtPieceGeneree = Nothing
+        btnPieceAccount.Enabled = False
         dgvControle.DataSource = Nothing
         progressBarTraitement.Value = 0
         tsslLignesActivite.Text = "Lignes activité : 0"
@@ -128,6 +130,7 @@ Public Class FrmCompensationWU
             tsslStatut.Text = $"Calcul terminé. {messageDate}"
 
             btnGenererPiece.Enabled = _listeCalculs.Count > 0
+            btnPieceAccount.Enabled = _listeCalculs.Count > 0
             progressBarTraitement.Value = 100
 
         Catch ex As RapportInvalideException
@@ -330,6 +333,83 @@ Public Class FrmCompensationWU
 
         Catch ex As Exception
             MessageBox.Show("Erreur lors de la génération de la pièce comptable : " & ex.Message,
+                             "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            Cursor = Cursors.Default
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Affiche la pièce comptable du seul point de vente sélectionné dans la grille de contrôle.
+    ''' La pièce est construite par le même service que la pièce globale, en ne lui transmettant
+    ''' que l'Account concerné : les écritures sont donc rigoureusement identiques à celles que
+    ''' produira la pièce globale pour ce point de vente.
+    '''
+    ''' VerifierEquilibrePiece n'est volontairement PAS appelée ici : le compte d'attente ne doit
+    ''' s'appliquer qu'à la pièce globale, jamais point de vente par point de vente (section 14).
+    ''' L'écart d'arrondi propre à cet Account est simplement affiché, sans être corrigé.
+    ''' </summary>
+    Private Sub btnPieceAccount_Click(sender As Object, e As EventArgs) Handles btnPieceAccount.Click
+        AfficherPieceDuPdvSelectionne()
+    End Sub
+
+    ''' <summary>Double-cliquer une ligne de la grille ouvre la pièce de ce point de vente.</summary>
+    Private Sub dgvControle_CellDoubleClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvControle.CellDoubleClick
+        If e.RowIndex >= 0 Then
+            AfficherPieceDuPdvSelectionne()
+        End If
+    End Sub
+
+    Private Sub AfficherPieceDuPdvSelectionne()
+
+        If _listeCalculs Is Nothing OrElse _listeCalculs.Count = 0 Then
+            MessageBox.Show("Veuillez d'abord charger les rapports et lancer le calcul (Afficher / Calculer).",
+                             "Action impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        If dgvControle.CurrentRow Is Nothing Then
+            MessageBox.Show("Sélectionnez d'abord une ligne (un Account) dans la grille de contrôle.",
+                             "Aucune sélection", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim account As String = Convert.ToString(dgvControle.CurrentRow.Cells("Account").Value)
+        Dim calc As CalculWU = _listeCalculs.FirstOrDefault(
+            Function(c) String.Equals(c.Account, account, StringComparison.OrdinalIgnoreCase))
+
+        If calc Is Nothing Then
+            MessageBox.Show($"Aucun calcul trouvé pour l'Account {account}.",
+                             "Account introuvable", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Try
+            Cursor = Cursors.WaitCursor
+
+            Dim dtPieceAccount As DataTable = PieceComptableService.GenererPieceComptable(New CalculWU() {calc})
+
+            If dtPieceAccount.Rows.Count = 0 Then
+                MessageBox.Show($"L'Account {calc.Account} ne génère aucune écriture (tous ses montants sont nuls).",
+                                 "Pièce vide", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Dim titre As String = $"Pièce comptable — {calc.Account} — {calc.Designation}"
+            Dim sousTitre As String = $"Type : {calc.TypePdv}" &
+                                      If(String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase),
+                                         $"     Taux sous-agent : {calc.TauxSA:P2}", String.Empty) &
+                                      $"     Compte de compensation : {If(String.IsNullOrWhiteSpace(calc.CompteCompense), "(non paramétré)", calc.CompteCompense)}" &
+                                      $"     Compte de commission : {If(String.IsNullOrWhiteSpace(calc.CompteCommission), "(non paramétré)", calc.CompteCommission)}"
+
+            Using formulaire As New FrmPieceComptable(dtPieceAccount, titre, sousTitre)
+                formulaire.ShowDialog(Me)
+            End Using
+
+            tsslStatut.Text = $"Pièce comptable affichée pour l'Account {calc.Account}."
+
+        Catch ex As Exception
+            MessageBox.Show("Erreur lors de la génération de la pièce du point de vente : " & ex.Message,
                              "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
         Finally
             Cursor = Cursors.Default
