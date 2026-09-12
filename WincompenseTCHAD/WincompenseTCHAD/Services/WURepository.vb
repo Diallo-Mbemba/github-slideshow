@@ -18,12 +18,12 @@ Public NotInheritable Class WURepository
 
     ''' <summary>
     ''' Construit la chaîne de connexion SQL Server à utiliser.
-    ''' Lue depuis App.config (clé "GWC_WINCOMPENSE") si disponible, sinon valeur par défaut
-    ''' pointant vers .\SQLEXPRESS / GWC_WINCOMPENSE en authentification Windows intégrée.
+    ''' Lue depuis App.config (clé "GWC_WINCOMPENSE_ETD") si disponible, sinon valeur par défaut
+    ''' pointant vers .\SQLEXPRESS / GWC_WINCOMPENSE_ETD en authentification Windows intégrée.
     ''' </summary>
     Public Shared Function ObtenirChaineConnexion() As String
         Try
-            Dim config As ConnectionStringSettings = ConfigurationManager.ConnectionStrings("GWC_WINCOMPENSE")
+            Dim config As ConnectionStringSettings = ConfigurationManager.ConnectionStrings("GWC_WINCOMPENSE_ETD")
             If config IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(config.ConnectionString) Then
                 Return config.ConnectionString
             End If
@@ -31,7 +31,7 @@ Public NotInheritable Class WURepository
             ' En cas de problème de lecture de configuration, on retombe sur la valeur par défaut ci-dessous.
         End Try
 
-        Return "Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE;Integrated Security=True;Connect Timeout=10;"
+        Return "Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;Connect Timeout=10;"
     End Function
 
     ''' <summary>

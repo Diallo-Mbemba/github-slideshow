@@ -1,6 +1,6 @@
 /*
     Script de création des tables de paramétrage des points de vente Western Union
-    pour la base GWC_WINCOMPENSE (SQL Server Express, instance .\SQLEXPRESS).
+    pour la base GWC_WINCOMPENSE_ETD (SQL Server Express, instance .\SQLEXPRESS).
 
     IMPORTANT : l'Account (Code_Pdv / Codesite) est l'identifiant métier unique.
     Ne jamais utiliser codeagence comme clé d'identification.
@@ -9,13 +9,13 @@
 USE master;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'GWC_WINCOMPENSE')
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'GWC_WINCOMPENSE_ETD')
 BEGIN
-    CREATE DATABASE GWC_WINCOMPENSE;
+    CREATE DATABASE GWC_WINCOMPENSE_ETD;
 END
 GO
 
-USE GWC_WINCOMPENSE;
+USE GWC_WINCOMPENSE_ETD;
 GO
 
 -- =========================================================================

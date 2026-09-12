@@ -4,7 +4,7 @@
     À adapter/compléter avec les données réelles de production.
 */
 
-USE GWC_WINCOMPENSE;
+USE GWC_WINCOMPENSE_ETD;
 GO
 
 -- Sous-agent de test (cas de référence AHB020200 - taux de rétrocession 70 %).

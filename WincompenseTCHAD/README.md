@@ -8,7 +8,7 @@ en VB.NET (.NET Framework 4.8 / Visual Studio 2019 / SQL Server Express).
 1. Ouvrir `WincompenseTCHAD.sln` dans Visual Studio 2019.
 2. Vérifier que le Framework cible du projet est bien **.NET Framework 4.8**.
 3. Adapter la chaîne de connexion SQL Server dans `WincompenseTCHAD\App.config` si nécessaire
-   (par défaut : `Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE;Integrated Security=True;`).
+   (par défaut : `Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;`).
 4. Exécuter les scripts SQL du dossier `Scripts\` (dans l'ordre numéroté) sur l'instance
    `.\SQLEXPRESS` pour créer les tables `T_Pdv_SA` / `T_Pdv_EC` et les données de test.
 5. Compiler et lancer (F5).
@@ -36,7 +36,7 @@ WincompenseTCHAD/
         └── FrmCompensationWU.resx
 
 Scripts/
-├── 01_CreateTables_GWC_WINCOMPENSE.sql
+├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
 └── 02_DonneesExemple.sql
 ```
 

@@ -155,7 +155,7 @@ Public Class FrmCompensationWU
                     "À vérifier :" & Environment.NewLine &
                     "  1. le service SQL Server (SQLEXPRESS) est démarré ;" & Environment.NewLine &
                     "  2. le nom de l'instance est correct dans le fichier App.config ;" & Environment.NewLine &
-                    "  3. la base GWC_WINCOMPENSE existe (scripts du dossier Scripts\ exécutés) ;" & Environment.NewLine &
+                    "  3. la base GWC_WINCOMPENSE_ETD existe (scripts du dossier Scripts\ exécutés) ;" & Environment.NewLine &
                     "  4. votre compte Windows a accès à cette base.",
                     "Base SQL Server inaccessible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End If
