@@ -86,6 +86,38 @@ Public Class FrmCompensationWU
         End Using
     End Sub
 
+    ''' <summary>
+    ''' Ouvre la gestion des sous-agents (T_Pdv_SA). À la fermeture, un calcul déjà affiché est
+    ''' invalidé : les points de vente ont pu changer, la grille de contrôle ne reflète donc
+    ''' plus le paramétrage. L'utilisateur est invité à relancer le calcul.
+    ''' </summary>
+    Private Sub btnSousAgents_Click(sender As Object, e As EventArgs) Handles btnSousAgents.Click
+        Using formulaire As New FrmSousAgents()
+            formulaire.ShowDialog(Me)
+        End Using
+        SignalerParametrageModifie("des sous-agents")
+    End Sub
+
+    ''' <summary>Ouvre la gestion des agences propres Ecobank (T_Pdv_EC).</summary>
+    Private Sub btnAgences_Click(sender As Object, e As EventArgs) Handles btnAgences.Click
+        Using formulaire As New FrmAgences()
+            formulaire.ShowDialog(Me)
+        End Using
+        SignalerParametrageModifie("des agences")
+    End Sub
+
+    ''' <summary>
+    ''' Avertit que le calcul affiché peut être devenu obsolète après un passage dans un écran
+    ''' de paramétrage. Le formulaire ne sait pas si une modification a réellement eu lieu : il
+    ''' vaut mieux une invitation inutile qu'une pièce comptable établie sur un paramétrage périmé.
+    ''' </summary>
+    Private Sub SignalerParametrageModifie(quoi As String)
+
+        If _listeCalculs Is Nothing OrElse _listeCalculs.Count = 0 Then Return
+
+        tsslStatut.Text = $"Paramétrage {quoi} éventuellement modifié : relancez le calcul."
+    End Sub
+
 #End Region
 
 #Region "Chargement des fichiers"

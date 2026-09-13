@@ -26,11 +26,13 @@ WincompenseTCHAD/
     ├── Constants/ConstantesWU.vb           ' Taux, comptes comptables, libellés, colonnes attendues
     ├── Models/
     │   ├── CalculWU.vb                     ' Classe métier par Account
-    │   └── ComptesSystemeWU.vb             ' Comptes comptables paramétrés (table SystemeWU)
+    │   ├── ComptesSystemeWU.vb             ' Comptes comptables paramétrés (table SystemeWU)
+    │   └── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
-    │   ├── WURepository.vb                 ' Accès SQL Server (T_Pdv_SA / T_Pdv_EC / SystemeWU)
+    │   ├── WURepository.vb                 ' Lecture SQL Server pour la compensation (T_Pdv_SA / T_Pdv_EC / SystemeWU)
+│   ├── PdvRepository.vb                ' CRUD des points de vente (écriture isolée de la lecture)
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     └── Forms/
@@ -38,7 +40,9 @@ WincompenseTCHAD/
         ├── FrmCompensationWU.Designer.vb
         ├── FrmCompensationWU.resx
         ├── FrmPieceComptable.vb            ' Affichage d'une pièce (globale ou d'un seul PDV)
-        └── FrmComptesSysteme.vb            ' Paramétrage des comptes comptables
+        ├── FrmComptesSysteme.vb            ' Paramétrage des comptes comptables
+        ├── FrmSousAgents.vb                ' Gestion des sous-agents (CRUD)
+        └── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
 
 Scripts/
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
@@ -156,6 +160,53 @@ porte dans deux colonnes distinctes (`Cpte_Produit` et `Cpte_Produit_Envoi`), qu
 présente comme deux champs : **elles peuvent maintenant recevoir des comptes différents sans
 toucher au code**. Tant que les deux colonnes portent la même valeur, la pièce comptable est
 strictement identique à celle produite auparavant.
+
+## Gestion des points de vente (sous-agents et agences)
+
+Deux écrans, ouverts depuis les boutons **« Sous-agents… »** et **« Agences propres… »**,
+permettent de créer, consulter, modifier et supprimer les points de vente sans passer par SQL
+Server Management Studio.
+
+| Écran | Table | Champs |
+|---|---|---|
+| Sous-agents Western Union | `T_Pdv_SA` | Account (`Code_Pdv`), Désignation, Groupe statistique, Taux, Compte de compensation, Compte de commission, Code agence |
+| Agences propres Ecobank | `T_Pdv_EC` | Account (`Codesite`), Désignation, Code agence Voyager |
+
+Une agence propre ne rétrocède aucune commission — la banque en conserve 100 % — d'où l'absence
+de taux et de comptes de compensation/commission, contrairement aux sous-agents.
+
+### Règles de fonctionnement
+
+- **L'Account n'est modifiable qu'à la création.** C'est la clé sous laquelle les rapports
+  Western Union désignent le point de vente : la renommer romprait le lien avec l'historique.
+  Pour la changer, supprimer puis recréer la fiche.
+- **Doublon entre les deux tables signalé.** Un même Account présent dans `T_Pdv_SA` et
+  `T_Pdv_EC` est une incohérence : la recherche interroge `T_Pdv_SA` en premier, la fiche
+  agence serait donc silencieusement ignorée. La base n'interdit pas ce doublon — l'application
+  avertit avant de créer la fiche, et laisse décider.
+- **Account déjà pris.** La violation de clé primaire est traduite en message clair
+  (« l'Account est déjà enregistré ») au lieu d'un code d'erreur SQL Server.
+- **Taux : une fraction, deux décimales.** 0,70 signifie 70 %. Toute valeur hors de
+  l'intervalle [0 ; 1] est refusée : la confusion « 70 » pour « 0,70 » multiplierait par cent
+  toutes les commissions rétrocédées. La colonne étant de type `DECIMAL(4,2)`, une saisie à
+  plus de deux décimales est également refusée — plutôt qu'arrondie en silence par la base.
+  La virgule et le point sont acceptés indifféremment comme séparateur décimal.
+- **Aucun NULL écrit.** Plusieurs colonnes facultatives du point de vue de la saisie
+  (`GroupeStatistique`, `codeagence`, `[CodeAgenc-Voyager]`) sont déclarées `NOT NULL` en base :
+  un champ laissé vide est donc enregistré comme chaîne vide. La lecture traite indifféremment
+  `NULL` et chaîne vide.
+- **Suppression confirmée, et expliquée.** La confirmation rappelle la conséquence réelle : les
+  rapports portant cet Account apparaîtront en `INCONNU` et leur pièce comptable utilisera le
+  compte courant WU au lieu du compte de compensation.
+- **Recherche.** Le champ de recherche filtre sur l'Account ou la désignation ; il s'applique à
+  la touche Entrée ou au bouton *Actualiser*, pas à chaque caractère frappé. Les caractères
+  génériques de SQL (`%`, `_`, `[`) y sont neutralisés : chercher « % » cherche bien un
+  pourcentage.
+- **Calcul invalidé.** Après un passage dans l'un de ces écrans, si un calcul est déjà affiché,
+  la barre d'état invite à le relancer : le paramétrage a pu changer.
+
+Le chemin de comptabilisation quotidienne ne peut jamais écrire dans ces tables : la lecture
+reste dans `WURepository`, l'écriture est isolée dans `PdvRepository`.
 
 ## Contrôles de sécurité sur les fichiers chargés
 
