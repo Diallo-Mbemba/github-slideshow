@@ -27,6 +27,17 @@ Public Class FrmAgences
 #Region "Chargement et affichage de la liste"
 
     Private Sub FrmAgences_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        If Not SessionWU.PeutGererLesPointsDeVente Then
+            MessageBox.Show("Le paramétrage des agences propres est réservé aux commerciaux et aux administrateurs.",
+                            "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            ' La fermeture est différée : un formulaire ne peut pas se fermer pendant son
+            ' propre chargement, la fenêtre resterait affichée et vide.
+            BeginInvoke(New Action(AddressOf Close))
+            Return
+        End If
+
         ChargerListe()
     End Sub
 

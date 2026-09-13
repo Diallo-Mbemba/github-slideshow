@@ -301,7 +301,8 @@ Public NotInheritable Class WURepository
                     "Tthu = @impotsTaxeEnvoi, " &
                     "Tob = @tva, " &
                     "Cpte_Envoi = @ttaEnvoi, " &
-                    "Cpte_Paiement = @ttaReception" & filtre
+                    "Cpte_Paiement = @ttaReception, " &
+                    "DateModification = GETDATE(), ModifiePar = @auteur" & filtre
 
                 Using commande As New SqlCommand(requete, connexion)
 
@@ -314,6 +315,7 @@ Public NotInheritable Class WURepository
                     commande.Parameters.Add("@tva", SqlDbType.NVarChar, 255).Value = comptes.TVACollectee
                     commande.Parameters.Add("@ttaEnvoi", SqlDbType.NVarChar, 255).Value = comptes.TTAEnvoi
                     commande.Parameters.Add("@ttaReception", SqlDbType.NVarChar, 255).Value = comptes.TTAReception
+                    commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
 
                     If codeVise.Length > 0 Then
                         commande.Parameters.Add("@code", SqlDbType.NVarChar, 10).Value = codeVise

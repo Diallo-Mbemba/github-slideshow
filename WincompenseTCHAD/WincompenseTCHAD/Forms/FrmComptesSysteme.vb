@@ -35,6 +35,17 @@ Public Class FrmComptesSysteme
 
     Private Sub FrmComptesSysteme_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        If Not SessionWU.PeutGererLesComptesSystemes Then
+            MessageBox.Show("Le paramétrage des comptes systèmes est réservé aux administrateurs.",
+                            "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            ' La fermeture est différée : un formulaire ne peut pas se fermer pendant son
+            ' propre chargement, la fenêtre resterait affichée et vide.
+            BeginInvoke(New Action(AddressOf Close))
+            Return
+        End If
+
+
         ' Relecture de la base à l'ouverture : les comptes ont pu être modifiés par un autre
         ' poste depuis le démarrage de l'application.
         Dim messageErreur As String = String.Empty

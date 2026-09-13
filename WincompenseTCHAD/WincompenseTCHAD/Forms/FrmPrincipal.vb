@@ -80,6 +80,79 @@ Public Class FrmPrincipal
 
 #End Region
 
+#Region "Sécurité"
+
+    Private Sub mnuUtilisateurs_Click(sender As Object, e As EventArgs) Handles mnuUtilisateurs.Click
+        AfficherEnfant(Of FrmUtilisateurs)()
+    End Sub
+
+    Private Sub mnuMonMotDePasse_Click(sender As Object, e As EventArgs) Handles mnuMonMotDePasse.Click
+
+        If SessionWU.Utilisateur Is Nothing Then Return
+
+        ' Le mot de passe actuel sera exigé : un poste laissé ouvert ne doit pas permettre à un
+        ' tiers de changer le mot de passe de son titulaire et de le priver de son outil.
+        Using changement As New FrmChangerMotDePasse(SessionWU.Identifiant)
+            changement.ShowDialog(Me)
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' Masque les écrans que le rôle connecté n'a pas le droit d'ouvrir.
+    '''
+    ''' Les entrées sont masquées et non grisées : une entrée grisée invite à demander le droit,
+    ''' alors que la banque a tranché — l'agent de compense n'a AUCUN accès au paramétrage, pas
+    ''' même en lecture. Le contrôle est de toute façon refait dans chaque écran : un menu n'est
+    ''' qu'un confort de navigation, jamais une barrière.
+    '''
+    ''' C'est Available et non Visible qui est employé : sur un élément de menu, Visible répond
+    ''' « faux » tant que le menu déroulant qui le contient n'est pas ouvert, si bien qu'une
+    ''' entrée qu'on vient d'afficher se relit comme masquée. Les deux droits seraient alors
+    ''' calculés à partir d'une lecture fausse.
+    ''' </summary>
+    Private Sub AppliquerLesDroits()
+
+        Dim traite As Boolean = SessionWU.PeutTraiterLaCompense
+        Dim rapports As Boolean = SessionWU.PeutVoirLesRapports
+        Dim pointsDeVente As Boolean = SessionWU.PeutGererLesPointsDeVente
+        Dim comptes As Boolean = SessionWU.PeutGererLesComptesSystemes
+        Dim utilisateurs As Boolean = SessionWU.PeutGererLesUtilisateurs
+
+        mnuTraitement.Available = traite
+        mnuRapport.Available = rapports
+        SEP1.Available = traite AndAlso rapports
+        mnuCompensation.Available = traite OrElse rapports
+
+        mnuSousAgents.Available = pointsDeVente
+        mnuAgences.Available = pointsDeVente
+        mnuGroupes.Available = pointsDeVente
+        mnuComptes.Available = comptes
+        SEP2.Available = pointsDeVente AndAlso comptes
+
+        ' Un menu dont toutes les entrées sont masquées resterait affiché, et s'ouvrirait sur
+        ' un vide : il disparaît avec elles.
+        mnuParametrage.Available = pointsDeVente OrElse comptes
+
+        mnuUtilisateurs.Available = utilisateurs
+        SEP4.Available = utilisateurs
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre l'écran correspondant à l'usage quotidien du rôle connecté : le traitement pour
+    ''' l'agent de compense, le rapport d'activité pour le commercial. Ouvrir un écran interdit
+    ''' au démarrage n'accueillerait l'utilisateur qu'avec un refus.
+    ''' </summary>
+    Private Sub OuvrirEcranDAccueil()
+
+        If SessionWU.PeutTraiterLaCompense Then
+            AfficherEnfant(Of FrmCompensationWU)()
+        ElseIf SessionWU.PeutVoirLesRapports Then
+            AfficherEnfant(Of FrmRapportActivite)()
+        End If
+    End Sub
+
+#End Region
+
 #Region "Disposition des fenêtres"
 
     Private Sub mnuCascade_Click(sender As Object, e As EventArgs) Handles mnuCascade.Click
@@ -109,10 +182,12 @@ Public Class FrmPrincipal
 
     Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        AppliquerLesDroits()
         AfficherEtatBase()
 
-        ' L'écran de traitement est ouvert d'emblée : c'est l'usage quotidien de l'application.
-        AfficherEnfant(Of FrmCompensationWU)()
+        tsslUtilisateur.Text = SessionWU.Description
+
+        OuvrirEcranDAccueil()
     End Sub
 
     ''' <summary>

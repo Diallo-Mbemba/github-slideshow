@@ -98,8 +98,9 @@ Public NotInheritable Class PdvRepository
 
         Const requete As String =
             "INSERT INTO T_Pdv_SA (Code_Pdv, Designationagence, GroupeStatistique, Taux, " &
-            "CompteCompense, CompteCommission, codeagence) " &
-            "VALUES (@code, @designation, @groupe, @taux, @compense, @commission, @codeagence)"
+            "CompteCompense, CompteCommission, codeagence, DateCreation, CreePar) " &
+            "VALUES (@code, @designation, @groupe, @taux, @compense, @commission, @codeagence, " &
+            "GETDATE(), @auteur)"
 
         Return ExecuterEcritureSA(requete, pdv, pdv.CodePdv, "créer", messageErreur)
     End Function
@@ -120,7 +121,8 @@ Public NotInheritable Class PdvRepository
         Const requete As String =
             "UPDATE T_Pdv_SA SET Designationagence = @designation, GroupeStatistique = @groupe, " &
             "Taux = @taux, CompteCompense = @compense, CompteCommission = @commission, " &
-            "codeagence = @codeagence WHERE Code_Pdv = @code"
+            "codeagence = @codeagence, DateModification = GETDATE(), ModifiePar = @auteur " &
+            "WHERE Code_Pdv = @code"
 
         Return ExecuterEcritureSA(requete, pdv, pdv.CodePdv, "modifier", messageErreur)
     End Function
@@ -152,6 +154,7 @@ Public NotInheritable Class PdvRepository
                     commande.Parameters.Add("@compense", SqlDbType.NVarChar, 255).Value = pdv.CompteCompense
                     commande.Parameters.Add("@commission", SqlDbType.NVarChar, 255).Value = pdv.CompteCommission
                     commande.Parameters.Add("@codeagence", SqlDbType.NVarChar, 255).Value = pdv.CodeAgence
+                    commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
 
                     If commande.ExecuteNonQuery() = 0 Then
                         messageErreur = $"Aucune fiche modifiée : le sous-agent « {code} » n'existe plus dans T_Pdv_SA." &
@@ -327,8 +330,9 @@ Public NotInheritable Class PdvRepository
         End If
 
         Const requete As String =
-            "INSERT INTO T_GroupeStatistique (Groupe, CompteActivite, CompteCommission, Taux) " &
-            "VALUES (@groupe, @activite, @commission, @taux)"
+            "INSERT INTO T_GroupeStatistique (Groupe, CompteActivite, CompteCommission, Taux, " &
+            "DateCreation, CreePar) " &
+            "VALUES (@groupe, @activite, @commission, @taux, GETDATE(), @auteur)"
 
         Return ExecuterEcritureGroupe(requete, groupe, "créer", messageErreur)
     End Function
@@ -348,7 +352,8 @@ Public NotInheritable Class PdvRepository
 
         Const requete As String =
             "UPDATE T_GroupeStatistique SET CompteActivite = @activite, " &
-            "CompteCommission = @commission, Taux = @taux WHERE Groupe = @groupe"
+            "CompteCommission = @commission, Taux = @taux, " &
+            "DateModification = GETDATE(), ModifiePar = @auteur WHERE Groupe = @groupe"
 
         Return ExecuterEcritureGroupe(requete, groupe, "modifier", messageErreur)
     End Function
@@ -421,7 +426,8 @@ Public NotInheritable Class PdvRepository
 
         Const requete As String =
             "UPDATE T_Pdv_SA SET CompteCompense = @activite, CompteCommission = @commission, " &
-            "Taux = @taux WHERE LTRIM(RTRIM(GroupeStatistique)) = @groupe"
+            "Taux = @taux, DateModification = GETDATE(), ModifiePar = @auteur " &
+            "WHERE LTRIM(RTRIM(GroupeStatistique)) = @groupe"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -484,6 +490,8 @@ Public NotInheritable Class PdvRepository
         parametreTaux.Precision = 4
         parametreTaux.Scale = 2
         parametreTaux.Value = Decimal.Round(groupe.Taux, 2)
+
+        commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
     End Sub
 
     Private Shared Function CompterSousAgentsDuGroupe(nomGroupe As String, connexion As SqlConnection) As Integer
@@ -592,8 +600,9 @@ Public NotInheritable Class PdvRepository
         End If
 
         Const requete As String =
-            "INSERT INTO T_Pdv_EC (Codesite, Designationagence, [CodeAgenc-Voyager]) " &
-            "VALUES (@code, @designation, @voyager)"
+            "INSERT INTO T_Pdv_EC (Codesite, Designationagence, [CodeAgenc-Voyager], " &
+            "DateCreation, CreePar) " &
+            "VALUES (@code, @designation, @voyager, GETDATE(), @auteur)"
 
         Return ExecuterEcritureEC(requete, pdv, "créer", messageErreur)
     End Function
@@ -608,8 +617,8 @@ Public NotInheritable Class PdvRepository
         End If
 
         Const requete As String =
-            "UPDATE T_Pdv_EC SET Designationagence = @designation, [CodeAgenc-Voyager] = @voyager " &
-            "WHERE Codesite = @code"
+            "UPDATE T_Pdv_EC SET Designationagence = @designation, [CodeAgenc-Voyager] = @voyager, " &
+            "DateModification = GETDATE(), ModifiePar = @auteur WHERE Codesite = @code"
 
         Return ExecuterEcritureEC(requete, pdv, "modifier", messageErreur)
     End Function
@@ -629,6 +638,7 @@ Public NotInheritable Class PdvRepository
                     commande.Parameters.Add("@code", SqlDbType.NVarChar, 255).Value = pdv.CodeSite
                     commande.Parameters.Add("@designation", SqlDbType.NVarChar, 255).Value = pdv.Designation
                     commande.Parameters.Add("@voyager", SqlDbType.NVarChar, 255).Value = pdv.CodeAgenceVoyager
+                    commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
 
                     If commande.ExecuteNonQuery() = 0 Then
                         messageErreur = $"Aucune fiche modifiée : l'agence « {pdv.CodeSite} » n'existe plus dans T_Pdv_EC." &

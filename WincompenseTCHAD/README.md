@@ -9,9 +9,12 @@ en VB.NET (.NET Framework 4.8 / Visual Studio 2019 / SQL Server Express).
 2. Vérifier que le Framework cible du projet est bien **.NET Framework 4.8**.
 3. Adapter la chaîne de connexion SQL Server dans `WincompenseTCHAD\App.config` si nécessaire
    (par défaut : `Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;`).
-4. Exécuter les scripts SQL du dossier `Scripts\` (dans l'ordre numéroté) sur l'instance
-   `.\SQLEXPRESS` pour créer les tables `T_Pdv_SA` / `T_Pdv_EC` et les données de test.
-5. Compiler et lancer (F5).
+4. Exécuter **tous** les scripts SQL du dossier `Scripts\`, dans l'ordre numéroté, sur
+   l'instance `.\SQLEXPRESS`. Les scripts `07` et `08` ne sont pas optionnels : sans le `07`,
+   la table des utilisateurs et les colonnes de traçabilité n'existent pas, et l'application ne
+   peut ni identifier personne ni écrire.
+5. Compiler et lancer (F5). Au premier lancement, l'application propose de créer le premier
+   compte administrateur : c'est lui qui créera ensuite les autres.
 
 ## L'application : une fenêtre MDI
 
@@ -24,7 +27,11 @@ l'interdisaient.
 |---|---|
 | **Compensation** | Traitement de la compense, Rapport d'activité |
 | **Paramétrage** | Sous-agents, Agences propres, Groupes statistiques, Comptes systèmes |
+| **Sécurité** | Mon mot de passe, Utilisateurs et connexions |
 | **Fenêtres** | Cascade, mosaïques, fermeture de toutes les fenêtres, et la liste des fenêtres ouvertes |
+
+Les entrées qu'un rôle n'a pas le droit d'ouvrir **ne sont pas affichées** — voir
+« Utilisateurs, rôles et traçabilité » plus bas.
 
 **Un écran déjà ouvert n'est jamais dupliqué** : il est ramené au premier plan, et rétabli s'il
 était réduit. Sans cette règle, dix clics sur un menu produiraient dix copies de la même liste,
@@ -34,8 +41,9 @@ Les boutons de paramétrage qui encombraient l'écran de traitement ont disparu 
 porte désormais, et les deux libellés de fichiers chargés occupent toute la largeur. Restent
 seuls sur cet écran les boutons de son propre enchaînement — charger, calculer, générer.
 
-La barre d'état rappelle en permanence **le serveur et la base** auxquels l'application est
-reliée : une confusion entre l'environnement de test et la production se voit immédiatement.
+La barre d'état rappelle en permanence **qui est connecté** et **le serveur et la base**
+auxquels l'application est reliée : une confusion entre l'environnement de test et la
+production se voit immédiatement.
 
 Deux ouvertures restent volontairement **modales**, parce qu'elles appartiennent à un
 enchaînement et non à la navigation : la création d'un groupe depuis la fiche d'un sous-agent
@@ -57,7 +65,8 @@ WincompenseTCHAD/
     │   ├── ComptesSystemeWU.vb             ' Comptes comptables paramétrés (table SystemeWU)
     │   ├── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
     │   ├── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
-    │   └── TransactionWU.vb                ' Une transaction identifiée par son MTCN
+    │   ├── TransactionWU.vb                ' Une transaction identifiée par son MTCN
+    │   └── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
@@ -67,7 +76,10 @@ WincompenseTCHAD/
 │   ├── HistoriqueRepository.vb         ' Historique des journées comptabilisées (T_HistoriqueWU)
 │   ├── RapportActiviteService.vb       ' Construction des quatre états du rapport d'activité
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
-    │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
+    │   ├── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
+    │   ├── MotDePasseService.vb            ' Empreintes PBKDF2, robustesse, mots de passe provisoires
+    │   ├── SessionWU.vb                    ' Utilisateur connecté et droits : point d'accès unique
+    │   └── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -79,12 +91,21 @@ WincompenseTCHAD/
         ├── FrmGroupesStatistiques.vb       ' Gestion des groupes statistiques (CRUD)
         ├── FrmSousAgentsParGroupe.vb       ' Liste des sous-agents par groupe (consultation)
         ├── FrmRapportActivite.vb           ' Rapport d'activité sur une période (4 états)
-        └── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
+        ├── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
+        ├── FrmConnexion.vb                 ' Écran de connexion, amorçage du premier administrateur
+        ├── FrmChangerMotDePasse.vb         ' Changement de mot de passe (imposé ou volontaire)
+        ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
+        └── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
 
 Scripts/
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
 ├── 02_DonneesExemple.sql
-└── 03_SystemeWU.sql                       ' Comptes comptables paramétrés
+├── 03_SystemeWU.sql                       ' Comptes comptables paramétrés
+├── 04_GroupeStatistique.sql               ' Table des groupes + migration depuis T_Pdv_SA
+├── 05_HistoriqueWU.sql                    ' Historique des journées comptabilisées
+├── 06_HistoriqueMTCN.sql                  ' Détail des transactions, MTCN par MTCN
+├── 07_Utilisateurs.sql                    ' Utilisateurs, journal des connexions, traçabilité
+└── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
 ```
 
 ## Hypothèses métier retenues (à valider)
@@ -553,6 +574,136 @@ La répartition banque / sous-agent des commissions. Elle dépend du taux du gro
 de l'édition**, et non au moment des opérations : un rapport rétroactif deviendrait faux dès
 qu'un taux change. L'historique conserve les commissions totales, qui elles ne bougent pas.
 
+## Utilisateurs, rôles et traçabilité
+
+L'application **exige une identification** avant d'afficher le moindre écran : `Program.Main`
+ouvre `FrmConnexion`, et ne construit la fenêtre MDI qu'une fois la session ouverte. Tant que
+personne n'est connecté, `SessionWU` refuse **tous** les droits — une erreur d'enchaînement ne
+peut donc pas ouvrir l'application sans identification.
+
+### Mot de passe applicatif, et non session Windows
+
+Les postes sont nominatifs, mais un agent qui laisse sa session ouverte ne doit pas pour autant
+laisser l'accès à la compense. Chaque utilisateur a donc son propre mot de passe applicatif.
+Le compte Windows et le nom de la machine sont néanmoins relevés et journalisés : un identifiant
+utilisé depuis un poste qui n'est pas le sien se repère ainsi.
+
+### Les trois rôles
+
+| | Agent de la compense | Commercial | Administrateur |
+|---|---|---|---|
+| Charger les rapports, calculer, générer et historiser les pièces | ✔ | | ✔ |
+| Sous-agents, agences propres, groupes statistiques | | ✔ | ✔ |
+| Comptes comptables de la pièce (table `SystemeWU`) | | | ✔ |
+| Comptes utilisateurs et journal des connexions | | | ✔ |
+| Rapports d'activité | ✔ | ✔ | ✔ |
+
+**L'agent de compense n'a aucun accès au paramétrage, pas même en lecture** : décision de la
+banque. C'est ce paramétrage qui détermine les écritures ; le laisser modifiable par celui qui
+les génère supprimerait le contrôle croisé recherché.
+
+Les entrées de menu correspondantes sont **masquées et non grisées** : une entrée grisée invite
+à demander le droit, alors que la question est tranchée. Le contrôle est refait à l'ouverture de
+chaque écran — un écran qui ne compte que sur le menu pour être protégé ne l'est pas.
+
+### Les mots de passe ne sont jamais enregistrés
+
+Seule une empreinte **PBKDF2** l'est, avec son sel (16 octets) et son nombre d'itérations
+(100 000). Un mot de passe perdu ne se retrouve donc pas : il se réinitialise, ce qui est le
+comportement attendu. Le nombre d'itérations est conservé **avec chaque empreinte** plutôt que
+fixé une fois pour toutes, afin de pouvoir être relevé quand les machines seront plus rapides
+sans invalider les comptes existants — chacun se vérifie avec le sien.
+
+PBKDF2 est retenu parce qu'il est fourni par le framework (`Rfc2898DeriveBytes`) et ne demande
+aucune bibliothèque supplémentaire, contrainte posée dès l'origine du projet.
+
+Un mot de passe doit comporter au moins 8 caractères, dont une majuscule, une minuscule et un
+chiffre, et ne pas contenir l'identifiant. La règle est volontairement courte : empiler les
+contraintes pousse les utilisateurs à noter leur mot de passe, ce qui dégrade la sécurité au
+lieu de l'améliorer.
+
+### Réinitialisation : un mot de passe provisoire, tiré au hasard
+
+L'administrateur ne saisit jamais le mot de passe de quelqu'un d'autre : il demande une
+réinitialisation, l'application **tire** un mot de passe provisoire de 12 caractères et
+l'affiche une seule fois. Un administrateur qui choisirait lui-même ces mots de passe finirait
+par leur donner toujours le même. Les caractères ambigus (`O` et `0`, `I`, `l` et `1`) en sont
+écartés, puisqu'il sera lu puis recopié à la main, et le tirage vient du générateur
+cryptographique : un mot de passe prévisible, même provisoire, laisse la porte ouverte jusqu'à
+son changement.
+
+Le titulaire devra en choisir un autre **avant d'accéder à l'application** : le changement est
+imposé à la connexion suivante, pas renvoyé à plus tard.
+
+### Verrouillage après échecs
+
+Au bout de **5 échecs consécutifs**, le compte est verrouillé et seul un administrateur peut le
+débloquer. Le message affiché ne distingue jamais « identifiant inconnu » de « mot de passe
+erroné » : il ne doit pas renseigner sur l'existence d'un compte.
+
+### Le dernier administrateur ne peut pas se retirer ses droits
+
+Changer le rôle ou désactiver un compte est refusé s'il ne reste **aucun autre administrateur
+actif et utilisable**. Sans cette règle, la base se retrouverait sans personne pour créer ou
+débloquer un compte, et il faudrait rouvrir SQL Server à la main pour s'en sortir.
+
+### Premier démarrage
+
+Le script `07_Utilisateurs.sql` ne crée **aucun compte**, et surtout pas un compte à mot de
+passe connu : une empreinte figée dans un fichier versionné est un mot de passe publié, que
+personne ne pense ensuite à changer.
+
+C'est l'application qui s'en charge : si la table ne contient aucun administrateur actif dont
+l'empreinte est exploitable, l'écran de connexion propose de créer ce premier compte et demande
+son mot de passe, haché comme tous les autres. C'est le seul moment où un compte se crée sans
+que personne ne soit connecté.
+
+La longueur de l'empreinte et du sel est contrôlée, et pas seulement leur présence : une ligne
+posée à la main dans SQL Server avec une empreinte de fortune ouvrirait un compte administrateur
+inutilisable, dont l'existence empêcherait pourtant la création du vrai.
+
+### Journal des connexions (`T_ConnexionWU`)
+
+**Toute** tentative est journalisée, réussie ou non, avec sa date, le poste, le compte Windows
+et le motif du refus. Un refus non enregistré serait précisément celui qu'un auditeur
+chercherait. Y figurent aussi les changements de mot de passe, les réinitialisations et les
+déverrouillages.
+
+Un échec d'écriture au journal **n'empêche jamais la connexion** : le journal sert à l'audit,
+pas au contrôle d'accès, et priver un agent de son outil parce qu'une trace n'a pas pu s'écrire
+serait disproportionné.
+
+L'écran « Utilisateurs et connexions » en présente les 100, 500 ou 2 000 dernières lignes.
+
+### Traçabilité des écritures
+
+Le script `07_Utilisateurs.sql` ajoute, **sans rien détruire**, les colonnes `CreePar`,
+`DateCreation`, `ModifiePar` et `DateModification` à `T_Pdv_SA`, `T_Pdv_EC`,
+`T_GroupeStatistique` et `SystemeWU`, ainsi que `ComptabilisePar` et `DateComptabilisation` à
+`T_HistoriqueWU` et `T_HistoriqueMTCN`. Les lignes existantes restent à `NULL` : on ne réécrit
+pas un passé que l'on ne connaît pas.
+
+L'application renseigne ensuite ces colonnes à chaque écriture — création et modification d'un
+sous-agent, d'une agence, d'un groupe, des comptes comptables, et comptabilisation d'une
+journée. Chaque écriture porte donc le nom de son auteur.
+
+> **Le script 07 est obligatoire.** Sans lui, ces colonnes n'existent pas et les écritures
+> échouent : exécutez-le avant de lancer cette version.
+
+### Rôles SQL Server (`08_RolesSQLServer.sql`)
+
+Les droits applicatifs ci-dessus sont doublés de trois rôles de base de données —
+`wu_compense`, `wu_commercial`, `wu_admin` — qui s'appliquent aux connexions SQL Server
+elles-mêmes, y compris à quelqu'un qui contournerait l'application avec SQL Server Management
+Studio. Le script est rejouable et se termine par un état des droits réellement accordés.
+
+**Aucun rôle ne reçoit `DELETE` sur le journal des connexions** : un journal que ses propres
+utilisateurs peuvent effacer ne prouve rien. L'historique, lui, accepte `DELETE` pour le rôle de
+compense, puisque rejouer une journée suppose d'effacer la version précédente.
+
+Le rattachement des comptes Windows aux rôles est laissé en commentaire à la fin du script : il
+dépend de votre domaine.
+
 ## Contrôles de sécurité sur les fichiers chargés
 
 Deux erreurs de manipulation fausseraient silencieusement toute la comptabilisation : croiser
@@ -663,7 +814,11 @@ charges pour un gain nul.
 
 - Structure des écritures pour une **agence propre "EC"** dans la pièce comptable (aucun exemple
   de référence de ce type disponible à ce jour ; seul un exemple sous-agent "SA" a pu être validé).
-- Mode d'authentification SQL Server réel en production (actuellement : Windows intégré).
+- Mode d'authentification SQL Server réel en production (actuellement : Windows intégré), et
+  rattachement des comptes aux rôles `wu_compense` / `wu_commercial` / `wu_admin`, laissé en
+  commentaire à la fin de `Scripts\08_RolesSQLServer.sql` faute de connaître votre domaine.
+- Durée de vie d'un mot de passe : aucune expiration périodique n'est imposée aujourd'hui.
+  Faut-il en ajouter une, et à quelle échéance ?
 - Usage exact du compte inter bancaire 381000101 pour l'écart d'arrondi global (voir hypothèse 6).
 - Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la

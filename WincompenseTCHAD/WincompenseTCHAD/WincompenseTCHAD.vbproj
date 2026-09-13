@@ -76,6 +76,7 @@
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
     <Compile Include="Models\TransactionWU.vb" />
+    <Compile Include="Models\UtilisateurWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
@@ -85,6 +86,9 @@
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
+    <Compile Include="Services\MotDePasseService.vb" />
+    <Compile Include="Services\SessionWU.vb" />
+    <Compile Include="Services\UtilisateurRepository.vb" />
     <Compile Include="Forms\FrmPrincipal.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -139,6 +143,30 @@
     <Compile Include="Forms\FrmRapportActivite.Designer.vb">
       <DependentUpon>FrmRapportActivite.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmConnexion.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmConnexion.Designer.vb">
+      <DependentUpon>FrmConnexion.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmChangerMotDePasse.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmChangerMotDePasse.Designer.vb">
+      <DependentUpon>FrmChangerMotDePasse.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmUtilisateurEdition.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmUtilisateurEdition.Designer.vb">
+      <DependentUpon>FrmUtilisateurEdition.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmUtilisateurs.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmUtilisateurs.Designer.vb">
+      <DependentUpon>FrmUtilisateurs.vb</DependentUpon>
+    </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="Program.vb" />
   </ItemGroup>
@@ -169,6 +197,18 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmRapportActivite.resx">
       <DependentUpon>FrmRapportActivite.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmConnexion.resx">
+      <DependentUpon>FrmConnexion.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmChangerMotDePasse.resx">
+      <DependentUpon>FrmChangerMotDePasse.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmUtilisateurEdition.resx">
+      <DependentUpon>FrmUtilisateurEdition.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmUtilisateurs.resx">
+      <DependentUpon>FrmUtilisateurs.vb</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

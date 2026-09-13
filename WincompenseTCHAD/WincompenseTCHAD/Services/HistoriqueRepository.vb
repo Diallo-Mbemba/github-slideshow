@@ -79,10 +79,11 @@ Public NotInheritable Class HistoriqueRepository
             "GroupeStatistique, TypePdv, NombreEnvois, NombrePaiements, NombreAnnulations, " &
             "PrincipalEnvoi, ChargeEnvoi, Taxes, PrincipalPaye, " &
             "CommissionEnvoi, CommissionPaiement, CommissionTransfert, " &
-            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi) " &
+            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi, DateComptabilisation, ComptabilisePar) " &
             "VALUES (@jour, @account, @designation, @groupe, @type, @nbEnvois, @nbPaiements, " &
             "@nbAnnulations, @principalEnvoi, @chargeEnvoi, @taxes, @principalPaye, " &
-            "@comEnvoi, @comPaiement, @comTransfert, @tva, @ttaEnvoi, @ttaReception, @taxeEnvoi)"
+            "@comEnvoi, @comPaiement, @comTransfert, @tva, @ttaEnvoi, @ttaReception, @taxeEnvoi, " &
+            "GETDATE(), @auteur)"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -178,6 +179,8 @@ Public NotInheritable Class HistoriqueRepository
         AjouterMontant(commande, "@ttaEnvoi", ligne.TTAEnvoi)
         AjouterMontant(commande, "@ttaReception", ligne.TTAReception)
         AjouterMontant(commande, "@taxeEnvoi", ligne.TaxeEnvoi)
+
+        commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
     End Sub
 
     ''' <summary>
@@ -220,8 +223,9 @@ Public NotInheritable Class HistoriqueRepository
 
         Const insertion As String =
             "INSERT INTO " & TABLE_MTCN & " (DateActivite, Account, MTCN, Sens, Statut, Montant, " &
-            "Designation, GroupeStatistique, TypePdv) " &
-            "VALUES (@jour, @account, @mtcn, @sens, @statut, @montant, @designation, @groupe, @type)"
+            "Designation, GroupeStatistique, TypePdv, DateComptabilisation, ComptabilisePar) " &
+            "VALUES (@jour, @account, @mtcn, @sens, @statut, @montant, @designation, @groupe, @type, " &
+            "GETDATE(), @auteur)"
 
         Dim ecrites As Integer = 0
 
@@ -251,6 +255,7 @@ Public NotInheritable Class HistoriqueRepository
                     If(calc Is Nothing, String.Empty, If(calc.GroupeStatistique, String.Empty))
                 commande.Parameters.Add("@type", SqlDbType.NVarChar, 20).Value =
                     If(calc Is Nothing, String.Empty, If(calc.TypePdv, String.Empty))
+                commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
 
                 commande.ExecuteNonQuery()
             End Using

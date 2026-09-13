@@ -67,6 +67,17 @@ Public Class FrmCompensationWU
     ''' </summary>
     Private Sub FrmCompensationWU_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        If Not SessionWU.PeutTraiterLaCompense Then
+            MessageBox.Show("Le traitement de la compense est réservé aux agents de la compense et aux administrateurs.",
+                            "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            ' La fermeture est différée : un formulaire ne peut pas se fermer pendant son
+            ' propre chargement, la fenêtre resterait affichée et vide.
+            BeginInvoke(New Action(AddressOf Close))
+            Return
+        End If
+
+
         Dim messageErreur As String = String.Empty
         ComptesSystemeWU.Actuels = WURepository.ChargerComptesSysteme(messageErreur)
 

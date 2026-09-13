@@ -31,6 +31,10 @@ Partial Class FrmPrincipal
         Me.mnuGroupes = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP2 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuComptes = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuSecurite = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuMonMotDePasse = New System.Windows.Forms.ToolStripMenuItem()
+        Me.SEP4 = New System.Windows.Forms.ToolStripSeparator()
+        Me.mnuUtilisateurs = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuFenetres = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuCascade = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuMosaiqueH = New System.Windows.Forms.ToolStripMenuItem()
@@ -47,7 +51,7 @@ Partial Class FrmPrincipal
         '
         'menuPrincipal
         '
-        Me.menuPrincipal.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuCompensation, Me.mnuParametrage, Me.mnuFenetres, Me.mnuQuitter})
+        Me.menuPrincipal.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuCompensation, Me.mnuParametrage, Me.mnuSecurite, Me.mnuFenetres, Me.mnuQuitter})
         Me.menuPrincipal.Location = New System.Drawing.Point(0, 0)
         Me.menuPrincipal.MdiWindowListItem = Me.mnuFenetres
         Me.menuPrincipal.Name = "menuPrincipal"
@@ -113,6 +117,30 @@ Partial Class FrmPrincipal
         Me.mnuComptes.Name = "mnuComptes"
         Me.mnuComptes.Size = New System.Drawing.Size(240, 22)
         Me.mnuComptes.Text = "&Comptes systèmes"
+        '
+        'mnuSecurite
+        '
+        Me.mnuSecurite.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuMonMotDePasse, Me.SEP4, Me.mnuUtilisateurs})
+        Me.mnuSecurite.Name = "mnuSecurite"
+        Me.mnuSecurite.Size = New System.Drawing.Size(100, 20)
+        Me.mnuSecurite.Text = "&Sécurité"
+        '
+        'mnuMonMotDePasse
+        '
+        Me.mnuMonMotDePasse.Name = "mnuMonMotDePasse"
+        Me.mnuMonMotDePasse.Size = New System.Drawing.Size(260, 22)
+        Me.mnuMonMotDePasse.Text = "&Mon mot de passe..."
+        '
+        'SEP4
+        '
+        Me.SEP4.Name = "SEP4"
+        Me.SEP4.Size = New System.Drawing.Size(240, 6)
+        '
+        'mnuUtilisateurs
+        '
+        Me.mnuUtilisateurs.Name = "mnuUtilisateurs"
+        Me.mnuUtilisateurs.Size = New System.Drawing.Size(260, 22)
+        Me.mnuUtilisateurs.Text = "&Utilisateurs et connexions"
         '
         'mnuFenetres
         '
@@ -212,6 +240,10 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuGroupes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP2 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuComptes As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuSecurite As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuMonMotDePasse As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents SEP4 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents mnuUtilisateurs As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuFenetres As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuCascade As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuMosaiqueH As System.Windows.Forms.ToolStripMenuItem
