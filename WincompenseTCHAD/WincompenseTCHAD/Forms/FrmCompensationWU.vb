@@ -87,6 +87,17 @@ Public Class FrmCompensationWU
     End Sub
 
     ''' <summary>
+    ''' Ouvre la gestion des groupes statistiques (T_GroupeStatistique), qui portent le compte
+    ''' d'activité, le compte de commission et le taux dont les sous-agents héritent.
+    ''' </summary>
+    Private Sub btnGroupes_Click(sender As Object, e As EventArgs) Handles btnGroupes.Click
+        Using formulaire As New FrmGroupesStatistiques()
+            formulaire.ShowDialog(Me)
+        End Using
+        SignalerParametrageModifie("des groupes statistiques")
+    End Sub
+
+    ''' <summary>
     ''' Ouvre la gestion des sous-agents (T_Pdv_SA). À la fermeture, un calcul déjà affiché est
     ''' invalidé : les points de vente ont pu changer, la grille de contrôle ne reflète donc
     ''' plus le paramétrage. L'utilisateur est invité à relancer le calcul.

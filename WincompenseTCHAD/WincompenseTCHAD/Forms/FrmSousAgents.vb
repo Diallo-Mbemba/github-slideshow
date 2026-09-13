@@ -157,12 +157,11 @@ Public Class FrmSousAgents
             txtCompteCompense.Text = fiche.CompteCompense
             txtCompteCommission.Text = fiche.CompteCommission
             txtCodeAgence.Text = fiche.CodeAgence
-            chkModifierGroupe.Checked = False
         Finally
             _affichageFiche = False
         End Try
 
-        MettreAJourVerrouillageHeritage()
+        VerrouillerChampsHerites()
         SignalerDivergenceAvecLeGroupe(fiche)
     End Sub
 
@@ -205,7 +204,7 @@ Public Class FrmSousAgents
         txtCodePdv.ReadOnly = Not _enCreation
         btnSupprimer.Enabled = Not _enCreation AndAlso FicheSelectionnee() IsNot Nothing
         grpDetail.Text = If(_enCreation, "Nouveau sous-agent", "Fiche du sous-agent")
-        MettreAJourVerrouillageHeritage()
+        VerrouillerChampsHerites()
     End Sub
 
 #End Region
@@ -213,28 +212,33 @@ Public Class FrmSousAgents
 #Region "Groupes statistiques et héritage"
 
     ''' <summary>
-    ''' Groupes statistiques présents en base, avec leurs valeurs héritées, tels que chargés au
-    ''' dernier rafraîchissement. Servent à trois choses : alimenter la liste déroulante,
-    ''' distinguer une sélection d'une création, et appliquer l'héritage.
+    ''' Groupes statistiques lus dans T_GroupeStatistique au dernier rafraîchissement. Ils
+    ''' alimentent la liste déroulante et portent les trois valeurs dont le sous-agent hérite.
     ''' </summary>
     Private _groupes As New List(Of GroupeStatistiqueWU)
 
     ''' <summary>
     ''' Empêche l'héritage de se déclencher pendant l'affichage d'une fiche existante : une
-    ''' fiche doit s'afficher avec SES valeurs, même si elles divergent de celles de son groupe.
-    ''' Écraser silencieusement une divergence reviendrait à la masquer, puis à l'enregistrer.
+    ''' fiche doit s'afficher avec SES valeurs, même si elles ont dérivé de celles de son
+    ''' groupe. Écraser silencieusement une dérive reviendrait à la masquer, puis à l'enregistrer.
     ''' </summary>
     Private _affichageFiche As Boolean = False
 
-    ''' <summary>Recharge les groupes et la liste déroulante depuis la base.</summary>
+    ''' <summary>Recharge les groupes et la liste déroulante depuis T_GroupeStatistique.</summary>
     Private Sub ChargerGroupes()
 
         Dim messageErreur As String = String.Empty
-        Dim groupes As List(Of GroupeStatistiqueWU) = PdvRepository.ListerGroupes(messageErreur)
+        Dim groupes As List(Of GroupeStatistiqueWU) = PdvRepository.ListerGroupes(String.Empty, messageErreur)
 
-        ' Une erreur ici ne doit pas empêcher de travailler : la liste reste vide, la saisie
-        ' libre prend le relais et les contrôles de l'enregistrement font foi.
-        If Not String.IsNullOrEmpty(messageErreur) Then Return
+        If Not String.IsNullOrEmpty(messageErreur) Then
+            ' Le plus souvent : la table n'existe pas encore (migration non jouée). Le dire une
+            ' fois, sans empêcher de consulter les sous-agents.
+            _groupes = New List(Of GroupeStatistiqueWU)
+            cboGroupeStatistique.Items.Clear()
+            lblStatut.Text = "Groupes statistiques indisponibles."
+            MessageBox.Show(messageErreur, "Groupes statistiques", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
 
         _groupes = groupes
 
@@ -255,10 +259,8 @@ Public Class FrmSousAgents
 
     ''' <summary>
     ''' Recherche un groupe par son libellé, sans tenir compte de la casse ni des espaces de
-    ''' bordure. Cette tolérance évite que « RESEAU », « Reseau » et « reseau » soient traités
-    ''' comme trois groupes distincts alors que l'utilisateur désignait le même.
+    ''' bordure : « reseau » saisi désigne bien le groupe « RESEAU ».
     ''' </summary>
-    ''' <returns>Le groupe, ou Nothing s'il n'existe pas encore.</returns>
     Private Function TrouverGroupe(saisie As String) As GroupeStatistiqueWU
 
         If String.IsNullOrWhiteSpace(saisie) Then Return Nothing
@@ -278,24 +280,16 @@ Public Class FrmSousAgents
         AppliquerHeritageGroupe()
     End Sub
 
-    ''' <summary>
-    ''' Un libellé peut aussi être frappé au clavier plutôt que choisi dans la liste : l'héritage
-    ''' s'applique alors à la sortie du champ.
-    ''' </summary>
+    ''' <summary>Un libellé peut aussi être frappé au clavier : l'héritage s'applique à la sortie du champ.</summary>
     Private Sub cboGroupeStatistique_Leave(sender As Object, e As EventArgs) Handles cboGroupeStatistique.Leave
         AppliquerHeritageGroupe()
     End Sub
 
-    Private Sub chkModifierGroupe_CheckedChanged(sender As Object, e As EventArgs) Handles chkModifierGroupe.CheckedChanged
-        MettreAJourVerrouillageHeritage()
-    End Sub
-
     ''' <summary>
     ''' Recopie dans les zones de saisie le compte d'activité, le compte de commission et le
-    ''' taux du groupe sélectionné : le sous-agent en hérite, il ne les définit pas.
-    '''
-    ''' Pour un groupe encore inexistant, les trois champs restent tels quels et deviennent
-    ''' saisissables : ce sont eux qui DÉFINIRONT le groupe à créer.
+    ''' taux du groupe sélectionné. Ces trois champs restent TOUJOURS en lecture seule : leurs
+    ''' valeurs appartiennent au groupe, et se modifient dans l'écran des groupes statistiques,
+    ''' où le changement s'applique d'un coup à tous les sous-agents concernés.
     ''' </summary>
     Private Sub AppliquerHeritageGroupe()
 
@@ -305,13 +299,9 @@ Public Class FrmSousAgents
         Dim groupe As GroupeStatistiqueWU = TrouverGroupe(cboGroupeStatistique.Text)
 
         If groupe Is Nothing Then
-            ' Groupe inconnu : l'utilisateur va définir ses valeurs (création confirmée à l'enregistrement).
-            chkModifierGroupe.Checked = False
-            MettreAJourVerrouillageHeritage()
-
             If cboGroupeStatistique.Text.Trim().Length > 0 Then
                 lblStatut.Text = $"Groupe « {cboGroupeStatistique.Text.Trim()} » inconnu : " &
-                                 "saisissez les comptes et le taux qui le définiront."
+                                 "cliquez sur « ... » pour le créer."
             End If
             Return
         End If
@@ -320,144 +310,79 @@ Public Class FrmSousAgents
         txtCompteCommission.Text = groupe.CompteCommission
         txtTaux.Text = groupe.Taux.ToString("0.00", Globalization.CultureInfo.CurrentCulture)
 
-        MettreAJourVerrouillageHeritage()
-
         lblStatut.Text = $"Groupe « {groupe.Nom} » : {groupe.NombreSousAgents} sous-agent(s), " &
                          $"taux {groupe.Taux:0.00}, activité {groupe.CompteActivite}, " &
                          $"commission {groupe.CompteCommission}."
+    End Sub
 
-        If groupe.EstIncoherent Then
-            AvertirGroupeIncoherent(groupe)
+    ''' <summary>
+    ''' Les trois champs hérités sont en lecture seule, sans exception : ils appartiennent au
+    ''' groupe. Le fond grisé le rend visible d'un coup d'oeil.
+    ''' </summary>
+    Private Sub VerrouillerChampsHerites()
+
+        txtCompteCompense.ReadOnly = True
+        txtCompteCommission.ReadOnly = True
+        txtTaux.ReadOnly = True
+
+        txtCompteCompense.BackColor = Drawing.SystemColors.Control
+        txtCompteCommission.BackColor = Drawing.SystemColors.Control
+        txtTaux.BackColor = Drawing.SystemColors.Control
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre l'écran des groupes statistiques, en création si le libellé saisi est inconnu.
+    ''' Au retour, la liste est rechargée et le groupe nouvellement créé aussitôt appliqué.
+    ''' </summary>
+    Private Sub btnNouveauGroupe_Click(sender As Object, e As EventArgs) Handles btnNouveauGroupe.Click
+
+        Dim saisie As String = cboGroupeStatistique.Text.Trim()
+        Dim aCreer As String = If(TrouverGroupe(saisie) Is Nothing, saisie, String.Empty)
+
+        Using formulaire As New FrmGroupesStatistiques(aCreer)
+            formulaire.ShowDialog(Me)
+        End Using
+
+        ChargerGroupes()
+
+        ' Le groupe vient peut-être d'être créé : on l'applique sans faire ressaisir son nom.
+        If saisie.Length > 0 Then
+            cboGroupeStatistique.Text = saisie
+            AppliquerHeritageGroupe()
         End If
     End Sub
 
     ''' <summary>
-    ''' Signale un groupe dont les membres ne portent pas tous les mêmes valeurs. L'application
-    ''' ne corrige jamais d'autorité : elle indique comment aligner le groupe si c'est voulu.
-    ''' </summary>
-    Private Sub AvertirGroupeIncoherent(groupe As GroupeStatistiqueWU)
-
-        lblStatut.Text = $"ATTENTION — groupe « {groupe.Nom} » incohérent : {groupe.DetailIncoherence}."
-
-        MessageBox.Show(
-            $"Les sous-agents du groupe « {groupe.Nom} » ne portent pas tous les mêmes valeurs :" &
-            Environment.NewLine & Environment.NewLine &
-            "    " & groupe.DetailIncoherence & Environment.NewLine & Environment.NewLine &
-            "La règle veut qu'un groupe porte un seul compte d'activité, un seul compte de " &
-            "commission et un seul taux, dont chaque Account hérite." & Environment.NewLine &
-            Environment.NewLine &
-            "Les valeurs affichées sont celles du premier membre rencontré. Pour aligner tout " &
-            "le groupe, corrigez-les puis cochez « Modifier les valeurs du groupe » avant " &
-            "d'enregistrer.",
-            "Groupe statistique incohérent", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-    End Sub
-
-    ''' <summary>
-    ''' Verrouille ou libère les trois champs hérités.
-    '''
-    ''' Ils sont en lecture seule dès qu'un groupe EXISTANT est sélectionné : leurs valeurs
-    ''' appartiennent au groupe, pas au sous-agent. Les libérer suppose de cocher explicitement
-    ''' « Modifier les valeurs du groupe », ce qui les appliquera alors à TOUS ses membres.
-    ''' Pour un groupe à créer, ils sont naturellement saisissables.
-    ''' </summary>
-    Private Sub MettreAJourVerrouillageHeritage()
-
-        Dim groupeExistant As GroupeStatistiqueWU = TrouverGroupe(cboGroupeStatistique.Text)
-        Dim herite As Boolean = groupeExistant IsNot Nothing AndAlso Not chkModifierGroupe.Checked
-
-        txtCompteCompense.ReadOnly = herite
-        txtCompteCommission.ReadOnly = herite
-        txtTaux.ReadOnly = herite
-
-        chkModifierGroupe.Enabled = groupeExistant IsNot Nothing
-        If groupeExistant Is Nothing Then chkModifierGroupe.Checked = False
-
-        Dim fondHerite As Drawing.Color = If(herite, Drawing.SystemColors.Control, Drawing.SystemColors.Window)
-        txtCompteCompense.BackColor = fondHerite
-        txtCompteCommission.BackColor = fondHerite
-        txtTaux.BackColor = fondHerite
-    End Sub
-
-    ''' <summary>
-    ''' Vérifie qu'aucun AUTRE groupe n'utilise déjà l'un des deux comptes saisis.
-    '''
-    ''' Règle métier : un couple compte d'activité / compte de commission n'appartient qu'à un
-    ''' seul groupe statistique. Sans ce contrôle, deux groupes partageant un compte rendraient
-    ''' toute ventilation comptable par groupe impossible à interpréter.
-    ''' </summary>
-    ''' <returns>False si un conflit est avéré : l'enregistrement doit être abandonné.</returns>
-    Private Function ValiderUniciteDesComptes(nomGroupe As String, compteActivite As String, compteCommission As String) As Boolean
-
-        For Each groupe As GroupeStatistiqueWU In _groupes
-
-            ' Le groupe de la fiche elle-même n'est évidemment pas en conflit avec lui-même.
-            If String.Equals(groupe.Nom, nomGroupe, StringComparison.OrdinalIgnoreCase) Then Continue For
-
-            Dim conflits As New List(Of String)
-
-            If compteActivite.Length > 0 AndAlso
-               String.Equals(groupe.CompteActivite, compteActivite, StringComparison.OrdinalIgnoreCase) Then
-                conflits.Add($"le compte d'activité {compteActivite}")
-            End If
-
-            If compteCommission.Length > 0 AndAlso
-               String.Equals(groupe.CompteCommission, compteCommission, StringComparison.OrdinalIgnoreCase) Then
-                conflits.Add($"le compte de commission {compteCommission}")
-            End If
-
-            If conflits.Count = 0 Then Continue For
-
-            MessageBox.Show(
-                $"Le groupe « {groupe.Nom} » utilise déjà {String.Join(" et ", conflits)}." &
-                Environment.NewLine & Environment.NewLine &
-                "Un compte d'activité et un compte de commission ne peuvent appartenir qu'à un " &
-                "seul groupe statistique." & Environment.NewLine & Environment.NewLine &
-                $"Rattachez ce sous-agent au groupe « {groupe.Nom} », ou donnez à « {nomGroupe} » " &
-                "des comptes qui lui soient propres.",
-                "Comptes déjà utilisés par un autre groupe", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-
-            Return False
-        Next
-
-        Return True
-    End Function
-
-    ''' <summary>
     ''' Valide le groupe statistique saisi et retourne le libellé à enregistrer.
     '''
-    '''   - groupe existant (à la casse près) : le libellé enregistré est retenu tel quel ;
-    '''   - groupe inconnu : création demandée explicitement à l'utilisateur — c'est le seul
-    '''     moyen de distinguer un nouveau groupe légitime d'une faute de frappe, les deux
-    '''     ayant exactement la même apparence pour l'application ;
-    '''   - champ vide : accepté après avertissement (le sous-agent n'héritera d'aucune valeur
-    '''     et n'apparaîtra dans aucun regroupement statistique).
+    ''' Le groupe est OBLIGATOIRE : c'est de lui que le sous-agent tient son compte d'activité,
+    ''' son compte de commission et son taux. Un libellé inconnu n'est pas créé à la volée —
+    ''' un groupe se définit par trois valeurs, pas par un simple nom : l'écran des groupes
+    ''' s'ouvre alors, pré-rempli.
     '''
-    ''' Retourne Nothing si l'utilisateur renonce : l'enregistrement doit alors être abandonné.
+    ''' Retourne Nothing si le groupe n'est finalement pas déterminé : l'enregistrement doit
+    ''' alors être abandonné.
     ''' </summary>
     Private Function ValiderGroupeStatistique() As String
 
         Dim saisie As String = cboGroupeStatistique.Text.Trim()
 
         If saisie.Length = 0 Then
-            Dim suite As DialogResult = MessageBox.Show(
-                "Aucun groupe statistique n'est renseigné." & Environment.NewLine & Environment.NewLine &
-                "Ce sous-agent n'héritera d'aucun compte ni d'aucun taux de groupe et n'apparaîtra " &
-                "dans aucun regroupement statistique." & Environment.NewLine & Environment.NewLine &
-                "Enregistrer tout de même ?",
-                "Groupe statistique non renseigné", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+            MessageBox.Show(
+                "Le groupe statistique est obligatoire." & Environment.NewLine & Environment.NewLine &
+                "C'est de lui que le sous-agent hérite son compte d'activité, son compte de " &
+                "commission et son taux." & Environment.NewLine & Environment.NewLine &
+                "Choisissez un groupe dans la liste, ou cliquez sur « ... » pour en créer un.",
+                "Groupe statistique obligatoire", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
-            If suite <> DialogResult.Yes Then
-                cboGroupeStatistique.Focus()
-                Return Nothing
-            End If
-
-            Return String.Empty
+            cboGroupeStatistique.Focus()
+            Return Nothing
         End If
 
         Dim existant As GroupeStatistiqueWU = TrouverGroupe(saisie)
 
         If existant IsNot Nothing Then
-            ' Aligne la casse sur celle déjà en base : « reseau » saisi rejoint « RESEAU ».
+            ' Aligne la casse sur celle enregistrée : « reseau » saisi rejoint « RESEAU ».
             If Not String.Equals(existant.Nom, saisie, StringComparison.Ordinal) Then
                 cboGroupeStatistique.Text = existant.Nom
             End If
@@ -465,13 +390,11 @@ Public Class FrmSousAgents
         End If
 
         Dim reponse As DialogResult = MessageBox.Show(
-            $"Le groupe statistique « {saisie} » n'existe pas encore." & Environment.NewLine & Environment.NewLine &
-            "Voulez-vous le CRÉER avec le compte d'activité, le compte de commission et le taux " &
-            "saisis ? Tous les sous-agents rattachés ensuite à ce groupe en hériteront." &
-            Environment.NewLine & Environment.NewLine &
-            "Répondez « Non » pour choisir un groupe existant dans la liste déroulante." & Environment.NewLine &
-            "Un groupe créé par erreur ne pourra être corrigé qu'en modifiant chaque sous-agent qui le porte.",
-            "Nouveau groupe statistique", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
+            $"Le groupe statistique « {saisie} » n'existe pas." & Environment.NewLine & Environment.NewLine &
+            "Un groupe se définit par un compte d'activité, un compte de commission et un taux : " &
+            "il ne peut donc pas être créé d'un simple nom." & Environment.NewLine & Environment.NewLine &
+            "Ouvrir l'écran des groupes statistiques pour le créer maintenant ?",
+            "Groupe inconnu", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
 
         If reponse <> DialogResult.Yes Then
             cboGroupeStatistique.DroppedDown = True
@@ -479,7 +402,22 @@ Public Class FrmSousAgents
             Return Nothing
         End If
 
-        Return saisie
+        Using formulaire As New FrmGroupesStatistiques(saisie)
+            formulaire.ShowDialog(Me)
+        End Using
+
+        ChargerGroupes()
+
+        existant = TrouverGroupe(saisie)
+        If existant Is Nothing Then
+            ' Le groupe n'a finalement pas été créé : rien à enregistrer.
+            cboGroupeStatistique.Focus()
+            Return Nothing
+        End If
+
+        cboGroupeStatistique.Text = existant.Nom
+        AppliquerHeritageGroupe()
+        Return existant.Nom
     End Function
 
 #End Region
@@ -515,7 +453,6 @@ Public Class FrmSousAgents
         dgvListe.ClearSelection()
         ViderChamps()
         txtTaux.Text = "0,00"
-        chkModifierGroupe.Checked = False
         MettreAJourEtatBoutons()
 
         lblStatut.Text = "Nouveau sous-agent : choisissez son groupe statistique, dont il héritera " &
@@ -539,66 +476,36 @@ Public Class FrmSousAgents
             Return
         End If
 
-        ' Le groupe statistique se choisit dans la liste des groupes existants ; un libellé
-        ' inconnu n'est retenu qu'après confirmation explicite de sa création. Ce contrôle vient
-        ' APRÈS les autres : inutile de faire trancher la création d'un groupe si la fiche est
-        ' de toute façon incomplète par ailleurs.
-        Dim groupe As String = ValiderGroupeStatistique()
-        If groupe Is Nothing Then Return ' L'utilisateur a renoncé : message déjà affiché.
+        ' Le groupe statistique est obligatoire et détermine à lui seul le compte d'activité, le
+        ' compte de commission et le taux. Ce contrôle vient APRÈS les autres : inutile d'ouvrir
+        ' l'écran des groupes si la fiche est de toute façon incomplète par ailleurs.
+        Dim nomGroupe As String = ValiderGroupeStatistique()
+        If nomGroupe Is Nothing Then Return ' Groupe non déterminé : message déjà affiché.
 
-        fiche.GroupeStatistique = groupe
+        Dim groupe As GroupeStatistiqueWU = TrouverGroupe(nomGroupe)
+        If groupe Is Nothing Then Return ' Ne devrait pas se produire : ValiderGroupeStatistique l'a vérifié.
 
-        ' Un couple de comptes n'appartient qu'à un seul groupe statistique.
-        If groupe.Length > 0 AndAlso
-           Not ValiderUniciteDesComptes(groupe, fiche.CompteCompense, fiche.CompteCommission) Then
-            Return
+        ' Les valeurs viennent du groupe, jamais de la fiche. Si la fiche en portait d'autres —
+        ' une dérive héritée du paramétrage antérieur — elle est réalignée, mais jamais sans le dire.
+        If Not groupe.CorrespondA(fiche) Then
+            Dim retour As DialogResult = MessageBox.Show(
+                $"Cette fiche ne porte pas les valeurs de son groupe « {groupe.Nom} » :" &
+                Environment.NewLine & Environment.NewLine &
+                $"    compte d'activité    : {fiche.CompteCompense}  ->  {groupe.CompteActivite}" & Environment.NewLine &
+                $"    compte de commission : {fiche.CompteCommission}  ->  {groupe.CompteCommission}" & Environment.NewLine &
+                $"    taux                 : {fiche.Taux:0.00}  ->  {groupe.Taux:0.00}" & Environment.NewLine &
+                Environment.NewLine &
+                "Un Account hérite des valeurs de son groupe : l'enregistrement les adoptera." &
+                Environment.NewLine & Environment.NewLine &
+                "Pour modifier les valeurs elles-mêmes, passez par l'écran des groupes " &
+                "(bouton « ... ») : le changement s'appliquera alors à tout le groupe." &
+                Environment.NewLine & Environment.NewLine & "Continuer ?",
+                "Alignement sur le groupe", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+            If retour <> DialogResult.Yes Then Return
         End If
 
-        ' Les valeurs saisies diffèrent-elles de celles du groupe ? Deux cas seulement :
-        ' soit l'utilisateur veut faire évoluer LE GROUPE (case cochée, propagation à tous ses
-        ' membres), soit la fiche doit revenir aux valeurs du groupe. Enregistrer une fiche
-        ' divergente sans le dire créerait précisément l'incohérence que la règle exclut.
-        Dim groupeExistant As GroupeStatistiqueWU = TrouverGroupe(groupe)
-        Dim propagerAuGroupe As Boolean = False
-
-        If groupeExistant IsNot Nothing AndAlso Not groupeExistant.CorrespondA(fiche) Then
-
-            If chkModifierGroupe.Checked Then
-                Dim confirmation As DialogResult = MessageBox.Show(
-                    $"Les nouvelles valeurs seront appliquées aux {groupeExistant.NombreSousAgents} " &
-                    $"sous-agent(s) du groupe « {groupeExistant.Nom} » :" & Environment.NewLine & Environment.NewLine &
-                    $"    compte d'activité   : {groupeExistant.CompteActivite}  ->  {fiche.CompteCompense}" & Environment.NewLine &
-                    $"    compte de commission : {groupeExistant.CompteCommission}  ->  {fiche.CompteCommission}" & Environment.NewLine &
-                    $"    taux                 : {groupeExistant.Taux:0.00}  ->  {fiche.Taux:0.00}" & Environment.NewLine &
-                    Environment.NewLine &
-                    "Les pièces comptables générées ensuite utiliseront ces comptes pour tout le groupe." &
-                    Environment.NewLine & "Confirmer ?",
-                    "Modifier les valeurs du groupe", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-                    MessageBoxDefaultButton.Button2)
-
-                If confirmation <> DialogResult.Yes Then Return
-                propagerAuGroupe = True
-            Else
-                Dim retour As DialogResult = MessageBox.Show(
-                    $"Les valeurs saisies diffèrent de celles du groupe « {groupeExistant.Nom} » :" &
-                    Environment.NewLine & Environment.NewLine &
-                    $"    compte d'activité   : {groupeExistant.CompteActivite}" & Environment.NewLine &
-                    $"    compte de commission : {groupeExistant.CompteCommission}" & Environment.NewLine &
-                    $"    taux                 : {groupeExistant.Taux:0.00}" & Environment.NewLine &
-                    Environment.NewLine &
-                    "Un Account hérite des valeurs de son groupe : adopter celles du groupe ?" &
-                    Environment.NewLine & Environment.NewLine &
-                    "Répondez « Non » pour revenir à la saisie — pour faire évoluer le groupe lui-même, " &
-                    "cochez « Modifier les valeurs du groupe ».",
-                    "Valeurs différentes de celles du groupe", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
-
-                If retour <> DialogResult.Yes Then Return
-
-                fiche.CompteCompense = groupeExistant.CompteActivite
-                fiche.CompteCommission = groupeExistant.CompteCommission
-                fiche.Taux = groupeExistant.Taux
-            End If
-        End If
+        groupe.AppliquerA(fiche)
 
 
         ' Un même Account dans les deux tables serait silencieusement traité comme un sous-agent :
@@ -632,34 +539,6 @@ Public Class FrmSousAgents
                                 $"Sous-agent « {fiche.CodePdv} » modifié.")
             _enCreation = False
 
-            ' Les valeurs appartiennent au groupe : elles sont reportées sur tous ses membres.
-            If propagerAuGroupe Then
-                Dim nouvellesValeurs As New GroupeStatistiqueWU() With {
-                    .Nom = fiche.GroupeStatistique,
-                    .CompteActivite = fiche.CompteCompense,
-                    .CompteCommission = fiche.CompteCommission,
-                    .Taux = fiche.Taux
-                }
-
-                Dim nombreModifies As Integer = 0
-                Dim erreurGroupe As String = String.Empty
-
-                If PdvRepository.AppliquerValeursGroupe(nouvellesValeurs, nombreModifies, erreurGroupe) Then
-                    lblStatut.Text = $"Groupe « {fiche.GroupeStatistique} » mis à jour : " &
-                                     $"{nombreModifies} sous-agent(s) alignés."
-                Else
-                    ' La fiche, elle, est bien enregistrée : le groupe est donc devenu incohérent,
-                    ' et l'utilisateur doit le savoir pour pouvoir relancer l'alignement.
-                    MessageBox.Show(
-                        erreurGroupe & Environment.NewLine & Environment.NewLine &
-                        $"Le sous-agent « {fiche.CodePdv} » a bien été enregistré, mais les autres " &
-                        "membres du groupe portent encore les anciennes valeurs." & Environment.NewLine &
-                        "Rouvrez la fiche et réessayez pour aligner le groupe.",
-                        "Groupe non aligné", MessageBoxButtons.OK, MessageBoxIcon.Error)
-                End If
-            End If
-
-            chkModifierGroupe.Checked = False
 
             ' Un groupe qui vient d'être créé n'existait dans aucune fiche : il devient
             ' sélectionnable dès maintenant pour les saisies suivantes.

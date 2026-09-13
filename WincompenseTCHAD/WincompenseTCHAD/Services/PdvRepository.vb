@@ -172,81 +172,84 @@ Public NotInheritable Class PdvRepository
         Return True
     End Function
 
+#End Region
+
+#Region "Groupes statistiques (T_GroupeStatistique)"
+
+    ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
+    Private Const ERREUR_TABLE_ABSENTE As Integer = 208
+
     ''' <summary>
-    ''' Liste les groupes statistiques avec leurs valeurs héritées (compte d'activité, compte de
-    ''' commission, taux) et le nombre de sous-agents qu'ils regroupent.
-    '''
-    ''' Il n'existe pas de table de groupes : les valeurs d'un groupe sont celles de ses membres.
-    ''' La requête relève donc, pour chaque groupe, le minimum ET le maximum de chaque colonne :
-    ''' lorsqu'ils diffèrent, c'est que les membres ne portent pas tous la même valeur — ce que
-    ''' la règle métier exclut, mais que des données antérieures peuvent présenter. Le groupe est
-    ''' alors marqué incohérent, avec le détail de la divergence : l'application le SIGNALE, elle
-    ''' ne corrige jamais d'autorité des données comptables.
-    '''
-    ''' Un seul aller-retour en base suffit ainsi à obtenir les valeurs et leur contrôle.
+    ''' Message posé lorsque la table des groupes n'existe pas encore : la migration n'a pas
+    ''' été jouée. Le dire explicitement évite de laisser croire à une panne de la base.
     ''' </summary>
-    ''' <returns>Groupes triés par libellé. Liste vide (jamais Nothing) en cas d'erreur.</returns>
-    Public Shared Function ListerGroupes(ByRef messageErreur As String) As List(Of GroupeStatistiqueWU)
+    Public Const MESSAGE_TABLE_GROUPES_ABSENTE As String =
+        "La table T_GroupeStatistique n'existe pas encore dans la base." & vbCrLf & vbCrLf &
+        "Exécutez le script Scripts\04_GroupeStatistique.sql : il crée la table et y reprend " &
+        "automatiquement les groupes déjà présents dans T_Pdv_SA."
+
+    ''' <summary>
+    ''' Liste les groupes statistiques, avec le nombre de sous-agents rattachés et le nombre de
+    ''' ceux dont les colonnes de T_Pdv_SA ne portent plus les valeurs du groupe.
+    '''
+    ''' La comptabilisation quotidienne continue de lire T_Pdv_SA : ces colonnes en sont le
+    ''' miroir, tenu à jour par l'application à chaque modification d'un groupe. Le décompte des
+    ''' désynchronisés permet de détecter une dérive (écriture directe en base, mise à jour
+    ''' interrompue) et de la corriger d'un clic.
+    ''' </summary>
+    ''' <param name="filtre">Texte recherché dans le libellé ou les comptes, ou chaîne vide.</param>
+    Public Shared Function ListerGroupes(filtre As String, ByRef messageErreur As String) As List(Of GroupeStatistiqueWU)
 
         messageErreur = String.Empty
         Dim resultat As New List(Of GroupeStatistiqueWU)
 
-        Const requete As String =
-            "SELECT LTRIM(RTRIM(GroupeStatistique)) AS Groupe, COUNT(*) AS Nombre, " &
-            "MIN(CompteCompense) AS ActiviteMin, MAX(CompteCompense) AS ActiviteMax, " &
-            "MIN(CompteCommission) AS CommissionMin, MAX(CompteCommission) AS CommissionMax, " &
-            "MIN(Taux) AS TauxMin, MAX(Taux) AS TauxMax " &
-            "FROM T_Pdv_SA " &
-            "WHERE GroupeStatistique IS NOT NULL AND LTRIM(RTRIM(GroupeStatistique)) <> '' " &
-            "GROUP BY LTRIM(RTRIM(GroupeStatistique)) ORDER BY 1"
+        Dim requete As String =
+            "SELECT g.Groupe, g.CompteActivite, g.CompteCommission, g.Taux, " &
+            "  (SELECT COUNT(*) FROM T_Pdv_SA p " &
+            "    WHERE LTRIM(RTRIM(p.GroupeStatistique)) = g.Groupe) AS NombreSousAgents, " &
+            "  (SELECT COUNT(*) FROM T_Pdv_SA p " &
+            "    WHERE LTRIM(RTRIM(p.GroupeStatistique)) = g.Groupe " &
+            "      AND (p.CompteCompense <> g.CompteActivite " &
+            "        OR p.CompteCommission <> g.CompteCommission " &
+            "        OR p.Taux <> g.Taux)) AS NombreDesynchronises " &
+            "FROM T_GroupeStatistique g"
+
+        Dim recherche As String = If(filtre, String.Empty).Trim()
+        If recherche.Length > 0 Then
+            requete &= " WHERE g.Groupe LIKE @filtre OR g.CompteActivite LIKE @filtre " &
+                       "OR g.CompteCommission LIKE @filtre"
+        End If
+        requete &= " ORDER BY g.Groupe"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
 
                 Using commande As New SqlCommand(requete, connexion)
+
+                    If recherche.Length > 0 Then
+                        commande.Parameters.Add("@filtre", SqlDbType.NVarChar, 255).Value = "%" & EchapperLike(recherche) & "%"
+                    End If
+
                     Using lecteur As SqlDataReader = commande.ExecuteReader()
                         While lecteur.Read()
-
-                            Dim activiteMin As String = LireChaine(lecteur, "ActiviteMin")
-                            Dim activiteMax As String = LireChaine(lecteur, "ActiviteMax")
-                            Dim commissionMin As String = LireChaine(lecteur, "CommissionMin")
-                            Dim commissionMax As String = LireChaine(lecteur, "CommissionMax")
-                            Dim tauxMin As Decimal = LireDecimal(lecteur, "TauxMin")
-                            Dim tauxMax As Decimal = LireDecimal(lecteur, "TauxMax")
-
-                            Dim groupe As New GroupeStatistiqueWU() With {
+                            resultat.Add(New GroupeStatistiqueWU() With {
                                 .Nom = LireChaine(lecteur, "Groupe"),
-                                .NombreSousAgents = LireEntier(lecteur, "Nombre"),
-                                .CompteActivite = activiteMin,
-                                .CompteCommission = commissionMin,
-                                .Taux = tauxMin
-                            }
-
-                            Dim divergences As New List(Of String)
-                            If Not String.Equals(activiteMin, activiteMax, StringComparison.OrdinalIgnoreCase) Then
-                                divergences.Add($"compte d'activité ({activiteMin} / {activiteMax})")
-                            End If
-                            If Not String.Equals(commissionMin, commissionMax, StringComparison.OrdinalIgnoreCase) Then
-                                divergences.Add($"compte de commission ({commissionMin} / {commissionMax})")
-                            End If
-                            If tauxMin <> tauxMax Then
-                                divergences.Add($"taux ({tauxMin:0.00} / {tauxMax:0.00})")
-                            End If
-
-                            If divergences.Count > 0 Then
-                                groupe.EstIncoherent = True
-                                groupe.DetailIncoherence = String.Join(", ", divergences)
-                            End If
-
-                            If groupe.Nom.Length > 0 Then resultat.Add(groupe)
+                                .CompteActivite = LireChaine(lecteur, "CompteActivite"),
+                                .CompteCommission = LireChaine(lecteur, "CompteCommission"),
+                                .Taux = LireDecimal(lecteur, "Taux"),
+                                .NombreSousAgents = LireEntier(lecteur, "NombreSousAgents"),
+                                .NombreDesynchronises = LireEntier(lecteur, "NombreDesynchronises")
+                            })
                         End While
                     End Using
                 End Using
             End Using
 
         Catch ex As SqlException
-            messageErreur = $"Lecture des groupes statistiques impossible : {ex.Message}"
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_GROUPES_ABSENTE,
+                               $"Lecture des groupes statistiques impossible : {ex.Message}")
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
@@ -254,24 +257,105 @@ Public NotInheritable Class PdvRepository
         Return resultat
     End Function
 
+    ''' <summary>Crée un groupe statistique.</summary>
+    Public Shared Function AjouterGroupe(groupe As GroupeStatistiqueWU, ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+        If groupe Is Nothing Then
+            messageErreur = "Aucun groupe à enregistrer."
+            Return False
+        End If
+
+        Const requete As String =
+            "INSERT INTO T_GroupeStatistique (Groupe, CompteActivite, CompteCommission, Taux) " &
+            "VALUES (@groupe, @activite, @commission, @taux)"
+
+        Return ExecuterEcritureGroupe(requete, groupe, "créer", messageErreur)
+    End Function
+
     ''' <summary>
-    ''' Applique le compte d'activité, le compte de commission et le taux d'un groupe à TOUS les
-    ''' sous-agents qui le portent.
-    '''
-    ''' C'est la traduction directe de la règle d'héritage : les valeurs appartiennent au groupe,
-    ''' pas au sous-agent. Les modifier sous-agent par sous-agent produirait exactement le genre
-    ''' d'incohérence que ListerGroupes sait détecter.
+    ''' Modifie un groupe existant, désigné par son libellé. Le libellé lui-même n'est jamais
+    ''' modifié ici : il est la clé sous laquelle les sous-agents se rattachent au groupe.
+    ''' Pour renommer un groupe, voir RenommerGroupe.
+    ''' </summary>
+    Public Shared Function ModifierGroupe(groupe As GroupeStatistiqueWU, ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+        If groupe Is Nothing Then
+            messageErreur = "Aucun groupe à enregistrer."
+            Return False
+        End If
+
+        Const requete As String =
+            "UPDATE T_GroupeStatistique SET CompteActivite = @activite, " &
+            "CompteCommission = @commission, Taux = @taux WHERE Groupe = @groupe"
+
+        Return ExecuterEcritureGroupe(requete, groupe, "modifier", messageErreur)
+    End Function
+
+    ''' <summary>
+    ''' Supprime un groupe. Refusé s'il reste des sous-agents rattachés : ils perdraient leur
+    ''' compte d'activité, leur compte de commission et leur taux sans qu'on s'en aperçoive.
+    ''' </summary>
+    Public Shared Function SupprimerGroupe(nomGroupe As String, ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If String.IsNullOrWhiteSpace(nomGroupe) Then
+            messageErreur = "Aucun groupe sélectionné."
+            Return False
+        End If
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Dim rattaches As Integer = CompterSousAgentsDuGroupe(nomGroupe, connexion)
+                If rattaches > 0 Then
+                    messageErreur = $"Le groupe « {nomGroupe} » ne peut pas être supprimé : " &
+                                    $"{rattaches} sous-agent(s) y sont rattachés." & Environment.NewLine & Environment.NewLine &
+                                    "Rattachez-les d'abord à un autre groupe."
+                    Return False
+                End If
+
+                Using commande As New SqlCommand("DELETE FROM T_GroupeStatistique WHERE Groupe = @groupe", connexion)
+                    commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = nomGroupe.Trim()
+
+                    If commande.ExecuteNonQuery() = 0 Then
+                        messageErreur = $"Aucune suppression : le groupe « {nomGroupe} » n'existe plus."
+                        Return False
+                    End If
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_GROUPES_ABSENTE,
+                               $"Suppression du groupe « {nomGroupe} » impossible : {ex.Message}")
+            Return False
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    ''' <summary>
+    ''' Reporte les valeurs d'un groupe sur TOUS les sous-agents qui le portent, afin que les
+    ''' colonnes de T_Pdv_SA — lues par la comptabilisation quotidienne et par d'autres
+    ''' applications — restent le reflet exact du groupe.
     ''' </summary>
     ''' <param name="nombreModifies">Nombre de sous-agents effectivement mis à jour.</param>
-    Public Shared Function AppliquerValeursGroupe(groupe As GroupeStatistiqueWU,
-                                                  ByRef nombreModifies As Integer,
-                                                  ByRef messageErreur As String) As Boolean
+    Public Shared Function SynchroniserSousAgentsDuGroupe(groupe As GroupeStatistiqueWU,
+                                                          ByRef nombreModifies As Integer,
+                                                          ByRef messageErreur As String) As Boolean
 
         messageErreur = String.Empty
         nombreModifies = 0
 
         If groupe Is Nothing OrElse String.IsNullOrWhiteSpace(groupe.Nom) Then
-            messageErreur = "Aucun groupe à mettre à jour."
+            messageErreur = "Aucun groupe à synchroniser."
             Return False
         End If
 
@@ -284,22 +368,13 @@ Public NotInheritable Class PdvRepository
                 connexion.Open()
 
                 Using commande As New SqlCommand(requete, connexion)
-                    commande.Parameters.Add("@activite", SqlDbType.NVarChar, 255).Value = groupe.CompteActivite
-                    commande.Parameters.Add("@commission", SqlDbType.NVarChar, 255).Value = groupe.CompteCommission
-
-                    Dim parametreTaux As SqlParameter = commande.Parameters.Add("@taux", SqlDbType.Decimal)
-                    parametreTaux.Precision = 4
-                    parametreTaux.Scale = 2
-                    parametreTaux.Value = Decimal.Round(groupe.Taux, 2)
-
-                    commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = groupe.Nom.Trim()
-
+                    AjouterParametresGroupe(commande, groupe)
                     nombreModifies = commande.ExecuteNonQuery()
                 End Using
             End Using
 
         Catch ex As SqlException
-            messageErreur = $"Mise à jour du groupe « {groupe.Nom} » impossible : {ex.Message}"
+            messageErreur = $"Synchronisation des sous-agents du groupe « {groupe.Nom} » impossible : {ex.Message}"
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -307,6 +382,94 @@ Public NotInheritable Class PdvRepository
         End Try
 
         Return True
+    End Function
+
+    Private Shared Function ExecuterEcritureGroupe(requete As String, groupe As GroupeStatistiqueWU,
+                                                   action As String, ByRef messageErreur As String) As Boolean
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    AjouterParametresGroupe(commande, groupe)
+
+                    If commande.ExecuteNonQuery() = 0 Then
+                        messageErreur = $"Aucune modification : le groupe « {groupe.Nom} » n'existe plus." &
+                                        Environment.NewLine & "Il a peut-être été supprimé depuis un autre poste."
+                        Return False
+                    End If
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = MessageErreurGroupe(ex, groupe, action)
+            Return False
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    Private Shared Sub AjouterParametresGroupe(commande As SqlCommand, groupe As GroupeStatistiqueWU)
+
+        commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = groupe.Nom.Trim()
+        commande.Parameters.Add("@activite", SqlDbType.NVarChar, 255).Value = groupe.CompteActivite
+        commande.Parameters.Add("@commission", SqlDbType.NVarChar, 255).Value = groupe.CompteCommission
+
+        ' La colonne Taux est de type DECIMAL(4,2) : précision et échelle cadrées explicitement,
+        ' valeur arrondie côté application, pour qu'aucun arrondi ne se produise en silence.
+        Dim parametreTaux As SqlParameter = commande.Parameters.Add("@taux", SqlDbType.Decimal)
+        parametreTaux.Precision = 4
+        parametreTaux.Scale = 2
+        parametreTaux.Value = Decimal.Round(groupe.Taux, 2)
+    End Sub
+
+    Private Shared Function CompterSousAgentsDuGroupe(nomGroupe As String, connexion As SqlConnection) As Integer
+
+        Using commande As New SqlCommand(
+            "SELECT COUNT(*) FROM T_Pdv_SA WHERE LTRIM(RTRIM(GroupeStatistique)) = @groupe", connexion)
+
+            commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = nomGroupe.Trim()
+
+            Dim valeur As Object = commande.ExecuteScalar()
+            If valeur Is Nothing OrElse valeur Is DBNull.Value Then Return 0
+
+            Return Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture)
+        End Using
+    End Function
+
+    ''' <summary>
+    ''' Traduit une exception SQL d'écriture sur les groupes. Les deux index uniques posés sur
+    ''' les comptes rendent la règle « un compte n'appartient qu'à un seul groupe » impossible à
+    ''' violer : reste à dire lequel des deux comptes est déjà pris, plutôt qu'un code d'erreur.
+    ''' </summary>
+    Private Shared Function MessageErreurGroupe(ex As SqlException, groupe As GroupeStatistiqueWU, action As String) As String
+
+        If ex.Number = ERREUR_TABLE_ABSENTE Then
+            Return MESSAGE_TABLE_GROUPES_ABSENTE
+        End If
+
+        If ex.Number = ERREUR_CLE_DUPLIQUEE OrElse ex.Number = ERREUR_INDEX_UNIQUE Then
+
+            ' Le message de SQL Server nomme l'index violé : il indique lequel des deux comptes
+            ' — ou le libellé du groupe — est déjà utilisé ailleurs.
+            If ex.Message.IndexOf("CompteActivite", StringComparison.OrdinalIgnoreCase) >= 0 Then
+                Return $"Le compte d'activité « {groupe.CompteActivite} » appartient déjà à un autre groupe." &
+                       Environment.NewLine & "Un compte ne peut appartenir qu'à un seul groupe statistique."
+            End If
+
+            If ex.Message.IndexOf("CompteCommission", StringComparison.OrdinalIgnoreCase) >= 0 Then
+                Return $"Le compte de commission « {groupe.CompteCommission} » appartient déjà à un autre groupe." &
+                       Environment.NewLine & "Un compte ne peut appartenir qu'à un seul groupe statistique."
+            End If
+
+            Return $"Le groupe « {groupe.Nom} » existe déjà." & Environment.NewLine &
+                   "Sélectionnez-le dans la liste pour le modifier."
+        End If
+
+        Return $"Impossible de {action} le groupe « {groupe.Nom} » : {ex.Message}"
     End Function
 
 #End Region

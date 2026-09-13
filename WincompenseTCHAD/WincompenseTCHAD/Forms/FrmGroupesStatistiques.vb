@@ -1,0 +1,449 @@
+Option Strict On
+Option Explicit On
+
+Imports System.Windows.Forms
+
+''' <summary>
+''' Gestion des groupes statistiques (table T_GroupeStatistique) : consultation, création,
+''' modification et suppression.
+'''
+''' Le groupe est l'unité de paramétrage : il porte le compte d'activité, le compte de
+''' commission et le taux dont chaque sous-agent hérite. Les deux index uniques posés sur les
+''' comptes rendent impossible qu'un compte appartienne à deux groupes — la règle est désormais
+''' garantie par la base, et non plus seulement vérifiée par l'application.
+'''
+''' Les colonnes correspondantes de T_Pdv_SA sont conservées et tenues synchronisées : la
+''' comptabilisation quotidienne continue de les lire, comme d'autres applications peuvent le
+''' faire. Toute modification d'un groupe est donc reportée sur ses sous-agents.
+''' </summary>
+Public Class FrmGroupesStatistiques
+
+    Private _liste As List(Of GroupeStatistiqueWU)
+    Private _enCreation As Boolean = False
+    Private _chargementEnCours As Boolean = False
+
+    ''' <summary>Libellé à pré-remplir à l'ouverture, lorsque le formulaire est appelé pour créer un groupe précis.</summary>
+    Private ReadOnly _nomAPreremplir As String
+
+    ''' <summary>Vrai si au moins un groupe a été créé ou modifié pendant la session du formulaire.</summary>
+    Public ReadOnly Property ModificationEnregistree As Boolean
+        Get
+            Return _modifie
+        End Get
+    End Property
+    Private _modifie As Boolean = False
+
+    Public Sub New()
+        Me.New(String.Empty)
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre le formulaire directement en création, avec un libellé pré-rempli. Utilisé depuis
+    ''' l'écran des sous-agents lorsque le groupe saisi n'existe pas encore : l'utilisateur n'a
+    ''' plus qu'à renseigner les comptes et le taux.
+    ''' </summary>
+    Public Sub New(nomAPreremplir As String)
+        InitializeComponent()
+        _nomAPreremplir = If(nomAPreremplir, String.Empty).Trim()
+    End Sub
+
+#Region "Chargement et affichage de la liste"
+
+    Private Sub FrmGroupesStatistiques_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        ChargerListe()
+
+        If _nomAPreremplir.Length > 0 Then
+            PreparerCreation(_nomAPreremplir)
+        End If
+    End Sub
+
+    Private Sub ChargerListe(Optional nomASelectionner As String = Nothing)
+
+        Cursor = Cursors.WaitCursor
+        _chargementEnCours = True
+
+        Try
+            Dim messageErreur As String = String.Empty
+            _liste = PdvRepository.ListerGroupes(txtRecherche.Text, messageErreur)
+
+            dgvListe.DataSource = Nothing
+            dgvListe.DataSource = _liste
+            RenommerColonnes()
+
+            If Not String.IsNullOrEmpty(messageErreur) Then
+                lblStatut.Text = "Groupes non lus : voir le message affiché."
+                lblNombre.Text = String.Empty
+                MessageBox.Show(messageErreur, "Groupes statistiques", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Else
+                lblNombre.Text = $"{_liste.Count} groupe(s)"
+                lblStatut.Text = If(_liste.Count = 0,
+                                    "Aucun groupe ne correspond à la recherche.",
+                                    "Sélectionnez un groupe pour le modifier, ou cliquez sur « Nouveau ».")
+                SignalerDesynchronisation()
+            End If
+
+        Finally
+            _chargementEnCours = False
+            Cursor = Cursors.Default
+        End Try
+
+        If Not String.IsNullOrEmpty(nomASelectionner) Then
+            SelectionnerNom(nomASelectionner)
+        End If
+
+        AfficherFicheSelectionnee()
+        MettreAJourEtatBoutons()
+    End Sub
+
+    ''' <summary>
+    ''' Signale les groupes dont des sous-agents ne portent plus les valeurs du groupe. La
+    ''' comptabilisation lisant les colonnes de T_Pdv_SA, une telle dérive produirait des
+    ''' écritures sur des comptes qui ne sont plus ceux du groupe.
+    ''' </summary>
+    Private Sub SignalerDesynchronisation()
+
+        Dim desynchronises As Integer = 0
+        For Each groupe As GroupeStatistiqueWU In _liste
+            If groupe.EstDesynchronise Then desynchronises += 1
+        Next
+
+        If desynchronises = 0 Then Return
+
+        lblStatut.Text = $"ATTENTION — {desynchronises} groupe(s) dont des sous-agents ne portent plus " &
+                         "les valeurs du groupe. Sélectionnez-les et cliquez sur « Synchroniser les sous-agents »."
+    End Sub
+
+    Private Sub RenommerColonnes()
+
+        DefinirEntete("Nom", "Groupe")
+        DefinirEntete("CompteActivite", "Compte d'activité")
+        DefinirEntete("CompteCommission", "Compte de commission")
+        DefinirEntete("Taux", "Taux")
+        DefinirEntete("NombreSousAgents", "Sous-agents")
+        DefinirEntete("NombreDesynchronises", "Désynchronisés")
+
+        ' Propriété calculée, sans intérêt dans la grille : la colonne « Désynchronisés » la dit mieux.
+        If dgvListe.Columns.Contains("EstDesynchronise") Then
+            dgvListe.Columns("EstDesynchronise").Visible = False
+        End If
+
+        If dgvListe.Columns.Contains("Taux") Then
+            dgvListe.Columns("Taux").DefaultCellStyle.Format = "P0"
+            dgvListe.Columns("Taux").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+        End If
+
+        dgvListe.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+        MettreEnEvidenceDesynchronises()
+    End Sub
+
+    ''' <summary>Met en évidence, en rouge, les groupes dont des sous-agents ont dérivé.</summary>
+    Private Sub MettreEnEvidenceDesynchronises()
+
+        For Each ligne As DataGridViewRow In dgvListe.Rows
+            Dim groupe As GroupeStatistiqueWU = TryCast(ligne.DataBoundItem, GroupeStatistiqueWU)
+            If groupe IsNot Nothing AndAlso groupe.EstDesynchronise Then
+                ligne.DefaultCellStyle.BackColor = Drawing.Color.MistyRose
+            End If
+        Next
+    End Sub
+
+    Private Sub DefinirEntete(nomColonne As String, intitule As String)
+        If dgvListe.Columns.Contains(nomColonne) Then
+            dgvListe.Columns(nomColonne).HeaderText = intitule
+        End If
+    End Sub
+
+    Private Sub SelectionnerNom(nom As String)
+
+        For Each ligne As DataGridViewRow In dgvListe.Rows
+            Dim groupe As GroupeStatistiqueWU = TryCast(ligne.DataBoundItem, GroupeStatistiqueWU)
+            If groupe IsNot Nothing AndAlso String.Equals(groupe.Nom, nom, StringComparison.OrdinalIgnoreCase) Then
+                ligne.Selected = True
+                dgvListe.CurrentCell = ligne.Cells(0)
+                Return
+            End If
+        Next
+    End Sub
+
+    Private Function GroupeSelectionne() As GroupeStatistiqueWU
+        If dgvListe.CurrentRow Is Nothing Then Return Nothing
+        Return TryCast(dgvListe.CurrentRow.DataBoundItem, GroupeStatistiqueWU)
+    End Function
+
+    Private Sub dgvListe_SelectionChanged(sender As Object, e As EventArgs) Handles dgvListe.SelectionChanged
+        If _chargementEnCours Then Return
+        _enCreation = False
+        AfficherFicheSelectionnee()
+        MettreAJourEtatBoutons()
+    End Sub
+
+    Private Sub AfficherFicheSelectionnee()
+
+        If _enCreation Then Return
+
+        Dim groupe As GroupeStatistiqueWU = GroupeSelectionne()
+
+        If groupe Is Nothing Then
+            ViderChamps()
+            Return
+        End If
+
+        txtNom.Text = groupe.Nom
+        txtCompteActivite.Text = groupe.CompteActivite
+        txtCompteCommission.Text = groupe.CompteCommission
+        txtTaux.Text = groupe.Taux.ToString("0.00", Globalization.CultureInfo.CurrentCulture)
+
+        If groupe.EstDesynchronise Then
+            lblStatut.Text = $"Groupe « {groupe.Nom} » : {groupe.NombreSousAgents} sous-agent(s), dont " &
+                             $"{groupe.NombreDesynchronises} ne portant plus les valeurs du groupe."
+        Else
+            lblStatut.Text = $"Groupe « {groupe.Nom} » : {groupe.NombreSousAgents} sous-agent(s) rattaché(s)."
+        End If
+    End Sub
+
+    Private Sub ViderChamps()
+        txtNom.Text = String.Empty
+        txtCompteActivite.Text = String.Empty
+        txtCompteCommission.Text = String.Empty
+        txtTaux.Text = String.Empty
+    End Sub
+
+    ''' <summary>
+    ''' Le libellé n'est saisissable qu'à la création : c'est la clé sous laquelle les
+    ''' sous-agents se rattachent au groupe, la renommer les détacherait tous d'un coup.
+    ''' </summary>
+    Private Sub MettreAJourEtatBoutons()
+
+        Dim groupe As GroupeStatistiqueWU = GroupeSelectionne()
+
+        txtNom.ReadOnly = Not _enCreation
+        btnSupprimer.Enabled = Not _enCreation AndAlso groupe IsNot Nothing
+        btnSynchroniser.Enabled = Not _enCreation AndAlso groupe IsNot Nothing
+        grpDetail.Text = If(_enCreation, "Nouveau groupe statistique", "Fiche du groupe statistique")
+    End Sub
+
+#End Region
+
+#Region "Recherche"
+
+    Private Sub txtRecherche_KeyDown(sender As Object, e As KeyEventArgs) Handles txtRecherche.KeyDown
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            _enCreation = False
+            ChargerListe()
+        End If
+    End Sub
+
+    Private Sub btnActualiser_Click(sender As Object, e As EventArgs) Handles btnActualiser.Click
+        _enCreation = False
+        ChargerListe()
+    End Sub
+
+#End Region
+
+#Region "Création, modification, suppression"
+
+    Private Sub btnNouveau_Click(sender As Object, e As EventArgs) Handles btnNouveau.Click
+        PreparerCreation(String.Empty)
+    End Sub
+
+    ''' <summary>Bascule le formulaire en saisie d'un nouveau groupe, libellé éventuellement pré-rempli.</summary>
+    Private Sub PreparerCreation(nom As String)
+
+        _enCreation = True
+        dgvListe.ClearSelection()
+        ViderChamps()
+        txtNom.Text = nom
+        txtTaux.Text = "0,00"
+        MettreAJourEtatBoutons()
+
+        lblStatut.Text = "Nouveau groupe : renseignez son compte d'activité, son compte de commission et son taux."
+
+        If nom.Length > 0 Then
+            txtCompteActivite.Focus()
+        Else
+            txtNom.Focus()
+        End If
+    End Sub
+
+    Private Sub btnEnregistrer_Click(sender As Object, e As EventArgs) Handles btnEnregistrer.Click
+
+        Dim taux As Decimal = 0D
+        If Not String.IsNullOrWhiteSpace(txtTaux.Text) AndAlso
+           Not PointDeVenteSA.EssayerAnalyserTaux(txtTaux.Text, taux) Then
+
+            MessageBox.Show(
+                $"Le taux saisi (« {txtTaux.Text} ») n'est pas un nombre." & Environment.NewLine & Environment.NewLine &
+                "Saisissez une fraction : 0,70 pour 70 %.",
+                "Taux incorrect", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtTaux.Focus()
+            Return
+        End If
+
+        Dim groupe As New GroupeStatistiqueWU() With {
+            .Nom = txtNom.Text,
+            .CompteActivite = txtCompteActivite.Text,
+            .CompteCommission = txtCompteCommission.Text,
+            .Taux = taux
+        }
+        groupe.Normaliser()
+
+        Dim anomalies As List(Of String) = groupe.Anomalies()
+        If anomalies.Count > 0 Then
+            MessageBox.Show(
+                "Saisie incomplète ou incorrecte :" & Environment.NewLine & Environment.NewLine &
+                "    " & String.Join(Environment.NewLine & "    ", anomalies),
+                "Groupe non enregistrable", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' Modifier un groupe change les comptes et le taux de TOUS ses sous-agents : la portée
+        ' réelle de l'opération doit être annoncée avant, pas découverte après.
+        Dim existant As GroupeStatistiqueWU = GroupeSelectionne()
+        If Not _enCreation AndAlso existant IsNot Nothing AndAlso existant.NombreSousAgents > 0 Then
+
+            Dim confirmation As DialogResult = MessageBox.Show(
+                $"Les {existant.NombreSousAgents} sous-agent(s) du groupe « {existant.Nom} » hériteront " &
+                "des nouvelles valeurs :" & Environment.NewLine & Environment.NewLine &
+                $"    compte d'activité    : {existant.CompteActivite}  ->  {groupe.CompteActivite}" & Environment.NewLine &
+                $"    compte de commission : {existant.CompteCommission}  ->  {groupe.CompteCommission}" & Environment.NewLine &
+                $"    taux                 : {existant.Taux:0.00}  ->  {groupe.Taux:0.00}" & Environment.NewLine &
+                Environment.NewLine &
+                "Les pièces comptables générées ensuite utiliseront ces comptes pour tout le groupe." &
+                Environment.NewLine & "Confirmer ?",
+                "Modifier le groupe", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2)
+
+            If confirmation <> DialogResult.Yes Then Return
+        End If
+
+        Cursor = Cursors.WaitCursor
+        Try
+            Dim messageErreur As String = String.Empty
+            Dim reussi As Boolean = If(_enCreation,
+                                       PdvRepository.AjouterGroupe(groupe, messageErreur),
+                                       PdvRepository.ModifierGroupe(groupe, messageErreur))
+
+            If Not reussi Then
+                MessageBox.Show(messageErreur, "Enregistrement impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+
+            _modifie = True
+            Dim creation As Boolean = _enCreation
+            _enCreation = False
+
+            ' Le groupe est la source de vérité ; les colonnes de T_Pdv_SA en sont le miroir,
+            ' que la comptabilisation quotidienne continue de lire. Elles sont donc réalignées
+            ' aussitôt — sans quoi la pièce comptable utiliserait les anciens comptes.
+            Dim nombreSynchronises As Integer = 0
+            Dim erreurSynchro As String = String.Empty
+
+            If PdvRepository.SynchroniserSousAgentsDuGroupe(groupe, nombreSynchronises, erreurSynchro) Then
+                lblStatut.Text = If(creation,
+                                    $"Groupe « {groupe.Nom} » créé.",
+                                    $"Groupe « {groupe.Nom} » modifié ; {nombreSynchronises} sous-agent(s) réaligné(s).")
+            Else
+                MessageBox.Show(
+                    erreurSynchro & Environment.NewLine & Environment.NewLine &
+                    $"Le groupe « {groupe.Nom} » a bien été enregistré, mais ses sous-agents portent encore " &
+                    "les anciennes valeurs." & Environment.NewLine &
+                    "Utilisez « Synchroniser les sous-agents » pour les réaligner.",
+                    "Sous-agents non réalignés", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+
+        Finally
+            Cursor = Cursors.Default
+        End Try
+
+        ChargerListe(groupe.Nom)
+    End Sub
+
+    Private Sub btnSupprimer_Click(sender As Object, e As EventArgs) Handles btnSupprimer.Click
+
+        Dim groupe As GroupeStatistiqueWU = GroupeSelectionne()
+        If groupe Is Nothing Then Return
+
+        If groupe.NombreSousAgents > 0 Then
+            MessageBox.Show(
+                $"Le groupe « {groupe.Nom} » ne peut pas être supprimé : {groupe.NombreSousAgents} " &
+                "sous-agent(s) y sont rattachés." & Environment.NewLine & Environment.NewLine &
+                "Rattachez-les d'abord à un autre groupe depuis l'écran des sous-agents.",
+                "Suppression impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim reponse As DialogResult = MessageBox.Show(
+            $"Supprimer définitivement le groupe « {groupe.Nom} » ?" & Environment.NewLine & Environment.NewLine &
+            "Aucun sous-agent n'y est rattaché : la suppression est sans effet sur la comptabilisation." &
+            Environment.NewLine & "Cette opération est irréversible.",
+            "Confirmer la suppression", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2)
+
+        If reponse <> DialogResult.Yes Then Return
+
+        Cursor = Cursors.WaitCursor
+        Try
+            Dim messageErreur As String = String.Empty
+            If Not PdvRepository.SupprimerGroupe(groupe.Nom, messageErreur) Then
+                MessageBox.Show(messageErreur, "Suppression impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+
+            _modifie = True
+            lblStatut.Text = $"Groupe « {groupe.Nom} » supprimé."
+
+        Finally
+            Cursor = Cursors.Default
+        End Try
+
+        ChargerListe()
+    End Sub
+
+    ''' <summary>
+    ''' Réaligne les colonnes de T_Pdv_SA sur les valeurs du groupe. Utile après une écriture
+    ''' directe en base ou une synchronisation interrompue, que la colonne « Désynchronisés »
+    ''' de la grille signale.
+    ''' </summary>
+    Private Sub btnSynchroniser_Click(sender As Object, e As EventArgs) Handles btnSynchroniser.Click
+
+        Dim groupe As GroupeStatistiqueWU = GroupeSelectionne()
+        If groupe Is Nothing Then Return
+
+        Dim reponse As DialogResult = MessageBox.Show(
+            $"Appliquer les valeurs du groupe « {groupe.Nom} » à ses {groupe.NombreSousAgents} sous-agent(s) ?" &
+            Environment.NewLine & Environment.NewLine &
+            $"    compte d'activité    : {groupe.CompteActivite}" & Environment.NewLine &
+            $"    compte de commission : {groupe.CompteCommission}" & Environment.NewLine &
+            $"    taux                 : {groupe.Taux:0.00}" & Environment.NewLine & Environment.NewLine &
+            "Les valeurs actuellement portées par ces sous-agents seront écrasées.",
+            "Synchroniser les sous-agents", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If reponse <> DialogResult.Yes Then Return
+
+        Cursor = Cursors.WaitCursor
+        Try
+            Dim nombreModifies As Integer = 0
+            Dim messageErreur As String = String.Empty
+
+            If Not PdvRepository.SynchroniserSousAgentsDuGroupe(groupe, nombreModifies, messageErreur) Then
+                MessageBox.Show(messageErreur, "Synchronisation impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+
+            _modifie = True
+            lblStatut.Text = $"{nombreModifies} sous-agent(s) du groupe « {groupe.Nom} » réaligné(s)."
+
+        Finally
+            Cursor = Cursors.Default
+        End Try
+
+        ChargerListe(groupe.Nom)
+    End Sub
+
+    Private Sub btnFermer_Click(sender As Object, e As EventArgs) Handles btnFermer.Click
+        Close()
+    End Sub
+
+#End Region
+
+End Class

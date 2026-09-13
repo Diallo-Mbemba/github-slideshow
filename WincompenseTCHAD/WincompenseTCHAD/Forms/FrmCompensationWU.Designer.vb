@@ -33,6 +33,7 @@ Partial Class FrmCompensationWU
         Me.btnParametres = New System.Windows.Forms.Button()
         Me.btnSousAgents = New System.Windows.Forms.Button()
         Me.btnAgences = New System.Windows.Forms.Button()
+        Me.btnGroupes = New System.Windows.Forms.Button()
         Me.lblActivite = New System.Windows.Forms.Label()
         Me.lblReglement = New System.Windows.Forms.Label()
         Me.dgvControle = New System.Windows.Forms.DataGridView()
@@ -99,27 +100,36 @@ Partial Class FrmCompensationWU
         '
         'btnParametres
         '
-        Me.btnParametres.Location = New System.Drawing.Point(594, 50)
+        Me.btnParametres.Location = New System.Drawing.Point(566, 50)
         Me.btnParametres.Name = "btnParametres"
-        Me.btnParametres.Size = New System.Drawing.Size(182, 26)
+        Me.btnParametres.Size = New System.Drawing.Size(143, 26)
         Me.btnParametres.TabIndex = 5
         Me.btnParametres.Text = "Comptes systèmes..."
         Me.btnParametres.UseVisualStyleBackColor = True
         '
+        'btnGroupes
+        '
+        Me.btnGroupes.Location = New System.Drawing.Point(717, 50)
+        Me.btnGroupes.Name = "btnGroupes"
+        Me.btnGroupes.Size = New System.Drawing.Size(143, 26)
+        Me.btnGroupes.TabIndex = 8
+        Me.btnGroupes.Text = "Groupes..."
+        Me.btnGroupes.UseVisualStyleBackColor = True
+        '
         'btnSousAgents
         '
-        Me.btnSousAgents.Location = New System.Drawing.Point(782, 50)
+        Me.btnSousAgents.Location = New System.Drawing.Point(868, 50)
         Me.btnSousAgents.Name = "btnSousAgents"
-        Me.btnSousAgents.Size = New System.Drawing.Size(182, 26)
+        Me.btnSousAgents.Size = New System.Drawing.Size(143, 26)
         Me.btnSousAgents.TabIndex = 6
         Me.btnSousAgents.Text = "Sous-agents..."
         Me.btnSousAgents.UseVisualStyleBackColor = True
         '
         'btnAgences
         '
-        Me.btnAgences.Location = New System.Drawing.Point(970, 50)
+        Me.btnAgences.Location = New System.Drawing.Point(1019, 50)
         Me.btnAgences.Name = "btnAgences"
-        Me.btnAgences.Size = New System.Drawing.Size(192, 26)
+        Me.btnAgences.Size = New System.Drawing.Size(143, 26)
         Me.btnAgences.TabIndex = 7
         Me.btnAgences.Text = "Agences propres..."
         Me.btnAgences.UseVisualStyleBackColor = True
@@ -130,7 +140,7 @@ Partial Class FrmCompensationWU
         Me.lblActivite.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
         Me.lblActivite.Location = New System.Drawing.Point(12, 50)
         Me.lblActivite.Name = "lblActivite"
-        Me.lblActivite.Size = New System.Drawing.Size(285, 23)
+        Me.lblActivite.Size = New System.Drawing.Size(270, 23)
         Me.lblActivite.TabIndex = 4
         Me.lblActivite.Text = "(aucun fichier sélectionné)"
         Me.lblActivite.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
@@ -139,9 +149,9 @@ Partial Class FrmCompensationWU
         '
         Me.lblReglement.AutoEllipsis = True
         Me.lblReglement.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
-        Me.lblReglement.Location = New System.Drawing.Point(303, 50)
+        Me.lblReglement.Location = New System.Drawing.Point(288, 50)
         Me.lblReglement.Name = "lblReglement"
-        Me.lblReglement.Size = New System.Drawing.Size(285, 23)
+        Me.lblReglement.Size = New System.Drawing.Size(270, 23)
         Me.lblReglement.TabIndex = 5
         Me.lblReglement.Text = "(aucun fichier sélectionné)"
         Me.lblReglement.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
@@ -233,6 +243,7 @@ Partial Class FrmCompensationWU
         Me.Controls.Add(Me.btnParametres)
         Me.Controls.Add(Me.btnSousAgents)
         Me.Controls.Add(Me.btnAgences)
+        Me.Controls.Add(Me.btnGroupes)
         Me.Controls.Add(Me.btnGenererPiece)
         Me.Controls.Add(Me.btnAfficher)
         Me.Controls.Add(Me.btnReglement)
@@ -257,6 +268,7 @@ Partial Class FrmCompensationWU
     Friend WithEvents btnParametres As System.Windows.Forms.Button
     Friend WithEvents btnSousAgents As System.Windows.Forms.Button
     Friend WithEvents btnAgences As System.Windows.Forms.Button
+    Friend WithEvents btnGroupes As System.Windows.Forms.Button
     Friend WithEvents lblActivite As System.Windows.Forms.Label
     Friend WithEvents lblReglement As System.Windows.Forms.Label
     Friend WithEvents dgvControle As System.Windows.Forms.DataGridView

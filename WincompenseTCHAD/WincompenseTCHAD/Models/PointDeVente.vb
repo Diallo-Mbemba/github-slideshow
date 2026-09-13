@@ -96,30 +96,30 @@ Public Class PointDeVenteSA
 End Class
 
 ''' <summary>
-''' Groupe statistique de sous-agents.
+''' Groupe statistique de sous-agents : une ligne de la table T_GroupeStatistique.
 '''
 ''' Règle métier : un groupe porte UN compte d'activité, UN compte de commission et UN taux.
-''' Tout Account appartient à un seul groupe et en hérite automatiquement ces trois valeurs ;
-''' un même couple de comptes ne peut appartenir qu'à un seul groupe.
+''' Tout Account appartient à un seul groupe et en hérite ces trois valeurs ; un compte
+''' d'activité ou de commission n'appartient qu'à un seul groupe — garanti en base par deux
+''' index uniques, et non plus seulement vérifié par l'application.
 '''
-''' Il n'existe pas de table de groupes : un groupe n'a d'existence que par les sous-agents
-''' qui le portent, et ses valeurs sont donc celles de ses membres. Rien n'empêche alors, au
-''' niveau de la base, que deux membres d'un même groupe portent des valeurs différentes :
-''' c'est pourquoi cette classe transporte aussi le constat d'une éventuelle INCOHÉRENCE,
-''' que l'application signale sans jamais la corriger d'autorité.
+''' Les colonnes CompteCompense / CompteCommission / Taux de T_Pdv_SA sont conservées et tenues
+''' SYNCHRONISÉES avec le groupe : d'autres applications peuvent les lire, et la comptabilisation
+''' quotidienne continue de s'y référer sans dépendre de la nouvelle table. NombreDesynchronises
+''' compte les sous-agents dont ces colonnes auraient dérivé.
 ''' </summary>
 Public Class GroupeStatistiqueWU
 
-    ''' <summary>Libellé du groupe, tel qu'enregistré.</summary>
+    ''' <summary>Libellé du groupe : clé primaire de T_GroupeStatistique.</summary>
     Public Property Nom As String = String.Empty
 
     ''' <summary>
-    ''' Compte d'activité du groupe (colonne CompteCompense). C'est lui qui porte la ligne de
-    ''' mouvement « CCS_... ACTIVITE WU » de la pièce comptable.
+    ''' Compte d'activité du groupe. C'est lui qui porte la ligne de mouvement
+    ''' « CCS_... ACTIVITE WU » de la pièce comptable (colonne CompteCompense de T_Pdv_SA).
     ''' </summary>
     Public Property CompteActivite As String = String.Empty
 
-    ''' <summary>Compte de commission du groupe (colonne CompteCommission).</summary>
+    ''' <summary>Compte de commission du groupe (colonne CompteCommission de T_Pdv_SA).</summary>
     Public Property CompteCommission As String = String.Empty
 
     ''' <summary>Quote-part du groupe dans les commissions (0,70 = 70 %).</summary>
@@ -129,13 +129,50 @@ Public Class GroupeStatistiqueWU
     Public Property NombreSousAgents As Integer = 0
 
     ''' <summary>
-    ''' Vrai si les sous-agents du groupe ne portent pas tous les mêmes valeurs — situation
-    ''' que la règle métier exclut, mais que des données antérieures peuvent présenter.
+    ''' Nombre de sous-agents dont les colonnes de T_Pdv_SA ne portent plus les valeurs du
+    ''' groupe. Normalement nul : l'application les réaligne à chaque modification du groupe.
+    ''' Un écart trahit une écriture directe en base, ou une mise à jour interrompue.
     ''' </summary>
-    Public Property EstIncoherent As Boolean = False
+    Public Property NombreDesynchronises As Integer = 0
 
-    ''' <summary>Description des valeurs divergentes, vide si le groupe est cohérent.</summary>
-    Public Property DetailIncoherence As String = String.Empty
+    ''' <summary>Vrai si des sous-agents ne portent plus les valeurs de leur groupe.</summary>
+    Public ReadOnly Property EstDesynchronise As Boolean
+        Get
+            Return NombreDesynchronises > 0
+        End Get
+    End Property
+
+    Public Sub Normaliser()
+        Nom = If(Nom, String.Empty).Trim()
+        CompteActivite = If(CompteActivite, String.Empty).Trim()
+        CompteCommission = If(CompteCommission, String.Empty).Trim()
+    End Sub
+
+    ''' <summary>
+    ''' Contrôle de saisie. Retourne la liste des anomalies BLOQUANTES — vide si le groupe est
+    ''' enregistrable.
+    ''' </summary>
+    Public Function Anomalies() As List(Of String)
+
+        Dim messages As New List(Of String)
+
+        If String.IsNullOrWhiteSpace(Nom) Then messages.Add("Le libellé du groupe est obligatoire.")
+        If String.IsNullOrWhiteSpace(CompteActivite) Then messages.Add("Le compte d'activité est obligatoire.")
+        If String.IsNullOrWhiteSpace(CompteCommission) Then messages.Add("Le compte de commission est obligatoire.")
+
+        ' Un taux hors [0 ; 1] n'a aucun sens métier, et la confusion « 70 » pour « 0,70 »
+        ' multiplierait par cent toutes les commissions rétrocédées du groupe.
+        If Taux < 0D OrElse Taux > 1D Then
+            messages.Add($"Le taux doit être compris entre 0 et 1 (saisir 0,70 pour 70 %). Valeur saisie : {Taux}.")
+        End If
+
+        ' DECIMAL(4,2) : au-delà de deux décimales, SQL Server arrondirait en silence.
+        If Decimal.Round(Taux, 2) <> Taux Then
+            messages.Add($"Le taux ne peut comporter que deux décimales (la base arrondirait {Taux} à {Decimal.Round(Taux, 2)}).")
+        End If
+
+        Return messages
+    End Function
 
     ''' <summary>Vrai si les trois valeurs héritées de ce groupe sont celles de la fiche indiquée.</summary>
     Public Function CorrespondA(pdv As PointDeVenteSA) As Boolean
@@ -146,6 +183,17 @@ Public Class GroupeStatistiqueWU
                String.Equals(CompteCommission, If(pdv.CompteCommission, String.Empty).Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
                Decimal.Round(Taux, 2) = Decimal.Round(pdv.Taux, 2)
     End Function
+
+    ''' <summary>Recopie dans une fiche de sous-agent les trois valeurs héritées du groupe.</summary>
+    Public Sub AppliquerA(pdv As PointDeVenteSA)
+
+        If pdv Is Nothing Then Return
+
+        pdv.GroupeStatistique = Nom
+        pdv.CompteCompense = CompteActivite
+        pdv.CompteCommission = CompteCommission
+        pdv.Taux = Taux
+    End Sub
 
     Public Overrides Function ToString() As String
         Return Nom

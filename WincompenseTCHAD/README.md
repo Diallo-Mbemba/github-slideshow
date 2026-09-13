@@ -32,7 +32,7 @@ WincompenseTCHAD/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
     │   ├── WURepository.vb                 ' Lecture SQL Server pour la compensation (T_Pdv_SA / T_Pdv_EC / SystemeWU)
-│   ├── PdvRepository.vb                ' CRUD des points de vente (écriture isolée de la lecture)
+│   ├── PdvRepository.vb                ' CRUD points de vente et groupes (écriture isolée de la lecture)
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     └── Forms/
@@ -42,6 +42,7 @@ WincompenseTCHAD/
         ├── FrmPieceComptable.vb            ' Affichage d'une pièce (globale ou d'un seul PDV)
         ├── FrmComptesSysteme.vb            ' Paramétrage des comptes comptables
         ├── FrmSousAgents.vb                ' Gestion des sous-agents (CRUD)
+        ├── FrmGroupesStatistiques.vb       ' Gestion des groupes statistiques (CRUD)
         └── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
 
 Scripts/
@@ -208,61 +209,90 @@ de taux et de comptes de compensation/commission, contrairement aux sous-agents.
 - **Calcul invalidé.** Après un passage dans l'un de ces écrans, si un calcul est déjà affiché,
   la barre d'état invite à le relancer : le paramétrage a pu changer.
 
-### Groupe statistique : l'unité de paramétrage dont l'Account hérite
+### Groupe statistique
 
-**Règle métier.** Un groupe statistique porte **un** compte d'activité, **un** compte de
-commission et **un** taux. Tout Account appartient à un seul groupe et en hérite
-automatiquement ces trois valeurs. Un même compte d'activité ou de commission ne peut
-appartenir qu'à un seul groupe.
-
-Le compte d'activité est la colonne `CompteCompense` : c'est lui qui porte la ligne de mouvement
-« CCS_… **ACTIVITE** WU » de la pièce comptable.
-
-**À l'écran.** Sélectionner un groupe dans la liste déroulante remplit aussitôt les trois zones
-de saisie et les **verrouille** : ces valeurs appartiennent au groupe, pas au sous-agent. Elles
-ne redeviennent saisissables que dans deux cas :
-
-| Cas | Champs hérités | Effet à l'enregistrement |
-|---|---|---|
-| Groupe existant sélectionné | verrouillés, fond grisé | Le sous-agent hérite, rien d'autre ne bouge |
-| Groupe inconnu saisi | saisissables | Les valeurs saisies **définissent** le nouveau groupe |
-| Case « Modifier les valeurs du groupe » cochée | saisissables | Après confirmation chiffrée, les nouvelles valeurs sont appliquées à **tous** les sous-agents du groupe |
-
-**Contrôles.**
-
-- **Unicité des comptes.** Si le compte d'activité ou de commission saisi appartient déjà à un
-  autre groupe, l'enregistrement est refusé, en nommant le groupe en conflit.
-- **Divergence d'une fiche.** Une fiche dont les valeurs ne sont pas celles de son groupe est
-  affichée **telle quelle**, avec un avertissement en barre d'état — jamais réalignée en
-  silence, ce qui masquerait le problème avant de l'enregistrer. À l'enregistrement, il faut
-  trancher : adopter les valeurs du groupe, ou faire évoluer le groupe.
-- **Groupe incohérent.** Les groupes dont les membres ne portent pas tous les mêmes valeurs sont
-  détectés à la lecture (la requête relève le minimum et le maximum de chaque colonne par
-  groupe : leur différence trahit la divergence) et signalés avec le détail. L'application ne
-  corrige jamais d'autorité des données comptables ; elle indique comment aligner le groupe.
-
-**Création d'un groupe.** Un libellé inconnu déclenche une demande explicite, dont le bouton par
-défaut est **Non** — une faute de frappe et un nouveau groupe légitime ont exactement la même
-apparence pour l'application. Un libellé qui ne diffère que par la casse rejoint le groupe
-existant et en reprend l'orthographe : `RESEAU`, `Reseau` et `reseau` ne peuvent pas coexister.
-
-**Champ vide.** Accepté après avertissement : le sous-agent n'hérite alors d'aucune valeur et
-n'apparaît dans aucun regroupement.
-
-**Il n'existe pas de table de groupes.** Un groupe n'a d'existence que par les sous-agents qui le
-portent : ses valeurs sont celles de ses membres, le créer revient à saisir un libellé inconnu,
-et supprimer son dernier membre le fait disparaître. La liste est rechargée après chaque
-enregistrement, chaque suppression et chaque *Actualiser*.
-
-> **Limite de ce choix, à arbitrer.** Faute de table dédiée, les trois invariants ci-dessus sont
-> *vérifiés par l'application*, pas *garantis par la base* : une écriture directe en SQL peut
-> toujours les enfreindre. Une table `T_GroupeStatistique` (libellé en clé primaire, index unique
-> sur chaque compte, `GroupeStatistique` en clé étrangère depuis `T_Pdv_SA`) les rendrait
-> impossibles à violer et ferait du renommage d'un groupe une opération immédiate. C'est une
-> modification de schéma sur une base de production : elle n'a pas été engagée sans validation.
+Le compte d'activité, le compte de commission et le taux appartiennent au GROUPE, pas au
+sous-agent : voir la section « Groupes statistiques » ci-dessous.
 
 Le chemin de comptabilisation quotidienne ne peut jamais écrire dans ces tables : la lecture
 reste dans `WURepository`, l'écriture est isolée dans `PdvRepository`.
+
+## Groupes statistiques (table T_GroupeStatistique)
+
+**Règle métier.** Un groupe statistique porte **un** compte d'activité, **un** compte de
+commission et **un** taux. Tout Account appartient à un seul groupe et en hérite ces trois
+valeurs. Un compte d'activité ou de commission n'appartient qu'à un seul groupe.
+
+Le compte d'activité est la colonne `CompteCompense` de `T_Pdv_SA` : c'est lui qui porte la
+ligne de mouvement « CCS_… **ACTIVITE** WU » de la pièce comptable.
+
+Ces trois règles ne sont plus seulement vérifiées par l'application : la table les rend
+**impossibles à violer**, y compris par une écriture SQL directe.
+
+| Contrainte | Ce qu'elle garantit |
+|---|---|
+| `Groupe` clé primaire | Un libellé de groupe unique |
+| Index unique sur `CompteActivite` | Un compte d'activité n'appartient qu'à un groupe |
+| Index unique sur `CompteCommission` | Un compte de commission n'appartient qu'à un groupe |
+
+### Migration
+
+Le script `Scripts\04_GroupeStatistique.sql` crée la table et y reprend les groupes déjà
+présents dans `T_Pdv_SA`. **Il ne modifie rien tant que les données ne sont pas saines** : il
+commence par un diagnostic en trois volets, et la migration ne s'exécute que si aucune anomalie
+bloquante n'est trouvée.
+
+| Diagnostic | Bloquant | Pourquoi |
+|---|---|---|
+| Groupes dont les sous-agents portent des valeurs divergentes | oui | Le groupe ne peut avoir qu'un seul jeu de valeurs : laquelle retenir ? |
+| Un même compte utilisé par plusieurs groupes | oui | Violerait l'index unique |
+| Sous-agents sans groupe | non | Listés pour information : ils n'hériteront d'aucune valeur |
+
+En cas de blocage, les lignes fautives sont affichées, aucune donnée n'est touchée, et le script
+se relance à volonté une fois les corrections faites. La pose d'une clé étrangère
+`T_Pdv_SA.GroupeStatistique → T_GroupeStatistique.Groupe` est proposée en fin de script, **non
+exécutée** : elle échouerait tant qu'il reste des sous-agents sans groupe.
+
+### Les colonnes de T_Pdv_SA restent le miroir du groupe
+
+`CompteCompense`, `CompteCommission` et `Taux` sont **conservées dans `T_Pdv_SA` et tenues
+synchronisées** avec leur groupe. Deux raisons :
+
+- la **comptabilisation quotidienne continue de les lire** — elle ne dépend donc pas de la
+  nouvelle table, et une migration non jouée ne peut pas interrompre la production ;
+- d'autres applications de la banque peuvent lire `T_Pdv_SA` : leur comportement est inchangé.
+
+Toute modification d'un groupe est aussitôt reportée sur ses sous-agents. Une dérive éventuelle
+(écriture directe en base, synchronisation interrompue) est comptée par la colonne
+**Désynchronisés** de la grille, la ligne apparaît en rose, et le bouton **« Synchroniser les
+sous-agents »** la corrige.
+
+### Écran « Groupes... »
+
+Liste, création, modification, suppression, plus la synchronisation ci-dessus.
+
+- **Le libellé n'est modifiable qu'à la création** : c'est la clé sous laquelle les sous-agents
+  se rattachent au groupe.
+- **Modifier un groupe est annoncé avant, pas découvert après** : la confirmation chiffre les
+  sous-agents concernés et affiche chaque valeur sous la forme `ancienne -> nouvelle`.
+- **Suppression refusée** tant que des sous-agents y sont rattachés : ils perdraient leurs
+  comptes et leur taux sans que rien ne le signale.
+- **Compte déjà pris.** La violation d'index unique est traduite en message nommant *lequel* des
+  deux comptes appartient déjà à un autre groupe.
+
+### Écran « Sous-agents... »
+
+Le groupe se choisit dans la liste déroulante ; les trois champs hérités se remplissent
+aussitôt et restent **toujours en lecture seule** (fond grisé) — ils appartiennent au groupe.
+Le bouton **« … »** à côté de la liste ouvre l'écran des groupes, en création et pré-rempli si
+le libellé saisi est inconnu.
+
+- **Le groupe est obligatoire** : sans lui, le sous-agent n'a ni compte ni taux.
+- **Un groupe ne se crée pas d'un simple nom.** Un libellé inconnu n'est plus accepté à la
+  volée : il faut ses trois valeurs, donc passer par l'écran des groupes, qui s'ouvre pré-rempli.
+- **Fiche ayant dérivé.** Une fiche antérieure ne portant pas les valeurs de son groupe est
+  affichée telle quelle, avec un avertissement — jamais réalignée en silence. L'enregistrement
+  adopte les valeurs du groupe, après une confirmation qui montre chaque changement.
 
 ## Contrôles de sécurité sur les fichiers chargés
 
@@ -379,6 +409,9 @@ charges pour un gain nul.
 - Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la
   saisie libre restant possible.
+- Sous-agents restant sans groupe statistique après la migration : quel groupe leur attribuer ?
+  Tant qu'il en subsiste, la clé étrangère proposée en fin de `Scripts\04_GroupeStatistique.sql`
+  ne peut pas être posée.
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.
 - Traitement définitif souhaité des Accounts `INCONNU` dans la pièce comptable.
 

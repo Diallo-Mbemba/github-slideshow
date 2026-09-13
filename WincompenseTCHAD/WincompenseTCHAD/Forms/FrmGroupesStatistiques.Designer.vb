@@ -1,7 +1,7 @@
 Option Strict On
 Option Explicit On
 
-Partial Class FrmSousAgents
+Partial Class FrmGroupesStatistiques
     Inherits System.Windows.Forms.Form
 
     <System.Diagnostics.DebuggerNonUserCode()>
@@ -28,24 +28,18 @@ Partial Class FrmSousAgents
         Me.btnNouveau = New System.Windows.Forms.Button()
         Me.btnEnregistrer = New System.Windows.Forms.Button()
         Me.btnSupprimer = New System.Windows.Forms.Button()
+        Me.btnSynchroniser = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
         Me.dgvListe = New System.Windows.Forms.DataGridView()
         Me.grpDetail = New System.Windows.Forms.GroupBox()
-        Me.lblCodePdv = New System.Windows.Forms.Label()
-        Me.txtCodePdv = New System.Windows.Forms.TextBox()
-        Me.lblDesignation = New System.Windows.Forms.Label()
-        Me.txtDesignation = New System.Windows.Forms.TextBox()
-        Me.lblGroupeStatistique = New System.Windows.Forms.Label()
-        Me.cboGroupeStatistique = New System.Windows.Forms.ComboBox()
-        Me.btnNouveauGroupe = New System.Windows.Forms.Button()
-        Me.lblTaux = New System.Windows.Forms.Label()
-        Me.txtTaux = New System.Windows.Forms.TextBox()
-        Me.lblCompteCompense = New System.Windows.Forms.Label()
-        Me.txtCompteCompense = New System.Windows.Forms.TextBox()
+        Me.lblNom = New System.Windows.Forms.Label()
+        Me.txtNom = New System.Windows.Forms.TextBox()
+        Me.lblCompteActivite = New System.Windows.Forms.Label()
+        Me.txtCompteActivite = New System.Windows.Forms.TextBox()
         Me.lblCompteCommission = New System.Windows.Forms.Label()
         Me.txtCompteCommission = New System.Windows.Forms.TextBox()
-        Me.lblCodeAgence = New System.Windows.Forms.Label()
-        Me.txtCodeAgence = New System.Windows.Forms.TextBox()
+        Me.lblTaux = New System.Windows.Forms.Label()
+        Me.txtTaux = New System.Windows.Forms.TextBox()
         CType(Me.dgvListe, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.grpDetail.SuspendLayout()
         Me.SuspendLayout()
@@ -77,7 +71,7 @@ Partial Class FrmSousAgents
         'lblNombre
         '
         Me.lblNombre.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.lblNombre.Location = New System.Drawing.Point(588, 16)
+        Me.lblNombre.Location = New System.Drawing.Point(508, 16)
         Me.lblNombre.Name = "lblNombre"
         Me.lblNombre.Size = New System.Drawing.Size(300, 20)
         Me.lblNombre.TabIndex = 3
@@ -98,194 +92,139 @@ Partial Class FrmSousAgents
         Me.dgvListe.ReadOnly = True
         Me.dgvListe.RowHeadersWidth = 25
         Me.dgvListe.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
-        Me.dgvListe.Size = New System.Drawing.Size(876, 270)
+        Me.dgvListe.Size = New System.Drawing.Size(796, 250)
         Me.dgvListe.TabIndex = 4
         '
         'grpDetail
         '
         Me.grpDetail.Anchor = CType(((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left) _
                     Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.grpDetail.Controls.Add(Me.lblCodePdv)
-        Me.grpDetail.Controls.Add(Me.txtCodePdv)
-        Me.grpDetail.Controls.Add(Me.lblDesignation)
-        Me.grpDetail.Controls.Add(Me.txtDesignation)
-        Me.grpDetail.Controls.Add(Me.lblGroupeStatistique)
-        Me.grpDetail.Controls.Add(Me.cboGroupeStatistique)
-        Me.grpDetail.Controls.Add(Me.btnNouveauGroupe)
-        Me.grpDetail.Controls.Add(Me.lblTaux)
-        Me.grpDetail.Controls.Add(Me.txtTaux)
-        Me.grpDetail.Controls.Add(Me.lblCompteCompense)
-        Me.grpDetail.Controls.Add(Me.txtCompteCompense)
+        Me.grpDetail.Controls.Add(Me.lblNom)
+        Me.grpDetail.Controls.Add(Me.txtNom)
+        Me.grpDetail.Controls.Add(Me.lblCompteActivite)
+        Me.grpDetail.Controls.Add(Me.txtCompteActivite)
         Me.grpDetail.Controls.Add(Me.lblCompteCommission)
         Me.grpDetail.Controls.Add(Me.txtCompteCommission)
-        Me.grpDetail.Controls.Add(Me.lblCodeAgence)
-        Me.grpDetail.Controls.Add(Me.txtCodeAgence)
-        Me.grpDetail.Location = New System.Drawing.Point(12, 327)
+        Me.grpDetail.Controls.Add(Me.lblTaux)
+        Me.grpDetail.Controls.Add(Me.txtTaux)
+        Me.grpDetail.Location = New System.Drawing.Point(12, 307)
         Me.grpDetail.Name = "grpDetail"
-        Me.grpDetail.Size = New System.Drawing.Size(876, 160)
+        Me.grpDetail.Size = New System.Drawing.Size(796, 165)
         Me.grpDetail.TabIndex = 5
         Me.grpDetail.TabStop = False
-        Me.grpDetail.Text = "Fiche du sous-agent"
+        Me.grpDetail.Text = "Fiche du groupe statistique"
         '
-        'lblCodePdv
+        'lblNom
         '
-        Me.lblCodePdv.Location = New System.Drawing.Point(15, 31)
-        Me.lblCodePdv.Name = "lblCodePdv"
-        Me.lblCodePdv.Size = New System.Drawing.Size(155, 20)
-        Me.lblCodePdv.TabIndex = 6
-        Me.lblCodePdv.Text = "Account (Code_Pdv) :"
+        Me.lblNom.Location = New System.Drawing.Point(15, 31)
+        Me.lblNom.Name = "lblNom"
+        Me.lblNom.Size = New System.Drawing.Size(175, 20)
+        Me.lblNom.TabIndex = 6
+        Me.lblNom.Text = "Libellé du groupe :"
         '
-        'txtCodePdv
+        'txtNom
         '
-        Me.txtCodePdv.Location = New System.Drawing.Point(175, 28)
-        Me.txtCodePdv.MaxLength = 255
-        Me.txtCodePdv.Name = "txtCodePdv"
-        Me.txtCodePdv.Size = New System.Drawing.Size(230, 22)
-        Me.txtCodePdv.TabIndex = 7
+        Me.txtNom.Location = New System.Drawing.Point(195, 28)
+        Me.txtNom.MaxLength = 255
+        Me.txtNom.Name = "txtNom"
+        Me.txtNom.Size = New System.Drawing.Size(260, 22)
+        Me.txtNom.TabIndex = 7
         '
-        'lblDesignation
+        'lblCompteActivite
         '
-        Me.lblDesignation.Location = New System.Drawing.Point(15, 65)
-        Me.lblDesignation.Name = "lblDesignation"
-        Me.lblDesignation.Size = New System.Drawing.Size(155, 20)
-        Me.lblDesignation.TabIndex = 8
-        Me.lblDesignation.Text = "Désignation agence :"
+        Me.lblCompteActivite.Location = New System.Drawing.Point(15, 65)
+        Me.lblCompteActivite.Name = "lblCompteActivite"
+        Me.lblCompteActivite.Size = New System.Drawing.Size(175, 20)
+        Me.lblCompteActivite.TabIndex = 8
+        Me.lblCompteActivite.Text = "Compte d'activité :"
         '
-        'txtDesignation
+        'txtCompteActivite
         '
-        Me.txtDesignation.Location = New System.Drawing.Point(175, 62)
-        Me.txtDesignation.MaxLength = 255
-        Me.txtDesignation.Name = "txtDesignation"
-        Me.txtDesignation.Size = New System.Drawing.Size(230, 22)
-        Me.txtDesignation.TabIndex = 9
+        Me.txtCompteActivite.Location = New System.Drawing.Point(195, 62)
+        Me.txtCompteActivite.MaxLength = 255
+        Me.txtCompteActivite.Name = "txtCompteActivite"
+        Me.txtCompteActivite.Size = New System.Drawing.Size(260, 22)
+        Me.txtCompteActivite.TabIndex = 9
         '
-        'lblGroupeStatistique
+        'lblCompteCommission
         '
-        Me.lblGroupeStatistique.Location = New System.Drawing.Point(15, 99)
-        Me.lblGroupeStatistique.Name = "lblGroupeStatistique"
-        Me.lblGroupeStatistique.Size = New System.Drawing.Size(155, 20)
-        Me.lblGroupeStatistique.TabIndex = 10
-        Me.lblGroupeStatistique.Text = "Groupe statistique :"
+        Me.lblCompteCommission.Location = New System.Drawing.Point(15, 99)
+        Me.lblCompteCommission.Name = "lblCompteCommission"
+        Me.lblCompteCommission.Size = New System.Drawing.Size(175, 20)
+        Me.lblCompteCommission.TabIndex = 10
+        Me.lblCompteCommission.Text = "Compte de commission :"
         '
-        'cboGroupeStatistique
+        'txtCompteCommission
         '
-        Me.cboGroupeStatistique.FormattingEnabled = True
-        Me.cboGroupeStatistique.Location = New System.Drawing.Point(175, 96)
-        Me.cboGroupeStatistique.MaxLength = 255
-        Me.cboGroupeStatistique.Name = "cboGroupeStatistique"
-        Me.cboGroupeStatistique.Size = New System.Drawing.Size(230, 24)
-        Me.cboGroupeStatistique.TabIndex = 11
+        Me.txtCompteCommission.Location = New System.Drawing.Point(195, 96)
+        Me.txtCompteCommission.MaxLength = 255
+        Me.txtCompteCommission.Name = "txtCompteCommission"
+        Me.txtCompteCommission.Size = New System.Drawing.Size(260, 22)
+        Me.txtCompteCommission.TabIndex = 11
         '
         'lblTaux
         '
         Me.lblTaux.Location = New System.Drawing.Point(15, 133)
         Me.lblTaux.Name = "lblTaux"
-        Me.lblTaux.Size = New System.Drawing.Size(155, 20)
+        Me.lblTaux.Size = New System.Drawing.Size(175, 20)
         Me.lblTaux.TabIndex = 12
         Me.lblTaux.Text = "Taux (0,70 = 70 %) :"
         '
         'txtTaux
         '
-        Me.txtTaux.Location = New System.Drawing.Point(175, 130)
+        Me.txtTaux.Location = New System.Drawing.Point(195, 130)
         Me.txtTaux.MaxLength = 255
         Me.txtTaux.Name = "txtTaux"
-        Me.txtTaux.Size = New System.Drawing.Size(230, 22)
+        Me.txtTaux.Size = New System.Drawing.Size(260, 22)
         Me.txtTaux.TabIndex = 13
-        '
-        'lblCompteCompense
-        '
-        Me.lblCompteCompense.Location = New System.Drawing.Point(430, 31)
-        Me.lblCompteCompense.Name = "lblCompteCompense"
-        Me.lblCompteCompense.Size = New System.Drawing.Size(165, 20)
-        Me.lblCompteCompense.TabIndex = 14
-        Me.lblCompteCompense.Text = "Compte de compensation :"
-        '
-        'txtCompteCompense
-        '
-        Me.txtCompteCompense.Location = New System.Drawing.Point(600, 28)
-        Me.txtCompteCompense.MaxLength = 255
-        Me.txtCompteCompense.Name = "txtCompteCompense"
-        Me.txtCompteCompense.Size = New System.Drawing.Size(255, 22)
-        Me.txtCompteCompense.TabIndex = 15
-        '
-        'lblCompteCommission
-        '
-        Me.lblCompteCommission.Location = New System.Drawing.Point(430, 65)
-        Me.lblCompteCommission.Name = "lblCompteCommission"
-        Me.lblCompteCommission.Size = New System.Drawing.Size(165, 20)
-        Me.lblCompteCommission.TabIndex = 16
-        Me.lblCompteCommission.Text = "Compte de commission :"
-        '
-        'txtCompteCommission
-        '
-        Me.txtCompteCommission.Location = New System.Drawing.Point(600, 62)
-        Me.txtCompteCommission.MaxLength = 255
-        Me.txtCompteCommission.Name = "txtCompteCommission"
-        Me.txtCompteCommission.Size = New System.Drawing.Size(255, 22)
-        Me.txtCompteCommission.TabIndex = 17
-        '
-        'btnNouveauGroupe
-        '
-        Me.btnNouveauGroupe.Location = New System.Drawing.Point(411, 95)
-        Me.btnNouveauGroupe.Name = "btnNouveauGroupe"
-        Me.btnNouveauGroupe.Size = New System.Drawing.Size(30, 26)
-        Me.btnNouveauGroupe.TabIndex = 12
-        Me.btnNouveauGroupe.Text = "..."
-        Me.btnNouveauGroupe.UseVisualStyleBackColor = True
-        '
-        'lblCodeAgence
-        '
-        Me.lblCodeAgence.Location = New System.Drawing.Point(430, 99)
-        Me.lblCodeAgence.Name = "lblCodeAgence"
-        Me.lblCodeAgence.Size = New System.Drawing.Size(165, 20)
-        Me.lblCodeAgence.TabIndex = 18
-        Me.lblCodeAgence.Text = "Code agence :"
-        '
-        'txtCodeAgence
-        '
-        Me.txtCodeAgence.Location = New System.Drawing.Point(600, 96)
-        Me.txtCodeAgence.MaxLength = 255
-        Me.txtCodeAgence.Name = "txtCodeAgence"
-        Me.txtCodeAgence.Size = New System.Drawing.Size(255, 22)
-        Me.txtCodeAgence.TabIndex = 19
         '
         'btnNouveau
         '
         Me.btnNouveau.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
-        Me.btnNouveau.Location = New System.Drawing.Point(12, 499)
+        Me.btnNouveau.Location = New System.Drawing.Point(12, 484)
         Me.btnNouveau.Name = "btnNouveau"
         Me.btnNouveau.Size = New System.Drawing.Size(120, 32)
-        Me.btnNouveau.TabIndex = 20
+        Me.btnNouveau.TabIndex = 14
         Me.btnNouveau.Text = "Nouveau"
         Me.btnNouveau.UseVisualStyleBackColor = True
         '
         'btnEnregistrer
         '
         Me.btnEnregistrer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
-        Me.btnEnregistrer.Location = New System.Drawing.Point(140, 499)
+        Me.btnEnregistrer.Location = New System.Drawing.Point(140, 484)
         Me.btnEnregistrer.Name = "btnEnregistrer"
         Me.btnEnregistrer.Size = New System.Drawing.Size(150, 32)
-        Me.btnEnregistrer.TabIndex = 21
+        Me.btnEnregistrer.TabIndex = 15
         Me.btnEnregistrer.Text = "Enregistrer"
         Me.btnEnregistrer.UseVisualStyleBackColor = True
         '
         'btnSupprimer
         '
         Me.btnSupprimer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
-        Me.btnSupprimer.Location = New System.Drawing.Point(298, 499)
+        Me.btnSupprimer.Location = New System.Drawing.Point(298, 484)
         Me.btnSupprimer.Name = "btnSupprimer"
         Me.btnSupprimer.Size = New System.Drawing.Size(120, 32)
-        Me.btnSupprimer.TabIndex = 22
+        Me.btnSupprimer.TabIndex = 16
         Me.btnSupprimer.Text = "Supprimer"
         Me.btnSupprimer.UseVisualStyleBackColor = True
+        '
+        'btnSynchroniser
+        '
+        Me.btnSynchroniser.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.btnSynchroniser.Location = New System.Drawing.Point(426, 484)
+        Me.btnSynchroniser.Name = "btnSynchroniser"
+        Me.btnSynchroniser.Size = New System.Drawing.Size(220, 32)
+        Me.btnSynchroniser.TabIndex = 17
+        Me.btnSynchroniser.Text = "Synchroniser les sous-agents"
+        Me.btnSynchroniser.UseVisualStyleBackColor = True
         '
         'btnFermer
         '
         Me.btnFermer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.btnFermer.Location = New System.Drawing.Point(768, 499)
+        Me.btnFermer.Location = New System.Drawing.Point(688, 484)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(120, 32)
-        Me.btnFermer.TabIndex = 23
+        Me.btnFermer.TabIndex = 18
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -294,18 +233,18 @@ Partial Class FrmSousAgents
         Me.lblStatut.Anchor = CType(((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left) _
                     Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.lblStatut.ForeColor = System.Drawing.SystemColors.GrayText
-        Me.lblStatut.Location = New System.Drawing.Point(12, 539)
+        Me.lblStatut.Location = New System.Drawing.Point(12, 524)
         Me.lblStatut.Name = "lblStatut"
-        Me.lblStatut.Size = New System.Drawing.Size(876, 20)
-        Me.lblStatut.TabIndex = 24
+        Me.lblStatut.Size = New System.Drawing.Size(796, 20)
+        Me.lblStatut.TabIndex = 19
         Me.lblStatut.Text = ""
         '
-        'FrmSousAgents
+        'FrmGroupesStatistiques
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(900, 569)
+        Me.ClientSize = New System.Drawing.Size(820, 554)
         Me.Controls.Add(Me.lblRecherche)
         Me.Controls.Add(Me.txtRecherche)
         Me.Controls.Add(Me.btnActualiser)
@@ -315,12 +254,13 @@ Partial Class FrmSousAgents
         Me.Controls.Add(Me.btnNouveau)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.btnSupprimer)
+        Me.Controls.Add(Me.btnSynchroniser)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.lblStatut)
-        Me.MinimumSize = New System.Drawing.Size(916, 609)
-        Me.Name = "FrmSousAgents"
+        Me.MinimumSize = New System.Drawing.Size(836, 594)
+        Me.Name = "FrmGroupesStatistiques"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
-        Me.Text = "Sous-agents Western Union (T_Pdv_SA)"
+        Me.Text = "Groupes statistiques (T_GroupeStatistique)"
         CType(Me.dgvListe, System.ComponentModel.ISupportInitialize).EndInit()
         Me.grpDetail.ResumeLayout(False)
         Me.grpDetail.PerformLayout()
@@ -336,23 +276,17 @@ Partial Class FrmSousAgents
     Friend WithEvents btnNouveau As System.Windows.Forms.Button
     Friend WithEvents btnEnregistrer As System.Windows.Forms.Button
     Friend WithEvents btnSupprimer As System.Windows.Forms.Button
+    Friend WithEvents btnSynchroniser As System.Windows.Forms.Button
     Friend WithEvents btnFermer As System.Windows.Forms.Button
     Friend WithEvents dgvListe As System.Windows.Forms.DataGridView
     Friend WithEvents grpDetail As System.Windows.Forms.GroupBox
-    Friend WithEvents lblCodePdv As System.Windows.Forms.Label
-    Friend WithEvents txtCodePdv As System.Windows.Forms.TextBox
-    Friend WithEvents lblDesignation As System.Windows.Forms.Label
-    Friend WithEvents txtDesignation As System.Windows.Forms.TextBox
-    Friend WithEvents lblGroupeStatistique As System.Windows.Forms.Label
-    Friend WithEvents cboGroupeStatistique As System.Windows.Forms.ComboBox
-    Friend WithEvents btnNouveauGroupe As System.Windows.Forms.Button
-    Friend WithEvents lblTaux As System.Windows.Forms.Label
-    Friend WithEvents txtTaux As System.Windows.Forms.TextBox
-    Friend WithEvents lblCompteCompense As System.Windows.Forms.Label
-    Friend WithEvents txtCompteCompense As System.Windows.Forms.TextBox
+    Friend WithEvents lblNom As System.Windows.Forms.Label
+    Friend WithEvents txtNom As System.Windows.Forms.TextBox
+    Friend WithEvents lblCompteActivite As System.Windows.Forms.Label
+    Friend WithEvents txtCompteActivite As System.Windows.Forms.TextBox
     Friend WithEvents lblCompteCommission As System.Windows.Forms.Label
     Friend WithEvents txtCompteCommission As System.Windows.Forms.TextBox
-    Friend WithEvents lblCodeAgence As System.Windows.Forms.Label
-    Friend WithEvents txtCodeAgence As System.Windows.Forms.TextBox
+    Friend WithEvents lblTaux As System.Windows.Forms.Label
+    Friend WithEvents txtTaux As System.Windows.Forms.TextBox
 
 End Class

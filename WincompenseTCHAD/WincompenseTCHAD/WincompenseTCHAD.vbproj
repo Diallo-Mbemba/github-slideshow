@@ -110,6 +110,12 @@
     <Compile Include="Forms\FrmAgences.Designer.vb">
       <DependentUpon>FrmAgences.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmGroupesStatistiques.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmGroupesStatistiques.Designer.vb">
+      <DependentUpon>FrmGroupesStatistiques.vb</DependentUpon>
+    </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="Program.vb" />
   </ItemGroup>
@@ -128,6 +134,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmAgences.resx">
       <DependentUpon>FrmAgences.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmGroupesStatistiques.resx">
+      <DependentUpon>FrmGroupesStatistiques.vb</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
