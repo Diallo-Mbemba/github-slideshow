@@ -389,10 +389,9 @@ exportables **en un seul document PDF**.
 |---|---|
 | 1. Synthèse | Volumes, envois, paiements, commissions et taxes, plus la **répartition entre sous-agents, agences propres et Accounts non paramétrés** |
 | 2. Jour par jour | Une ligne par journée comptabilisée : c'est la page qui fait ressortir un jour anormal |
-| 3. Par point de vente | **Sous-agents et agences propres séparés**, chacun avec son sous-total, classés par principal envoyé décroissant |
+| 3. Par point de vente | **Sous-agents et agences propres séparés**, chacun avec son sous-total, classés par principal envoyé décroissant. **Chaque Account se déroule** sur le détail de ses transactions, MTCN par MTCN |
 | 4. Par groupe statistique | Une ligne par groupe, les points de vente sans groupe formant une ligne distincte |
 | 5. Évolution des commissions | Jour par jour : les trois commissions, leur total, la variation par rapport à la veille et le cumul de la période |
-| 6. Transactions (MTCN) | Le détail transaction par transaction : date, Account, groupe, MTCN, sens, statut et montant |
 
 Les **annulations** figurent dans toutes les pages de détail — et plus seulement en synthèse —
 sous une colonne dédiée : sans elle, il était impossible de savoir *qui* annule, alors que
@@ -438,16 +437,28 @@ Les quatre états sont bâtis sur **la même lecture**, agrégée différemment 
 donc nécessairement identiques d'une page à l'autre. Le rapprochement entre pages est un
 contrôle de cohérence, pas une coïncidence.
 
-### Suivi des MTCN
+### Le déroulé d'un point de vente : ses transactions, MTCN par MTCN
+
+Dans l'état **par point de vente**, un Account porteur de transactions s'ouvre d'un clic sur le
+`+` de sa première colonne : ses envois et ses paiements apparaissent alors sous lui, chacun
+avec sa date, son MTCN, son sens et son statut. Le même mécanisme vaut pour les agences propres.
+
+Une transaction est **une unité de volume** : son montant alimente la colonne d'envoi ou de
+paiement selon son sens, et son compteur la colonne correspondante. Les cumuls du point de vente
+au-dessus sont donc exactement la somme des lignes en dessous — **le déroulé justifie le total,
+il ne se contente pas de l'accompagner**. Une transaction annulée ne pèse dans aucun montant :
+elle ne compte que comme annulation, exactement comme dans l'agrégat de la journée, et sa ligne
+est surlignée en rose.
+
+Tout est replié à l'ouverture : un état de gestion se lit d'abord au niveau des points de vente.
+Le tri des colonnes est désactivé sur cette page — il détacherait une transaction de son point
+de vente.
 
 `T_HistoriqueWU` agrège la journée par point de vente : elle ne peut pas porter le MTCN, qui
 identifie **une** transaction. La table **`T_HistoriqueMTCN`** (script
-`Scripts\06_HistoriqueMTCN.sql`) conserve donc le détail, une ligne par transaction d'envoi ou
-de paiement, et permet de retrouver et de justifier une opération précise.
+`Scripts\06_HistoriqueMTCN.sql`) conserve donc le détail, une ligne par transaction.
 
 - Alimentée **dans la même transaction** que l'agrégat : les deux tables ne peuvent pas diverger.
-- Les **annulations y figurent**, signalées par leur statut et surlignées en rose à l'écran :
-  c'est le plus souvent une transaction annulée que l'on cherche.
 - Le filtre par groupe statistique est appliqué **par la base**, plutôt que de rapatrier toute
   la période pour la trier ensuite.
 - Volume : de l'ordre de 400 transactions par jour, soit environ 100 000 lignes par an.
@@ -456,9 +467,10 @@ de paiement, et permet de retrouver et de justifier une opération précise.
   en produirait un — et une contrainte trop stricte ferait échouer l'historisation d'une journée
   par ailleurs valable. L'unicité technique est assurée par une colonne d'identité.
 
-Dans le PDF, le détail est inclus **après confirmation** au-delà de 2 000 transactions : sur un
-mois complet, l'ajouter sans le dire produirait des dizaines de pages que personne n'attendait.
-Il reste alors consultable à l'écran.
+Dans le PDF, le détail est inclus sous chaque point de vente **après confirmation** au-delà de
+2 000 transactions : sur un mois complet, l'ajouter sans le dire produirait des dizaines de pages
+que personne n'attendait. Répondre « Non » produit l'état au niveau des points de vente
+seulement ; le détail reste consultable à l'écran.
 
 ### Agences propres restées sans activité
 

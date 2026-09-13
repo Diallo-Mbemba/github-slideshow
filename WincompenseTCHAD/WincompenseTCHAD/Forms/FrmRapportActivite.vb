@@ -23,7 +23,7 @@ Public Class FrmRapportActivite
     ''' Nombre de transactions au-delà duquel l'inclusion du détail dans le PDF est soumise à
     ''' confirmation : une vingtaine de pages, soit environ une semaine d'activité.
     ''' </summary>
-    Private Const SEUIL_MTCN_VOLUMINEUX As Integer = 2000
+    Private Const SEUIL_DETAIL_VOLUMINEUX As Integer = 2000
 
     ''' <summary>Lignes d'historique de la période, TOUS groupes confondus.</summary>
     Private _lignes As New List(Of LigneHistoriqueWU)
@@ -50,7 +50,12 @@ Public Class FrmRapportActivite
     Private _parPdv As DataTable
     Private _parGroupe As DataTable
     Private _commissions As DataTable
-    Private _transactions As DataTable
+
+    ''' <summary>
+    ''' Détail des transactions de la période, rattaché aux points de vente dans l'état
+    ''' correspondant : dérouler un Account fait apparaître ses envois et ses paiements.
+    ''' </summary>
+    Private _operations As New List(Of TransactionWU)
 
     ''' <summary>Empêche le filtre de relancer l'affichage pendant qu'on le remplit.</summary>
     Private _chargementEnCours As Boolean = False
@@ -181,33 +186,30 @@ Public Class FrmRapportActivite
         ' Un filtre par groupe ne les concerne pas : une agence propre n'appartient à aucun
         ' groupe statistique, ceux-ci ne s'appliquant qu'aux sous-agents.
         Dim agences As List(Of PointDeVenteEC) = If(String.IsNullOrEmpty(_groupeChoisi), _agences, Nothing)
-        _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees, agences)
-        _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
-        _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
 
-        ' Le détail des MTCN est relu à part : il ne se déduit pas de l'agrégat, et le filtre
-        ' par groupe est appliqué par la base plutôt que de rapatrier toute la période.
-        Dim erreurMtcn As String = String.Empty
-        Dim operations As List(Of TransactionWU) =
-            HistoriqueRepository.ListerTransactions(dtpDebut.Value.Date, dtpFin.Value.Date,
-                                                    _groupeChoisi, erreurMtcn)
+        ' Détail des transactions : il ne se déduit pas de l'agrégat, et le filtre par groupe
+        ' est appliqué par la base plutôt que de rapatrier toute la période pour la trier.
+        Dim erreurDetail As String = String.Empty
+        _operations = HistoriqueRepository.ListerTransactions(dtpDebut.Value.Date, dtpFin.Value.Date,
+                                                             _groupeChoisi, erreurDetail)
 
-        If Not String.IsNullOrEmpty(erreurMtcn) Then
-            ' Le détail manque, mais les cinq autres états restent valables : on le signale
-            ' sans priver l'utilisateur du reste du rapport.
-            operations = New List(Of TransactionWU)
-            lblStatut.Text = "Détail des MTCN indisponible."
+        If Not String.IsNullOrEmpty(erreurDetail) Then
+            ' Le détail manque, mais les états agrégés restent valables : on le signale sans
+            ' priver l'utilisateur du reste du rapport.
+            _operations = New List(Of TransactionWU)
         End If
 
-        _transactions = RapportActiviteService.ConstruireTransactions(operations)
+        _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees, agences, _operations)
+        _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
+        _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
 
         AfficherSynthese()
         AfficherDetail(dgvParJour, _parJour, "Date", "Date")
         AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
         AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
         AfficherDetail(dgvCommissions, _commissions, "Date", "Date")
-        AfficherDetail(dgvMtcn, _transactions, "Date", "Date")
-        MettreEnEvidenceAnnulations()
+
+        ReplierToutLeDetail()
 
         btnExporter.Enabled = _lignesAffichees.Count > 0
 
@@ -291,22 +293,53 @@ Public Class FrmRapportActivite
             grille.Columns("Variation").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
         End If
 
+        DefinirEntete(grille, "Deroule", String.Empty)
+        DefinirEntete(grille, "MTCN", "MTCN")
+        DefinirEntete(grille, "Statut", "Statut")
+
+        ' Colonne technique : elle pilote le pliage, elle n'a rien à faire à l'écran.
+        If grille.Columns.Contains("Niveau") Then
+            grille.Columns("Niveau").Visible = False
+        End If
+
         grille.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
 
+        ' Le tri brouillerait l'ordre hiérarchique : une transaction se retrouverait détachée
+        ' de son point de vente.
+        If grille.Columns.Contains("Deroule") Then
+            For Each colonne As DataGridViewColumn In grille.Columns
+                colonne.SortMode = DataGridViewColumnSortMode.NotSortable
+            Next
+            grille.Columns("Deroule").AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+            grille.Columns("Deroule").Width = 26
+            grille.Columns("Deroule").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+        End If
+
         MettreEnEvidenceTotaux(grille)
+        MettreEnEvidenceNiveaux(grille)
     End Sub
 
     ''' <summary>
-    ''' Signale en rouge les transactions annulées : ce sont elles que l'on cherche le plus
-    ''' souvent dans ce détail.
+    ''' Distingue les lignes de détail des lignes de point de vente, et signale en rose les
+    ''' transactions annulées : ce sont elles que l'on cherche le plus souvent.
     ''' </summary>
-    Private Sub MettreEnEvidenceAnnulations()
+    Private Shared Sub MettreEnEvidenceNiveaux(grille As DataGridView)
 
-        If Not dgvMtcn.Columns.Contains("Statut") Then Return
+        If Not grille.Columns.Contains("Niveau") Then Return
 
-        For Each ligne As DataGridViewRow In dgvMtcn.Rows
+        For Each ligne As DataGridViewRow In grille.Rows
+
+            Dim valeur As Object = ligne.Cells("Niveau").Value
+            If valeur Is Nothing OrElse valeur Is DBNull.Value Then Continue For
+
+            If Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture) <>
+               RapportActiviteService.NIVEAU_TRANSACTION Then Continue For
+
+            ligne.DefaultCellStyle.ForeColor = Drawing.SystemColors.GrayText
+
             If String.Equals(Convert.ToString(ligne.Cells("Statut").Value), "ANNULÉE", StringComparison.Ordinal) Then
                 ligne.DefaultCellStyle.BackColor = Drawing.Color.MistyRose
+                ligne.DefaultCellStyle.ForeColor = Drawing.SystemColors.ControlText
             End If
         Next
     End Sub
@@ -346,7 +379,73 @@ Public Class FrmRapportActivite
 
 #End Region
 
+#Region "Déroulé d'un point de vente"
+
+    ''' <summary>
+    ''' Replie tout le détail à l'affichage : un état de gestion se lit d'abord au niveau des
+    ''' points de vente. Le détail ne s'ouvre que lorsqu'on le demande.
+    ''' </summary>
+    Private Sub ReplierToutLeDetail()
+
+        For Each ligne As DataGridViewRow In dgvParPdv.Rows
+            If NiveauDeLaLigne(ligne) = RapportActiviteService.NIVEAU_TRANSACTION Then
+                ligne.Visible = False
+            End If
+        Next
+    End Sub
+
+    ''' <summary>
+    ''' Déroule ou replie un point de vente lorsqu'on clique dessus : ses envois et ses
+    ''' paiements apparaissent alors sous lui, chacun avec son MTCN.
+    ''' </summary>
+    Private Sub dgvParPdv_CellClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvParPdv.CellClick
+
+        If e.RowIndex < 0 Then Return
+
+        Dim ligne As DataGridViewRow = dgvParPdv.Rows(e.RowIndex)
+        If NiveauDeLaLigne(ligne) <> RapportActiviteService.NIVEAU_POINT_DE_VENTE Then Return
+
+        Dim signe As String = Convert.ToString(ligne.Cells("Deroule").Value)
+        If String.IsNullOrEmpty(signe) Then Return ' Point de vente sans détail : rien à dérouler.
+
+        Dim ouvrir As Boolean = (signe = RapportActiviteService.SIGNE_PLIE)
+
+        ' Une ligne courante ne peut pas être masquée : on ramène la sélection sur le point de
+        ' vente lui-même avant de replier son détail.
+        If Not ouvrir Then
+            dgvParPdv.CurrentCell = ligne.Cells("Account")
+        End If
+
+        ' Le détail d'un point de vente est la suite ininterrompue des lignes de transaction
+        ' qui le suivent : la suivante d'un autre niveau ferme le bloc.
+        For index As Integer = e.RowIndex + 1 To dgvParPdv.Rows.Count - 1
+
+            Dim suivante As DataGridViewRow = dgvParPdv.Rows(index)
+            If NiveauDeLaLigne(suivante) <> RapportActiviteService.NIVEAU_TRANSACTION Then Exit For
+
+            suivante.Visible = ouvrir
+        Next
+
+        ligne.Cells("Deroule").Value = If(ouvrir,
+                                          RapportActiviteService.SIGNE_DEPLIE,
+                                          RapportActiviteService.SIGNE_PLIE)
+    End Sub
+
+    ''' <summary>Niveau porté par une ligne, ou -1 si la colonne technique est absente.</summary>
+    Private Shared Function NiveauDeLaLigne(ligne As DataGridViewRow) As Integer
+
+        If ligne Is Nothing OrElse Not ligne.DataGridView.Columns.Contains("Niveau") Then Return -1
+
+        Dim valeur As Object = ligne.Cells("Niveau").Value
+        If valeur Is Nothing OrElse valeur Is DBNull.Value Then Return -1
+
+        Return Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+#End Region
+
 #Region "Export PDF"
+
 
     ''' <summary>
     ''' Exporte les cinq états en PDF, l'un sous l'autre, avec le même titre et la même mise en
@@ -364,22 +463,22 @@ Public Class FrmRapportActivite
             Return
         End If
 
-        ' Le détail des MTCN peut représenter des milliers de lignes, soit des dizaines de pages
-        ' imprimées. Sur un mois complet, l'inclure sans le dire produirait un document que
-        ' personne n'attendait : la question est posée, elle ne l'est pas quand le volume reste
-        ' raisonnable.
-        Dim inclureMtcn As Boolean = _transactions IsNot Nothing AndAlso _transactions.Rows.Count > 0
+        ' Le détail des transactions peut représenter des milliers de lignes, soit des dizaines
+        ' de pages imprimées. Sur un mois complet, l'inclure sans le dire produirait un document
+        ' que personne n'attendait : la question est posée, et seulement quand le volume le mérite.
+        Dim inclureDetail As Boolean = _operations IsNot Nothing AndAlso _operations.Count > 0
 
-        If inclureMtcn AndAlso _transactions.Rows.Count > SEUIL_MTCN_VOLUMINEUX Then
+        If inclureDetail AndAlso _operations.Count > SEUIL_DETAIL_VOLUMINEUX Then
 
             Dim reponse As DialogResult = MessageBox.Show(
-                $"Le détail des transactions compte {_transactions.Rows.Count:N0} lignes, " &
+                $"Le détail des transactions compte {_operations.Count:N0} lignes, " &
                 "soit plusieurs dizaines de pages." & Environment.NewLine & Environment.NewLine &
-                "L'inclure dans le document PDF ?" & Environment.NewLine & Environment.NewLine &
-                "Répondre « Non » produit le rapport sans ce détail ; il reste consultable à l'écran.",
+                "L'inclure sous chaque point de vente dans le document PDF ?" & Environment.NewLine & Environment.NewLine &
+                "Répondre « Non » produit le rapport au niveau des points de vente seulement ; " &
+                "le détail reste consultable à l'écran.",
                 "Détail des transactions volumineux", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
 
-            inclureMtcn = (reponse = DialogResult.Yes)
+            inclureDetail = (reponse = DialogResult.Yes)
         End If
 
         sfdExport.FileName = NomFichierPropose()
@@ -403,7 +502,7 @@ Public Class FrmRapportActivite
             ExcelExportService.ExporterEnPdf(
                 "ECOBANK TCHAD — RAPPORT D'ACTIVITÉ WESTERN UNION",
                 sousTitres,
-                ConstruireBlocs(inclureMtcn),
+                ConstruireBlocs(inclureDetail),
                 "Rapport activité",
                 sfdExport.FileName)
 
@@ -430,8 +529,11 @@ Public Class FrmRapportActivite
     End Sub
 
     ''' <summary>Les états, dans l'ordre des onglets, avec leurs intitulés et formats.</summary>
-    ''' <param name="inclureMtcn">Inclut le détail des transactions, dont le volume peut être élevé.</param>
-    Private Function ConstruireBlocs(inclureMtcn As Boolean) As List(Of BlocExcel)
+    ''' <param name="inclureDetail">
+    ''' Inclut, sous chaque point de vente, le détail de ses transactions — dont le volume peut
+    ''' être élevé. Sinon l'état s'arrête au niveau des points de vente.
+    ''' </param>
+    Private Function ConstruireBlocs(inclureDetail As Boolean) As List(Of BlocExcel)
 
         Dim formatsChiffres As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
             {"NbEnvois", "# ##0"}, {"NbPaiements", "# ##0"}, {"NbAnnulations", "# ##0"},
@@ -444,7 +546,8 @@ Public Class FrmRapportActivite
             {"Designation", "Désignation"}, {"PointsDeVente", "Points de vente"},
             {"NbEnvois", "Envois"}, {"PrincipalEnvoi", "Principal envoyé"},
             {"NbPaiements", "Paiements"}, {"PrincipalPaye", "Principal payé"},
-            {"NbAnnulations", "Annulations"}, {"TotalTaxes", "Total taxes"}
+            {"NbAnnulations", "Annulations"}, {"TotalTaxes", "Total taxes"},
+            {"MTCN", "MTCN"}, {"Statut", "Statut"}
         }
 
         Dim synthese As New BlocExcel("1. Synthèse de la période", _synthese)
@@ -456,7 +559,7 @@ Public Class FrmRapportActivite
         }
 
         ' Le filtre automatique va à la page des points de vente : c'est celle que l'on fouille.
-        Dim parPdv As New BlocExcel("3. Par point de vente", _parPdv) With {
+        Dim parPdv As New BlocExcel("3. Par point de vente", TablePointDeVentePourExport(inclureDetail)) With {
             .Entetes = entetes, .Formats = formatsChiffres, .AvecFiltre = True,
             .ExergueColonne = "Account", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
@@ -482,21 +585,36 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Dim blocs As New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions}
+        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions}
+    End Function
 
-        If inclureMtcn Then
-            blocs.Add(New BlocExcel("6. Détail des transactions (MTCN)", _transactions) With {
-                .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
-                    {"Designation", "Désignation"}, {"Montant", "Montant"}
-                },
-                .Formats = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
-                    {"Montant", "# ##0"}
-                },
-                .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
-            })
+    ''' <summary>
+    ''' État par point de vente destiné à l'export : les colonnes techniques sont retirées, et
+    ''' les lignes de transaction le sont aussi lorsque le détail n'est pas demandé.
+    ''' </summary>
+    Private Function TablePointDeVentePourExport(inclureDetail As Boolean) As DataTable
+
+        Dim exportable As DataTable = _parPdv.Copy()
+
+        If Not inclureDetail Then
+            For index As Integer = exportable.Rows.Count - 1 To 0 Step -1
+
+                Dim valeur As Object = exportable.Rows(index)("Niveau")
+                If valeur Is DBNull.Value Then Continue For
+
+                If Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture) =
+                   RapportActiviteService.NIVEAU_TRANSACTION Then
+                    exportable.Rows.RemoveAt(index)
+                End If
+            Next
         End If
 
-        Return blocs
+        ' Colonnes techniques : elles pilotent l'affichage, elles n'ont rien à faire dans un état.
+        For Each nom As String In New String() {"Niveau", "Deroule"}
+            If exportable.Columns.Contains(nom) Then exportable.Columns.Remove(nom)
+        Next
+
+        Return exportable
     End Function
 
     ''' <summary>

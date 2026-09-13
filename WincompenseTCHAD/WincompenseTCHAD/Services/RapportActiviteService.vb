@@ -25,6 +25,20 @@ Public NotInheritable Class RapportActiviteService
     ''' <summary>Libellé des sous-totaux par nature de point de vente.</summary>
     Public Const LIBELLE_SOUS_TOTAL As String = "Sous-total"
 
+    ''' <summary>
+    ''' Niveau de chaque ligne de l'état par point de vente. Il pilote le pliage à l'écran et
+    ''' la mise en forme, et permet d'exclure le détail d'un export sans reconstruire l'état.
+    ''' </summary>
+    Public Const NIVEAU_CATEGORIE As Integer = 0
+    Public Const NIVEAU_POINT_DE_VENTE As Integer = 1
+    Public Const NIVEAU_TRANSACTION As Integer = 2
+    Public Const NIVEAU_SOUS_TOTAL As Integer = 3
+    Public Const NIVEAU_TOTAL As Integer = 4
+
+    ''' <summary>Signes de la colonne de pliage.</summary>
+    Public Const SIGNE_PLIE As String = "+"
+    Public Const SIGNE_DEPLIE As String = "-"
+
     ''' <summary>Libellé des points de vente sans groupe statistique.</summary>
     Public Const SANS_GROUPE As String = "(sans groupe statistique)"
 
@@ -143,19 +157,33 @@ Public NotInheritable Class RapportActiviteService
     ''' Agences propres du paramétrage (T_Pdv_EC). Celles qui n'ont eu AUCUNE activité sur la
     ''' période y figurent tout de même, à zéro : une agence qui n'a rien fait est une
     ''' information de gestion, et l'omettre reviendrait à la rendre invisible au moment même
-    ''' où elle mérite d'être regardée. Facultatif : sans cette liste, seules les agences ayant
-    ''' travaillé apparaissent.
+    ''' où elle mérite d'être regardée. Facultatif.
+    ''' </param>
+    ''' <param name="transactions">
+    ''' Détail des transactions, rattaché à chaque point de vente : dérouler un Account fait
+    ''' apparaître ses envois et ses paiements, chacun avec son MTCN. Facultatif.
     ''' </param>
     Public Shared Function ConstruireParPointDeVente(lignes As List(Of LigneHistoriqueWU),
-                                                     Optional agencesConnues As List(Of PointDeVenteEC) = Nothing) As DataTable
+                                                     Optional agencesConnues As List(Of PointDeVenteEC) = Nothing,
+                                                     Optional transactions As List(Of TransactionWU) = Nothing) As DataTable
 
         Dim table As New DataTable("ParPointDeVente")
+
+        ' Colonne de pliage : "+" quand le point de vente a du détail, vide sinon.
+        table.Columns.Add("Deroule", GetType(String))
         table.Columns.Add("Account", GetType(String))
         table.Columns.Add("Designation", GetType(String))
         table.Columns.Add("Groupe", GetType(String))
+        table.Columns.Add("MTCN", GetType(String))
+        table.Columns.Add("Statut", GetType(String))
         AjouterColonnesChiffrees(table)
 
-        ' Cumul par Account, en conservant sa nature : sous-agent, agence propre ou non paramétré.
+        ' Niveau de la ligne, masqué à l'affichage : il pilote le pliage et l'export.
+        table.Columns.Add("Niveau", GetType(Integer))
+
+        ' Transactions regroupées par Account, triées par date puis par MTCN.
+        Dim detailParAccount As Dictionary(Of String, List(Of TransactionWU)) = RegrouperTransactions(transactions)
+
         Dim cumuls As New Dictionary(Of String, LigneHistoriqueWU)(StringComparer.OrdinalIgnoreCase)
 
         For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
@@ -214,18 +242,31 @@ Public NotInheritable Class RapportActiviteService
                         End Function)
 
             Dim entete As DataRow = table.NewRow()
+            entete("Deroule") = String.Empty
             entete("Account") = typePdv
-            entete("Designation") = String.Empty
-            entete("Groupe") = String.Empty
+            entete("Niveau") = NIVEAU_CATEGORIE
             table.Rows.Add(entete)
 
             For Each cumul As LigneHistoriqueWU In duType
+
+                Dim operations As List(Of TransactionWU) = Nothing
+                detailParAccount.TryGetValue(cumul.Account, operations)
+                Dim aDuDetail As Boolean = operations IsNot Nothing AndAlso operations.Count > 0
+
                 Dim enregistrement As DataRow = table.NewRow()
+                enregistrement("Deroule") = If(aDuDetail, SIGNE_PLIE, String.Empty)
                 enregistrement("Account") = cumul.Account
                 enregistrement("Designation") = cumul.Designation
                 enregistrement("Groupe") = LibelleGroupe(cumul.GroupeStatistique)
+                enregistrement("MTCN") = String.Empty
+                enregistrement("Statut") = String.Empty
                 RemplirColonnesChiffrees(enregistrement, cumul)
+                enregistrement("Niveau") = NIVEAU_POINT_DE_VENTE
                 table.Rows.Add(enregistrement)
+
+                If aDuDetail Then
+                    AjouterLignesTransactions(table, operations)
+                End If
             Next
 
             Dim sansActivite As Integer = 0
@@ -235,22 +276,92 @@ Public NotInheritable Class RapportActiviteService
             Next
 
             Dim sousTotal As DataRow = table.NewRow()
+            sousTotal("Deroule") = String.Empty
             sousTotal("Account") = LIBELLE_SOUS_TOTAL
             sousTotal("Designation") = $"{typePdv} — {duType.Count} point(s) de vente" &
                                        If(sansActivite > 0, $", dont {sansActivite} sans activité", String.Empty)
-            sousTotal("Groupe") = String.Empty
             RemplirColonnesChiffrees(sousTotal, CumulerLignes(duType))
+            sousTotal("Niveau") = NIVEAU_SOUS_TOTAL
             table.Rows.Add(sousTotal)
         Next
 
         Dim total As DataRow = table.NewRow()
+        total("Deroule") = String.Empty
         total("Account") = LIBELLE_TOTAL
         total("Designation") = $"{cumuls.Count} point(s) de vente"
-        total("Groupe") = String.Empty
         RemplirColonnesChiffrees(total, Cumuler(lignes))
+        total("Niveau") = NIVEAU_TOTAL
         table.Rows.Add(total)
 
         Return table
+    End Function
+
+    ''' <summary>
+    ''' Écrit le détail des transactions d'un point de vente, une ligne chacune.
+    '''
+    ''' Une transaction est UNE unité de volume : son montant alimente la colonne d'envoi ou de
+    ''' paiement selon son sens, et son compteur la colonne correspondante. Les cumuls du point
+    ''' de vente au-dessus sont donc exactement la somme des lignes en dessous — le déroulé
+    ''' justifie le total, il ne se contente pas de l'accompagner.
+    ''' </summary>
+    Private Shared Sub AjouterLignesTransactions(table As DataTable, operations As List(Of TransactionWU))
+
+        For Each operation As TransactionWU In operations
+
+            Dim enregistrement As DataRow = table.NewRow()
+            enregistrement("Deroule") = String.Empty
+
+            ' L'indentation place visuellement la transaction sous son point de vente.
+            enregistrement("Account") = "    " & operation.DateActivite.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture)
+            enregistrement("Designation") = operation.Sens
+            enregistrement("Groupe") = String.Empty
+            enregistrement("MTCN") = operation.MTCN
+            enregistrement("Statut") = LibelleStatut(operation.Statut)
+
+            If operation.EstAnnulee Then
+                ' Une transaction annulée ne pèse dans aucun montant : elle ne compte que comme
+                ' annulation, exactement comme dans l'agrégat de la journée.
+                enregistrement("NbAnnulations") = 1
+            ElseIf String.Equals(operation.Sens, TransactionWU.SENS_ENVOI, StringComparison.Ordinal) Then
+                enregistrement("NbEnvois") = 1
+                enregistrement("PrincipalEnvoi") = operation.Montant
+            Else
+                enregistrement("NbPaiements") = 1
+                enregistrement("PrincipalPaye") = operation.Montant
+            End If
+
+            enregistrement("Niveau") = NIVEAU_TRANSACTION
+            table.Rows.Add(enregistrement)
+        Next
+    End Sub
+
+    ''' <summary>Regroupe les transactions par Account, triées par date puis par MTCN.</summary>
+    Private Shared Function RegrouperTransactions(transactions As List(Of TransactionWU)) As Dictionary(Of String, List(Of TransactionWU))
+
+        Dim parAccount As New Dictionary(Of String, List(Of TransactionWU))(StringComparer.OrdinalIgnoreCase)
+
+        If transactions Is Nothing Then Return parAccount
+
+        For Each operation As TransactionWU In transactions
+
+            If operation Is Nothing OrElse String.IsNullOrWhiteSpace(operation.Account) Then Continue For
+
+            If Not parAccount.ContainsKey(operation.Account) Then
+                parAccount(operation.Account) = New List(Of TransactionWU)
+            End If
+
+            parAccount(operation.Account).Add(operation)
+        Next
+
+        For Each operations As List(Of TransactionWU) In parAccount.Values
+            operations.Sort(Function(x, y)
+                                Dim parDate As Integer = x.DateActivite.CompareTo(y.DateActivite)
+                                If parDate <> 0 Then Return parDate
+                                Return String.Compare(x.MTCN, y.MTCN, StringComparison.OrdinalIgnoreCase)
+                            End Function)
+        Next
+
+        Return parAccount
     End Function
 
 #End Region
@@ -439,82 +550,7 @@ Public NotInheritable Class RapportActiviteService
 
 #End Region
 
-#Region "Page — Transactions (MTCN)"
-
-    ''' <summary>
-    ''' Détail des transactions identifiées par leur MTCN, pour retrouver et justifier une
-    ''' opération précise.
-    '''
-    ''' Les annulations y figurent, signalées par leur statut : c'est précisément une
-    ''' transaction annulée que l'on cherche à retrouver le plus souvent. Le pied de page
-    ''' récapitule les envois, les paiements et les annulations.
-    ''' </summary>
-    Public Shared Function ConstruireTransactions(transactions As List(Of TransactionWU)) As DataTable
-
-        Dim table As New DataTable("Transactions")
-        table.Columns.Add("Date", GetType(String))
-        table.Columns.Add("Account", GetType(String))
-        table.Columns.Add("Designation", GetType(String))
-        table.Columns.Add("Groupe", GetType(String))
-        table.Columns.Add("MTCN", GetType(String))
-        table.Columns.Add("Sens", GetType(String))
-        table.Columns.Add("Statut", GetType(String))
-        table.Columns.Add("Montant", GetType(Decimal))
-
-        If transactions Is Nothing Then Return table
-
-        Dim envois As Integer = 0
-        Dim paiements As Integer = 0
-        Dim annulations As Integer = 0
-        Dim montantEnvois As Decimal = 0D
-        Dim montantPaiements As Decimal = 0D
-
-        For Each operation As TransactionWU In transactions
-
-            If operation Is Nothing Then Continue For
-
-            Dim enregistrement As DataRow = table.NewRow()
-            enregistrement("Date") = operation.DateActivite.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture)
-            enregistrement("Account") = operation.Account
-            enregistrement("Designation") = operation.Designation
-            enregistrement("Groupe") = LibelleGroupe(operation.GroupeStatistique)
-            enregistrement("MTCN") = operation.MTCN
-            enregistrement("Sens") = operation.Sens
-            enregistrement("Statut") = LibelleStatut(operation.Statut)
-            enregistrement("Montant") = operation.Montant
-            table.Rows.Add(enregistrement)
-
-            If operation.EstAnnulee Then
-                annulations += 1
-                ' Une transaction annulée ne compte pas dans les volumes : elle est dénombrée
-                ' à part, comme partout ailleurs dans les rapports.
-                Continue For
-            End If
-
-            If String.Equals(operation.Sens, TransactionWU.SENS_ENVOI, StringComparison.Ordinal) Then
-                envois += 1
-                montantEnvois += operation.Montant
-            Else
-                paiements += 1
-                montantPaiements += operation.Montant
-            End If
-        Next
-
-        If table.Rows.Count = 0 Then Return table
-
-        Dim total As DataRow = table.NewRow()
-        total("Date") = LIBELLE_TOTAL
-        total("Account") = String.Empty
-        total("Designation") = $"{envois} envoi(s), {paiements} paiement(s), {annulations} annulation(s)"
-        total("Groupe") = String.Empty
-        total("MTCN") = String.Empty
-        total("Sens") = String.Empty
-        total("Statut") = String.Empty
-        total("Montant") = montantEnvois + montantPaiements
-        table.Rows.Add(total)
-
-        Return table
-    End Function
+#Region "Statut des transactions"
 
     ''' <summary>
     ''' Traduit le statut Western Union en libellé lisible. Un statut inconnu est restitué tel
