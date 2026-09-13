@@ -169,9 +169,12 @@ Public Class FrmPrincipal
 
     Private Sub mnuFermerTout_Click(sender As Object, e As EventArgs) Handles mnuFermerTout.Click
 
-        ' La collection est parcourue sur une copie : fermer une fenêtre la retire de MdiChildren,
-        ' ce qui fausserait l'énumération en cours.
-        For Each enfant As Form In Me.MdiChildren.Clone()
+        ' La liste est relevée avant la première fermeture : fermer une fenêtre la retire de
+        ' MdiChildren, et énumérer directement cette collection pendant qu'elle se vide en
+        ' sauterait une sur deux.
+        Dim ouvertes As Form() = Me.MdiChildren
+
+        For Each enfant As Form In ouvertes
             enfant.Close()
         Next
     End Sub
