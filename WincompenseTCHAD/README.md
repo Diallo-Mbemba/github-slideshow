@@ -169,7 +169,7 @@ Server Management Studio.
 
 | Écran | Table | Champs |
 |---|---|---|
-| Sous-agents Western Union | `T_Pdv_SA` | Account (`Code_Pdv`), Désignation, Groupe statistique, Taux, Compte de compensation, Compte de commission, Code agence |
+| Sous-agents Western Union | `T_Pdv_SA` | Account (`Code_Pdv`), Désignation, Groupe statistique, puis — hérités du groupe — Taux, Compte d'activité (`CompteCompense`), Compte de commission ; et Code agence |
 | Agences propres Ecobank | `T_Pdv_EC` | Account (`Codesite`), Désignation, Code agence Voyager |
 
 Une agence propre ne rétrocède aucune commission — la banque en conserve 100 % — d'où l'absence
@@ -198,8 +198,9 @@ de taux et de comptes de compensation/commission, contrairement aux sous-agents.
 - **Suppression confirmée, et expliquée.** La confirmation rappelle la conséquence réelle : les
   rapports portant cet Account apparaîtront en `INCONNU` et leur pièce comptable utilisera le
   compte courant WU au lieu du compte de compensation.
-- **Groupe statistique : liste déroulante.** Il se choisit parmi les groupes existants ; un
-  libellé inconnu n'est retenu qu'après confirmation explicite de sa création (voir ci-dessous).
+- **Groupe statistique : unité de paramétrage.** Le compte d'activité, le compte de commission
+  et le taux appartiennent au GROUPE ; le sous-agent en hérite et ne peut pas les redéfinir
+  pour lui seul (voir ci-dessous).
 - **Recherche.** Le champ de recherche filtre sur l'Account ou la désignation ; il s'applique à
   la touche Entrée ou au bouton *Actualiser*, pas à chaque caractère frappé. Les caractères
   génériques de SQL (`%`, `_`, `[`) y sont neutralisés : chercher « % » cherche bien un
@@ -207,35 +208,58 @@ de taux et de comptes de compensation/commission, contrairement aux sous-agents.
 - **Calcul invalidé.** Après un passage dans l'un de ces écrans, si un calcul est déjà affiché,
   la barre d'état invite à le relancer : le paramétrage a pu changer.
 
-### Groupe statistique : sélectionner, ou créer en le disant
+### Groupe statistique : l'unité de paramétrage dont l'Account hérite
 
-Le groupe statistique se saisit dans une **liste déroulante alimentée par les groupes déjà
-présents en base** (`SELECT DISTINCT GroupeStatistique FROM T_Pdv_SA`). La saisie libre reste
-possible, mais un libellé inconnu déclenche une **demande de création explicite** :
+**Règle métier.** Un groupe statistique porte **un** compte d'activité, **un** compte de
+commission et **un** taux. Tout Account appartient à un seul groupe et en hérite
+automatiquement ces trois valeurs. Un même compte d'activité ou de commission ne peut
+appartenir qu'à un seul groupe.
 
-> Le groupe statistique « RESAU NORD » n'existe pas encore. Voulez-vous le CRÉER ?
-> Répondez « Non » pour choisir un groupe existant dans la liste déroulante.
+Le compte d'activité est la colonne `CompteCompense` : c'est lui qui porte la ligne de mouvement
+« CCS_… **ACTIVITE** WU » de la pièce comptable.
 
-C'est le seul moyen de distinguer un nouveau groupe légitime d'une faute de frappe : les deux
-ont exactement la même apparence pour l'application. Le bouton par défaut de cette boîte est
-**Non**, pour qu'une validation machinale ne crée pas un groupe parasite.
+**À l'écran.** Sélectionner un groupe dans la liste déroulante remplit aussitôt les trois zones
+de saisie et les **verrouille** : ces valeurs appartiennent au groupe, pas au sous-agent. Elles
+ne redeviennent saisissables que dans deux cas :
 
-| Situation | Comportement |
-|---|---|
-| Groupe choisi dans la liste | Enregistré tel quel, sans question |
-| Libellé connu à la casse près (`reseau` pour `RESEAU`) | Rejoint le groupe existant, dont l'orthographe est reprise — pas de doublon `RESEAU`/`Reseau`/`reseau` |
-| Libellé inconnu | Création demandée explicitement ; refusée, la liste se déroule pour choisir |
-| Champ laissé vide | Averti (le sous-agent n'apparaîtra dans aucun regroupement), mais enregistrable |
+| Cas | Champs hérités | Effet à l'enregistrement |
+|---|---|---|
+| Groupe existant sélectionné | verrouillés, fond grisé | Le sous-agent hérite, rien d'autre ne bouge |
+| Groupe inconnu saisi | saisissables | Les valeurs saisies **définissent** le nouveau groupe |
+| Case « Modifier les valeurs du groupe » cochée | saisissables | Après confirmation chiffrée, les nouvelles valeurs sont appliquées à **tous** les sous-agents du groupe |
 
-Il n'existe pas de table de groupes : **un groupe n'a d'existence que par les sous-agents qui le
-portent**. Créer un groupe revient donc à saisir un libellé encore inconnu, et supprimer le
-dernier sous-agent d'un groupe le fait disparaître. La liste déroulante est rechargée après
-chaque enregistrement, chaque suppression et chaque *Actualiser*, de sorte qu'un groupe qui
-vient d'être créé est aussitôt sélectionnable — et qu'un groupe devenu vide cesse d'être
-proposé.
+**Contrôles.**
 
-Conséquence à connaître : **renommer un groupe suppose de modifier chaque sous-agent qui le
-porte**. C'est pourquoi la création demande confirmation plutôt que de se faire en silence.
+- **Unicité des comptes.** Si le compte d'activité ou de commission saisi appartient déjà à un
+  autre groupe, l'enregistrement est refusé, en nommant le groupe en conflit.
+- **Divergence d'une fiche.** Une fiche dont les valeurs ne sont pas celles de son groupe est
+  affichée **telle quelle**, avec un avertissement en barre d'état — jamais réalignée en
+  silence, ce qui masquerait le problème avant de l'enregistrer. À l'enregistrement, il faut
+  trancher : adopter les valeurs du groupe, ou faire évoluer le groupe.
+- **Groupe incohérent.** Les groupes dont les membres ne portent pas tous les mêmes valeurs sont
+  détectés à la lecture (la requête relève le minimum et le maximum de chaque colonne par
+  groupe : leur différence trahit la divergence) et signalés avec le détail. L'application ne
+  corrige jamais d'autorité des données comptables ; elle indique comment aligner le groupe.
+
+**Création d'un groupe.** Un libellé inconnu déclenche une demande explicite, dont le bouton par
+défaut est **Non** — une faute de frappe et un nouveau groupe légitime ont exactement la même
+apparence pour l'application. Un libellé qui ne diffère que par la casse rejoint le groupe
+existant et en reprend l'orthographe : `RESEAU`, `Reseau` et `reseau` ne peuvent pas coexister.
+
+**Champ vide.** Accepté après avertissement : le sous-agent n'hérite alors d'aucune valeur et
+n'apparaît dans aucun regroupement.
+
+**Il n'existe pas de table de groupes.** Un groupe n'a d'existence que par les sous-agents qui le
+portent : ses valeurs sont celles de ses membres, le créer revient à saisir un libellé inconnu,
+et supprimer son dernier membre le fait disparaître. La liste est rechargée après chaque
+enregistrement, chaque suppression et chaque *Actualiser*.
+
+> **Limite de ce choix, à arbitrer.** Faute de table dédiée, les trois invariants ci-dessus sont
+> *vérifiés par l'application*, pas *garantis par la base* : une écriture directe en SQL peut
+> toujours les enfreindre. Une table `T_GroupeStatistique` (libellé en clé primaire, index unique
+> sur chaque compte, `GroupeStatistique` en clé étrangère depuis `T_Pdv_SA`) les rendrait
+> impossibles à violer et ferait du renommage d'un groupe une opération immédiate. C'est une
+> modification de schéma sur une base de production : elle n'a pas été engagée sans validation.
 
 Le chemin de comptabilisation quotidienne ne peut jamais écrire dans ces tables : la lecture
 reste dans `WURepository`, l'écriture est isolée dans `PdvRepository`.

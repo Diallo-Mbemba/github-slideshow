@@ -173,24 +173,32 @@ Public NotInheritable Class PdvRepository
     End Function
 
     ''' <summary>
-    ''' Liste les groupes statistiques DÉJÀ utilisés par au moins un sous-agent.
+    ''' Liste les groupes statistiques avec leurs valeurs héritées (compte d'activité, compte de
+    ''' commission, taux) et le nombre de sous-agents qu'ils regroupent.
     '''
-    ''' Il n'existe pas de table de groupes : un groupe n'a d'existence que par les sous-agents
-    ''' qui le portent. « Créer un groupe » revient donc simplement à saisir un libellé encore
-    ''' inconnu — et « supprimer » le dernier sous-agent d'un groupe le fait disparaître de
-    ''' cette liste. C'est précisément pourquoi la saisie doit passer par une sélection : sans
-    ''' cela, la moindre faute de frappe crée un groupe parasite impossible à distinguer.
+    ''' Il n'existe pas de table de groupes : les valeurs d'un groupe sont celles de ses membres.
+    ''' La requête relève donc, pour chaque groupe, le minimum ET le maximum de chaque colonne :
+    ''' lorsqu'ils diffèrent, c'est que les membres ne portent pas tous la même valeur — ce que
+    ''' la règle métier exclut, mais que des données antérieures peuvent présenter. Le groupe est
+    ''' alors marqué incohérent, avec le détail de la divergence : l'application le SIGNALE, elle
+    ''' ne corrige jamais d'autorité des données comptables.
+    '''
+    ''' Un seul aller-retour en base suffit ainsi à obtenir les valeurs et leur contrôle.
     ''' </summary>
-    ''' <returns>Libellés distincts, triés. Liste vide (jamais Nothing) en cas d'erreur.</returns>
-    Public Shared Function ListerGroupesStatistiques(ByRef messageErreur As String) As List(Of String)
+    ''' <returns>Groupes triés par libellé. Liste vide (jamais Nothing) en cas d'erreur.</returns>
+    Public Shared Function ListerGroupes(ByRef messageErreur As String) As List(Of GroupeStatistiqueWU)
 
         messageErreur = String.Empty
-        Dim resultat As New List(Of String)
+        Dim resultat As New List(Of GroupeStatistiqueWU)
 
         Const requete As String =
-            "SELECT DISTINCT LTRIM(RTRIM(GroupeStatistique)) AS Groupe FROM T_Pdv_SA " &
+            "SELECT LTRIM(RTRIM(GroupeStatistique)) AS Groupe, COUNT(*) AS Nombre, " &
+            "MIN(CompteCompense) AS ActiviteMin, MAX(CompteCompense) AS ActiviteMax, " &
+            "MIN(CompteCommission) AS CommissionMin, MAX(CompteCommission) AS CommissionMax, " &
+            "MIN(Taux) AS TauxMin, MAX(Taux) AS TauxMax " &
+            "FROM T_Pdv_SA " &
             "WHERE GroupeStatistique IS NOT NULL AND LTRIM(RTRIM(GroupeStatistique)) <> '' " &
-            "ORDER BY Groupe"
+            "GROUP BY LTRIM(RTRIM(GroupeStatistique)) ORDER BY 1"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -199,8 +207,39 @@ Public NotInheritable Class PdvRepository
                 Using commande As New SqlCommand(requete, connexion)
                     Using lecteur As SqlDataReader = commande.ExecuteReader()
                         While lecteur.Read()
-                            Dim groupe As String = LireChaine(lecteur, "Groupe")
-                            If groupe.Length > 0 Then resultat.Add(groupe)
+
+                            Dim activiteMin As String = LireChaine(lecteur, "ActiviteMin")
+                            Dim activiteMax As String = LireChaine(lecteur, "ActiviteMax")
+                            Dim commissionMin As String = LireChaine(lecteur, "CommissionMin")
+                            Dim commissionMax As String = LireChaine(lecteur, "CommissionMax")
+                            Dim tauxMin As Decimal = LireDecimal(lecteur, "TauxMin")
+                            Dim tauxMax As Decimal = LireDecimal(lecteur, "TauxMax")
+
+                            Dim groupe As New GroupeStatistiqueWU() With {
+                                .Nom = LireChaine(lecteur, "Groupe"),
+                                .NombreSousAgents = LireEntier(lecteur, "Nombre"),
+                                .CompteActivite = activiteMin,
+                                .CompteCommission = commissionMin,
+                                .Taux = tauxMin
+                            }
+
+                            Dim divergences As New List(Of String)
+                            If Not String.Equals(activiteMin, activiteMax, StringComparison.OrdinalIgnoreCase) Then
+                                divergences.Add($"compte d'activité ({activiteMin} / {activiteMax})")
+                            End If
+                            If Not String.Equals(commissionMin, commissionMax, StringComparison.OrdinalIgnoreCase) Then
+                                divergences.Add($"compte de commission ({commissionMin} / {commissionMax})")
+                            End If
+                            If tauxMin <> tauxMax Then
+                                divergences.Add($"taux ({tauxMin:0.00} / {tauxMax:0.00})")
+                            End If
+
+                            If divergences.Count > 0 Then
+                                groupe.EstIncoherent = True
+                                groupe.DetailIncoherence = String.Join(", ", divergences)
+                            End If
+
+                            If groupe.Nom.Length > 0 Then resultat.Add(groupe)
                         End While
                     End Using
                 End Using
@@ -215,7 +254,63 @@ Public NotInheritable Class PdvRepository
         Return resultat
     End Function
 
+    ''' <summary>
+    ''' Applique le compte d'activité, le compte de commission et le taux d'un groupe à TOUS les
+    ''' sous-agents qui le portent.
+    '''
+    ''' C'est la traduction directe de la règle d'héritage : les valeurs appartiennent au groupe,
+    ''' pas au sous-agent. Les modifier sous-agent par sous-agent produirait exactement le genre
+    ''' d'incohérence que ListerGroupes sait détecter.
+    ''' </summary>
+    ''' <param name="nombreModifies">Nombre de sous-agents effectivement mis à jour.</param>
+    Public Shared Function AppliquerValeursGroupe(groupe As GroupeStatistiqueWU,
+                                                  ByRef nombreModifies As Integer,
+                                                  ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+        nombreModifies = 0
+
+        If groupe Is Nothing OrElse String.IsNullOrWhiteSpace(groupe.Nom) Then
+            messageErreur = "Aucun groupe à mettre à jour."
+            Return False
+        End If
+
+        Const requete As String =
+            "UPDATE T_Pdv_SA SET CompteCompense = @activite, CompteCommission = @commission, " &
+            "Taux = @taux WHERE LTRIM(RTRIM(GroupeStatistique)) = @groupe"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    commande.Parameters.Add("@activite", SqlDbType.NVarChar, 255).Value = groupe.CompteActivite
+                    commande.Parameters.Add("@commission", SqlDbType.NVarChar, 255).Value = groupe.CompteCommission
+
+                    Dim parametreTaux As SqlParameter = commande.Parameters.Add("@taux", SqlDbType.Decimal)
+                    parametreTaux.Precision = 4
+                    parametreTaux.Scale = 2
+                    parametreTaux.Value = Decimal.Round(groupe.Taux, 2)
+
+                    commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = groupe.Nom.Trim()
+
+                    nombreModifies = commande.ExecuteNonQuery()
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = $"Mise à jour du groupe « {groupe.Nom} » impossible : {ex.Message}"
+            Return False
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
 #End Region
+
 
 #Region "Agences propres Ecobank (T_Pdv_EC)"
 
@@ -441,6 +536,12 @@ Public NotInheritable Class PdvRepository
         Dim index As Integer = lecteur.GetOrdinal(colonne)
         If lecteur.IsDBNull(index) Then Return String.Empty
         Return lecteur.GetValue(index).ToString().Trim()
+    End Function
+
+    Private Shared Function LireEntier(lecteur As SqlDataReader, colonne As String) As Integer
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return 0
+        Return Convert.ToInt32(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
     End Function
 
     Private Shared Function LireDecimal(lecteur As SqlDataReader, colonne As String) As Decimal

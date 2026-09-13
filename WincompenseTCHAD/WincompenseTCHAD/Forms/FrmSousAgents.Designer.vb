@@ -37,6 +37,7 @@ Partial Class FrmSousAgents
         Me.txtDesignation = New System.Windows.Forms.TextBox()
         Me.lblGroupeStatistique = New System.Windows.Forms.Label()
         Me.cboGroupeStatistique = New System.Windows.Forms.ComboBox()
+        Me.chkModifierGroupe = New System.Windows.Forms.CheckBox()
         Me.lblTaux = New System.Windows.Forms.Label()
         Me.txtTaux = New System.Windows.Forms.TextBox()
         Me.lblCompteCompense = New System.Windows.Forms.Label()
@@ -110,6 +111,7 @@ Partial Class FrmSousAgents
         Me.grpDetail.Controls.Add(Me.txtDesignation)
         Me.grpDetail.Controls.Add(Me.lblGroupeStatistique)
         Me.grpDetail.Controls.Add(Me.cboGroupeStatistique)
+        Me.grpDetail.Controls.Add(Me.chkModifierGroupe)
         Me.grpDetail.Controls.Add(Me.lblTaux)
         Me.grpDetail.Controls.Add(Me.txtTaux)
         Me.grpDetail.Controls.Add(Me.lblCompteCompense)
@@ -221,6 +223,15 @@ Partial Class FrmSousAgents
         Me.txtCompteCommission.Name = "txtCompteCommission"
         Me.txtCompteCommission.Size = New System.Drawing.Size(255, 22)
         Me.txtCompteCommission.TabIndex = 17
+        '
+        'chkModifierGroupe
+        '
+        Me.chkModifierGroupe.Location = New System.Drawing.Point(600, 132)
+        Me.chkModifierGroupe.Name = "chkModifierGroupe"
+        Me.chkModifierGroupe.Size = New System.Drawing.Size(255, 22)
+        Me.chkModifierGroupe.TabIndex = 18
+        Me.chkModifierGroupe.Text = "Modifier les valeurs du groupe"
+        Me.chkModifierGroupe.UseVisualStyleBackColor = True
         '
         'lblCodeAgence
         '
@@ -334,6 +345,7 @@ Partial Class FrmSousAgents
     Friend WithEvents txtDesignation As System.Windows.Forms.TextBox
     Friend WithEvents lblGroupeStatistique As System.Windows.Forms.Label
     Friend WithEvents cboGroupeStatistique As System.Windows.Forms.ComboBox
+    Friend WithEvents chkModifierGroupe As System.Windows.Forms.CheckBox
     Friend WithEvents lblTaux As System.Windows.Forms.Label
     Friend WithEvents txtTaux As System.Windows.Forms.TextBox
     Friend WithEvents lblCompteCompense As System.Windows.Forms.Label
