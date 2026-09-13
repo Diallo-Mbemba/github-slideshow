@@ -99,10 +99,15 @@ Public Class FrmCompensationWU
     '''      règlement, ou l'inverse) ;
     '''   2. sa période est celle de l'autre rapport déjà chargé.
     '''
-    ''' En cas de contradiction avérée, le fichier est REFUSÉ : la sélection précédente est
-    ''' conservée telle quelle, rien n'est écrasé. Un nom de fichier non standard, dont on ne
-    ''' peut rien déduire, n'est jamais refusé ici : les contrôles sur le contenu des rapports,
-    ''' eux systématiques, prendront le relais au moment du calcul.
+    ''' Un rapport du mauvais TYPE est purement et simplement refusé. Une PÉRIODE différente
+    ''' de celle de l'autre rapport déjà chargé ouvre en revanche un choix explicite : soit
+    ''' abandonner le fichier, soit changer de journée de traitement, l'autre rapport étant
+    ''' alors retiré. Dans les deux cas, deux rapports de périodes différentes ne peuvent
+    ''' jamais être chargés ensemble.
+    '''
+    ''' Un nom de fichier non standard, dont on ne peut rien déduire, ne déclenche jamais de
+    ''' refus ici : les contrôles sur le CONTENU des rapports, eux systématiques, prendront
+    ''' le relais au moment du calcul.
     ''' </summary>
     ''' <param name="infos">Fichier que l'utilisateur vient de choisir.</param>
     ''' <param name="typeAttendu">Type de rapport attendu par le bouton utilisé.</param>
@@ -127,13 +132,50 @@ Public Class FrmCompensationWU
 
         Dim messagePeriode As String = String.Empty
         If Not WUFichierService.VerifierMemePeriode(infosActivite, infosReglement, messagePeriode) Then
-            MessageBox.Show(messagePeriode, "Périodes différentes", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            tsslStatut.Text = "Fichier refusé : période différente de celle de l'autre rapport."
-            Return False
+
+            ' Refuser sèchement le fichier enfermerait l'utilisateur : une fois les deux rapports
+            ' d'une journée chargés, aucun fichier d'une autre journée ne pourrait plus jamais être
+            ' sélectionné, ni d'un côté ni de l'autre. On lui laisse donc le choix explicite de
+            ' changer de journée — auquel cas l'autre rapport, devenu hors période, est retiré.
+            ' Dans les deux cas, deux rapports de périodes différentes ne peuvent jamais coexister.
+            Dim reponse As DialogResult = MessageBox.Show(
+                messagePeriode & Environment.NewLine & Environment.NewLine &
+                "Souhaitez-vous changer de journée de traitement ?" & Environment.NewLine & Environment.NewLine &
+                "   Oui  : ce fichier est conservé, l'autre rapport est retiré (à recharger)." & Environment.NewLine &
+                "   Non  : ce fichier est abandonné, la sélection précédente est conservée.",
+                "Périodes différentes", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+
+            If reponse <> DialogResult.Yes Then
+                tsslStatut.Text = "Fichier abandonné : période différente de celle de l'autre rapport."
+                Return False
+            End If
+
+            RetirerAutreRapport(typeAttendu)
         End If
 
         Return True
     End Function
+
+    ''' <summary>
+    ''' Retire de la sélection le rapport qui n'est PAS du type indiqué, lorsque l'utilisateur
+    ''' change de journée de traitement. Garantit qu'à aucun moment deux rapports de périodes
+    ''' différentes ne sont chargés ensemble.
+    ''' </summary>
+    ''' <param name="typeConserve">Type du rapport que l'utilisateur vient de sélectionner.</param>
+    Private Sub RetirerAutreRapport(typeConserve As TypeRapportWU)
+
+        If typeConserve = TypeRapportWU.Activite Then
+            _infosReglement = Nothing
+            _cheminReglement = String.Empty
+            lblReglement.Text = "(aucun fichier sélectionné)"
+            lblReglement.Tag = Nothing
+        Else
+            _infosActivite = Nothing
+            _cheminActivite = String.Empty
+            lblActivite.Text = "(aucun fichier sélectionné)"
+            lblActivite.Tag = Nothing
+        End If
+    End Sub
 
     ''' <summary>
     ''' Affiche dans la barre d'état la période des rapports chargés, ou la raison pour laquelle

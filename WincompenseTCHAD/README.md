@@ -107,7 +107,7 @@ Le contrôle fondé sur le **contenu**, lui, est systématique et fait foi.
 
 | Barrière | Moment | Source | Effet |
 |---|---|---|---|
-| Nom du fichier | dès le clic sur le bouton | période lue dans le nom de l'archive | fichier **refusé**, la sélection précédente est conservée |
+| Nom du fichier | dès le clic sur le bouton | période lue dans le nom de l'archive | choix explicite : abandonner le fichier, **ou** changer de journée (l'autre rapport est alors retiré) |
 | Contenu | au clic sur « Afficher » | dates lues **dans** les rapports (`ValiderCoherenceDates`) | traitement **bloqué** |
 
 Deux nomenclatures de période sont reconnues (`WUFichierService.ExtrairePeriode`) :
@@ -118,6 +118,12 @@ Deux nomenclatures de période sont reconnues (`WUFichierService.ExtrairePeriode
 | `RSP_TD383_ACTIVITY_REPORT_BY_ACCOUNT_20260501_20260531_...zip` | du 01/05/2026 au 31/05/2026 |
 | `Rapport d'activité par Site (N° d'opérateur) du 02 Jan 2021.zip` | 02/01/2021 |
 | `rapports_du_jour.zip` | non lisible → contrôle reporté sur le contenu |
+
+Le contrôle sur la période ne refuse pas sèchement le fichier : cela enfermerait l'utilisateur,
+qui ne pourrait plus jamais passer d'une journée à une autre une fois les deux rapports chargés.
+Une boîte de dialogue lui laisse donc le choix entre abandonner le fichier et changer de journée
+de traitement — auquel cas l'autre rapport, devenu hors période, est retiré et doit être rechargé.
+**Dans les deux cas, deux rapports de périodes différentes ne peuvent jamais être chargés ensemble.**
 
 Seuls les groupes de **8 chiffres exactement** sont retenus comme dates : l'horodatage d'édition
 du rapport (`202606031151`, 12 chiffres) est ainsi écarté et ne peut pas être pris pour une date
