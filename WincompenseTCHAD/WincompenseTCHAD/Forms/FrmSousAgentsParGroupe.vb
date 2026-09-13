@@ -29,6 +29,13 @@ Public Class FrmSousAgentsParGroupe
 
     Private _chargementEnCours As Boolean = False
 
+    ''' <summary>
+    ''' Les deux tableaux tels qu'affichés, conservés pour l'export : ce qui part dans Excel est
+    ''' exactement ce qui est à l'écran, filtre compris.
+    ''' </summary>
+    Private _recapitulatif As DataTable
+    Private _detail As DataTable
+
     Public Sub New()
         InitializeComponent()
     End Sub
@@ -106,6 +113,7 @@ Public Class FrmSousAgentsParGroupe
                                    "Aucun compte ni taux hérité")
         End If
 
+        _recapitulatif = recapitulatif
         dgvGroupes.DataSource = recapitulatif
 
         DefinirEntete(dgvGroupes, "SousAgents", "Sous-agents")
@@ -228,6 +236,7 @@ Public Class FrmSousAgentsParGroupe
                             pdv.Taux, pdv.CodeAgence)
         Next
 
+        _detail = detail
         dgvSousAgents.DataSource = detail
 
         DefinirEntete(dgvSousAgents, "Designation", "Désignation")
@@ -294,6 +303,113 @@ Public Class FrmSousAgentsParGroupe
             groupePrecedent = groupe
         Next
     End Sub
+
+#End Region
+
+#Region "Export Excel"
+
+    ''' <summary>
+    ''' Exporte l'état affiché vers un classeur Excel — titre, sous-titres rappelant le filtre et
+    ''' la date d'édition, récapitulatif des groupes puis détail des sous-agents — et l'ouvre.
+    '''
+    ''' Ce sont les tableaux EXACTEMENT tels qu'ils sont affichés qui sont exportés, filtre
+    ''' compris : ce qui est imprimé est ce qui a été vu à l'écran.
+    ''' </summary>
+    Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
+
+        If _recapitulatif Is Nothing OrElse _detail Is Nothing OrElse _detail.Rows.Count = 0 Then
+            MessageBox.Show("Aucune donnée à exporter.", "Export Excel",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim groupeChoisi As String = Convert.ToString(cboGroupe.SelectedItem)
+        Dim tous As Boolean = String.IsNullOrEmpty(groupeChoisi) OrElse groupeChoisi = TOUS_LES_GROUPES
+
+        sfdExport.FileName = NomFichierPropose(groupeChoisi, tous)
+        If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
+
+        Cursor = Cursors.WaitCursor
+        Try
+            Dim recapitulatif As New BlocExcel("Récapitulatif par groupe statistique", _recapitulatif)
+            recapitulatif.Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                {"SousAgents", "Sous-agents"},
+                {"CompteActivite", "Compte d'activité"},
+                {"CompteCommission", "Compte de commission"},
+                {"Etat", "État"}
+            }
+            recapitulatif.Formats = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                {"Taux", "0 %"},
+                {"SousAgents", "# ##0"}
+            }
+
+            Dim detail As New BlocExcel(If(tous,
+                                           $"Sous-agents, tous groupes confondus ({_detail.Rows.Count})",
+                                           $"Sous-agents du groupe « {groupeChoisi} » ({_detail.Rows.Count})"),
+                                        _detail)
+            detail.Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                {"Designation", "Désignation"},
+                {"CompteActivite", "Compte d'activité"},
+                {"CompteCommission", "Compte de commission"},
+                {"CodeAgence", "Code agence"}
+            }
+            detail.Formats = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                {"Taux", "0 %"}
+            }
+            ' Le filtre automatique va au tableau de détail : c'est celui que l'on fouille.
+            detail.AvecFiltre = True
+
+            Dim sousTitres As New List(Of String) From {
+                If(tous, "Tous les groupes", $"Groupe : {groupeChoisi}"),
+                $"{_groupes.Count} groupe(s) — {_sousAgents.Count} sous-agent(s) au total",
+                $"Édité le {Date.Now:dd/MM/yyyy à HH:mm}"
+            }
+
+            ExcelExportService.ExporterEtOuvrir(
+                "ECOBANK TCHAD — SOUS-AGENTS PAR GROUPE STATISTIQUE",
+                sousTitres,
+                New BlocExcel() {recapitulatif, detail},
+                "Sous-agents par groupe",
+                sfdExport.FileName)
+
+            lblStatut.Text = $"Liste exportée vers {sfdExport.FileName}."
+
+        Catch ex As InvalidOperationException
+            ' Excel absent du poste, ou aucune donnée : message métier déjà explicite.
+            MessageBox.Show(ex.Message, "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+        Catch ex As IO.IOException
+            MessageBox.Show(
+                $"Écriture du fichier impossible : {ex.Message}" & Environment.NewLine & Environment.NewLine &
+                "Le classeur est peut-être déjà ouvert dans Excel.",
+                "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+        Catch ex As Runtime.InteropServices.COMException
+            ' Excel a refusé une opération (classeur verrouillé, instance en cours d'arrêt...).
+            MessageBox.Show(
+                $"Microsoft Excel a signalé une erreur : {ex.Message}",
+                "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+        Finally
+            Cursor = Cursors.Default
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Nom de fichier proposé : il porte le groupe exporté et la date, de sorte que plusieurs
+    ''' extractions successives ne s'écrasent pas les unes les autres.
+    ''' </summary>
+    Private Shared Function NomFichierPropose(groupeChoisi As String, tous As Boolean) As String
+
+        Dim partieGroupe As String = If(tous, "TousGroupes", groupeChoisi)
+
+        ' Un libellé de groupe peut contenir des caractères interdits dans un nom de fichier.
+        For Each interdit As Char In IO.Path.GetInvalidFileNameChars()
+            partieGroupe = partieGroupe.Replace(interdit, "_"c)
+        Next
+
+        Return $"SousAgents_{partieGroupe}_{Date.Now:yyyyMMdd_HHmm}.xlsx"
+    End Function
 
 #End Region
 

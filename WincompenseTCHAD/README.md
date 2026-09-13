@@ -33,6 +33,7 @@ WincompenseTCHAD/
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
     │   ├── WURepository.vb                 ' Lecture SQL Server pour la compensation (T_Pdv_SA / T_Pdv_EC / SystemeWU)
 │   ├── PdvRepository.vb                ' CRUD points de vente et groupes (écriture isolée de la lecture)
+│   ├── ExcelExportService.vb           ' Export générique de tableaux vers Excel (titre, en-têtes, impression)
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     └── Forms/
@@ -341,6 +342,32 @@ Deux partis pris :
 La fenêtre s'ouvre en mode non modal : elle peut rester affichée pendant la saisie d'une fiche.
 Les données sont lues une fois à l'ouverture — le bouton *Actualiser* les relit après une
 modification.
+
+Le bouton **« Exporter vers Excel… »** produit un classeur reprenant l'état **tel qu'il est
+affiché, filtre compris** — ce qui est imprimé est ce qui a été vu :
+
+| Élément | Contenu |
+|---|---|
+| Bandeau de titre | « ECOBANK TCHAD — SOUS-AGENTS PAR GROUPE STATISTIQUE », fond bleu, texte blanc |
+| Sous-titres | Groupe affiché (ou « Tous les groupes »), effectifs totaux, date et heure d'édition |
+| Tableau 1 | Récapitulatif par groupe |
+| Tableau 2 | Détail des sous-agents, avec filtre automatique |
+
+Mise en forme : en-têtes en gras sur fond bleuté, bordures sur toutes les cellules, taux au
+format pourcentage, colonnes ajustées. Mise en page d'impression : **paysage, ajusté à la
+largeur d'une page**, bandeau de titre répété en haut de chaque page, pied de page numéroté
+(`Page 1 / 3`) et horodaté. Le classeur est enregistré à l'emplacement choisi puis **ouvert
+dans Excel**.
+
+Les valeurs numériques partent en tant que **nombres** et non en texte : elles restent
+calculables et triables dans Excel. Le nom de fichier proposé porte le groupe et l'horodatage
+(`SousAgents_RESEAU_20260913_1432.xlsx`), de sorte que deux extractions ne s'écrasent pas.
+
+L'export est assuré par `ExcelExportService`, générique : il ne connaît que des `DataTable` et
+peut donc servir à d'autres états. Comme l'export de la pièce comptable, il fonctionne en
+**liaison tardive** — aucune référence COM Excel n'est imposée au projet, dont le numéro de
+version diffère d'un poste à l'autre. Excel absent du poste, l'application continue de
+fonctionner : seul l'export le signale, au moment où il est demandé.
 
 ## Contrôles de sécurité sur les fichiers chargés
 

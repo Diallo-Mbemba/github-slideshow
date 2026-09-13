@@ -27,11 +27,13 @@ Partial Class FrmSousAgentsParGroupe
         Me.lblDetail = New System.Windows.Forms.Label()
         Me.cboGroupe = New System.Windows.Forms.ComboBox()
         Me.btnActualiser = New System.Windows.Forms.Button()
+        Me.btnExporter = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
         Me.dgvGroupes = New System.Windows.Forms.DataGridView()
         Me.dgvSousAgents = New System.Windows.Forms.DataGridView()
         CType(Me.dgvGroupes, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.dgvSousAgents, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.sfdExport = New System.Windows.Forms.SaveFileDialog()
         Me.SuspendLayout()
         '
         'lblFiltre
@@ -119,13 +121,29 @@ Partial Class FrmSousAgentsParGroupe
         Me.dgvSousAgents.Size = New System.Drawing.Size(916, 300)
         Me.dgvSousAgents.TabIndex = 7
         '
+        'btnExporter
+        '
+        Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.btnExporter.Location = New System.Drawing.Point(12, 578)
+        Me.btnExporter.Name = "btnExporter"
+        Me.btnExporter.Size = New System.Drawing.Size(220, 32)
+        Me.btnExporter.TabIndex = 8
+        Me.btnExporter.Text = "Exporter vers Excel..."
+        Me.btnExporter.UseVisualStyleBackColor = True
+        '
+        'sfdExport
+        '
+        Me.sfdExport.DefaultExt = "xlsx"
+        Me.sfdExport.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
+        Me.sfdExport.Title = "Exporter la liste des sous-agents par groupe"
+        '
         'btnFermer
         '
         Me.btnFermer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnFermer.Location = New System.Drawing.Point(808, 578)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(120, 32)
-        Me.btnFermer.TabIndex = 8
+        Me.btnFermer.TabIndex = 9
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -137,7 +155,7 @@ Partial Class FrmSousAgentsParGroupe
         Me.lblStatut.Location = New System.Drawing.Point(12, 586)
         Me.lblStatut.Name = "lblStatut"
         Me.lblStatut.Size = New System.Drawing.Size(784, 20)
-        Me.lblStatut.TabIndex = 9
+        Me.lblStatut.TabIndex = 10
         Me.lblStatut.Text = ""
         '
         'FrmSousAgentsParGroupe
@@ -154,6 +172,7 @@ Partial Class FrmSousAgentsParGroupe
         Me.Controls.Add(Me.dgvGroupes)
         Me.Controls.Add(Me.lblDetail)
         Me.Controls.Add(Me.dgvSousAgents)
+        Me.Controls.Add(Me.btnExporter)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.lblStatut)
         Me.MinimumSize = New System.Drawing.Size(956, 660)
@@ -172,6 +191,8 @@ Partial Class FrmSousAgentsParGroupe
     Friend WithEvents lblDetail As System.Windows.Forms.Label
     Friend WithEvents cboGroupe As System.Windows.Forms.ComboBox
     Friend WithEvents btnActualiser As System.Windows.Forms.Button
+    Friend WithEvents btnExporter As System.Windows.Forms.Button
+    Friend WithEvents sfdExport As System.Windows.Forms.SaveFileDialog
     Friend WithEvents btnFermer As System.Windows.Forms.Button
     Friend WithEvents dgvGroupes As System.Windows.Forms.DataGridView
     Friend WithEvents dgvSousAgents As System.Windows.Forms.DataGridView
