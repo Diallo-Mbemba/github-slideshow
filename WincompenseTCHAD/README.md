@@ -33,6 +33,12 @@ l'interdisaient.
 Les entrées qu'un rôle n'a pas le droit d'ouvrir **ne sont pas affichées** — voir
 « Utilisateurs, rôles et traçabilité » plus bas.
 
+**Aucun écran n'est ouvert d'office.** Une fois la connexion validée, l'application affiche sa
+zone de travail — le nom du logiciel et son numéro de version en filigrane — et c'est l'utilisateur
+qui choisit par où commencer. Ouvrir le traitement de la compense d'emblée imposait cet écran au
+commercial, qui n'y a pas accès, et faisait attendre l'agent de compense les jours où il venait
+seulement consulter un rapport.
+
 **Un écran déjà ouvert n'est jamais dupliqué** : il est ramené au premier plan, et rétabli s'il
 était réduit. Sans cette règle, dix clics sur un menu produiraient dix copies de la même liste,
 chacune avec ses propres données, et l'utilisateur ne saurait plus laquelle fait foi.

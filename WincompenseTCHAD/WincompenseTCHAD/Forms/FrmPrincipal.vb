@@ -138,20 +138,6 @@ Public Class FrmPrincipal
         SEP4.Available = utilisateurs
     End Sub
 
-    ''' <summary>
-    ''' Ouvre l'écran correspondant à l'usage quotidien du rôle connecté : le traitement pour
-    ''' l'agent de compense, le rapport d'activité pour le commercial. Ouvrir un écran interdit
-    ''' au démarrage n'accueillerait l'utilisateur qu'avec un refus.
-    ''' </summary>
-    Private Sub OuvrirEcranDAccueil()
-
-        If SessionWU.PeutTraiterLaCompense Then
-            AfficherEnfant(Of FrmCompensationWU)()
-        ElseIf SessionWU.PeutVoirLesRapports Then
-            AfficherEnfant(Of FrmRapportActivite)()
-        End If
-    End Sub
-
 #End Region
 
 #Region "Disposition des fenêtres"
@@ -360,7 +346,10 @@ Public Class FrmPrincipal
 
         tsslUtilisateur.Text = SessionWU.Description
 
-        OuvrirEcranDAccueil()
+        ' Aucun écran n'est ouvert d'office : l'application s'ouvre sur sa zone de travail, et
+        ' c'est l'utilisateur qui choisit par où commencer. Ouvrir le traitement de la compense
+        ' d'emblée imposait cet écran au commercial, qui n'y a pas accès, et faisait attendre
+        ' l'agent de compense les jours où il venait seulement consulter un rapport.
     End Sub
 
     ''' <summary>
