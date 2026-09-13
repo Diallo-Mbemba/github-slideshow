@@ -220,6 +220,40 @@ Public NotInheritable Class WUReportService
         Return fichiers.OrderByDescending(Function(e) e.Length).First()
     End Function
 
+
+    ''' <summary>
+    ''' Retourne le nom du rapport CONTENU dans l'archive, ou une chaîne vide si le fichier
+    ''' n'est pas une archive (ou s'il est illisible). Sert aux contrôles de sécurité : quand
+    ''' l'archive a été renommée, le fichier qu'elle contient porte encore, lui, la nomenclature
+    ''' Western Union et permet donc d'identifier le type et la période du rapport.
+    ''' Ne lève jamais d'exception : un nom indéterminé n'est pas une erreur de traitement.
+    ''' </summary>
+    Public Shared Function ObtenirNomRapportInterne(cheminFichier As String) As String
+
+        If String.IsNullOrWhiteSpace(cheminFichier) OrElse Not File.Exists(cheminFichier) Then
+            Return String.Empty
+        End If
+
+        If Not EstArchiveZip(cheminFichier) Then
+            Return String.Empty
+        End If
+
+        Try
+            Using fluxArchive As FileStream = File.OpenRead(cheminFichier)
+                Using archive As New ZipArchive(fluxArchive, ZipArchiveMode.Read)
+                    Dim entree As ZipArchiveEntry = ChoisirEntreeRapport(archive)
+                    Return If(entree Is Nothing, String.Empty, entree.Name)
+                End Using
+            End Using
+        Catch ex As InvalidDataException
+            Return String.Empty
+        Catch ex As IOException
+            Return String.Empty
+        Catch ex As UnauthorizedAccessException
+            Return String.Empty
+        End Try
+    End Function
+
 #End Region
 
 #Region "Parsing robuste"

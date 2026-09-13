@@ -209,4 +209,87 @@ Public NotInheritable Class ConstantesWU
 
 #End Region
 
+#Region "Contrôles de sécurité sur les fichiers chargés"
+
+    ''' <summary>
+    ''' Fragments recherchés dans le NOM du fichier pour reconnaître un rapport d'activité.
+    ''' Couvrent les deux nomenclatures rencontrées : celle de Western Union
+    ''' ("RSP_TD383_ACTIVITY_REPORT_BY_ACCOUNT_...") et l'intitulé français des anciens
+    ''' rapports ("Rapport d'activité par Site ... du 02 Jan 2021"). La recherche est faite
+    ''' sur un nom normalisé (minuscules, accents retirés), la ponctuation pouvant varier.
+    ''' </summary>
+    Public Shared ReadOnly MarqueursNomActivite As String() = {"activity", "activite"}
+
+    ''' <summary>
+    ''' Fragments recherchés dans le NOM du fichier pour reconnaître un rapport de règlement :
+    ''' "settlement" (nomenclature Western Union) et "reglement" (anciens intitulés français).
+    ''' </summary>
+    Public Shared ReadOnly MarqueursNomReglement As String() = {"settlement", "reglement"}
+
+    ''' <summary>
+    ''' Colonnes présentes dans TOUT rapport d'activité (ancien comme nouveau format) et dans
+    ''' AUCUN rapport de règlement : elles constituent donc la signature permettant d'identifier
+    ''' le type réel d'un fichier d'après son CONTENU, indépendamment de son nom — un fichier
+    ''' pouvant toujours être renommé. Déterminées par comparaison des en-têtes des rapports
+    ''' des 02/01/2021 et 30/05/2026. Comparaison insensible à la casse.
+    ''' </summary>
+    Public Shared ReadOnly SignatureRapportActivite As String() = {
+        "TaxesREC", "TaxesPAY", "PayPrincipalPAY", "txnDateLOC"
+    }
+
+    ''' <summary>
+    ''' Colonnes présentes dans TOUT rapport de règlement et dans AUCUN rapport d'activité.
+    ''' Même méthode de détermination que SignatureRapportActivite.
+    ''' </summary>
+    Public Shared ReadOnly SignatureRapportReglement As String() = {
+        "TransactionType", "PayCountry", "ClearChargesLOC", "ClearFXLOC", "SetDateLOCYear"
+    }
+
+    ''' <summary>
+    ''' Nombre minimum de colonnes de signature devant être présentes pour conclure au type.
+    ''' Fixé à 2 et non à la totalité : ainsi la détection résiste à la disparition d'une
+    ''' colonne lors d'une future évolution du format, sans risque de confusion puisque aucune
+    ''' de ces colonnes n'existe dans le rapport de l'autre type.
+    ''' </summary>
+    Public Const MIN_COLONNES_SIGNATURE As Integer = 2
+
+    ''' <summary>
+    ''' Mois acceptés dans le nom des anciens rapports ("... du 02 Jan 2021"), en français
+    ''' comme en anglais, sous forme abrégée ou complète. Les formes les plus longues sont
+    ''' placées en premier afin que "juillet" ne soit jamais confondu avec "juin". Le texte
+    ''' comparé est préalablement normalisé (minuscules, accents retirés).
+    ''' </summary>
+    Public Shared ReadOnly MoisNommes As String() = {
+        "janvier", "janv", "jan",
+        "fevrier", "fevr", "fev", "feb",
+        "mars", "mar",
+        "avril", "avr", "apr",
+        "mai", "may",
+        "juillet", "juil", "jul",
+        "juin", "jun",
+        "aout", "aug", "aou",
+        "septembre", "sept", "sep",
+        "octobre", "oct",
+        "novembre", "nov",
+        "decembre", "dec"
+    }
+
+    ''' <summary>Numéro du mois associé à chaque entrée de MoisNommes, dans le même ordre.</summary>
+    Public Shared ReadOnly NumerosMoisNommes As Integer() = {
+        1, 1, 1,
+        2, 2, 2, 2,
+        3, 3,
+        4, 4, 4,
+        5, 5,
+        7, 7, 7,
+        6, 6,
+        8, 8, 8,
+        9, 9, 9,
+        10, 10,
+        11, 11,
+        12, 12
+    }
+
+#End Region
+
 End Class

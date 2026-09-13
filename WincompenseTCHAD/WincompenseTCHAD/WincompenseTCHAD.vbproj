@@ -72,6 +72,7 @@
   <ItemGroup>
     <Compile Include="Constants\ConstantesWU.vb" />
     <Compile Include="Models\CalculWU.vb" />
+    <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
     <Compile Include="Services\WUCalculationService.vb" />

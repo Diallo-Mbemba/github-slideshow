@@ -26,7 +26,8 @@ WincompenseTCHAD/
     ├── Constants/ConstantesWU.vb           ' Taux, comptes comptables, libellés, colonnes attendues
     ├── Models/CalculWU.vb                  ' Classe métier par Account
     ├── Services/
-    │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
+    │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
+│   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
     │   ├── WURepository.vb                 ' Accès SQL Server (T_Pdv_SA / T_Pdv_EC)
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
@@ -90,6 +91,65 @@ Détails d'implémentation (`WUReportService`) :
 
 Aucune étape de traitement en aval n'est modifiée : une fois les lignes obtenues, le parsing,
 l'agrégation, les calculs et la génération de la pièce comptable sont strictement identiques.
+
+## Contrôles de sécurité sur les fichiers chargés
+
+Deux erreurs de manipulation fausseraient silencieusement toute la comptabilisation : croiser
+deux rapports de **périodes différentes**, ou charger un rapport **d'activité à la place d'un
+rapport de règlement** (ou l'inverse). Chacune est bloquée par **deux barrières indépendantes**.
+
+Principe retenu : un contrôle fondé sur le **nom** du fichier ne bloque que s'il constate une
+contradiction *certaine*. Un nom non standard, dont on ne peut rien déduire, n'interrompt jamais
+le traitement — il serait inacceptable qu'un simple renommage empêche de comptabiliser la journée.
+Le contrôle fondé sur le **contenu**, lui, est systématique et fait foi.
+
+### 1. Les deux rapports doivent couvrir la même période
+
+| Barrière | Moment | Source | Effet |
+|---|---|---|---|
+| Nom du fichier | dès le clic sur le bouton | période lue dans le nom de l'archive | fichier **refusé**, la sélection précédente est conservée |
+| Contenu | au clic sur « Afficher » | dates lues **dans** les rapports (`ValiderCoherenceDates`) | traitement **bloqué** |
+
+Deux nomenclatures de période sont reconnues (`WUFichierService.ExtrairePeriode`) :
+
+| Nom du fichier | Période retenue |
+|---|---|
+| `RSP_TD383_ACTIVITY_REPORT_BY_ACCOUNT_20260530_20260530_202606031151.zip` | 30/05/2026 |
+| `RSP_TD383_ACTIVITY_REPORT_BY_ACCOUNT_20260501_20260531_...zip` | du 01/05/2026 au 31/05/2026 |
+| `Rapport d'activité par Site (N° d'opérateur) du 02 Jan 2021.zip` | 02/01/2021 |
+| `rapports_du_jour.zip` | non lisible → contrôle reporté sur le contenu |
+
+Seuls les groupes de **8 chiffres exactement** sont retenus comme dates : l'horodatage d'édition
+du rapport (`202606031151`, 12 chiffres) est ainsi écarté et ne peut pas être pris pour une date
+de période. Les mois nommés sont acceptés en français comme en anglais, abrégés ou complets ; un
+libellé ambigu comme `jui` (juin ? juillet ?) est volontairement **non** reconnu — sur une donnée
+comptable, ne rien conclure vaut mieux que deviner.
+
+### 2. Un rapport ne peut pas être chargé à la place de l'autre
+
+| Barrière | Moment | Source | Effet |
+|---|---|---|---|
+| Nom du fichier | dès le clic sur le bouton | mots-clés `ACTIVITY`/`activité` et `SETTLEMENT`/`règlement` | fichier **refusé** |
+| Contenu | au clic sur « Afficher » | colonnes réellement présentes (`VerifierTypeRapport`) | traitement **bloqué** |
+
+La seconde barrière est celle qui compte : **un fichier renommé franchit la première, jamais la
+seconde**. Elle repose sur des colonnes discriminantes, présentes dans tout rapport d'un type et
+dans aucun rapport de l'autre — vérifié sur les rapports des 02/01/2021 et 30/05/2026, soit les
+deux formats Western Union :
+
+| Signature | Colonnes |
+|---|---|
+| Rapport d'activité | `TaxesREC`, `TaxesPAY`, `PayPrincipalPAY`, `txnDateLOC` |
+| Rapport de règlement | `TransactionType`, `PayCountry`, `ClearChargesLOC`, `ClearFXLOC`, `SetDateLOCYear` |
+
+Deux colonnes suffisent pour conclure (`MIN_COLONNES_SIGNATURE`) : la détection résiste ainsi à la
+disparition d'une colonne lors d'une future évolution du format, sans risque de confusion puisque
+aucune de ces colonnes n'existe dans le rapport de l'autre type. Sur les quatre rapports réels
+disponibles, la séparation est nette : score 4/0 pour les rapports d'activité, 0/5 pour les
+rapports de règlement, dans les deux formats.
+
+Si l'archive a été renommée et que son nom ne dit plus rien, le nom du **rapport contenu dans
+l'archive** est analysé à son tour : il porte, lui, la nomenclature Western Union d'origine.
 
 ## Compatibilité avec les formats de rapport Western Union
 

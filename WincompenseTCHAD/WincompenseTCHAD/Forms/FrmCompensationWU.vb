@@ -24,6 +24,14 @@ Public Class FrmCompensationWU
 
     Private _cheminActivite As String = String.Empty
     Private _cheminReglement As String = String.Empty
+
+    ''' <summary>
+    ''' Ce que le NOM de chaque fichier chargé a permis d'établir (type de rapport, période).
+    ''' Conservé pour contrôler la concordance des deux rapports dès la seconde sélection,
+    ''' sans avoir à relire les fichiers. Nothing tant qu'aucun fichier n'est sélectionné.
+    ''' </summary>
+    Private _infosActivite As InfosFichierRapport
+    Private _infosReglement As InfosFichierRapport
     Private _listeCalculs As List(Of CalculWU)
     Private _dtPieceGeneree As DataTable
 
@@ -44,13 +52,22 @@ Public Class FrmCompensationWU
     ''' décompressé : la décompression éventuelle est faite à la lecture, par WUReportService.
     ''' </summary>
     Private Sub btnActivite_Click(sender As Object, e As EventArgs) Handles btnActivite.Click
-        If ofdActivite.ShowDialog() = DialogResult.OK Then
-            _cheminActivite = ofdActivite.FileName
-            lblActivite.Text = Path.GetFileName(_cheminActivite)
-            lblActivite.Tag = _cheminActivite
-            ReinitialiserResultats()
-            MettreAJourEtatBoutons()
-        End If
+
+        If ofdActivite.ShowDialog() <> DialogResult.OK Then Return
+
+        Dim infos As InfosFichierRapport = WUFichierService.AnalyserFichier(ofdActivite.FileName)
+
+        ' Contrôles de sécurité sur le nom : type attendu, puis concordance avec l'autre rapport.
+        If Not ValiderSelection(infos, TypeRapportWU.Activite, _infosReglement) Then Return
+
+        _infosActivite = infos
+        _cheminActivite = infos.Chemin
+        lblActivite.Text = infos.NomFichier
+        lblActivite.Tag = _cheminActivite
+
+        ReinitialiserResultats()
+        MettreAJourEtatBoutons()
+        AfficherPeriodeChargee()
     End Sub
 
     ''' <summary>
@@ -58,12 +75,81 @@ Public Class FrmCompensationWU
     ''' directement et décompressée en mémoire au moment de la lecture.
     ''' </summary>
     Private Sub btnReglement_Click(sender As Object, e As EventArgs) Handles btnReglement.Click
-        If ofdReglement.ShowDialog() = DialogResult.OK Then
-            _cheminReglement = ofdReglement.FileName
-            lblReglement.Text = Path.GetFileName(_cheminReglement)
-            lblReglement.Tag = _cheminReglement
-            ReinitialiserResultats()
-            MettreAJourEtatBoutons()
+
+        If ofdReglement.ShowDialog() <> DialogResult.OK Then Return
+
+        Dim infos As InfosFichierRapport = WUFichierService.AnalyserFichier(ofdReglement.FileName)
+
+        If Not ValiderSelection(infos, TypeRapportWU.Reglement, _infosActivite) Then Return
+
+        _infosReglement = infos
+        _cheminReglement = infos.Chemin
+        lblReglement.Text = infos.NomFichier
+        lblReglement.Tag = _cheminReglement
+
+        ReinitialiserResultats()
+        MettreAJourEtatBoutons()
+        AfficherPeriodeChargee()
+    End Sub
+
+    ''' <summary>
+    ''' Contrôles de sécurité appliqués dès la sélection d'un fichier, sur son seul nom :
+    '''
+    '''   1. le fichier n'est pas le rapport de l'autre type (activité chargée à la place du
+    '''      règlement, ou l'inverse) ;
+    '''   2. sa période est celle de l'autre rapport déjà chargé.
+    '''
+    ''' En cas de contradiction avérée, le fichier est REFUSÉ : la sélection précédente est
+    ''' conservée telle quelle, rien n'est écrasé. Un nom de fichier non standard, dont on ne
+    ''' peut rien déduire, n'est jamais refusé ici : les contrôles sur le contenu des rapports,
+    ''' eux systématiques, prendront le relais au moment du calcul.
+    ''' </summary>
+    ''' <param name="infos">Fichier que l'utilisateur vient de choisir.</param>
+    ''' <param name="typeAttendu">Type de rapport attendu par le bouton utilisé.</param>
+    ''' <param name="infosAutreRapport">Autre rapport déjà chargé, ou Nothing.</param>
+    ''' <returns>True si le fichier peut être retenu.</returns>
+    Private Function ValiderSelection(infos As InfosFichierRapport,
+                                      typeAttendu As TypeRapportWU,
+                                      infosAutreRapport As InfosFichierRapport) As Boolean
+
+        ' --- 1. Type de rapport ---
+        Dim messageType As String = String.Empty
+        If Not WUFichierService.VerifierTypeAttendu(infos, typeAttendu, messageType) Then
+            MessageBox.Show(messageType, "Rapport incorrect", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            tsslStatut.Text = "Fichier refusé : ce n'est pas le rapport " &
+                              WUFichierService.LibelleType(typeAttendu) & "."
+            Return False
+        End If
+
+        ' --- 2. Concordance des périodes ---
+        Dim infosActivite As InfosFichierRapport = If(typeAttendu = TypeRapportWU.Activite, infos, infosAutreRapport)
+        Dim infosReglement As InfosFichierRapport = If(typeAttendu = TypeRapportWU.Reglement, infos, infosAutreRapport)
+
+        Dim messagePeriode As String = String.Empty
+        If Not WUFichierService.VerifierMemePeriode(infosActivite, infosReglement, messagePeriode) Then
+            MessageBox.Show(messagePeriode, "Périodes différentes", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            tsslStatut.Text = "Fichier refusé : période différente de celle de l'autre rapport."
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    ''' <summary>
+    ''' Affiche dans la barre d'état la période des rapports chargés, ou la raison pour laquelle
+    ''' elle n'a pas pu être déterminée à partir des noms de fichiers.
+    ''' </summary>
+    Private Sub AfficherPeriodeChargee()
+
+        Dim message As String = String.Empty
+        WUFichierService.VerifierMemePeriode(_infosActivite, _infosReglement, message)
+
+        If Not String.IsNullOrEmpty(message) Then
+            tsslStatut.Text = message
+        ElseIf _infosActivite IsNot Nothing AndAlso _infosActivite.Periode IsNot Nothing Then
+            tsslStatut.Text = $"Rapport d'activité — période : {_infosActivite.Periode}."
+        ElseIf _infosReglement IsNot Nothing AndAlso _infosReglement.Periode IsNot Nothing Then
+            tsslStatut.Text = $"Rapport de règlement — période : {_infosReglement.Periode}."
         End If
     End Sub
 
@@ -106,6 +192,12 @@ Public Class FrmCompensationWU
             Dim dtActivite As DataTable = WUReportService.LireRapportWU(_cheminActivite)
             Dim dtReglement As DataTable = WUReportService.LireRapportWU(_cheminReglement)
             progressBarTraitement.Value = 15
+
+            ' Contrôle de sécurité : chaque fichier est-il bien le rapport qu'il prétend être ?
+            ' Fondé sur les colonnes réellement présentes, ce contrôle démasque un fichier
+            ' renommé, que le contrôle sur le nom fait au chargement ne peut pas détecter.
+            WUFichierService.VerifierTypeRapport(dtActivite, TypeRapportWU.Activite, Path.GetFileName(_cheminActivite))
+            WUFichierService.VerifierTypeRapport(dtReglement, TypeRapportWU.Reglement, Path.GetFileName(_cheminReglement))
 
             ' Vérification structurelle avant tout calcul (section 15).
             WUReportService.VerifierColonnesRapport(dtActivite, ConstantesWU.ColonnesRapportActivite, "activité")
