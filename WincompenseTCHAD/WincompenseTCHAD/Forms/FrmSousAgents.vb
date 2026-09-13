@@ -673,6 +673,19 @@ Public Class FrmSousAgents
         }
     End Function
 
+    ''' <summary>
+    ''' Ouvre l'état de restitution « sous-agents par groupe statistique » : récapitulatif des
+    ''' groupes et détail de leurs sous-agents. Écran de consultation seule, ouvert en modeless
+    ''' afin de pouvoir être laissé à l'écran pendant la saisie d'une fiche.
+    ''' </summary>
+    Private Sub btnParGroupe_Click(sender As Object, e As EventArgs) Handles btnParGroupe.Click
+
+        ' Non modal : l'utilisateur consulte la liste tout en modifiant une fiche. Le formulaire
+        ' se libère seul à sa fermeture (pas de Using : sa durée de vie dépasse cette méthode).
+        Dim etat As New FrmSousAgentsParGroupe()
+        etat.Show(Me)
+    End Sub
+
     Private Sub btnFermer_Click(sender As Object, e As EventArgs) Handles btnFermer.Click
         Close()
     End Sub

@@ -116,6 +116,12 @@
     <Compile Include="Forms\FrmGroupesStatistiques.Designer.vb">
       <DependentUpon>FrmGroupesStatistiques.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmSousAgentsParGroupe.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmSousAgentsParGroupe.Designer.vb">
+      <DependentUpon>FrmSousAgentsParGroupe.vb</DependentUpon>
+    </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="Program.vb" />
   </ItemGroup>
@@ -137,6 +143,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmGroupesStatistiques.resx">
       <DependentUpon>FrmGroupesStatistiques.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmSousAgentsParGroupe.resx">
+      <DependentUpon>FrmSousAgentsParGroupe.vb</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

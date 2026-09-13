@@ -28,6 +28,7 @@ Partial Class FrmSousAgents
         Me.btnNouveau = New System.Windows.Forms.Button()
         Me.btnEnregistrer = New System.Windows.Forms.Button()
         Me.btnSupprimer = New System.Windows.Forms.Button()
+        Me.btnParGroupe = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
         Me.dgvListe = New System.Windows.Forms.DataGridView()
         Me.grpDetail = New System.Windows.Forms.GroupBox()
@@ -279,6 +280,16 @@ Partial Class FrmSousAgents
         Me.btnSupprimer.Text = "Supprimer"
         Me.btnSupprimer.UseVisualStyleBackColor = True
         '
+        'btnParGroupe
+        '
+        Me.btnParGroupe.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.btnParGroupe.Location = New System.Drawing.Point(426, 499)
+        Me.btnParGroupe.Name = "btnParGroupe"
+        Me.btnParGroupe.Size = New System.Drawing.Size(200, 32)
+        Me.btnParGroupe.TabIndex = 22
+        Me.btnParGroupe.Text = "Liste par groupe..."
+        Me.btnParGroupe.UseVisualStyleBackColor = True
+        '
         'btnFermer
         '
         Me.btnFermer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
@@ -315,6 +326,7 @@ Partial Class FrmSousAgents
         Me.Controls.Add(Me.btnNouveau)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.btnSupprimer)
+        Me.Controls.Add(Me.btnParGroupe)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.lblStatut)
         Me.MinimumSize = New System.Drawing.Size(916, 609)
@@ -336,6 +348,7 @@ Partial Class FrmSousAgents
     Friend WithEvents btnNouveau As System.Windows.Forms.Button
     Friend WithEvents btnEnregistrer As System.Windows.Forms.Button
     Friend WithEvents btnSupprimer As System.Windows.Forms.Button
+    Friend WithEvents btnParGroupe As System.Windows.Forms.Button
     Friend WithEvents btnFermer As System.Windows.Forms.Button
     Friend WithEvents dgvListe As System.Windows.Forms.DataGridView
     Friend WithEvents grpDetail As System.Windows.Forms.GroupBox

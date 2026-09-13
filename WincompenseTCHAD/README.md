@@ -43,6 +43,7 @@ WincompenseTCHAD/
         ├── FrmComptesSysteme.vb            ' Paramétrage des comptes comptables
         ├── FrmSousAgents.vb                ' Gestion des sous-agents (CRUD)
         ├── FrmGroupesStatistiques.vb       ' Gestion des groupes statistiques (CRUD)
+        ├── FrmSousAgentsParGroupe.vb       ' Liste des sous-agents par groupe (consultation)
         └── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
 
 Scripts/
@@ -312,6 +313,34 @@ le libellé saisi est inconnu.
 - **Fiche ayant dérivé.** Une fiche antérieure ne portant pas les valeurs de son groupe est
   affichée telle quelle, avec un avertissement — jamais réalignée en silence. L'enregistrement
   adopte les valeurs du groupe, après une confirmation qui montre chaque changement.
+
+### Bouton « Liste par groupe… » — restitution du paramétrage
+
+Depuis l'écran des sous-agents, ce bouton ouvre un état de **consultation seule** organisé en
+deux grilles :
+
+| Grille | Contenu |
+|---|---|
+| Récapitulatif (haut) | Un ligne par groupe : libellé, nombre de sous-agents, compte d'activité, compte de commission, taux, état |
+| Détail (bas) | Les sous-agents, tous groupes confondus ou ceux du seul groupe choisi |
+
+Cliquer un groupe du récapitulatif — ou le choisir dans la liste déroulante — restreint le
+détail à ce groupe. En affichage complet, la liste est triée par groupe puis par Account, et la
+teinte de fond change **à chaque changement de groupe** : les blocs se distinguent sans qu'il
+faille de ligne de séparation.
+
+Deux partis pris :
+
+- **Les sous-agents sans groupe ne sont pas omis** : ils forment une ligne `(sans groupe
+  statistique)` en fin de liste, sans compte ni taux. Ce sont précisément ceux qui n'héritent de
+  rien, et qu'il faut voir.
+- **La colonne « État » reprend les mêmes termes que l'écran des groupes** : *Hérité — pas encore
+  enregistré*, ou *N sous-agent(s) désynchronisé(s)*. Un paramétrage à régulariser se repère donc
+  depuis cet état, sans changer d'écran.
+
+La fenêtre s'ouvre en mode non modal : elle peut rester affichée pendant la saisie d'une fiche.
+Les données sont lues une fois à l'ouverture — le bouton *Actualiser* les relit après une
+modification.
 
 ## Contrôles de sécurité sur les fichiers chargés
 
