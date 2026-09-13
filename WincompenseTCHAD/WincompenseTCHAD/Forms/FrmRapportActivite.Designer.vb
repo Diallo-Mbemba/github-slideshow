@@ -278,7 +278,7 @@ Partial Class FrmRapportActivite
         Me.btnExporter.Name = "btnExporter"
         Me.btnExporter.Size = New System.Drawing.Size(240, 32)
         Me.btnExporter.TabIndex = 9
-        Me.btnExporter.Text = "Exporter vers Excel..."
+        Me.btnExporter.Text = "Exporter en PDF..."
         Me.btnExporter.UseVisualStyleBackColor = True
         '
         'btnFermer
@@ -293,8 +293,8 @@ Partial Class FrmRapportActivite
         '
         'sfdExport
         '
-        Me.sfdExport.DefaultExt = "xlsx"
-        Me.sfdExport.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
+        Me.sfdExport.DefaultExt = "pdf"
+        Me.sfdExport.Filter = "Document PDF (*.pdf)|*.pdf"
         Me.sfdExport.Title = "Exporter le rapport d'activité"
         '
         'lblStatut

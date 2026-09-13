@@ -287,16 +287,20 @@ Public Class FrmRapportActivite
 
 #End Region
 
-#Region "Export Excel"
+#Region "Export PDF"
 
     ''' <summary>
-    ''' Exporte les quatre états dans un même classeur, l'un sous l'autre, avec le même titre
-    ''' et la même mise en page que les autres états de l'application.
+    ''' Exporte les cinq états en PDF, l'un sous l'autre, avec le même titre et la même mise en
+    ''' page que les autres états de l'application.
+    '''
+    ''' Le PDF a été retenu contre le classeur Excel pour figer l'état édité : il ne s'ouvre pas
+    ''' dans un tableur et ne se retouche pas au fil de l'eau. Il est produit PAR Excel, à partir
+    ''' d'un classeur invisible et jamais enregistré : aucun fichier intermédiaire ne subsiste.
     ''' </summary>
     Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
 
         If _lignesAffichees Is Nothing OrElse _lignesAffichees.Count = 0 Then
-            MessageBox.Show("Aucune donnée à exporter.", "Export Excel",
+            MessageBox.Show("Aucune donnée à exporter.", "Export PDF",
                             MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
@@ -319,7 +323,7 @@ Public Class FrmRapportActivite
                 New SousTitreExcel($"Édité le {Date.Now:dd/MM/yyyy à HH:mm}")
             }
 
-            ExcelExportService.ExporterEtOuvrir(
+            ExcelExportService.ExporterEnPdf(
                 "ECOBANK TCHAD — RAPPORT D'ACTIVITÉ WESTERN UNION",
                 sousTitres,
                 ConstruireBlocs(),
@@ -329,17 +333,19 @@ Public Class FrmRapportActivite
             lblStatut.Text = $"Rapport exporté vers {sfdExport.FileName}."
 
         Catch ex As InvalidOperationException
-            MessageBox.Show(ex.Message, "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            ' Excel absent, ou refus d'Excel de produire le PDF : message déjà explicite.
+            MessageBox.Show(ex.Message, "Export PDF impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Catch ex As IO.IOException
             MessageBox.Show(
                 $"Écriture du fichier impossible : {ex.Message}" & Environment.NewLine & Environment.NewLine &
-                "Le classeur est peut-être déjà ouvert dans Excel.",
-                "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                "Le document est peut-être déjà ouvert dans un lecteur PDF.",
+                "Export PDF impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
-        Catch ex As Runtime.InteropServices.COMException
-            MessageBox.Show($"Microsoft Excel a signalé une erreur : {ex.Message}",
-                            "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        Catch ex As UnauthorizedAccessException
+            MessageBox.Show(
+                $"Accès refusé au fichier : {ex.Message}",
+                "Export PDF impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Finally
             Cursor = Cursors.Default
@@ -417,7 +423,7 @@ Public Class FrmRapportActivite
             partieGroupe = "_" & partieGroupe
         End If
 
-        Return $"RapportActivite{partieGroupe}_{dtpDebut.Value:yyyyMMdd}_{dtpFin.Value:yyyyMMdd}.xlsx"
+        Return $"RapportActivite{partieGroupe}_{dtpDebut.Value:yyyyMMdd}_{dtpFin.Value:yyyyMMdd}.pdf"
     End Function
 
 #End Region

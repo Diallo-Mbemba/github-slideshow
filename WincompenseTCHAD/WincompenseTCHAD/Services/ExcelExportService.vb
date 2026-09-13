@@ -91,8 +91,9 @@ Public Class BlocExcel
 End Class
 
 ''' <summary>
-''' Export générique de tableaux vers Microsoft Excel, avec titre, sous-titres, en-têtes mis en
-''' forme et mise en page d'impression.
+''' Export générique de tableaux vers Microsoft Excel ou PDF, avec titre, sous-titres, en-têtes
+''' mis en forme et mise en page d'impression. Le PDF est produit par Excel à partir du même
+''' classeur, qui n'est alors ni affiché ni enregistré : seul le PDF sort.
 '''
 ''' Volontairement indépendant de tout métier : il ne connaît que des DataTable. La pièce
 ''' comptable conserve son propre export (PieceComptableService), dont la mise en forme répond
@@ -113,6 +114,9 @@ Public NotInheritable Class ExcelExportService
     Private Const XL_TRAIT_CONTINU As Integer = 1
     Private Const XL_PAYSAGE As Integer = 2
     Private Const XL_MAXIMISE As Integer = -4137
+
+    ''' <summary>xlTypePDF : format d'export de ExportAsFixedFormat.</summary>
+    Private Const XL_TYPE_PDF As Integer = 0
 
     ''' <summary>Jaune de mise en exergue, conforme au modèle fourni par la Direction Comptable.</summary>
     Private Shared ReadOnly JAUNE_EXERGUE As Integer = RGB(255, 255, 0)
@@ -191,6 +195,106 @@ Public NotInheritable Class ExcelExportService
             ' sont libérées, excelApp restant actif tant que sa fenêtre est affichée.
             If feuille IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(feuille)
             If classeur IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(classeur)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Écrit les blocs dans un classeur Excel invisible, l'exporte en PDF, puis referme tout :
+    ''' aucun fichier Excel intermédiaire n'est laissé sur le disque, et le classeur lui-même
+    ''' n'est jamais enregistré.
+    '''
+    ''' L'intérêt du PDF est de figer l'état édité : il ne s'ouvre pas dans un tableur et ne se
+    ''' retouche pas au fil de l'eau. Ce n'est pas pour autant un document infalsifiable — un PDF
+    ''' reste modifiable avec l'outil adéquat. Pour une valeur probante, il faudrait le signer
+    ''' électroniquement, ce qui relève d'un dispositif de la banque et non de cette application.
+    '''
+    ''' La mise en page d'impression déjà posée (paysage, ajusté à la largeur d'une page, bandeau
+    ''' de titre répété, pied de page numéroté) est reprise telle quelle par l'export.
+    ''' </summary>
+    ''' <param name="cheminFichier">Chemin du fichier .pdf à créer.</param>
+    ''' <param name="ouvrirApres">Ouvre le PDF dans le lecteur par défaut du poste.</param>
+    ''' <exception cref="InvalidOperationException">Excel absent du poste, ou aucune donnée.</exception>
+    Public Shared Sub ExporterEnPdf(titre As String,
+                                    sousTitres As IEnumerable(Of SousTitreExcel),
+                                    blocs As IEnumerable(Of BlocExcel),
+                                    nomFeuille As String,
+                                    cheminFichier As String,
+                                    Optional ouvrirApres As Boolean = True)
+
+        Dim listeBlocs As List(Of BlocExcel) = BlocsExploitables(blocs)
+
+        If listeBlocs.Count = 0 Then
+            Throw New InvalidOperationException("Aucune donnée à exporter.")
+        End If
+
+        Dim excelApp As Object = Nothing
+        Dim classeur As Object = Nothing
+        Dim feuille As Object = Nothing
+
+        Try
+            Dim typeExcel As Type = Type.GetTypeFromProgID("Excel.Application")
+            If typeExcel Is Nothing Then
+                Throw New InvalidOperationException(
+                    "Microsoft Excel n'est pas installé sur ce poste : l'export PDF est impossible." &
+                    Environment.NewLine &
+                    "Excel sert ici à la mise en page ; le rapport reste consultable à l'écran.")
+            End If
+
+            excelApp = Activator.CreateInstance(typeExcel)
+
+            ' Classeur invisible : l'utilisateur ne doit jamais voir passer un tableur qu'il
+            ' pourrait prendre pour le document livrable.
+            excelApp.Visible = False
+            excelApp.DisplayAlerts = False
+
+            classeur = excelApp.Workbooks.Add()
+            feuille = classeur.Worksheets(1)
+
+            RemplirFeuille(feuille, titre, sousTitres, listeBlocs, nomFeuille)
+
+            ' xlTypePDF = 0. Le classeur n'est pas enregistré : seul le PDF sort.
+            classeur.ExportAsFixedFormat(XL_TYPE_PDF, cheminFichier)
+
+        Catch ex As Runtime.InteropServices.COMException
+            Throw New InvalidOperationException(
+                "Microsoft Excel n'a pas pu produire le PDF : " & ex.Message & Environment.NewLine & Environment.NewLine &
+                "Vérifiez que le fichier n'est pas déjà ouvert dans un lecteur PDF, et que la " &
+                "version d'Excel installée prend en charge l'export PDF (Excel 2007 et ultérieurs).", ex)
+
+        Finally
+            ' Contrairement à l'export Excel, rien ne doit rester ouvert : le livrable est le PDF.
+            Try
+                If classeur IsNot Nothing Then classeur.Close(False)
+            Catch
+            End Try
+            Try
+                If excelApp IsNot Nothing Then excelApp.Quit()
+            Catch
+            End Try
+
+            If feuille IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(feuille)
+            If classeur IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(classeur)
+            If excelApp IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(excelApp)
+        End Try
+
+        If ouvrirApres Then
+            OuvrirDocument(cheminFichier)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre un document dans l'application associée du poste. L'échec — aucun lecteur PDF
+    ''' installé, par exemple — n'est pas remonté comme une erreur : le fichier est produit, et
+    ''' c'est ce qui était demandé.
+    ''' </summary>
+    Private Shared Sub OuvrirDocument(cheminFichier As String)
+
+        Try
+            Process.Start(cheminFichier)
+        Catch ex As ComponentModel.Win32Exception
+            ' Aucune application associée à ce type de fichier sur ce poste.
+        Catch ex As IO.FileNotFoundException
+            ' Fichier disparu entre-temps : sans conséquence sur l'export lui-même.
         End Try
     End Sub
 

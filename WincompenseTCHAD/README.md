@@ -34,7 +34,7 @@ WincompenseTCHAD/
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
     │   ├── WURepository.vb                 ' Lecture SQL Server pour la compensation (T_Pdv_SA / T_Pdv_EC / SystemeWU)
 │   ├── PdvRepository.vb                ' CRUD points de vente et groupes (écriture isolée de la lecture)
-│   ├── ExcelExportService.vb           ' Export générique de tableaux vers Excel (titre, en-têtes, impression)
+│   ├── ExcelExportService.vb           ' Export générique de tableaux vers Excel ou PDF (titre, en-têtes, impression)
 │   ├── HistoriqueRepository.vb         ' Historique des journées comptabilisées (T_HistoriqueWU)
 │   ├── RapportActiviteService.vb       ' Construction des quatre états du rapport d'activité
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
@@ -373,16 +373,16 @@ Les valeurs numériques partent en tant que **nombres** et non en texte : elles 
 calculables et triables dans Excel. Le nom de fichier proposé porte le groupe et l'horodatage
 (`SousAgents_RESEAU_20260913_1432.xlsx`), de sorte que deux extractions ne s'écrasent pas.
 
-L'export est assuré par `ExcelExportService`, générique : il ne connaît que des `DataTable` et
-peut donc servir à d'autres états. Comme l'export de la pièce comptable, il fonctionne en
+L'export est assuré par `ExcelExportService`, générique : il ne connaît que des `DataTable`,
+produit indifféremment un classeur Excel ou un PDF, et peut donc servir à d'autres états. Comme l'export de la pièce comptable, il fonctionne en
 **liaison tardive** — aucune référence COM Excel n'est imposée au projet, dont le numéro de
 version diffère d'un poste à l'autre. Excel absent du poste, l'application continue de
 fonctionner : seul l'export le signale, au moment où il est demandé.
 
 ## Rapport d'activité sur une période
 
-Bouton **« Rapport d'activité… »** de l'écran principal. Quatre états, en quatre onglets, tous
-exportables en un seul classeur Excel.
+Bouton **« Rapport d'activité… »** de l'écran principal. Cinq états, en cinq onglets, tous
+exportables **en un seul document PDF**.
 
 | Onglet | Contenu |
 |---|---|
@@ -397,6 +397,28 @@ groupe ; l'export porte alors sur ce périmètre, le nom du groupe figure en jau
 classeur et dans le nom de fichier proposé. Les groupes proposés sont ceux **présents dans
 l'historique de la période**, et non ceux du paramétrage courant : un groupe supprimé depuis
 reste consultable sur les journées où il existait.
+
+### Pourquoi un PDF et non un classeur Excel
+
+Le rapport est un état édité, destiné à circuler : le figer évite qu'il soit retouché après
+coup, volontairement ou non. Le PDF ne s'ouvre pas dans un tableur et ne se modifie pas au fil
+de l'eau.
+
+Il est produit **par Excel**, à partir d'un classeur **invisible et jamais enregistré** : la
+mise en page d'impression déjà en place (paysage, ajusté à la largeur d'une page, bandeau de
+titre répété en haut de chaque page, pied de page numéroté et horodaté) est reprise telle
+quelle, et aucun fichier intermédiaire ne subsiste sur le disque. Le document s'ouvre ensuite
+dans le lecteur PDF du poste.
+
+> **Ce que le PDF ne fait pas.** Il n'est pas infalsifiable : un PDF reste modifiable avec
+> l'outil adéquat. Pour une valeur probante, il faudrait le signer électroniquement — un
+> dispositif qui relève de la banque, pas de cette application.
+
+Excel reste nécessaire sur le poste, non pour ouvrir le résultat mais pour le mettre en page.
+Son absence est signalée au moment de l'export ; le rapport reste consultable à l'écran.
+
+La **liste des sous-agents par groupe** conserve son export Excel : c'est une liste de travail,
+que l'on trie et filtre, non un état à figer.
 
 Trois précisions sur ces états :
 
