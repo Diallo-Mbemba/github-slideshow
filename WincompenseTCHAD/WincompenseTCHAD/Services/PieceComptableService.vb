@@ -139,6 +139,12 @@ Public NotInheritable Class PieceComptableService
 
         If listeCalculs Is Nothing Then Return dt
 
+        ' Comptes comptables en service, lus une fois pour toute la pièce : ils proviennent de la
+        ' table SystemeWU (voir ComptesSystemeWU) et non plus de constantes figées dans le code.
+        ' Les prendre ici, et non à chaque écriture, garantit qu'une même pièce ne mélange jamais
+        ' deux paramétrages si les comptes venaient à être modifiés pendant sa génération.
+        Dim comptes As ComptesSystemeWU = ComptesSystemeWU.Actuels
+
         For Each calc As CalculWU In listeCalculs
 
             Dim compteMouvement As String
@@ -146,7 +152,7 @@ Public NotInheritable Class PieceComptableService
                Not String.IsNullOrWhiteSpace(calc.CompteCompense) Then
                 compteMouvement = calc.CompteCompense
             Else
-                compteMouvement = ConstantesWU.CPT_COMPTE_COURANT
+                compteMouvement = comptes.CompteCourant
             End If
 
             Dim libelleMouvement As String = String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, calc.Designation).Trim()
@@ -166,14 +172,17 @@ Public NotInheritable Class PieceComptableService
             AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement)
 
             ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
-            AjouterLigneSigneAuto(dt, ConstantesWU.CPT_COMPTE_COURANT, ConstantesWU.LIB_COMPTE_COURANT, -netCompteCourant)
+            AjouterLigneSigneAuto(dt, comptes.CompteCourant, ConstantesWU.LIB_COMPTE_COURANT, -netCompteCourant)
 
             ' 3) Commissions part Banque (toujours créditées, quel que soit le type de PDV).
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_COMMISSION_TRANSFERT_ENVOI_BANQUE,
+            ' Transfert et Envoi partagent le même compte dans le paramétrage actuel (728300148),
+            ' mais la table SystemeWU les porte dans deux colonnes distinctes (Cpte_Produit et
+            ' Cpte_Produit_Envoi) : ils sont donc désormais dissociables sans toucher au code.
+            AjouterLigneSiNonNul(dt, comptes.CommissionTransfertBanque,
                                  ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, 0D, calc.CommissionTransfertBanque)
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_COMMISSION_TRANSFERT_ENVOI_BANQUE,
+            AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
                                  ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque)
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_COMMISSION_PAIEMENT_BANQUE,
+            AjouterLigneSiNonNul(dt, comptes.CommissionPaiementBanque,
                                  ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, 0D, calc.CommissionPaiementBanque)
 
             ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
@@ -189,10 +198,10 @@ Public NotInheritable Class PieceComptableService
             End If
 
             ' 5) Taxes (impôts, TVA, TTA) : toujours créditées, à la charge de la banque.
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_IMPOTS_TAXE_ENVOI, ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, 0D, calc.TaxeEnvoi)
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_TVA_COLLECTEE, ConstantesWU.LIB_TVA, 0D, calc.TVA)
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_TTA_ENVOI, ConstantesWU.LIB_TTA_ENVOI, 0D, calc.TTAEnvoi)
-            AjouterLigneSiNonNul(dt, ConstantesWU.CPT_TTA_RECEPTION, ConstantesWU.LIB_TTA_RECEPTION, 0D, calc.TTAReception)
+            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, 0D, calc.TaxeEnvoi)
+            AjouterLigneSiNonNul(dt, comptes.TVACollectee, ConstantesWU.LIB_TVA, 0D, calc.TVA)
+            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, ConstantesWU.LIB_TTA_ENVOI, 0D, calc.TTAEnvoi)
+            AjouterLigneSiNonNul(dt, comptes.TTAReception, ConstantesWU.LIB_TTA_RECEPTION, 0D, calc.TTAReception)
         Next
 
         Return dt
@@ -278,7 +287,7 @@ Public NotInheritable Class PieceComptableService
 
     Private Shared Sub AjouterLigne(dt As DataTable, compte As String, libelle As String, debit As Long, credit As Long)
         Dim ligne As DataRow = dt.NewRow()
-        ligne("Compte") = If(String.IsNullOrWhiteSpace(compte), ConstantesWU.CPT_ATTENTE, compte)
+        ligne("Compte") = If(String.IsNullOrWhiteSpace(compte), ComptesSystemeWU.Actuels.CompteInterBancaire, compte)
         ligne("Libelle") = libelle
         ligne("Debit") = debit
         ligne("Credit") = credit
@@ -316,15 +325,19 @@ Public NotInheritable Class PieceComptableService
             Return True
         End If
 
+        ' Compte encaissant l'écart d'arrondi résiduel : le compte inter bancaire paramétré
+        ' dans SystemeWU (colonnes Cpte_attenteDEBIT / Cpte_attenteCREDIT).
+        Dim compteEcart As String = ComptesSystemeWU.Actuels.CompteInterBancaire
+
         If differenceGlobale > 0D AndAlso differenceGlobale <= ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, ConstantesWU.CPT_ATTENTE, ConstantesWU.LIB_ECART_ATTENTE, 0L, CLng(differenceGlobale))
-            messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte d'attente {ConstantesWU.CPT_ATTENTE}."
+            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE, 0L, CLng(differenceGlobale))
+            messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte inter bancaire {compteEcart}."
             Return True
         End If
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, ConstantesWU.CPT_ATTENTE, ConstantesWU.LIB_ECART_ATTENTE, CLng(Math.Abs(differenceGlobale)), 0L)
-            messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte d'attente {ConstantesWU.CPT_ATTENTE}."
+            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE, CLng(Math.Abs(differenceGlobale)), 0L)
+            messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte inter bancaire {compteEcart}."
             Return True
         End If
 

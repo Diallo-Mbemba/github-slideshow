@@ -30,6 +30,7 @@ Partial Class FrmCompensationWU
         Me.btnAfficher = New System.Windows.Forms.Button()
         Me.btnGenererPiece = New System.Windows.Forms.Button()
         Me.btnPieceAccount = New System.Windows.Forms.Button()
+        Me.btnParametres = New System.Windows.Forms.Button()
         Me.lblActivite = New System.Windows.Forms.Label()
         Me.lblReglement = New System.Windows.Forms.Label()
         Me.dgvControle = New System.Windows.Forms.DataGridView()
@@ -94,6 +95,15 @@ Partial Class FrmCompensationWU
         Me.btnPieceAccount.Text = "Pièce de l'Account sélectionné"
         Me.btnPieceAccount.UseVisualStyleBackColor = True
         '
+        'btnParametres
+        '
+        Me.btnParametres.Location = New System.Drawing.Point(952, 50)
+        Me.btnParametres.Name = "btnParametres"
+        Me.btnParametres.Size = New System.Drawing.Size(210, 26)
+        Me.btnParametres.TabIndex = 5
+        Me.btnParametres.Text = "Paramètres des comptes..."
+        Me.btnParametres.UseVisualStyleBackColor = True
+        '
         'lblActivite
         '
         Me.lblActivite.AutoEllipsis = True
@@ -109,7 +119,7 @@ Partial Class FrmCompensationWU
         '
         Me.lblReglement.AutoEllipsis = True
         Me.lblReglement.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
-        Me.lblReglement.Location = New System.Drawing.Point(198, 50)
+        Me.lblReglement.Location = New System.Drawing.Point(384, 50)
         Me.lblReglement.Name = "lblReglement"
         Me.lblReglement.Size = New System.Drawing.Size(366, 23)
         Me.lblReglement.TabIndex = 5
@@ -200,6 +210,7 @@ Partial Class FrmCompensationWU
         Me.Controls.Add(Me.lblReglement)
         Me.Controls.Add(Me.lblActivite)
         Me.Controls.Add(Me.btnPieceAccount)
+        Me.Controls.Add(Me.btnParametres)
         Me.Controls.Add(Me.btnGenererPiece)
         Me.Controls.Add(Me.btnAfficher)
         Me.Controls.Add(Me.btnReglement)
@@ -221,6 +232,7 @@ Partial Class FrmCompensationWU
     Friend WithEvents btnAfficher As System.Windows.Forms.Button
     Friend WithEvents btnGenererPiece As System.Windows.Forms.Button
     Friend WithEvents btnPieceAccount As System.Windows.Forms.Button
+    Friend WithEvents btnParametres As System.Windows.Forms.Button
     Friend WithEvents lblActivite As System.Windows.Forms.Label
     Friend WithEvents lblReglement As System.Windows.Forms.Label
     Friend WithEvents dgvControle As System.Windows.Forms.DataGridView

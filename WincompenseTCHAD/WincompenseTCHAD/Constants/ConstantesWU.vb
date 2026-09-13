@@ -86,11 +86,16 @@ Public NotInheritable Class ConstantesWU
     Public Const CPT_TTA_RECEPTION As String = "434000159"
 
     ''' <summary>
-    ''' Compte d'attente provisoire utilisé pour absorber un écart résiduel d'arrondi
-    ''' au niveau GLOBAL de la pièce comptable (jamais Account par Account).
-    ''' À CONFIRMER / REMPLACER par le numéro de compte réel avant mise en production.
+    ''' Compte inter bancaire, utilisé pour absorber un écart résiduel d'arrondi au niveau
+    ''' GLOBAL de la pièce comptable (jamais Account par Account). Il remplaçait jusqu'ici un
+    ''' compte d'attente fictif ("XXXXXXXXXX") faute de numéro connu : la ligne de paramétrage
+    ''' de la table SystemeWU (colonnes Cpte_attenteDEBIT / Cpte_attenteCREDIT) et le formulaire
+    ''' « Comptes Systèmes WU » de la Direction Comptable le désignent tous deux comme étant
+    ''' le compte inter bancaire 381000101.
+    ''' Cette valeur n'est plus qu'un DÉFAUT : le compte réellement utilisé est celui lu dans
+    ''' SystemeWU au démarrage (voir ComptesSystemeWU.CompteInterBancaire).
     ''' </summary>
-    Public Const CPT_ATTENTE As String = "XXXXXXXXXX"
+    Public Const CPT_ATTENTE As String = "381000101"
 
 #End Region
 
@@ -109,7 +114,7 @@ Public NotInheritable Class ConstantesWU
     ' Double espace avant "DE" : reproduit fidèlement le libellé du classeur de référence
     ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception).
     Public Const LIB_TTA_RECEPTION As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU)"
-    Public Const LIB_ECART_ATTENTE As String = "ECART D'ARRONDI - COMPTE D'ATTENTE PROVISOIRE"
+    Public Const LIB_ECART_ATTENTE As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE"
 
     ''' <summary>
     ''' Gabarit du libellé de la ligne de mouvement (activité) du point de vente, tel que

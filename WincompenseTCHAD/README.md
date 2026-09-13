@@ -24,21 +24,26 @@ WincompenseTCHAD/
     ├── Program.vb                          ' Point d'entrée (Sub Main)
     ├── My Project/AssemblyInfo.vb
     ├── Constants/ConstantesWU.vb           ' Taux, comptes comptables, libellés, colonnes attendues
-    ├── Models/CalculWU.vb                  ' Classe métier par Account
+    ├── Models/
+    │   ├── CalculWU.vb                     ' Classe métier par Account
+    │   └── ComptesSystemeWU.vb             ' Comptes comptables paramétrés (table SystemeWU)
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
-    │   ├── WURepository.vb                 ' Accès SQL Server (T_Pdv_SA / T_Pdv_EC)
+    │   ├── WURepository.vb                 ' Accès SQL Server (T_Pdv_SA / T_Pdv_EC / SystemeWU)
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     └── Forms/
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
         ├── FrmCompensationWU.Designer.vb
-        └── FrmCompensationWU.resx
+        ├── FrmCompensationWU.resx
+        ├── FrmPieceComptable.vb            ' Affichage d'une pièce (globale ou d'un seul PDV)
+        └── FrmComptesSysteme.vb            ' Paramétrage des comptes comptables
 
 Scripts/
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
-└── 02_DonneesExemple.sql
+├── 02_DonneesExemple.sql
+└── 03_SystemeWU.sql                       ' Comptes comptables paramétrés
 ```
 
 ## Hypothèses métier retenues (à valider)
@@ -62,8 +67,13 @@ Scripts/
    rapport de règlement, reconstituée depuis `SetDateLOCYear/Month/Day` (à défaut `RepDate`).
    Une divergence bloque le traitement. Si aucune date n'est exploitable d'un côté, la
    vérification est ignorée sans bloquer (avertissement affiché dans le StatusStrip).
-6. **Compte d'attente `XXXXXXXXXX`** : valeur littérale provisoire (`ConstantesWU.CPT_ATTENTE`),
-   à remplacer par le numéro de compte réel avant mise en production.
+6. **Compte absorbant l'écart d'arrondi global** : le **compte inter bancaire 381000101**,
+   d'après la ligne de paramétrage de `SystemeWU` (`Cpte_attenteDEBIT` / `Cpte_attenteCREDIT`)
+   et le formulaire « Comptes Systèmes WU » de la Direction Comptable, qui le désignent tous
+   deux ainsi. Il remplace le compte d'attente fictif `XXXXXXXXXX` utilisé jusqu'ici faute de
+   numéro connu. *Usage à confirmer : la table nomme ces colonnes « attente », le formulaire
+   « compte inter bancaire » — s'il s'agit de deux comptes distincts, seul le paramétrage est
+   à corriger, le code n'est pas concerné.*
 7. **Export Excel** : réalisé en liaison tardive (late binding, `Option Strict Off` isolé dans
    `PieceComptableService.vb`) afin de ne pas imposer de référence COM Excel obligatoire au
    projet. Toute la logique métier fonctionne sans Excel installé.
@@ -91,6 +101,61 @@ Détails d'implémentation (`WUReportService`) :
 
 Aucune étape de traitement en aval n'est modifiée : une fois les lignes obtenues, le parsing,
 l'agrégation, les calculs et la génération de la pièce comptable sont strictement identiques.
+
+## Paramétrage des comptes comptables (table SystemeWU)
+
+Les comptes utilisés par la pièce comptable ne sont plus figés dans le code : ils sont lus au
+démarrage dans la table SQL Server **`SystemeWU`** et modifiables depuis le formulaire
+**« Comptes Systèmes WU »** (bouton *Paramètres des comptes…* de l'écran principal).
+
+### Correspondance champ du formulaire → colonne de la table
+
+| Champ du formulaire | Colonne `SystemeWU` | Valeur en service |
+|---|---|---|
+| Compte courant Western Union ETD | `Cpte_PositionNette` | 32100003292 |
+| Compte inter bancaire | `Cpte_attenteDEBIT` / `Cpte_attenteCREDIT` | 381000101 |
+| Commission sur Transfert_Ecobank | `Cpte_Produit` | 728300148 |
+| Commission sur Envoi_Ecobank | `Cpte_Produit_Envoi` | 728300148 |
+| Commission sur Paiement_Ecobank | `Cpte_Produit_Paiement` | 728300149 |
+| Impôts et taxe sur envoi | `Tthu` | 434000147 |
+| TVA | `Tob` | 434000104 |
+| TTA sur envoi WU | `Cpte_Envoi` | 434000145 |
+| TTA sur paiement WU | `Cpte_Paiement` | 434000159 |
+
+Les autres colonnes de la table (`Passif`, `Actif`, `Cpte_Charge_Publicitaire`,
+`Cpte_Gainde_Change`, `Cpte_Envoi_agence`, `Cpte_Paiement_agence`) ne sont **ni lues ni
+écrites** : elles ne concernent pas la pièce comptable Western Union et un enregistrement ne
+les altère jamais. La table étant partagée, l'`UPDATE` ne porte que sur les dix colonnes
+ci-dessus.
+
+### Règles de fonctionnement
+
+- **Repli sans base.** Si la base est inaccessible, la table absente ou vide, les comptes
+  **par défaut du code** (`ConstantesWU`) prennent le relais : l'application reste utilisable
+  et se comporte exactement comme avant le paramétrage. La barre d'état l'indique.
+- **Colonne vide = valeur par défaut conservée.** Une colonne NULL ou vide ne remplace pas la
+  valeur par défaut : mieux vaut un compte connu qu'une écriture sans numéro de compte.
+- **Ligne visée à l'enregistrement.** Celle dont la colonne `code` correspond à la ligne lue.
+  Si aucun code n'est lisible, la mise à jour n'est acceptée que lorsque la table ne contient
+  qu'une seule ligne : jamais question de modifier une ligne au hasard dans une table partagée.
+- **Édition sur copie.** Les comptes en service ne sont remplacés qu'une fois l'écriture en
+  base réussie : une modification abandonnée ne peut pas fausser une pièce comptable.
+- **Contrôles de saisie.** Un compte vide bloque l'enregistrement (il produirait une écriture
+  sans numéro de compte) ; un compte non exclusivement numérique déclenche un avertissement
+  — typiquement une faute de frappe — mais reste enregistrable après confirmation.
+- **Prise en compte immédiate.** Les nouveaux comptes s'appliquent dès l'enregistrement. Si un
+  calcul est déjà affiché, l'application invite à le relancer avant de générer la pièce.
+
+Le script `Scripts\03_SystemeWU.sql` crée la table et sa ligne de paramétrage **si elles
+n'existent pas** ; il ne modifie jamais un paramétrage en place.
+
+### Commission Transfert et Commission Envoi désormais dissociables
+
+Le code n'utilisait qu'un seul compte pour ces deux commissions (`728300148`). La table les
+porte dans deux colonnes distinctes (`Cpte_Produit` et `Cpte_Produit_Envoi`), que le formulaire
+présente comme deux champs : **elles peuvent maintenant recevoir des comptes différents sans
+toucher au code**. Tant que les deux colonnes portent la même valeur, la pièce comptable est
+strictement identique à celle produite auparavant.
 
 ## Contrôles de sécurité sur les fichiers chargés
 
@@ -203,6 +268,10 @@ charges pour un gain nul.
 - Structure des écritures pour une **agence propre "EC"** dans la pièce comptable (aucun exemple
   de référence de ce type disponible à ce jour ; seul un exemple sous-agent "SA" a pu être validé).
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré).
+- Usage exact du compte inter bancaire 381000101 pour l'écart d'arrondi global (voir hypothèse 6).
+- Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
+  complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la
+  saisie libre restant possible.
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.
 - Traitement définitif souhaité des Accounts `INCONNU` dans la pièce comptable.
 

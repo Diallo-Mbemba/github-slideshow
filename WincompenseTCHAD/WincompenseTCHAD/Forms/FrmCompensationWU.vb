@@ -44,6 +44,50 @@ Public Class FrmCompensationWU
 
 #End Region
 
+#Region "Démarrage et paramétrage des comptes"
+
+    ''' <summary>
+    ''' Au démarrage, les comptes comptables de la pièce sont lus dans la table SystemeWU.
+    ''' Si la base est inaccessible, les comptes par défaut de l'application prennent le relais
+    ''' et l'utilisateur en est averti dans la barre d'état : la comptabilisation reste possible,
+    ''' mais avec un paramétrage qui n'est peut-être plus celui de la Direction Comptable.
+    ''' </summary>
+    Private Sub FrmCompensationWU_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        Dim messageErreur As String = String.Empty
+        ComptesSystemeWU.Actuels = WURepository.ChargerComptesSysteme(messageErreur)
+
+        If Not String.IsNullOrEmpty(messageErreur) Then
+            tsslStatut.Text = "Comptes comptables PAR DÉFAUT (table SystemeWU non lue)."
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre le paramétrage des comptes comptables. Les comptes modifiés sont pris en compte
+    ''' immédiatement ; une pièce déjà calculée, elle, n'est pas recalculée — l'utilisateur est
+    ''' donc invité à relancer le calcul pour qu'elle reflète le nouveau paramétrage.
+    ''' </summary>
+    Private Sub btnParametres_Click(sender As Object, e As EventArgs) Handles btnParametres.Click
+
+        Using formulaire As New FrmComptesSysteme()
+            formulaire.ShowDialog(Me)
+
+            If Not formulaire.ModificationEnregistree Then Return
+
+            tsslStatut.Text = "Comptes comptables mis à jour."
+
+            If _listeCalculs IsNot Nothing AndAlso _listeCalculs.Count > 0 Then
+                MessageBox.Show(
+                    "Les comptes comptables ont été modifiés." & Environment.NewLine & Environment.NewLine &
+                    "Relancez « Afficher / Calculer » avant de générer la pièce, afin qu'elle " &
+                    "utilise bien le nouveau paramétrage.",
+                    "Paramétrage modifié", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End Using
+    End Sub
+
+#End Region
+
 #Region "Chargement des fichiers"
 
     ''' <summary>
