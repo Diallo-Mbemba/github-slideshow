@@ -18,8 +18,11 @@ Public Class CalculWU
     ''' <summary>Désignation de l'agence / du sous-agent.</summary>
     Public Property Designation As String = String.Empty
 
+    ''' <summary>Valeur de TypePdv quand l'Account n'a été trouvé dans aucune table de paramétrage.</summary>
+    Public Const TYPE_INCONNU As String = "INCONNU"
+
     ''' <summary>Type de point de vente : "SA" (sous-agent), "EC" (agence propre) ou "INCONNU".</summary>
-    Public Property TypePdv As String = "INCONNU"
+    Public Property TypePdv As String = TYPE_INCONNU
 
     ''' <summary>Code agence associé (codeagence), à titre informatif uniquement.</summary>
     Public Property CodeAgence As String = String.Empty
@@ -127,7 +130,7 @@ Public Class CalculWU
     ''' <summary>Indique si l'Account n'est rattaché à aucun paramétrage connu.</summary>
     Public ReadOnly Property EstInconnu As Boolean
         Get
-            Return String.Equals(TypePdv, "INCONNU", StringComparison.OrdinalIgnoreCase)
+            Return String.Equals(TypePdv, TYPE_INCONNU, StringComparison.OrdinalIgnoreCase)
         End Get
     End Property
 

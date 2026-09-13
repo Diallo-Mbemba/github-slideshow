@@ -31,6 +31,11 @@ Public Class FrmUtilisateurs
 
     Private Sub FrmUtilisateurs_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
+        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
+        ThemeWU.Appliquer(Me, "Utilisateurs et connexions", btnNouveau)
+        DimensionsWU.Adapter(Me, True)
+
         If Not SessionWU.PeutGererLesUtilisateurs Then
             MessageBox.Show("La gestion des utilisateurs est réservée aux administrateurs.",
                             "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)

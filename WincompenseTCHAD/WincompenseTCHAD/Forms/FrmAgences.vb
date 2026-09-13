@@ -28,6 +28,11 @@ Public Class FrmAgences
 
     Private Sub FrmAgences_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
+        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
+        ThemeWU.Appliquer(Me, "Agences propres", btnEnregistrer)
+        DimensionsWU.Adapter(Me, True)
+
         If Not SessionWU.PeutGererLesPointsDeVente Then
             MessageBox.Show("Le paramétrage des agences propres est réservé aux commerciaux et aux administrateurs.",
                             "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)

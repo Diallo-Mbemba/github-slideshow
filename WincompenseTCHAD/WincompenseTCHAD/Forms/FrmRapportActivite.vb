@@ -75,6 +75,11 @@ Public Class FrmRapportActivite
     ''' </summary>
     Private Sub FrmRapportActivite_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
+        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
+        ThemeWU.Appliquer(Me, "Rapport d'activité", btnAfficher)
+        DimensionsWU.Adapter(Me, True)
+
         Dim premiere As Date = Date.Today
         Dim derniere As Date = Date.Today
         Dim messageErreur As String = String.Empty

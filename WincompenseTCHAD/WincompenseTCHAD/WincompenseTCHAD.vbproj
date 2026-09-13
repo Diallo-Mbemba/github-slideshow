@@ -77,6 +77,7 @@
     <Compile Include="Models\LigneHistoriqueWU.vb" />
     <Compile Include="Models\TransactionWU.vb" />
     <Compile Include="Models\UtilisateurWU.vb" />
+    <Compile Include="Models\EtatLigneWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
@@ -89,6 +90,8 @@
     <Compile Include="Services\MotDePasseService.vb" />
     <Compile Include="Services\SessionWU.vb" />
     <Compile Include="Services\UtilisateurRepository.vb" />
+    <Compile Include="Services\ThemeWU.vb" />
+    <Compile Include="Services\DimensionsWU.vb" />
     <Compile Include="Forms\FrmPrincipal.vb">
       <SubType>Form</SubType>
     </Compile>
