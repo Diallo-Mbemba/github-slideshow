@@ -79,7 +79,7 @@ Public NotInheritable Class DemandeRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = MessageErreur(ex, demande)
+            messageErreur = TraduireErreurDepot(ex, demande)
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -111,7 +111,14 @@ Public NotInheritable Class DemandeRepository
         commande.Parameters.Add("@saisiPar", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
     End Sub
 
-    Private Shared Function MessageErreur(ex As SqlException, demande As DemandeWU) As String
+    ''' <summary>
+    ''' Traduit une erreur SQL du dépôt en message lisible.
+    '''
+    ''' Elle ne s'appelle pas « MessageErreur » : le paramètre messageErreur, présent dans
+    ''' presque toutes les méthodes de cette classe, la masquerait — Visual Basic ne distingue
+    ''' pas la casse, et l'appel serait lu comme une indexation de la chaîne.
+    ''' </summary>
+    Private Shared Function TraduireErreurDepot(ex As SqlException, demande As DemandeWU) As String
 
         If ex.Number = ERREUR_TABLE_ABSENTE Then Return MESSAGE_TABLE_ABSENTE
 
