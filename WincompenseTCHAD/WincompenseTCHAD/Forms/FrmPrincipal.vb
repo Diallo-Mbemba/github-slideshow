@@ -217,6 +217,20 @@ Public Class FrmPrincipal
         DirectCast(sender, Control).Invalidate()
     End Sub
 
+    ''' <summary>
+    ''' Numéro de version, lu sur l'assemblage plutôt que recopié en dur : il suit ainsi
+    ''' automatiquement l'AssemblyVersion et ne peut pas annoncer une version que le binaire
+    ''' n'est pas.
+    ''' </summary>
+    Private Shared ReadOnly Property NumeroDeVersion As String
+        Get
+            Dim identite As Reflection.AssemblyName = Reflection.Assembly.GetExecutingAssembly().GetName()
+            If identite Is Nothing OrElse identite.Version Is Nothing Then Return String.Empty
+
+            Return $"Version {identite.Version.Major}.{identite.Version.Minor}.{identite.Version.Build}"
+        End Get
+    End Property
+
     Private Sub ZoneMdi_Paint(sender As Object, e As PaintEventArgs)
 
         Dim zone As Control = DirectCast(sender, Control)
@@ -252,7 +266,10 @@ Public Class FrmPrincipal
                     e.Graphics.DrawString(FILIGRANE, police, pinceau, cadre, alignement)
                 End Using
 
-                RayerLeFiligrane(e.Graphics, police, zone.BackColor, largeur, hauteur, taille)
+                Dim mesure As SizeF = e.Graphics.MeasureString(FILIGRANE, police)
+
+                RayerLeFiligrane(e.Graphics, zone.BackColor, largeur, hauteur, taille, mesure)
+                EcrireLaVersion(e.Graphics, largeur, hauteur, taille, mesure, alignement)
             End Using
         End Using
     End Sub
@@ -267,10 +284,9 @@ Public Class FrmPrincipal
     ''' Elles sont tracées en dernier, après l'ombre et après le mot, faute de quoi l'ombre
     ''' resterait pleine là où la lettre est coupée.
     ''' </summary>
-    Private Shared Sub RayerLeFiligrane(surface As Graphics, police As Font, couleurFond As Color,
-                                        largeur As Integer, hauteur As Integer, taille As Single)
-
-        Dim mesure As SizeF = surface.MeasureString(FILIGRANE, police)
+    Private Shared Sub RayerLeFiligrane(surface As Graphics, couleurFond As Color,
+                                        largeur As Integer, hauteur As Integer,
+                                        taille As Single, mesure As SizeF)
 
         ' La bande déborde un peu du mot : l'ombre portée est décalée de trois pixels, et les
         ' rayures doivent la traverser elle aussi.
@@ -293,6 +309,42 @@ Public Class FrmPrincipal
                 surface.FillRectangle(pinceauRayure, bande.X, y, bande.Width, epaisseur)
                 y += periode
             End While
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' Inscrit le numéro de version juste sous le filigrane.
+    '''
+    ''' Il est écrit après les rayures, et non avant : elles le hacheraient, alors qu'un numéro
+    ''' de version doit rester lisible — c'est ce qu'on demandera à l'agent au téléphone le jour
+    ''' où quelque chose ne tournera pas rond.
+    ''' </summary>
+    Private Shared Sub EcrireLaVersion(surface As Graphics, largeur As Integer, hauteur As Integer,
+                                       taille As Single, mesure As SizeF, alignement As StringFormat)
+
+        Dim texte As String = NumeroDeVersion
+        If String.IsNullOrEmpty(texte) Then Return
+
+        Dim tailleVersion As Single = Math.Max(taille / 6.0F, 12.0F)
+
+        Using police As New Font("Segoe UI", tailleVersion, FontStyle.Regular, GraphicsUnit.Pixel)
+
+            ' La boîte de ligne mesurée descend nettement plus bas que les capitales, à cause
+            ' des jambages et de l'interligne. S'en tenir à elle laisserait un blanc de la moitié
+            ' d'une hauteur de police entre le mot et son numéro : on remonte d'autant.
+            Const RETRAIT_INTERLIGNE As Single = 0.22F
+
+            Dim cadre As New RectangleF(
+                0.0F,
+                (CSng(hauteur) + mesure.Height) / 2.0F - taille * RETRAIT_INTERLIGNE,
+                CSng(largeur),
+                tailleVersion * 1.8F)
+
+            ' Moins opaque que le mot : le numéro accompagne le filigrane, il ne rivalise pas
+            ' avec lui.
+            Using pinceau As New SolidBrush(Color.FromArgb(170, 255, 255, 255))
+                surface.DrawString(texte, police, pinceau, cadre, alignement)
+            End Using
         End Using
     End Sub
 
