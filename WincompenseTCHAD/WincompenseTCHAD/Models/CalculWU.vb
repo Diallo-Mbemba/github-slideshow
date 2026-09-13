@@ -25,6 +25,12 @@ Public Class CalculWU
     Public Property CodeAgence As String = String.Empty
 
     ''' <summary>Compte de compensation du sous-agent (T_Pdv_SA.CompteCompense).</summary>
+    ''' <summary>
+    ''' Groupe statistique du point de vente, pour les sous-agents. Non utilisé par les calculs
+    ''' comptables : repris dans l'historique, où il permet de ventiler l'activité par groupe.
+    ''' </summary>
+    Public Property GroupeStatistique As String = String.Empty
+
     Public Property CompteCompense As String = String.Empty
 
     ''' <summary>Compte de commission du sous-agent (T_Pdv_SA.CompteCommission).</summary>
@@ -36,6 +42,15 @@ Public Class CalculWU
 #End Region
 
 #Region "Agrégats bruts (activité + règlement)"
+
+    ''' <summary>Nombre de transactions d'envoi de la journée pour cet Account.</summary>
+    Public Property NombreEnvois As Integer = 0
+
+    ''' <summary>Nombre de transactions de paiement de la journée pour cet Account.</summary>
+    Public Property NombrePaiements As Integer = 0
+
+    ''' <summary>Nombre de transactions annulées, exclues des montants mais comptées.</summary>
+    Public Property NombreAnnulations As Integer = 0
 
     Public Property PrincipalEnvoi As Decimal = 0D
     Public Property PrincipalPaye As Decimal = 0D

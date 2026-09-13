@@ -27,10 +27,25 @@ End Class
 
 ''' <summary>Résultat de l'agrégation du rapport d'activité pour un Account donné.</summary>
 Public Class ActiviteAgregat
+
     Public Property PrincipalEnvoi As Decimal = 0D
     Public Property PrincipalPaye As Decimal = 0D
     Public Property ChargeEnvoi As Decimal = 0D
     Public Property Taxes As Decimal = 0D
+
+    ''' <summary>Nombre de transactions d'envoi retenues (SendPayIndicator = "S").</summary>
+    Public Property NombreEnvois As Integer = 0
+
+    ''' <summary>Nombre de transactions de paiement retenues (SendPayIndicator = "P").</summary>
+    Public Property NombrePaiements As Integer = 0
+
+    ''' <summary>
+    ''' Nombre de transactions écartées de l'agrégation parce qu'annulées (STATUS = "C").
+    ''' Sans effet sur les montants : compté pour figurer, à titre d'information, dans les
+    ''' rapports d'activité — une journée riche en annulations mérite d'être regardée.
+    ''' </summary>
+    Public Property NombreAnnulations As Integer = 0
+
 End Class
 
 ''' <summary>Résultat de l'agrégation du rapport de règlement pour un Account donné.</summary>
@@ -386,26 +401,35 @@ Public NotInheritable Class WUReportService
 
         For Each row As DataRow In dtActivite.Rows
 
-            ' Account vide ou transaction annulée : ligne ignorée, sans faire échouer le traitement.
-            If Not InclureLigneActivite(row) Then
+            Dim account As String = ObtenirValeurTexte(row, "Account")
+
+            ' Sans Account, la ligne n'est rattachable à aucun point de vente : rien à en faire.
+            If String.IsNullOrWhiteSpace(account) Then
                 Continue For
             End If
-
-            Dim account As String = ObtenirValeurTexte(row, "Account")
 
             If Not resultat.ContainsKey(account) Then
                 resultat(account) = New ActiviteAgregat()
             End If
 
             Dim agregat As ActiviteAgregat = resultat(account)
+
+            ' Transaction annulée : exclue des montants, mais comptée — le nombre d'annulations
+            ' d'une journée est une information de gestion, pas un détail à faire disparaître.
+            If Not InclureLigneActivite(row) Then
+                agregat.NombreAnnulations += 1
+                Continue For
+            End If
             Dim indicateur As String = ObtenirValeurTexte(row, "SendPayIndicator").Trim().ToUpperInvariant()
 
             Select Case indicateur
                 Case "S"
+                    agregat.NombreEnvois += 1
                     agregat.PrincipalEnvoi += ToDecimalSafe(ObtenirValeur(row, "RecPrincipalREC"))
                     agregat.ChargeEnvoi += ToDecimalSafe(ObtenirValeur(row, "TotalChargesREC"))
                     agregat.Taxes += ToDecimalSafe(ObtenirValeur(row, "TaxesREC"))
                 Case "P"
+                    agregat.NombrePaiements += 1
                     agregat.PrincipalPaye += ToDecimalSafe(ObtenirValeur(row, "PayPrincipalPAY"))
                 Case Else
                     ' Indicateur inconnu ou vide : ligne non exploitable pour l'agrégation, ignorée sans erreur bloquante.

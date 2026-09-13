@@ -34,6 +34,7 @@ Partial Class FrmCompensationWU
         Me.btnSousAgents = New System.Windows.Forms.Button()
         Me.btnAgences = New System.Windows.Forms.Button()
         Me.btnGroupes = New System.Windows.Forms.Button()
+        Me.btnRapport = New System.Windows.Forms.Button()
         Me.lblActivite = New System.Windows.Forms.Label()
         Me.lblReglement = New System.Windows.Forms.Label()
         Me.dgvControle = New System.Windows.Forms.DataGridView()
@@ -67,6 +68,15 @@ Partial Class FrmCompensationWU
         Me.btnReglement.TabIndex = 1
         Me.btnReglement.Text = "Charger rapport règlement"
         Me.btnReglement.UseVisualStyleBackColor = True
+        '
+        'btnRapport
+        '
+        Me.btnRapport.Location = New System.Drawing.Point(386, 12)
+        Me.btnRapport.Name = "btnRapport"
+        Me.btnRapport.Size = New System.Drawing.Size(206, 32)
+        Me.btnRapport.TabIndex = 9
+        Me.btnRapport.Text = "Rapport d'activité..."
+        Me.btnRapport.UseVisualStyleBackColor = True
         '
         'btnAfficher
         '
@@ -244,6 +254,7 @@ Partial Class FrmCompensationWU
         Me.Controls.Add(Me.btnSousAgents)
         Me.Controls.Add(Me.btnAgences)
         Me.Controls.Add(Me.btnGroupes)
+        Me.Controls.Add(Me.btnRapport)
         Me.Controls.Add(Me.btnGenererPiece)
         Me.Controls.Add(Me.btnAfficher)
         Me.Controls.Add(Me.btnReglement)
@@ -269,6 +280,7 @@ Partial Class FrmCompensationWU
     Friend WithEvents btnSousAgents As System.Windows.Forms.Button
     Friend WithEvents btnAgences As System.Windows.Forms.Button
     Friend WithEvents btnGroupes As System.Windows.Forms.Button
+    Friend WithEvents btnRapport As System.Windows.Forms.Button
     Friend WithEvents lblActivite As System.Windows.Forms.Label
     Friend WithEvents lblReglement As System.Windows.Forms.Label
     Friend WithEvents dgvControle As System.Windows.Forms.DataGridView

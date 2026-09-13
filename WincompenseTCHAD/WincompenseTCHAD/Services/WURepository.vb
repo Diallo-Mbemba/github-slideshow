@@ -107,6 +107,7 @@ Public NotInheritable Class WURepository
                 If lecteur.Read() Then
                     calc.TypePdv = "SA"
                     calc.Designation = LireChaine(lecteur, "Designationagence")
+                    calc.GroupeStatistique = LireChaine(lecteur, "GroupeStatistique")
                     calc.CodeAgence = LireChaine(lecteur, "codeagence")
                     calc.CompteCompense = LireChaine(lecteur, "CompteCompense")
                     calc.CompteCommission = LireChaine(lecteur, "CompteCommission")

@@ -32,6 +32,12 @@ Public Class FrmCompensationWU
     ''' </summary>
     Private _infosActivite As InfosFichierRapport
     Private _infosReglement As InfosFichierRapport
+
+    ''' <summary>
+    ''' Date d'activité de la journée calculée, lue dans le rapport lui-même. Mémorisée pour
+    ''' l'historisation : c'est elle qui classe la journée dans le temps, et non la date du jour.
+    ''' </summary>
+    Private _dateActivite As Date?
     Private _listeCalculs As List(Of CalculWU)
     Private _dtPieceGeneree As DataTable
 
@@ -84,6 +90,51 @@ Public Class FrmCompensationWU
                     "Paramétrage modifié", MessageBoxButtons.OK, MessageBoxIcon.Information)
             End If
         End Using
+    End Sub
+
+    ''' <summary>
+    ''' Enregistre la journée dans l'historique (table T_HistoriqueWU), source des rapports
+    ''' d'activité sur une période.
+    '''
+    ''' L'échec de l'historisation n'annule JAMAIS la pièce comptable : celle-ci est déjà
+    ''' générée et équilibrée, elle reste la priorité. L'utilisateur est simplement averti que
+    ''' la journée ne figurera pas dans les rapports tant qu'elle n'aura pas été regénérée.
+    ''' </summary>
+    Private Sub HistoriserLaJournee()
+
+        If Not _dateActivite.HasValue Then
+            ' Sans date d'activité exploitable, la journée ne peut pas être classée dans le temps.
+            tsslStatut.Text &= "  |  Journée non historisée : date d'activité indéterminée."
+            Return
+        End If
+
+        Dim nombreEnregistrees As Integer = 0
+        Dim messageErreur As String = String.Empty
+
+        If HistoriqueRepository.EnregistrerJournee(_dateActivite.Value, _listeCalculs,
+                                                   nombreEnregistrees, messageErreur) Then
+            tsslStatut.Text &= $"  |  Journée du {_dateActivite.Value:dd/MM/yyyy} historisée " &
+                               $"({nombreEnregistrees} point(s) de vente)."
+            Return
+        End If
+
+        MessageBox.Show(
+            messageErreur & Environment.NewLine & Environment.NewLine &
+            "La pièce comptable, elle, est bien générée et reste utilisable." & Environment.NewLine &
+            "Seul le rapport d'activité ignorera cette journée tant qu'elle n'aura pas été " &
+            "regénérée une fois le problème corrigé.",
+            "Journée non historisée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+        tsslStatut.Text &= "  |  Journée NON historisée."
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre le rapport d'activité sur une période. Fenêtre non modale : elle peut rester
+    ''' affichée pendant la comptabilisation d'une nouvelle journée.
+    ''' </summary>
+    Private Sub btnRapport_Click(sender As Object, e As EventArgs) Handles btnRapport.Click
+        Dim rapport As New FrmRapportActivite()
+        rapport.Show(Me)
     End Sub
 
     ''' <summary>
@@ -294,6 +345,7 @@ Public Class FrmCompensationWU
     Private Sub ReinitialiserResultats()
         _listeCalculs = Nothing
         _dtPieceGeneree = Nothing
+        _dateActivite = Nothing
         btnPieceAccount.Enabled = False
         dgvControle.DataSource = Nothing
         progressBarTraitement.Value = 0
@@ -332,6 +384,9 @@ Public Class FrmCompensationWU
             WUReportService.VerifierColonnesRapport(dtActivite, ConstantesWU.ColonnesRapportActivite, "activité")
             WUReportService.VerifierColonnesRapport(dtReglement, ConstantesWU.ColonnesRapportReglement, "règlement")
             progressBarTraitement.Value = 30
+
+            ' Date de la journée traitée, retenue pour l'historisation.
+            _dateActivite = WUReportService.ObtenirDateActivite(dtActivite)
 
             ' Validation de la cohérence des dates entre les deux rapports (section 16).
             Dim messageDate As String = String.Empty
@@ -462,6 +517,9 @@ Public Class FrmCompensationWU
                     calc.PrincipalPaye = agregatActivite.PrincipalPaye
                     calc.ChargeEnvoi = agregatActivite.ChargeEnvoi
                     calc.Taxes = agregatActivite.Taxes
+                    calc.NombreEnvois = agregatActivite.NombreEnvois
+                    calc.NombrePaiements = agregatActivite.NombrePaiements
+                    calc.NombreAnnulations = agregatActivite.NombreAnnulations
                 Else
                     calc.DonneesManquantes = True ' Account présent en règlement mais absent de l'activité.
                 End If
@@ -587,6 +645,10 @@ Public Class FrmCompensationWU
 
             _dtPieceGeneree = dtPiece
             tsslStatut.Text = messageControle
+
+            ' La journée est comptabilisée : c'est le moment de l'historiser, et pas avant.
+            ' Un simple affichage ne doit rien laisser dans l'historique.
+            HistoriserLaJournee()
 
             OuvrirPieceDansExcel()
 

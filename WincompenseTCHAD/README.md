@@ -27,13 +27,16 @@ WincompenseTCHAD/
     ├── Models/
     │   ├── CalculWU.vb                     ' Classe métier par Account
     │   ├── ComptesSystemeWU.vb             ' Comptes comptables paramétrés (table SystemeWU)
-    │   └── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
+    │   ├── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
+    │   └── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
     │   ├── WURepository.vb                 ' Lecture SQL Server pour la compensation (T_Pdv_SA / T_Pdv_EC / SystemeWU)
 │   ├── PdvRepository.vb                ' CRUD points de vente et groupes (écriture isolée de la lecture)
 │   ├── ExcelExportService.vb           ' Export générique de tableaux vers Excel (titre, en-têtes, impression)
+│   ├── HistoriqueRepository.vb         ' Historique des journées comptabilisées (T_HistoriqueWU)
+│   ├── RapportActiviteService.vb       ' Construction des quatre états du rapport d'activité
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     └── Forms/
@@ -45,6 +48,7 @@ WincompenseTCHAD/
         ├── FrmSousAgents.vb                ' Gestion des sous-agents (CRUD)
         ├── FrmGroupesStatistiques.vb       ' Gestion des groupes statistiques (CRUD)
         ├── FrmSousAgentsParGroupe.vb       ' Liste des sous-agents par groupe (consultation)
+        ├── FrmRapportActivite.vb           ' Rapport d'activité sur une période (4 états)
         └── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
 
 Scripts/
@@ -374,6 +378,56 @@ peut donc servir à d'autres états. Comme l'export de la pièce comptable, il f
 **liaison tardive** — aucune référence COM Excel n'est imposée au projet, dont le numéro de
 version diffère d'un poste à l'autre. Excel absent du poste, l'application continue de
 fonctionner : seul l'export le signale, au moment où il est demandé.
+
+## Rapport d'activité sur une période
+
+Bouton **« Rapport d'activité… »** de l'écran principal. Quatre états, en quatre onglets, tous
+exportables en un seul classeur Excel.
+
+| Onglet | Contenu |
+|---|---|
+| 1. Synthèse | Volumes, envois, paiements, commissions et taxes, cumulés sur la période |
+| 2. Jour par jour | Une ligne par journée comptabilisée : c'est la page qui fait ressortir un jour anormal |
+| 3. Par point de vente | Une ligne par Account, classée par principal envoyé décroissant |
+| 4. Par groupe statistique | Une ligne par groupe, les points de vente sans groupe formant une ligne distincte |
+
+Les quatre états sont bâtis sur **la même lecture**, agrégée différemment : leurs totaux sont
+donc nécessairement identiques d'une page à l'autre. Le rapprochement entre pages est un
+contrôle de cohérence, pas une coïncidence.
+
+### La source : l'historique des journées comptabilisées
+
+L'application traite une journée à la fois et ne conservait rien. La table
+**`T_HistoriqueWU`** (script `Scripts\05_HistoriqueWU.sql`) enregistre désormais le résultat de
+chaque journée — une ligne par point de vente — et sert de source à ces rapports.
+
+- **Alimentée à la génération de la pièce comptable**, jamais à un simple affichage : seule une
+  journée réellement comptabilisée entre dans l'historique.
+- **Restitue ce qui a été comptabilisé**, et non un recalcul a posteriori qui dépendrait du
+  paramétrage du jour. L'identification du point de vente — désignation, groupe, type — est
+  recopiée telle qu'elle était ce jour-là : changer un point de vente de groupe ne réécrit pas
+  le passé.
+- **Écriture répétable** : une journée regénérée remplace intégralement ses lignes. Suppression
+  et réinsertion dans une même transaction, pour qu'un incident laisse la journée dans son état
+  antérieur plutôt qu'amputée.
+- **Un échec d'historisation n'annule jamais la pièce comptable** : elle est déjà générée et
+  équilibrée. L'utilisateur est averti que la journée manquera aux rapports tant qu'elle n'aura
+  pas été regénérée.
+
+L'historique ne couvre que les journées comptabilisées **après** la mise en service. Pour les
+périodes antérieures, il faut regénérer les journées concernées à partir de leurs rapports.
+
+### Volumes
+
+Le nombre de transactions d'envoi et de paiement est désormais compté à l'agrégation
+(`ActiviteAgregat`), ainsi que le nombre de transactions **annulées** — exclues des montants,
+mais comptées : une journée riche en annulations mérite d'être regardée.
+
+### Ce qui ne figure pas dans ces rapports
+
+La répartition banque / sous-agent des commissions. Elle dépend du taux du groupe **au moment
+de l'édition**, et non au moment des opérations : un rapport rétroactif deviendrait faux dès
+qu'un taux change. L'historique conserve les commissions totales, qui elles ne bougent pas.
 
 ## Contrôles de sécurité sur les fichiers chargés
 

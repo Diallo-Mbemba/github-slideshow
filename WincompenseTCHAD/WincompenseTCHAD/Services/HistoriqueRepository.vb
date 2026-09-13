@@ -1,0 +1,310 @@
+Option Strict On
+Option Explicit On
+
+Imports System.Data
+Imports System.Data.SqlClient
+
+''' <summary>
+''' Historique des journées comptabilisées (table T_HistoriqueWU) : écriture au moment de la
+''' génération de la pièce comptable, lecture pour les rapports d'activité sur une période.
+'''
+''' L'historique restitue ce qui a RÉELLEMENT été comptabilisé, et non un recalcul a posteriori.
+''' C'est pourquoi il recopie l'identification du point de vente telle qu'elle était ce jour-là
+''' plutôt que de la rattacher au paramétrage courant.
+'''
+''' Comme les autres dépôts, aucune exception SQL ne remonte à l'interface : chaque fonction
+''' retourne un booléen de réussite et pose un message explicite, en français.
+''' </summary>
+Public NotInheritable Class HistoriqueRepository
+
+    Private Sub New()
+    End Sub
+
+    Private Const TABLE_HISTORIQUE As String = "T_HistoriqueWU"
+
+    ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
+    Private Const ERREUR_TABLE_ABSENTE As Integer = 208
+
+    ''' <summary>Message posé lorsque la table n'existe pas : le script d'installation n'a pas été joué.</summary>
+    Public Const MESSAGE_TABLE_ABSENTE As String =
+        "La table T_HistoriqueWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
+        "Exécutez le script Scripts\05_HistoriqueWU.sql : il la crée." & vbCrLf &
+        "Tant qu'elle est absente, les journées comptabilisées ne sont pas historisées et les " &
+        "rapports d'activité restent vides."
+
+#Region "Écriture"
+
+    ''' <summary>
+    ''' Enregistre le résultat d'une journée comptabilisée : une ligne par point de vente.
+    '''
+    ''' L'écriture est RÉPÉTABLE : les lignes existantes de la journée sont d'abord supprimées.
+    ''' Une journée regénérée — après correction d'un paramétrage, par exemple — remplace donc
+    ''' intégralement la précédente, sans jamais produire de doublon ni de cumul.
+    '''
+    ''' Suppression et insertion se font dans une même transaction : en cas d'incident, la
+    ''' journée reste dans son état antérieur plutôt qu'amputée de ses lignes.
+    ''' </summary>
+    ''' <param name="jour">Journée d'activité comptabilisée.</param>
+    ''' <param name="calculs">Résultat du calcul, un élément par Account.</param>
+    ''' <param name="nombreEnregistrees">Nombre de lignes effectivement écrites.</param>
+    Public Shared Function EnregistrerJournee(jour As Date, calculs As IEnumerable(Of CalculWU),
+                                              ByRef nombreEnregistrees As Integer,
+                                              ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+        nombreEnregistrees = 0
+
+        If calculs Is Nothing Then
+            messageErreur = "Aucun calcul à historiser."
+            Return False
+        End If
+
+        Const suppression As String = "DELETE FROM " & TABLE_HISTORIQUE & " WHERE DateActivite = @jour"
+
+        Const insertion As String =
+            "INSERT INTO " & TABLE_HISTORIQUE & " (DateActivite, Account, Designation, " &
+            "GroupeStatistique, TypePdv, NombreEnvois, NombrePaiements, NombreAnnulations, " &
+            "PrincipalEnvoi, ChargeEnvoi, Taxes, PrincipalPaye, " &
+            "CommissionEnvoi, CommissionPaiement, CommissionTransfert, " &
+            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi) " &
+            "VALUES (@jour, @account, @designation, @groupe, @type, @nbEnvois, @nbPaiements, " &
+            "@nbAnnulations, @principalEnvoi, @chargeEnvoi, @taxes, @principalPaye, " &
+            "@comEnvoi, @comPaiement, @comTransfert, @tva, @ttaEnvoi, @ttaReception, @taxeEnvoi)"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using transaction As SqlTransaction = connexion.BeginTransaction()
+                    Try
+                        Using commande As New SqlCommand(suppression, connexion, transaction)
+                            commande.Parameters.Add("@jour", SqlDbType.Date).Value = jour.Date
+                            commande.ExecuteNonQuery()
+                        End Using
+
+                        For Each calc As CalculWU In calculs
+
+                            ' Un Account sans opération de la journée n'a rien à historiser.
+                            If calc Is Nothing OrElse String.IsNullOrWhiteSpace(calc.Account) Then Continue For
+
+                            Dim ligne As LigneHistoriqueWU = LigneHistoriqueWU.DepuisCalcul(calc, jour)
+
+                            Using commande As New SqlCommand(insertion, connexion, transaction)
+                                AjouterParametres(commande, ligne)
+                                commande.ExecuteNonQuery()
+                            End Using
+
+                            nombreEnregistrees += 1
+                        Next
+
+                        transaction.Commit()
+
+                    Catch
+                        Try
+                            transaction.Rollback()
+                        Catch
+                            ' La connexion est peut-être déjà tombée : l'erreur d'origine prime.
+                        End Try
+                        Throw
+                    End Try
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            nombreEnregistrees = 0
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_ABSENTE,
+                               $"Historisation de la journée du {jour:dd/MM/yyyy} impossible : {ex.Message}")
+            Return False
+
+        Catch ex As InvalidOperationException
+            nombreEnregistrees = 0
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    Private Shared Sub AjouterParametres(commande As SqlCommand, ligne As LigneHistoriqueWU)
+
+        commande.Parameters.Add("@jour", SqlDbType.Date).Value = ligne.DateActivite
+        commande.Parameters.Add("@account", SqlDbType.NVarChar, 255).Value = ligne.Account
+        commande.Parameters.Add("@designation", SqlDbType.NVarChar, 255).Value = If(ligne.Designation, String.Empty)
+        commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = If(ligne.GroupeStatistique, String.Empty)
+        commande.Parameters.Add("@type", SqlDbType.NVarChar, 20).Value = If(ligne.TypePdv, String.Empty)
+
+        commande.Parameters.Add("@nbEnvois", SqlDbType.Int).Value = ligne.NombreEnvois
+        commande.Parameters.Add("@nbPaiements", SqlDbType.Int).Value = ligne.NombrePaiements
+        commande.Parameters.Add("@nbAnnulations", SqlDbType.Int).Value = ligne.NombreAnnulations
+
+        AjouterMontant(commande, "@principalEnvoi", ligne.PrincipalEnvoi)
+        AjouterMontant(commande, "@chargeEnvoi", ligne.ChargeEnvoi)
+        AjouterMontant(commande, "@taxes", ligne.Taxes)
+        AjouterMontant(commande, "@principalPaye", ligne.PrincipalPaye)
+        AjouterMontant(commande, "@comEnvoi", ligne.CommissionEnvoi)
+        AjouterMontant(commande, "@comPaiement", ligne.CommissionPaiement)
+        AjouterMontant(commande, "@comTransfert", ligne.CommissionTransfert)
+        AjouterMontant(commande, "@tva", ligne.TVA)
+        AjouterMontant(commande, "@ttaEnvoi", ligne.TTAEnvoi)
+        AjouterMontant(commande, "@ttaReception", ligne.TTAReception)
+        AjouterMontant(commande, "@taxeEnvoi", ligne.TaxeEnvoi)
+    End Sub
+
+    ''' <summary>
+    ''' Ajoute un montant en cadrant explicitement précision et échelle sur DECIMAL(18,2) :
+    ''' sans cela, ADO.NET déduit l'échelle de la valeur transmise et SQL Server peut arrondir
+    ''' autrement qu'attendu.
+    ''' </summary>
+    Private Shared Sub AjouterMontant(commande As SqlCommand, nom As String, valeur As Decimal)
+
+        Dim parametre As SqlParameter = commande.Parameters.Add(nom, SqlDbType.Decimal)
+        parametre.Precision = 18
+        parametre.Scale = 2
+        parametre.Value = Decimal.Round(valeur, 2)
+    End Sub
+
+#End Region
+
+#Region "Lecture"
+
+    ''' <summary>
+    ''' Retourne les lignes d'historique d'une période, bornes comprises.
+    '''
+    ''' Les rapports agrègent ensuite ces lignes en mémoire — par jour, par point de vente,
+    ''' par groupe — plutôt que d'interroger la base quatre fois. Un mois représente quelques
+    ''' centaines de lignes, et cette source unique garantit que les quatre pages d'un même
+    ''' rapport présentent exactement les mêmes totaux.
+    ''' </summary>
+    ''' <returns>Lignes triées par date puis par Account. Liste vide en cas d'erreur.</returns>
+    Public Shared Function ListerPeriode(debut As Date, fin As Date, ByRef messageErreur As String) As List(Of LigneHistoriqueWU)
+
+        messageErreur = String.Empty
+        Dim resultat As New List(Of LigneHistoriqueWU)
+
+        Const requete As String =
+            "SELECT DateActivite, Account, Designation, GroupeStatistique, TypePdv, " &
+            "NombreEnvois, NombrePaiements, NombreAnnulations, " &
+            "PrincipalEnvoi, ChargeEnvoi, Taxes, PrincipalPaye, " &
+            "CommissionEnvoi, CommissionPaiement, CommissionTransfert, " &
+            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi " &
+            "FROM " & TABLE_HISTORIQUE & " " &
+            "WHERE DateActivite >= @debut AND DateActivite <= @fin " &
+            "ORDER BY DateActivite, Account"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    commande.Parameters.Add("@debut", SqlDbType.Date).Value = debut.Date
+                    commande.Parameters.Add("@fin", SqlDbType.Date).Value = fin.Date
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+                            resultat.Add(New LigneHistoriqueWU() With {
+                                .DateActivite = Convert.ToDateTime(lecteur("DateActivite"), Globalization.CultureInfo.InvariantCulture),
+                                .Account = LireChaine(lecteur, "Account"),
+                                .Designation = LireChaine(lecteur, "Designation"),
+                                .GroupeStatistique = LireChaine(lecteur, "GroupeStatistique"),
+                                .TypePdv = LireChaine(lecteur, "TypePdv"),
+                                .NombreEnvois = LireEntier(lecteur, "NombreEnvois"),
+                                .NombrePaiements = LireEntier(lecteur, "NombrePaiements"),
+                                .NombreAnnulations = LireEntier(lecteur, "NombreAnnulations"),
+                                .PrincipalEnvoi = LireMontant(lecteur, "PrincipalEnvoi"),
+                                .ChargeEnvoi = LireMontant(lecteur, "ChargeEnvoi"),
+                                .Taxes = LireMontant(lecteur, "Taxes"),
+                                .PrincipalPaye = LireMontant(lecteur, "PrincipalPaye"),
+                                .CommissionEnvoi = LireMontant(lecteur, "CommissionEnvoi"),
+                                .CommissionPaiement = LireMontant(lecteur, "CommissionPaiement"),
+                                .CommissionTransfert = LireMontant(lecteur, "CommissionTransfert"),
+                                .TVA = LireMontant(lecteur, "TVA"),
+                                .TTAEnvoi = LireMontant(lecteur, "TTAEnvoi"),
+                                .TTAReception = LireMontant(lecteur, "TTAReception"),
+                                .TaxeEnvoi = LireMontant(lecteur, "TaxeEnvoi")
+                            })
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_ABSENTE,
+                               $"Lecture de l'historique impossible : {ex.Message}")
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return resultat
+    End Function
+
+    ''' <summary>
+    ''' Première et dernière journées historisées. Servent à proposer d'emblée une période
+    ''' pertinente plutôt qu'un intervalle vide.
+    ''' </summary>
+    ''' <returns>False si l'historique est vide ou illisible.</returns>
+    Public Shared Function ObtenirBornes(ByRef premiere As Date, ByRef derniere As Date,
+                                         ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+        premiere = Date.Today
+        derniere = Date.Today
+
+        Const requete As String = "SELECT MIN(DateActivite), MAX(DateActivite) FROM " & TABLE_HISTORIQUE
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+
+                        If Not lecteur.Read() OrElse lecteur.IsDBNull(0) Then
+                            Return False ' Historique vide : aucune journée encore comptabilisée.
+                        End If
+
+                        premiere = Convert.ToDateTime(lecteur.GetValue(0), Globalization.CultureInfo.InvariantCulture).Date
+                        derniere = Convert.ToDateTime(lecteur.GetValue(1), Globalization.CultureInfo.InvariantCulture).Date
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_ABSENTE,
+                               $"Lecture de l'historique impossible : {ex.Message}")
+            Return False
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+#End Region
+
+#Region "Utilitaires de lecture"
+
+    Private Shared Function LireChaine(lecteur As SqlDataReader, colonne As String) As String
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return String.Empty
+        Return lecteur.GetValue(index).ToString().Trim()
+    End Function
+
+    Private Shared Function LireEntier(lecteur As SqlDataReader, colonne As String) As Integer
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return 0
+        Return Convert.ToInt32(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    Private Shared Function LireMontant(lecteur As SqlDataReader, colonne As String) As Decimal
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return 0D
+        Return Convert.ToDecimal(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+#End Region
+
+End Class
