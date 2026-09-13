@@ -327,12 +327,16 @@ Public NotInheritable Class ExcelExportService
         ' Lignes à mettre en exergue, repérées pendant l'écriture et mises en forme ensuite :
         ' un seul aller-retour de mise en forme par ligne concernée, plutôt qu'un par cellule.
         Dim lignesEnExergue As New List(Of Integer)
-        Dim indexColonneExergue As Integer = IndexColonneExergue(bloc)
+
+        ' La variable ne doit pas porter le nom de la fonction : VB étant insensible à la casse,
+        ' une locale nommée « indexColonneExergue » masquerait IndexColonneExergue et l'appel
+        ' serait lu comme une indexation de cette locale.
+        Dim positionExergue As Integer = IndexColonneExergue(bloc)
 
         For Each enregistrement As DataRow In bloc.Donnees.Rows
 
-            If indexColonneExergue >= 0 AndAlso
-               String.Equals(Convert.ToString(enregistrement(indexColonneExergue)),
+            If positionExergue >= 0 AndAlso
+               String.Equals(Convert.ToString(enregistrement(positionExergue)),
                              bloc.ExergueValeur, StringComparison.OrdinalIgnoreCase) Then
                 lignesEnExergue.Add(ligne)
             End If
