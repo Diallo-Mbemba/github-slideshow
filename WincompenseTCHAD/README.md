@@ -198,12 +198,44 @@ de taux et de comptes de compensation/commission, contrairement aux sous-agents.
 - **Suppression confirmée, et expliquée.** La confirmation rappelle la conséquence réelle : les
   rapports portant cet Account apparaîtront en `INCONNU` et leur pièce comptable utilisera le
   compte courant WU au lieu du compte de compensation.
+- **Groupe statistique : liste déroulante.** Il se choisit parmi les groupes existants ; un
+  libellé inconnu n'est retenu qu'après confirmation explicite de sa création (voir ci-dessous).
 - **Recherche.** Le champ de recherche filtre sur l'Account ou la désignation ; il s'applique à
   la touche Entrée ou au bouton *Actualiser*, pas à chaque caractère frappé. Les caractères
   génériques de SQL (`%`, `_`, `[`) y sont neutralisés : chercher « % » cherche bien un
   pourcentage.
 - **Calcul invalidé.** Après un passage dans l'un de ces écrans, si un calcul est déjà affiché,
   la barre d'état invite à le relancer : le paramétrage a pu changer.
+
+### Groupe statistique : sélectionner, ou créer en le disant
+
+Le groupe statistique se saisit dans une **liste déroulante alimentée par les groupes déjà
+présents en base** (`SELECT DISTINCT GroupeStatistique FROM T_Pdv_SA`). La saisie libre reste
+possible, mais un libellé inconnu déclenche une **demande de création explicite** :
+
+> Le groupe statistique « RESAU NORD » n'existe pas encore. Voulez-vous le CRÉER ?
+> Répondez « Non » pour choisir un groupe existant dans la liste déroulante.
+
+C'est le seul moyen de distinguer un nouveau groupe légitime d'une faute de frappe : les deux
+ont exactement la même apparence pour l'application. Le bouton par défaut de cette boîte est
+**Non**, pour qu'une validation machinale ne crée pas un groupe parasite.
+
+| Situation | Comportement |
+|---|---|
+| Groupe choisi dans la liste | Enregistré tel quel, sans question |
+| Libellé connu à la casse près (`reseau` pour `RESEAU`) | Rejoint le groupe existant, dont l'orthographe est reprise — pas de doublon `RESEAU`/`Reseau`/`reseau` |
+| Libellé inconnu | Création demandée explicitement ; refusée, la liste se déroule pour choisir |
+| Champ laissé vide | Averti (le sous-agent n'apparaîtra dans aucun regroupement), mais enregistrable |
+
+Il n'existe pas de table de groupes : **un groupe n'a d'existence que par les sous-agents qui le
+portent**. Créer un groupe revient donc à saisir un libellé encore inconnu, et supprimer le
+dernier sous-agent d'un groupe le fait disparaître. La liste déroulante est rechargée après
+chaque enregistrement, chaque suppression et chaque *Actualiser*, de sorte qu'un groupe qui
+vient d'être créé est aussitôt sélectionnable — et qu'un groupe devenu vide cesse d'être
+proposé.
+
+Conséquence à connaître : **renommer un groupe suppose de modifier chaque sous-agent qui le
+porte**. C'est pourquoi la création demande confirmation plutôt que de se faire en silence.
 
 Le chemin de comptabilisation quotidienne ne peut jamais écrire dans ces tables : la lecture
 reste dans `WURepository`, l'écriture est isolée dans `PdvRepository`.

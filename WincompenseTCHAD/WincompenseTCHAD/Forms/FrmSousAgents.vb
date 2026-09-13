@@ -33,6 +33,7 @@ Public Class FrmSousAgents
 #Region "Chargement et affichage de la liste"
 
     Private Sub FrmSousAgents_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ChargerGroupes()
         ChargerListe()
     End Sub
 
@@ -142,7 +143,7 @@ Public Class FrmSousAgents
 
         txtCodePdv.Text = fiche.CodePdv
         txtDesignation.Text = fiche.Designation
-        txtGroupeStatistique.Text = fiche.GroupeStatistique
+        cboGroupeStatistique.Text = fiche.GroupeStatistique
         txtTaux.Text = fiche.Taux.ToString("0.00", Globalization.CultureInfo.CurrentCulture)
         txtCompteCompense.Text = fiche.CompteCompense
         txtCompteCommission.Text = fiche.CompteCommission
@@ -152,7 +153,7 @@ Public Class FrmSousAgents
     Private Sub ViderChamps()
         txtCodePdv.Text = String.Empty
         txtDesignation.Text = String.Empty
-        txtGroupeStatistique.Text = String.Empty
+        cboGroupeStatistique.Text = String.Empty
         txtTaux.Text = String.Empty
         txtCompteCompense.Text = String.Empty
         txtCompteCommission.Text = String.Empty
@@ -168,6 +169,132 @@ Public Class FrmSousAgents
         btnSupprimer.Enabled = Not _enCreation AndAlso FicheSelectionnee() IsNot Nothing
         grpDetail.Text = If(_enCreation, "Nouveau sous-agent", "Fiche du sous-agent")
     End Sub
+
+#End Region
+
+#Region "Groupes statistiques"
+
+    ''' <summary>
+    ''' Groupes statistiques actuellement présents dans la base, tels que chargés au dernier
+    ''' rafraîchissement. Sert à distinguer une SÉLECTION d'un groupe existant d'une CRÉATION
+    ''' de nouveau groupe, qui elle demande confirmation.
+    ''' </summary>
+    Private _groupes As New List(Of String)
+
+    ''' <summary>
+    ''' Recharge la liste déroulante des groupes statistiques depuis la base.
+    '''
+    ''' Il n'existe pas de table de groupes : un groupe n'a d'existence que par les sous-agents
+    ''' qui le portent (voir PdvRepository.ListerGroupesStatistiques). La liste est donc
+    ''' reconstruite après chaque enregistrement, un groupe nouvellement créé devenant aussitôt
+    ''' sélectionnable pour les fiches suivantes.
+    ''' </summary>
+    Private Sub ChargerGroupes()
+
+        Dim messageErreur As String = String.Empty
+        Dim groupes As List(Of String) = PdvRepository.ListerGroupesStatistiques(messageErreur)
+
+        ' Une erreur ici ne doit pas empêcher de travailler : la liste reste simplement vide,
+        ' la saisie libre prend le relais et le contrôle de l'enregistrement fera foi.
+        If Not String.IsNullOrEmpty(messageErreur) Then Return
+
+        _groupes = groupes
+
+        Dim saisieEnCours As String = cboGroupeStatistique.Text
+
+        cboGroupeStatistique.BeginUpdate()
+        Try
+            cboGroupeStatistique.Items.Clear()
+            For Each groupe As String In _groupes
+                cboGroupeStatistique.Items.Add(groupe)
+            Next
+        Finally
+            cboGroupeStatistique.EndUpdate()
+        End Try
+
+        cboGroupeStatistique.Text = saisieEnCours
+    End Sub
+
+    ''' <summary>
+    ''' Recherche un groupe dans la liste des groupes existants, sans tenir compte de la casse
+    ''' ni des espaces de bordure, et retourne son ORTHOGRAPHE EXACTE telle qu'enregistrée.
+    '''
+    ''' Cette normalisation évite que « RESEAU », « Reseau » et « reseau » coexistent comme
+    ''' trois groupes distincts alors que l'utilisateur désignait le même : une saisie qui ne
+    ''' diffère que par la casse rejoint le groupe existant plutôt que d'en créer un nouveau.
+    ''' </summary>
+    ''' <returns>Le libellé enregistré, ou Nothing si le groupe n'existe pas encore.</returns>
+    Private Function TrouverGroupeExistant(saisie As String) As String
+
+        If String.IsNullOrWhiteSpace(saisie) Then Return Nothing
+
+        Dim recherche As String = saisie.Trim()
+
+        For Each groupe As String In _groupes
+            If String.Equals(groupe, recherche, StringComparison.OrdinalIgnoreCase) Then
+                Return groupe
+            End If
+        Next
+
+        Return Nothing
+    End Function
+
+    ''' <summary>
+    ''' Valide le groupe statistique saisi et retourne le libellé à enregistrer.
+    '''
+    '''   - groupe existant (à la casse près) : le libellé enregistré est retenu tel quel ;
+    '''   - groupe inconnu : création demandée explicitement à l'utilisateur — c'est le seul
+    '''     moyen de distinguer un nouveau groupe légitime d'une faute de frappe, les deux
+    '''     ayant exactement la même apparence pour l'application ;
+    '''   - champ vide : accepté après avertissement (la colonne l'autorise, mais le sous-agent
+    '''     n'apparaîtra alors dans aucun regroupement statistique).
+    '''
+    ''' Retourne Nothing si l'utilisateur renonce : l'enregistrement doit alors être abandonné.
+    ''' </summary>
+    Private Function ValiderGroupeStatistique() As String
+
+        Dim saisie As String = cboGroupeStatistique.Text.Trim()
+
+        If saisie.Length = 0 Then
+            Dim suite As DialogResult = MessageBox.Show(
+                "Aucun groupe statistique n'est renseigné." & Environment.NewLine & Environment.NewLine &
+                "Ce sous-agent n'apparaîtra dans aucun regroupement statistique." & Environment.NewLine &
+                "Enregistrer tout de même ?",
+                "Groupe statistique non renseigné", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+
+            If suite <> DialogResult.Yes Then
+                cboGroupeStatistique.Focus()
+                Return Nothing
+            End If
+
+            Return String.Empty
+        End If
+
+        Dim existant As String = TrouverGroupeExistant(saisie)
+
+        If existant IsNot Nothing Then
+            ' Aligne la casse sur celle déjà en base : « reseau » saisi rejoint « RESEAU ».
+            If Not String.Equals(existant, saisie, StringComparison.Ordinal) Then
+                cboGroupeStatistique.Text = existant
+            End If
+            Return existant
+        End If
+
+        Dim reponse As DialogResult = MessageBox.Show(
+            $"Le groupe statistique « {saisie} » n'existe pas encore." & Environment.NewLine & Environment.NewLine &
+            "Voulez-vous le CRÉER ?" & Environment.NewLine & Environment.NewLine &
+            "Répondez « Non » pour choisir un groupe existant dans la liste déroulante." & Environment.NewLine &
+            "Un groupe créé par erreur ne pourra être corrigé qu'en modifiant chaque sous-agent qui le porte.",
+            "Nouveau groupe statistique", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
+
+        If reponse <> DialogResult.Yes Then
+            cboGroupeStatistique.DroppedDown = True
+            cboGroupeStatistique.Focus()
+            Return Nothing
+        End If
+
+        Return saisie
+    End Function
 
 #End Region
 
@@ -188,6 +315,7 @@ Public Class FrmSousAgents
 
     Private Sub btnActualiser_Click(sender As Object, e As EventArgs) Handles btnActualiser.Click
         _enCreation = False
+        ChargerGroupes()
         ChargerListe()
     End Sub
 
@@ -223,6 +351,15 @@ Public Class FrmSousAgents
             Return
         End If
 
+        ' Le groupe statistique se choisit dans la liste des groupes existants ; un libellé
+        ' inconnu n'est retenu qu'après confirmation explicite de sa création. Ce contrôle vient
+        ' APRÈS les autres : inutile de faire trancher la création d'un groupe si la fiche est
+        ' de toute façon incomplète par ailleurs.
+        Dim groupe As String = ValiderGroupeStatistique()
+        If groupe Is Nothing Then Return ' L'utilisateur a renoncé : message déjà affiché.
+
+        fiche.GroupeStatistique = groupe
+
         ' Un même Account dans les deux tables serait silencieusement traité comme un sous-agent :
         ' la recherche interroge T_Pdv_SA en premier. L'utilisateur doit le savoir avant de valider.
         If _enCreation AndAlso PdvRepository.ExisteDansAutreTable(fiche.CodePdv, estSousAgent:=True) Then
@@ -253,6 +390,10 @@ Public Class FrmSousAgents
                                 $"Sous-agent « {fiche.CodePdv} » créé.",
                                 $"Sous-agent « {fiche.CodePdv} » modifié.")
             _enCreation = False
+
+            ' Un groupe qui vient d'être créé n'existait dans aucune fiche : il devient
+            ' sélectionnable dès maintenant pour les saisies suivantes.
+            ChargerGroupes()
 
         Finally
             Cursor = Cursors.Default
@@ -287,6 +428,10 @@ Public Class FrmSousAgents
 
             lblStatut.Text = $"Sous-agent « {fiche.CodePdv} » supprimé."
 
+            ' Supprimer le dernier sous-agent d'un groupe fait disparaître ce groupe : la liste
+            ' déroulante doit cesser de le proposer.
+            ChargerGroupes()
+
         Finally
             Cursor = Cursors.Default
         End Try
@@ -317,7 +462,7 @@ Public Class FrmSousAgents
         Return New PointDeVenteSA() With {
             .CodePdv = txtCodePdv.Text,
             .Designation = txtDesignation.Text,
-            .GroupeStatistique = txtGroupeStatistique.Text,
+            .GroupeStatistique = cboGroupeStatistique.Text,
             .Taux = taux,
             .CompteCompense = txtCompteCompense.Text,
             .CompteCommission = txtCompteCommission.Text,

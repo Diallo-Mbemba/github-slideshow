@@ -172,6 +172,49 @@ Public NotInheritable Class PdvRepository
         Return True
     End Function
 
+    ''' <summary>
+    ''' Liste les groupes statistiques DÉJÀ utilisés par au moins un sous-agent.
+    '''
+    ''' Il n'existe pas de table de groupes : un groupe n'a d'existence que par les sous-agents
+    ''' qui le portent. « Créer un groupe » revient donc simplement à saisir un libellé encore
+    ''' inconnu — et « supprimer » le dernier sous-agent d'un groupe le fait disparaître de
+    ''' cette liste. C'est précisément pourquoi la saisie doit passer par une sélection : sans
+    ''' cela, la moindre faute de frappe crée un groupe parasite impossible à distinguer.
+    ''' </summary>
+    ''' <returns>Libellés distincts, triés. Liste vide (jamais Nothing) en cas d'erreur.</returns>
+    Public Shared Function ListerGroupesStatistiques(ByRef messageErreur As String) As List(Of String)
+
+        messageErreur = String.Empty
+        Dim resultat As New List(Of String)
+
+        Const requete As String =
+            "SELECT DISTINCT LTRIM(RTRIM(GroupeStatistique)) AS Groupe FROM T_Pdv_SA " &
+            "WHERE GroupeStatistique IS NOT NULL AND LTRIM(RTRIM(GroupeStatistique)) <> '' " &
+            "ORDER BY Groupe"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+                            Dim groupe As String = LireChaine(lecteur, "Groupe")
+                            If groupe.Length > 0 Then resultat.Add(groupe)
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = $"Lecture des groupes statistiques impossible : {ex.Message}"
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return resultat
+    End Function
+
 #End Region
 
 #Region "Agences propres Ecobank (T_Pdv_EC)"

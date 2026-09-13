@@ -36,7 +36,7 @@ Partial Class FrmSousAgents
         Me.lblDesignation = New System.Windows.Forms.Label()
         Me.txtDesignation = New System.Windows.Forms.TextBox()
         Me.lblGroupeStatistique = New System.Windows.Forms.Label()
-        Me.txtGroupeStatistique = New System.Windows.Forms.TextBox()
+        Me.cboGroupeStatistique = New System.Windows.Forms.ComboBox()
         Me.lblTaux = New System.Windows.Forms.Label()
         Me.txtTaux = New System.Windows.Forms.TextBox()
         Me.lblCompteCompense = New System.Windows.Forms.Label()
@@ -109,7 +109,7 @@ Partial Class FrmSousAgents
         Me.grpDetail.Controls.Add(Me.lblDesignation)
         Me.grpDetail.Controls.Add(Me.txtDesignation)
         Me.grpDetail.Controls.Add(Me.lblGroupeStatistique)
-        Me.grpDetail.Controls.Add(Me.txtGroupeStatistique)
+        Me.grpDetail.Controls.Add(Me.cboGroupeStatistique)
         Me.grpDetail.Controls.Add(Me.lblTaux)
         Me.grpDetail.Controls.Add(Me.txtTaux)
         Me.grpDetail.Controls.Add(Me.lblCompteCompense)
@@ -165,13 +165,14 @@ Partial Class FrmSousAgents
         Me.lblGroupeStatistique.TabIndex = 10
         Me.lblGroupeStatistique.Text = "Groupe statistique :"
         '
-        'txtGroupeStatistique
+        'cboGroupeStatistique
         '
-        Me.txtGroupeStatistique.Location = New System.Drawing.Point(175, 96)
-        Me.txtGroupeStatistique.MaxLength = 255
-        Me.txtGroupeStatistique.Name = "txtGroupeStatistique"
-        Me.txtGroupeStatistique.Size = New System.Drawing.Size(230, 22)
-        Me.txtGroupeStatistique.TabIndex = 11
+        Me.cboGroupeStatistique.FormattingEnabled = True
+        Me.cboGroupeStatistique.Location = New System.Drawing.Point(175, 96)
+        Me.cboGroupeStatistique.MaxLength = 255
+        Me.cboGroupeStatistique.Name = "cboGroupeStatistique"
+        Me.cboGroupeStatistique.Size = New System.Drawing.Size(230, 24)
+        Me.cboGroupeStatistique.TabIndex = 11
         '
         'lblTaux
         '
@@ -332,7 +333,7 @@ Partial Class FrmSousAgents
     Friend WithEvents lblDesignation As System.Windows.Forms.Label
     Friend WithEvents txtDesignation As System.Windows.Forms.TextBox
     Friend WithEvents lblGroupeStatistique As System.Windows.Forms.Label
-    Friend WithEvents txtGroupeStatistique As System.Windows.Forms.TextBox
+    Friend WithEvents cboGroupeStatistique As System.Windows.Forms.ComboBox
     Friend WithEvents lblTaux As System.Windows.Forms.Label
     Friend WithEvents txtTaux As System.Windows.Forms.TextBox
     Friend WithEvents lblCompteCompense As System.Windows.Forms.Label
