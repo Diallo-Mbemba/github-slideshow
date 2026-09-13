@@ -16,14 +16,31 @@ Imports System.Windows.Forms
 ''' </summary>
 Public Class FrmRapportActivite
 
-    ''' <summary>Lignes d'historique de la période affichée.</summary>
+    ''' <summary>Entrée du filtre affichant l'ensemble des groupes.</summary>
+    Private Const TOUS_LES_GROUPES As String = "(tous les groupes)"
+
+    ''' <summary>Lignes d'historique de la période, TOUS groupes confondus.</summary>
     Private _lignes As New List(Of LigneHistoriqueWU)
 
-    ''' <summary>Les quatre états, conservés pour l'export : ce qui part dans Excel est ce qui est à l'écran.</summary>
+    ''' <summary>
+    ''' Lignes effectivement restituées : les précédentes, restreintes au groupe choisi.
+    ''' Les états et l'export travaillent sur elles, jamais sur _lignes : l'écran et le
+    ''' classeur portent ainsi toujours sur le même périmètre.
+    ''' </summary>
+    Private _lignesAffichees As New List(Of LigneHistoriqueWU)
+
+    ''' <summary>Groupe statistique retenu, ou chaîne vide pour tous les groupes.</summary>
+    Private _groupeChoisi As String = String.Empty
+
+    ''' <summary>Les cinq états, conservés pour l'export : ce qui part dans Excel est ce qui est à l'écran.</summary>
     Private _synthese As DataTable
     Private _parJour As DataTable
     Private _parPdv As DataTable
     Private _parGroupe As DataTable
+    Private _commissions As DataTable
+
+    ''' <summary>Empêche le filtre de relancer l'affichage pendant qu'on le remplit.</summary>
+    Private _chargementEnCours As Boolean = False
 
     Public Sub New()
         InitializeComponent()
@@ -90,28 +107,79 @@ Public Class FrmRapportActivite
                 Return
             End If
 
-            _synthese = RapportActiviteService.ConstruireSynthese(_lignes)
-            _parJour = RapportActiviteService.ConstruireParJour(_lignes)
-            _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignes)
-            _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignes)
-
-            AfficherSynthese()
-            AfficherDetail(dgvParJour, _parJour, "Date", "Date")
-            AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
-            AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
-
-            btnExporter.Enabled = _lignes.Count > 0
-
-            If _lignes.Count = 0 Then
-                lblStatut.Text = "Aucune journée comptabilisée sur cette période."
-            Else
-                lblStatut.Text = $"{RapportActiviteService.CompterJours(_lignes)} journée(s), " &
-                                 $"{RapportActiviteService.CompterPointsDeVente(_lignes)} point(s) de vente."
-            End If
+            RemplirListeGroupes()
+            ConstruireEtats()
 
         Finally
             Cursor = Cursors.Default
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' Alimente le filtre avec les groupes réellement présents dans la période — lus dans
+    ''' l'historique et non dans le paramétrage courant : un groupe supprimé depuis reste
+    ''' présent dans l'historique et doit rester consultable.
+    ''' </summary>
+    Private Sub RemplirListeGroupes()
+
+        Dim selectionPrecedente As String = _groupeChoisi
+
+        _chargementEnCours = True
+        Try
+            cboGroupe.Items.Clear()
+            cboGroupe.Items.Add(TOUS_LES_GROUPES)
+
+            For Each groupe As String In RapportActiviteService.ListerGroupesPresents(_lignes)
+                cboGroupe.Items.Add(groupe)
+            Next
+
+            ' La sélection est conservée d'une période à l'autre lorsque le groupe y figure encore.
+            Dim index As Integer = If(String.IsNullOrEmpty(selectionPrecedente), 0, cboGroupe.Items.IndexOf(selectionPrecedente))
+            cboGroupe.SelectedIndex = If(index >= 0, index, 0)
+            _groupeChoisi = If(cboGroupe.SelectedIndex = 0, String.Empty, Convert.ToString(cboGroupe.SelectedItem))
+
+        Finally
+            _chargementEnCours = False
+        End Try
+    End Sub
+
+    Private Sub cboGroupe_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboGroupe.SelectedIndexChanged
+
+        If _chargementEnCours Then Return
+
+        _groupeChoisi = If(cboGroupe.SelectedIndex <= 0, String.Empty, Convert.ToString(cboGroupe.SelectedItem))
+        ConstruireEtats()
+    End Sub
+
+    ''' <summary>Construit et affiche les cinq états sur le périmètre retenu.</summary>
+    Private Sub ConstruireEtats()
+
+        _lignesAffichees = RapportActiviteService.Filtrer(_lignes, _groupeChoisi)
+
+        _synthese = RapportActiviteService.ConstruireSynthese(_lignesAffichees)
+        _parJour = RapportActiviteService.ConstruireParJour(_lignesAffichees)
+        _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees)
+        _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
+        _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
+
+        AfficherSynthese()
+        AfficherDetail(dgvParJour, _parJour, "Date", "Date")
+        AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
+        AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
+        AfficherDetail(dgvCommissions, _commissions, "Date", "Date")
+
+        btnExporter.Enabled = _lignesAffichees.Count > 0
+
+        If _lignesAffichees.Count = 0 Then
+            lblStatut.Text = If(String.IsNullOrEmpty(_groupeChoisi),
+                                "Aucune journée comptabilisée sur cette période.",
+                                $"Aucune activité du groupe « {_groupeChoisi} » sur cette période.")
+            Return
+        End If
+
+        lblStatut.Text = $"{RapportActiviteService.CompterJours(_lignesAffichees)} journée(s), " &
+                         $"{RapportActiviteService.CompterPointsDeVente(_lignesAffichees)} point(s) de vente" &
+                         If(String.IsNullOrEmpty(_groupeChoisi), ".", $" — groupe « {_groupeChoisi} ».")
     End Sub
 
     ''' <summary>Synthèse : deux colonnes, les intitulés de section en gras et sans valeur.</summary>
@@ -156,23 +224,57 @@ Public Class FrmRapportActivite
         DefinirEntete(grille, "NbPaiements", "Paiements")
         DefinirEntete(grille, "PrincipalPaye", "Principal payé")
         DefinirEntete(grille, "TotalTaxes", "Total taxes")
+        DefinirEntete(grille, "CommissionEnvoi", "Commission Envoi")
+        DefinirEntete(grille, "CommissionPaiement", "Commission Paiement")
+        DefinirEntete(grille, "CommissionTransfert", "Commission Transfert")
+        DefinirEntete(grille, "TotalCommissions", "Total commissions")
+        DefinirEntete(grille, "Variation", "Variation / veille")
+        DefinirEntete(grille, "Cumul", "Cumul période")
 
         For Each nom As String In New String() {"NbEnvois", "NbPaiements", "PointsDeVente",
                                                 "PrincipalEnvoi", "PrincipalPaye", "Commissions",
-                                                "TVA", "TTA", "TotalTaxes"}
+                                                "TVA", "TTA", "TotalTaxes",
+                                                "CommissionEnvoi", "CommissionPaiement",
+                                                "CommissionTransfert", "TotalCommissions", "Cumul"}
             If Not grille.Columns.Contains(nom) Then Continue For
             grille.Columns(nom).DefaultCellStyle.Format = "N0"
             grille.Columns(nom).DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
         Next
 
+        ' La variation est une proportion : elle s'affiche en pourcentage signé.
+        If grille.Columns.Contains("Variation") Then
+            grille.Columns("Variation").DefaultCellStyle.Format = "+0.0 %;-0.0 %;0.0 %"
+            grille.Columns("Variation").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+        End If
+
         grille.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
 
-        ' La ligne de total ferme chaque page : elle doit se distinguer au premier coup d'oeil.
+        MettreEnEvidenceTotaux(grille)
+    End Sub
+
+    ''' <summary>
+    ''' Distingue les lignes de structure : total général, sous-totaux par nature de point de
+    ''' vente, et intitulés de catégorie — ces derniers étant des lignes sans chiffres.
+    ''' </summary>
+    Private Shared Sub MettreEnEvidenceTotaux(grille As DataGridView)
+
         For Each ligne As DataGridViewRow In grille.Rows
-            If String.Equals(Convert.ToString(ligne.Cells(0).Value),
-                             RapportActiviteService.LIBELLE_TOTAL, StringComparison.Ordinal) Then
+
+            Dim cle As String = Convert.ToString(ligne.Cells(0).Value)
+
+            If String.Equals(cle, RapportActiviteService.LIBELLE_TOTAL, StringComparison.Ordinal) Then
                 ligne.DefaultCellStyle.Font = New Drawing.Font(grille.Font, Drawing.FontStyle.Bold)
                 ligne.DefaultCellStyle.BackColor = Drawing.Color.Gainsboro
+
+            ElseIf String.Equals(cle, RapportActiviteService.LIBELLE_SOUS_TOTAL, StringComparison.Ordinal) Then
+                ligne.DefaultCellStyle.Font = New Drawing.Font(grille.Font, Drawing.FontStyle.Bold)
+                ligne.DefaultCellStyle.BackColor = Drawing.Color.WhiteSmoke
+
+            ElseIf String.Equals(cle, RapportActiviteService.TYPE_SOUS_AGENT, StringComparison.Ordinal) OrElse
+                   String.Equals(cle, RapportActiviteService.TYPE_AGENCE, StringComparison.Ordinal) OrElse
+                   String.Equals(cle, RapportActiviteService.TYPE_NON_PARAMETRE, StringComparison.Ordinal) Then
+                ligne.DefaultCellStyle.Font = New Drawing.Font(grille.Font, Drawing.FontStyle.Bold)
+                ligne.DefaultCellStyle.BackColor = Drawing.Color.LightSteelBlue
             End If
         Next
     End Sub
@@ -193,21 +295,27 @@ Public Class FrmRapportActivite
     ''' </summary>
     Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
 
-        If _lignes Is Nothing OrElse _lignes.Count = 0 Then
+        If _lignesAffichees Is Nothing OrElse _lignesAffichees.Count = 0 Then
             MessageBox.Show("Aucune donnée à exporter.", "Export Excel",
                             MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
 
-        sfdExport.FileName = $"RapportActivite_{dtpDebut.Value:yyyyMMdd}_{dtpFin.Value:yyyyMMdd}.xlsx"
+        sfdExport.FileName = NomFichierPropose()
         If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
 
         Cursor = Cursors.WaitCursor
         Try
+            ' La période est toujours mise en exergue ; le groupe l'est aussi lorsqu'il en
+            ' restreint le périmètre — c'est ce qui caractérise l'extraction.
             Dim sousTitres As New List(Of SousTitreExcel) From {
                 New SousTitreExcel($"Période du {dtpDebut.Value:dd/MM/yyyy} au {dtpFin.Value:dd/MM/yyyy}", True),
-                New SousTitreExcel($"{RapportActiviteService.CompterJours(_lignes)} journée(s) comptabilisée(s) — " &
-                                   $"{RapportActiviteService.CompterPointsDeVente(_lignes)} point(s) de vente"),
+                New SousTitreExcel(If(String.IsNullOrEmpty(_groupeChoisi),
+                                      "Tous les groupes statistiques",
+                                      $"Groupe statistique : {_groupeChoisi}"),
+                                   Not String.IsNullOrEmpty(_groupeChoisi)),
+                New SousTitreExcel($"{RapportActiviteService.CompterJours(_lignesAffichees)} journée(s) comptabilisée(s) — " &
+                                   $"{RapportActiviteService.CompterPointsDeVente(_lignesAffichees)} point(s) de vente"),
                 New SousTitreExcel($"Édité le {Date.Now:dd/MM/yyyy à HH:mm}")
             }
 
@@ -273,7 +381,43 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Groupe", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe}
+        Dim formatsCommissions As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+            {"CommissionEnvoi", "# ##0"}, {"CommissionPaiement", "# ##0"},
+            {"CommissionTransfert", "# ##0"}, {"TotalCommissions", "# ##0"},
+            {"Cumul", "# ##0"}, {"Variation", "+0,0 %;-0,0 %;0,0 %"}
+        }
+
+        Dim commissions As New BlocExcel("5. Évolution des commissions", _commissions) With {
+            .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                {"CommissionEnvoi", "Commission Envoi"}, {"CommissionPaiement", "Commission Paiement"},
+                {"CommissionTransfert", "Commission Transfert"}, {"TotalCommissions", "Total commissions"},
+                {"Variation", "Variation / veille"}, {"Cumul", "Cumul période"}
+            },
+            .Formats = formatsCommissions,
+            .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
+        }
+
+        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions}
+    End Function
+
+    ''' <summary>
+    ''' Nom de fichier proposé : il porte la période et, le cas échéant, le groupe retenu, de
+    ''' sorte que deux extractions successives ne s'écrasent pas.
+    ''' </summary>
+    Private Function NomFichierPropose() As String
+
+        Dim partieGroupe As String = String.Empty
+
+        If Not String.IsNullOrEmpty(_groupeChoisi) Then
+            partieGroupe = _groupeChoisi
+            ' Un libellé de groupe peut contenir des caractères interdits dans un nom de fichier.
+            For Each interdit As Char In IO.Path.GetInvalidFileNameChars()
+                partieGroupe = partieGroupe.Replace(interdit, "_"c)
+            Next
+            partieGroupe = "_" & partieGroupe
+        End If
+
+        Return $"RapportActivite{partieGroupe}_{dtpDebut.Value:yyyyMMdd}_{dtpFin.Value:yyyyMMdd}.xlsx"
     End Function
 
 #End Region

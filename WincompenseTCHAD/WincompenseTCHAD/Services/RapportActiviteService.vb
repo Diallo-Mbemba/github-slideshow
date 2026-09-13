@@ -22,6 +22,9 @@ Public NotInheritable Class RapportActiviteService
     ''' <summary>Libellé des lignes de total, reconnaissable pour la mise en évidence.</summary>
     Public Const LIBELLE_TOTAL As String = "TOTAL"
 
+    ''' <summary>Libellé des sous-totaux par nature de point de vente.</summary>
+    Public Const LIBELLE_SOUS_TOTAL As String = "Sous-total"
+
     ''' <summary>Libellé des points de vente sans groupe statistique.</summary>
     Public Const SANS_GROUPE As String = "(sans groupe statistique)"
 
@@ -62,6 +65,32 @@ Public NotInheritable Class RapportActiviteService
         table.Rows.Add("    Commission Paiement", cumul.CommissionPaiement)
         table.Rows.Add("    Commission Transfert", cumul.CommissionTransfert)
         table.Rows.Add("    TOTAL COMMISSIONS", cumul.TotalCommissions)
+
+        ' Répartition sous-agents / agences propres : ce que la banque réalise par son propre
+        ' réseau ne se confond pas avec ce qu'elle réalise par ses sous-agents.
+        table.Rows.Add("RÉPARTITION PAR NATURE DE POINT DE VENTE", DBNull.Value)
+
+        For Each typePdv As String In New String() {TYPE_SOUS_AGENT, TYPE_AGENCE, TYPE_NON_PARAMETRE}
+
+            Dim duType As New List(Of LigneHistoriqueWU)
+            Dim comptes As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+            For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+                If String.Equals(LibelleType(ligne.TypePdv), typePdv, StringComparison.Ordinal) Then
+                    duType.Add(ligne)
+                    comptes.Add(ligne.Account)
+                End If
+            Next
+
+            ' Une nature absente de la période n'a pas à encombrer l'état d'une ligne à zéro.
+            If duType.Count = 0 Then Continue For
+
+            Dim cumulType As LigneHistoriqueWU = CumulerLignes(duType)
+            table.Rows.Add($"    {typePdv} — points de vente", CDec(comptes.Count))
+            table.Rows.Add($"    {typePdv} — principal envoyé", cumulType.PrincipalEnvoi)
+            table.Rows.Add($"    {typePdv} — principal payé", cumulType.PrincipalPaye)
+            table.Rows.Add($"    {typePdv} — commissions", cumulType.TotalCommissions)
+        Next
 
         table.Rows.Add("TAXES (FCFA)", DBNull.Value)
         table.Rows.Add("    TVA collectée", cumul.TVA)
@@ -118,32 +147,64 @@ Public NotInheritable Class RapportActiviteService
         table.Columns.Add("Groupe", GetType(String))
         AjouterColonnesChiffrees(table)
 
+        ' Cumul par Account, en conservant sa nature : sous-agent, agence propre ou non paramétré.
         Dim cumuls As New Dictionary(Of String, LigneHistoriqueWU)(StringComparer.OrdinalIgnoreCase)
 
         For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
 
             If Not cumuls.ContainsKey(ligne.Account) Then
-                ' La désignation et le groupe retenus sont ceux de la journée la plus récente,
-                ' les lignes arrivant triées par date : c'est l'identification la plus à jour.
                 cumuls(ligne.Account) = New LigneHistoriqueWU() With {.Account = ligne.Account}
             End If
 
             Dim cumul As LigneHistoriqueWU = cumuls(ligne.Account)
+
+            ' Les lignes arrivant triées par date, la dernière valeur rencontrée est la plus
+            ' récente : c'est l'identification à jour du point de vente qui est retenue.
             cumul.Designation = ligne.Designation
             cumul.GroupeStatistique = ligne.GroupeStatistique
+            cumul.TypePdv = ligne.TypePdv
             cumul.Cumuler(ligne)
         Next
 
-        Dim ordonnes As New List(Of LigneHistoriqueWU)(cumuls.Values)
-        ordonnes.Sort(Function(x, y) y.PrincipalEnvoi.CompareTo(x.PrincipalEnvoi))
+        ' Sous-agents et agences propres sont restitués SÉPARÉMENT, chacun avec son sous-total :
+        ' ce que la banque réalise par son propre réseau ne se confond pas avec ce qu'elle
+        ' réalise par ses sous-agents.
+        For Each typePdv As String In New String() {TYPE_SOUS_AGENT, TYPE_AGENCE, TYPE_NON_PARAMETRE}
 
-        For Each cumul As LigneHistoriqueWU In ordonnes
-            Dim enregistrement As DataRow = table.NewRow()
-            enregistrement("Account") = cumul.Account
-            enregistrement("Designation") = cumul.Designation
-            enregistrement("Groupe") = LibelleGroupe(cumul.GroupeStatistique)
-            RemplirColonnesChiffrees(enregistrement, cumul)
-            table.Rows.Add(enregistrement)
+            Dim duType As New List(Of LigneHistoriqueWU)
+
+            For Each cumul As LigneHistoriqueWU In cumuls.Values
+                If String.Equals(LibelleType(cumul.TypePdv), typePdv, StringComparison.Ordinal) Then
+                    duType.Add(cumul)
+                End If
+            Next
+
+            If duType.Count = 0 Then Continue For
+
+            ' Les points de vente qui pèsent apparaissent en tête de leur catégorie.
+            duType.Sort(Function(x, y) y.PrincipalEnvoi.CompareTo(x.PrincipalEnvoi))
+
+            Dim entete As DataRow = table.NewRow()
+            entete("Account") = typePdv
+            entete("Designation") = String.Empty
+            entete("Groupe") = String.Empty
+            table.Rows.Add(entete)
+
+            For Each cumul As LigneHistoriqueWU In duType
+                Dim enregistrement As DataRow = table.NewRow()
+                enregistrement("Account") = cumul.Account
+                enregistrement("Designation") = cumul.Designation
+                enregistrement("Groupe") = LibelleGroupe(cumul.GroupeStatistique)
+                RemplirColonnesChiffrees(enregistrement, cumul)
+                table.Rows.Add(enregistrement)
+            Next
+
+            Dim sousTotal As DataRow = table.NewRow()
+            sousTotal("Account") = LIBELLE_SOUS_TOTAL
+            sousTotal("Designation") = $"{typePdv} — {duType.Count} point(s) de vente"
+            sousTotal("Groupe") = String.Empty
+            RemplirColonnesChiffrees(sousTotal, CumulerLignes(duType))
+            table.Rows.Add(sousTotal)
         Next
 
         Dim total As DataRow = table.NewRow()
@@ -206,6 +267,142 @@ Public NotInheritable Class RapportActiviteService
 
 #End Region
 
+#Region "Types de point de vente et filtrage"
+
+    ''' <summary>Libellés des trois natures de point de vente, dans l'ordre où elles sont restituées.</summary>
+    Public Const TYPE_SOUS_AGENT As String = "SOUS-AGENTS"
+    Public Const TYPE_AGENCE As String = "AGENCES PROPRES"
+    Public Const TYPE_NON_PARAMETRE As String = "NON PARAMÉTRÉS"
+
+    ''' <summary>
+    ''' Nature du point de vente, telle qu'enregistrée le jour de la comptabilisation.
+    ''' Les Accounts non paramétrés forment une catégorie à part : les ranger avec les agences
+    ''' propres reviendrait à affirmer qu'ils en sont, ce que précisément on ignore.
+    ''' </summary>
+    Public Shared Function LibelleType(typePdv As String) As String
+
+        Select Case If(typePdv, String.Empty).Trim().ToUpperInvariant()
+            Case "SA" : Return TYPE_SOUS_AGENT
+            Case "EC" : Return TYPE_AGENCE
+            Case Else : Return TYPE_NON_PARAMETRE
+        End Select
+    End Function
+
+    ''' <summary>
+    ''' Restreint les lignes à un groupe statistique. Un libellé vide retourne la liste
+    ''' entière : c'est le cas « tous les groupes ».
+    ''' </summary>
+    Public Shared Function Filtrer(lignes As List(Of LigneHistoriqueWU), groupe As String) As List(Of LigneHistoriqueWU)
+
+        Dim toutes As List(Of LigneHistoriqueWU) = SansNothing(lignes)
+
+        If String.IsNullOrWhiteSpace(groupe) Then Return toutes
+
+        Dim retenues As New List(Of LigneHistoriqueWU)
+
+        For Each ligne As LigneHistoriqueWU In toutes
+            If String.Equals(LibelleGroupe(ligne.GroupeStatistique), groupe, StringComparison.OrdinalIgnoreCase) Then
+                retenues.Add(ligne)
+            End If
+        Next
+
+        Return retenues
+    End Function
+
+    ''' <summary>Groupes statistiques présents dans la période, triés. Lus dans l'historique lui-même.</summary>
+    ''' <remarks>
+    ''' Et non dans T_GroupeStatistique : un groupe supprimé depuis reste présent dans l'historique,
+    ''' et doit continuer d'être consultable.
+    ''' </remarks>
+    Public Shared Function ListerGroupesPresents(lignes As List(Of LigneHistoriqueWU)) As List(Of String)
+
+        Dim groupes As New SortedSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            groupes.Add(LibelleGroupe(ligne.GroupeStatistique))
+        Next
+
+        Return New List(Of String)(groupes)
+    End Function
+
+#End Region
+
+#Region "Page — Évolution des commissions"
+
+    ''' <summary>
+    ''' Évolution des commissions jour après jour : le détail des trois commissions, leur total,
+    ''' la variation par rapport à la journée précédente et le cumul depuis le début de la période.
+    '''
+    ''' La variation est exprimée en pourcentage du jour précédent. Elle est laissée VIDE pour la
+    ''' première journée et lorsque la veille est à zéro : une variation depuis zéro n'a pas de
+    ''' sens, et afficher 100 % ou l'infini induirait en erreur.
+    ''' </summary>
+    Public Shared Function ConstruireEvolutionCommissions(lignes As List(Of LigneHistoriqueWU)) As DataTable
+
+        Dim table As New DataTable("EvolutionCommissions")
+        table.Columns.Add("Date", GetType(String))
+        table.Columns.Add("CommissionEnvoi", GetType(Decimal))
+        table.Columns.Add("CommissionPaiement", GetType(Decimal))
+        table.Columns.Add("CommissionTransfert", GetType(Decimal))
+        table.Columns.Add("TotalCommissions", GetType(Decimal))
+        table.Columns.Add("Variation", GetType(Decimal))
+        table.Columns.Add("Cumul", GetType(Decimal))
+
+        Dim cumuls As New SortedDictionary(Of Date, LigneHistoriqueWU)
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            If Not cumuls.ContainsKey(ligne.DateActivite) Then
+                cumuls(ligne.DateActivite) = New LigneHistoriqueWU()
+            End If
+            cumuls(ligne.DateActivite).Cumuler(ligne)
+        Next
+
+        Dim cumulPeriode As Decimal = 0D
+        Dim veille As Decimal = -1D ' -1 : aucune journée précédente
+
+        For Each jour As Date In cumuls.Keys
+
+            Dim cumulJour As LigneHistoriqueWU = cumuls(jour)
+            Dim totalJour As Decimal = cumulJour.TotalCommissions
+            cumulPeriode += totalJour
+
+            Dim enregistrement As DataRow = table.NewRow()
+            enregistrement("Date") = jour.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture)
+            enregistrement("CommissionEnvoi") = cumulJour.CommissionEnvoi
+            enregistrement("CommissionPaiement") = cumulJour.CommissionPaiement
+            enregistrement("CommissionTransfert") = cumulJour.CommissionTransfert
+            enregistrement("TotalCommissions") = totalJour
+            enregistrement("Cumul") = cumulPeriode
+
+            If veille > 0D Then
+                enregistrement("Variation") = (totalJour - veille) / veille
+            Else
+                enregistrement("Variation") = DBNull.Value
+            End If
+
+            table.Rows.Add(enregistrement)
+            veille = totalJour
+        Next
+
+        ' Ligne de total : la variation et le cumul n'y ont pas de sens, laissés vides.
+        If cumuls.Count > 0 Then
+            Dim total As LigneHistoriqueWU = Cumuler(lignes)
+            Dim ligneTotal As DataRow = table.NewRow()
+            ligneTotal("Date") = LIBELLE_TOTAL
+            ligneTotal("CommissionEnvoi") = total.CommissionEnvoi
+            ligneTotal("CommissionPaiement") = total.CommissionPaiement
+            ligneTotal("CommissionTransfert") = total.CommissionTransfert
+            ligneTotal("TotalCommissions") = total.TotalCommissions
+            ligneTotal("Variation") = DBNull.Value
+            ligneTotal("Cumul") = DBNull.Value
+            table.Rows.Add(ligneTotal)
+        End If
+
+        Return table
+    End Function
+
+#End Region
+
 #Region "Utilitaires de construction"
 
     ''' <summary>Table de détail à colonne d'en-tête libre (date, par exemple) puis colonnes chiffrées.</summary>
@@ -258,11 +455,18 @@ Public NotInheritable Class RapportActiviteService
 
     ''' <summary>Cumul de toutes les lignes de la période.</summary>
     Public Shared Function Cumuler(lignes As List(Of LigneHistoriqueWU)) As LigneHistoriqueWU
+        Return CumulerLignes(SansNothing(lignes))
+    End Function
+
+    ''' <summary>Cumul d'un ensemble quelconque de lignes déjà constitué.</summary>
+    Private Shared Function CumulerLignes(lignes As List(Of LigneHistoriqueWU)) As LigneHistoriqueWU
 
         Dim total As New LigneHistoriqueWU()
 
-        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
-            total.Cumuler(ligne)
+        If lignes Is Nothing Then Return total
+
+        For Each ligne As LigneHistoriqueWU In lignes
+            If ligne IsNot Nothing Then total.Cumuler(ligne)
         Next
 
         Return total

@@ -386,10 +386,25 @@ exportables en un seul classeur Excel.
 
 | Onglet | Contenu |
 |---|---|
-| 1. Synthèse | Volumes, envois, paiements, commissions et taxes, cumulés sur la période |
+| 1. Synthèse | Volumes, envois, paiements, commissions et taxes, plus la **répartition entre sous-agents, agences propres et Accounts non paramétrés** |
 | 2. Jour par jour | Une ligne par journée comptabilisée : c'est la page qui fait ressortir un jour anormal |
-| 3. Par point de vente | Une ligne par Account, classée par principal envoyé décroissant |
+| 3. Par point de vente | **Sous-agents et agences propres séparés**, chacun avec son sous-total, classés par principal envoyé décroissant |
 | 4. Par groupe statistique | Une ligne par groupe, les points de vente sans groupe formant une ligne distincte |
+| 5. Évolution des commissions | Jour par jour : les trois commissions, leur total, la variation par rapport à la veille et le cumul de la période |
+
+**Filtre par groupe statistique.** Une liste déroulante restreint les cinq états à un seul
+groupe ; l'export porte alors sur ce périmètre, le nom du groupe figure en jaune dans le
+classeur et dans le nom de fichier proposé. Les groupes proposés sont ceux **présents dans
+l'historique de la période**, et non ceux du paramétrage courant : un groupe supprimé depuis
+reste consultable sur les journées où il existait.
+
+Trois précisions sur ces états :
+
+- les **Accounts non paramétrés** forment une catégorie à part, ni sous-agents ni agences
+  propres : les ranger avec les secondes reviendrait à affirmer ce que précisément on ignore ;
+- la **variation** de la page 5 est laissée vide pour la première journée et lorsque la veille
+  est à zéro — une variation depuis zéro n'a pas de sens, et afficher 100 % induirait en erreur ;
+- une nature de point de vente absente de la période n'apparaît pas : pas de ligne à zéro.
 
 Les quatre états sont bâtis sur **la même lecture**, agrégée différemment : leurs totaux sont
 donc nécessairement identiques d'une page à l'autre. Le rapprochement entre pages est un
