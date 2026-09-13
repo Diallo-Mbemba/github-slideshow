@@ -343,6 +343,15 @@ Public Class FrmSousAgentsParGroupe
                 {"SousAgents", "# ##0"}
             }
 
+            ' Le récapitulatif liste TOUS les groupes, y compris quand le détail est restreint à
+            ' un seul : sans mise en exergue, celui dont on tire l'état s'y perdrait au milieu
+            ' des autres. Le détail, lui, ne contient que ce groupe — le surligner entièrement
+            ' n'apporterait rien.
+            If Not tous Then
+                recapitulatif.ExergueColonne = "Groupe"
+                recapitulatif.ExergueValeur = groupeChoisi
+            End If
+
             Dim detail As New BlocExcel(If(tous,
                                            $"Sous-agents, tous groupes confondus ({_detail.Rows.Count})",
                                            $"Sous-agents du groupe « {groupeChoisi} » ({_detail.Rows.Count})"),
@@ -359,10 +368,13 @@ Public Class FrmSousAgentsParGroupe
             ' Le filtre automatique va au tableau de détail : c'est celui que l'on fouille.
             detail.AvecFiltre = True
 
-            Dim sousTitres As New List(Of String) From {
-                If(tous, "Tous les groupes", $"Groupe : {groupeChoisi}"),
-                $"{_groupes.Count} groupe(s) — {_sousAgents.Count} sous-agent(s) au total",
-                $"Édité le {Date.Now:dd/MM/yyyy à HH:mm}"
+            ' Le groupe retenu est mis en exergue : sur un état imprimé, c'est la première
+            ' chose que doit voir le lecteur. En affichage « tous les groupes », il n'y a
+            ' rien à distinguer.
+            Dim sousTitres As New List(Of SousTitreExcel) From {
+                New SousTitreExcel(If(tous, "Tous les groupes", $"Groupe : {groupeChoisi}"), Not tous),
+                New SousTitreExcel($"{_groupes.Count} groupe(s) — {_sousAgents.Count} sous-agent(s) au total"),
+                New SousTitreExcel($"Édité le {Date.Now:dd/MM/yyyy à HH:mm}")
             }
 
             ExcelExportService.ExporterEtOuvrir(

@@ -353,6 +353,12 @@ affiché, filtre compris** — ce qui est imprimé est ce qui a été vu :
 | Tableau 1 | Récapitulatif par groupe |
 | Tableau 2 | Détail des sous-agents, avec filtre automatique |
 
+**Le groupe retenu est mis en exergue en jaune** : la ligne de sous-titre qui le nomme, et sa
+ligne dans le récapitulatif — qui liste tous les groupes, y compris lorsque le détail est
+restreint à un seul. Sans cela, le groupe dont on tire l'état s'y perdrait au milieu des autres.
+Le tableau de détail, lui, ne contient alors que ce groupe : le surligner entièrement
+n'apporterait rien. En affichage « tous les groupes », rien n'est mis en exergue.
+
 Mise en forme : en-têtes en gras sur fond bleuté, bordures sur toutes les cellules, taux au
 format pourcentage, colonnes ajustées. Mise en page d'impression : **paysage, ajusté à la
 largeur d'une page**, bandeau de titre répété en haut de chaque page, pied de page numéroté

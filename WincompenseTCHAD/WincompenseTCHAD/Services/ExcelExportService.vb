@@ -11,6 +11,28 @@ Imports System.Globalization
 Imports System.IO
 
 ''' <summary>
+''' Une ligne d'information sous le titre principal. Elle peut être mise en exergue, pour
+''' faire ressortir ce qui caractérise l'extraction — le groupe retenu, par exemple.
+''' </summary>
+Public Class SousTitreExcel
+
+    Public Property Texte As String = String.Empty
+
+    ''' <summary>Vrai pour un fond jaune : la ligne saute alors aux yeux sur un état imprimé.</summary>
+    Public Property EnExergue As Boolean = False
+
+    Public Sub New(texteSousTitre As String)
+        Texte = texteSousTitre
+    End Sub
+
+    Public Sub New(texteSousTitre As String, exergue As Boolean)
+        Texte = texteSousTitre
+        EnExergue = exergue
+    End Sub
+
+End Class
+
+''' <summary>
 ''' Un tableau à écrire dans la feuille Excel : son intitulé et ses données. Plusieurs blocs
 ''' peuvent se succéder dans une même feuille (par exemple un récapitulatif puis un détail).
 ''' </summary>
@@ -33,6 +55,18 @@ Public Class BlocExcel
     ''' Une colonne absente garde le format général.
     ''' </summary>
     Public Property Formats As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+
+    ''' <summary>
+    ''' Nom de la colonne servant à repérer les lignes à mettre en exergue. Vide : aucune mise
+    ''' en exergue. Utilisée avec ExergueValeur.
+    ''' </summary>
+    Public Property ExergueColonne As String = String.Empty
+
+    ''' <summary>
+    ''' Valeur recherchée dans ExergueColonne : toute ligne qui la porte reçoit un fond jaune.
+    ''' Comparaison insensible à la casse.
+    ''' </summary>
+    Public Property ExergueValeur As String = String.Empty
 
     ''' <summary>
     ''' Pose un filtre automatique sur l'en-tête de ce bloc. Excel n'admettant qu'un seul filtre
@@ -74,6 +108,9 @@ Public NotInheritable Class ExcelExportService
     Private Const XL_PAYSAGE As Integer = 2
     Private Const XL_MAXIMISE As Integer = -4137
 
+    ''' <summary>Jaune de mise en exergue, conforme au modèle fourni par la Direction Comptable.</summary>
+    Private Shared ReadOnly JAUNE_EXERGUE As Integer = RGB(255, 255, 0)
+
 #End Region
 
     ''' <summary>
@@ -87,7 +124,7 @@ Public NotInheritable Class ExcelExportService
     ''' <param name="cheminFichier">Chemin du fichier .xlsx à créer.</param>
     ''' <exception cref="InvalidOperationException">Excel absent du poste, ou aucune donnée.</exception>
     Public Shared Sub ExporterEtOuvrir(titre As String,
-                                       sousTitres As IEnumerable(Of String),
+                                       sousTitres As IEnumerable(Of SousTitreExcel),
                                        blocs As IEnumerable(Of BlocExcel),
                                        nomFeuille As String,
                                        cheminFichier As String)
@@ -170,7 +207,7 @@ Public NotInheritable Class ExcelExportService
 #Region "Écriture de la feuille"
 
     Private Shared Sub RemplirFeuille(feuille As Object, titre As String,
-                                      sousTitres As IEnumerable(Of String),
+                                      sousTitres As IEnumerable(Of SousTitreExcel),
                                       blocs As List(Of BlocExcel), nomFeuille As String)
 
         If Not String.IsNullOrWhiteSpace(nomFeuille) Then
@@ -204,7 +241,7 @@ Public NotInheritable Class ExcelExportService
 
     ''' <summary>Écrit le bandeau de titre et les sous-titres. Retourne la première ligne libre.</summary>
     Private Shared Function EcrireTitre(feuille As Object, titre As String,
-                                        sousTitres As IEnumerable(Of String),
+                                        sousTitres As IEnumerable(Of SousTitreExcel),
                                         largeur As Integer, ligne As Integer) As Integer
 
         If Not String.IsNullOrWhiteSpace(titre) Then
@@ -224,16 +261,21 @@ Public NotInheritable Class ExcelExportService
         End If
 
         If sousTitres IsNot Nothing Then
-            For Each sousTitre As String In sousTitres
+            For Each sousTitre As SousTitreExcel In sousTitres
 
-                If String.IsNullOrWhiteSpace(sousTitre) Then Continue For
+                If sousTitre Is Nothing OrElse String.IsNullOrWhiteSpace(sousTitre.Texte) Then Continue For
 
                 Dim plage As Object = feuille.Range(feuille.Cells(ligne, 1), feuille.Cells(ligne, largeur))
-                feuille.Cells(ligne, 1).Value = sousTitre
+                feuille.Cells(ligne, 1).Value = sousTitre.Texte
 
                 plage.Merge()
                 plage.HorizontalAlignment = XL_GAUCHE
                 plage.Font.Italic = True
+
+                If sousTitre.EnExergue Then
+                    plage.Interior.Color = JAUNE_EXERGUE
+                    plage.Font.Bold = True
+                End If
 
                 ligne += 1
             Next
@@ -282,7 +324,19 @@ Public NotInheritable Class ExcelExportService
         ' --- Données ---
         Dim premiereLigneDonnees As Integer = ligne
 
+        ' Lignes à mettre en exergue, repérées pendant l'écriture et mises en forme ensuite :
+        ' un seul aller-retour de mise en forme par ligne concernée, plutôt qu'un par cellule.
+        Dim lignesEnExergue As New List(Of Integer)
+        Dim indexColonneExergue As Integer = IndexColonneExergue(bloc)
+
         For Each enregistrement As DataRow In bloc.Donnees.Rows
+
+            If indexColonneExergue >= 0 AndAlso
+               String.Equals(Convert.ToString(enregistrement(indexColonneExergue)),
+                             bloc.ExergueValeur, StringComparison.OrdinalIgnoreCase) Then
+                lignesEnExergue.Add(ligne)
+            End If
+
             For c As Integer = 0 To nombreColonnes - 1
                 Dim valeur As Object = enregistrement(c)
                 If valeur Is DBNull.Value Then Continue For
@@ -314,6 +368,16 @@ Public NotInheritable Class ExcelExportService
                 feuille.Range(feuille.Cells(premiereLigneDonnees, c + 1),
                               feuille.Cells(derniereLigne, c + 1)).NumberFormat = bloc.Formats(nom)
             Next
+
+            ' --- Mise en exergue ---
+            ' Appliquée APRÈS les formats de nombre : ceux-ci portent sur des colonnes entières
+            ' et effaceraient sinon le fond des lignes concernées.
+            For Each ligneExergue As Integer In lignesEnExergue
+                Dim plage As Object = feuille.Range(feuille.Cells(ligneExergue, 1),
+                                                    feuille.Cells(ligneExergue, nombreColonnes))
+                plage.Interior.Color = JAUNE_EXERGUE
+                plage.Font.Bold = True
+            Next
         End If
 
         ' Excel n'admet qu'un filtre automatique par feuille : seul le premier demandé est posé.
@@ -328,6 +392,24 @@ Public NotInheritable Class ExcelExportService
         End If
 
         Return ligne
+    End Function
+
+    ''' <summary>
+    ''' Position, dans le tableau, de la colonne servant à repérer les lignes en exergue.
+    ''' Retourne -1 si aucune mise en exergue n'est demandée, ou si la colonne nommée n'existe
+    ''' pas : une demande portant sur une colonne absente est ignorée, jamais bloquante.
+    ''' </summary>
+    Private Shared Function IndexColonneExergue(bloc As BlocExcel) As Integer
+
+        If String.IsNullOrWhiteSpace(bloc.ExergueColonne) OrElse String.IsNullOrWhiteSpace(bloc.ExergueValeur) Then
+            Return -1
+        End If
+
+        If Not bloc.Donnees.Columns.Contains(bloc.ExergueColonne) Then
+            Return -1
+        End If
+
+        Return bloc.Donnees.Columns(bloc.ExergueColonne).Ordinal
     End Function
 
     ''' <summary>
