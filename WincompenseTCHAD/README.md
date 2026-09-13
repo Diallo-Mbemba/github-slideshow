@@ -238,20 +238,39 @@ Ces trois règles ne sont plus seulement vérifiées par l'application : la tabl
 ### Migration
 
 Le script `Scripts\04_GroupeStatistique.sql` crée la table et y reprend les groupes déjà
-présents dans `T_Pdv_SA`. **Il ne modifie rien tant que les données ne sont pas saines** : il
-commence par un diagnostic en trois volets, et la migration ne s'exécute que si aucune anomalie
-bloquante n'est trouvée.
+présents dans `T_Pdv_SA`. Il est **partiel et répétable** : il migre tous les groupes sains et
+laisse de côté ceux qui demandent un arbitrage, en disant lesquels et pourquoi.
 
-| Diagnostic | Bloquant | Pourquoi |
+| Groupe | Repris ? | Motif |
 |---|---|---|
-| Groupes dont les sous-agents portent des valeurs divergentes | oui | Le groupe ne peut avoir qu'un seul jeu de valeurs : laquelle retenir ? |
-| Un même compte utilisé par plusieurs groupes | oui | Violerait l'index unique |
-| Sous-agents sans groupe | non | Listés pour information : ils n'hériteront d'aucune valeur |
+| Sous-agents portant tous les mêmes valeurs, comptes non revendiqués ailleurs | oui | — |
+| Sous-agents aux valeurs divergentes | non | Laquelle retenir pour le groupe ? |
+| Un de ses comptes déjà utilisé par un autre groupe | non | Violerait l'index unique |
+| Déjà enregistré lors d'une exécution précédente | non | Jamais retouché |
 
-En cas de blocage, les lignes fautives sont affichées, aucune donnée n'est touchée, et le script
-se relance à volonté une fois les corrections faites. La pose d'une clé étrangère
-`T_Pdv_SA.GroupeStatistique → T_GroupeStatistique.Groupe` est proposée en fin de script, **non
-exécutée** : elle échouerait tant qu'il reste des sous-agents sans groupe.
+**Un groupe non repris n'est pas un groupe perdu** : l'application continue de le proposer, avec
+les valeurs lues dans `T_Pdv_SA`, permet d'y rattacher de nouveaux sous-agents, et de
+l'enregistrer d'un clic après arbitrage. Rien n'est bloqué en attendant — voir « groupes
+hérités » ci-dessous. Le script se relance autant de fois que nécessaire.
+
+La pose d'une clé étrangère `T_Pdv_SA.GroupeStatistique → T_GroupeStatistique.Groupe` est
+proposée en fin de script, **non exécutée** : elle échouerait tant qu'il reste des sous-agents
+sans groupe.
+
+### Groupes hérités : l'application fonctionne avant, pendant et après la migration
+
+Un groupe encore porté par les seuls sous-agents de `T_Pdv_SA`, sans ligne dans
+`T_GroupeStatistique`, est dit **hérité**. Il est listé partout comme les autres, avec les
+valeurs lues dans `T_Pdv_SA`, et se comporte normalement :
+
+- dans l'écran **Sous-agents**, il se choisit dans la liste déroulante et transmet ses valeurs ;
+  au moment d'enregistrer, l'application propose de le reprendre dans la table — un refus
+  n'empêche jamais le rattachement ;
+- dans l'écran **Groupes**, il apparaît **en jaune** avec la colonne *Enregistré* à faux ;
+  le bouton *Enregistrer* l'insère dans la table plutôt que de le modifier.
+
+Si `T_GroupeStatistique` n'existe pas encore du tout, la lecture se rabat automatiquement sur
+les groupes hérités : **l'application reste pleinement utilisable avant toute migration**.
 
 ### Les colonnes de T_Pdv_SA restent le miroir du groupe
 

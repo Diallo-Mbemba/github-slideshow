@@ -129,6 +129,17 @@ Public Class GroupeStatistiqueWU
     Public Property NombreSousAgents As Integer = 0
 
     ''' <summary>
+    ''' Faux pour un groupe HÉRITÉ de l'ancien paramétrage : il est porté par des sous-agents de
+    ''' T_Pdv_SA mais n'a pas encore de ligne dans T_GroupeStatistique — migration non jouée, ou
+    ''' groupe écarté par les contrôles de la migration.
+    '''
+    ''' Ces groupes restent proposés partout : sans cela, plus aucun sous-agent ne pourrait être
+    ''' rattaché aux groupes existants tant que la migration n'a pas abouti. Leurs valeurs sont
+    ''' alors celles lues dans T_Pdv_SA, et une simple confirmation suffit à les enregistrer.
+    ''' </summary>
+    Public Property EstEnregistre As Boolean = True
+
+    ''' <summary>
     ''' Nombre de sous-agents dont les colonnes de T_Pdv_SA ne portent plus les valeurs du
     ''' groupe. Normalement nul : l'application les réaligne à chaque modification du groupe.
     ''' Un écart trahit une écriture directe en base, ou une mise à jour interrompue.

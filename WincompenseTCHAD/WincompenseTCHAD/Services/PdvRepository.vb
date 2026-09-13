@@ -189,70 +189,130 @@ Public NotInheritable Class PdvRepository
         "automatiquement les groupes déjà présents dans T_Pdv_SA."
 
     ''' <summary>
-    ''' Liste les groupes statistiques, avec le nombre de sous-agents rattachés et le nombre de
-    ''' ceux dont les colonnes de T_Pdv_SA ne portent plus les valeurs du groupe.
+    ''' Liste les groupes statistiques : ceux de T_GroupeStatistique, ET ceux qui ne sont encore
+    ''' portés que par des sous-agents de T_Pdv_SA — les groupes « hérités ».
     '''
-    ''' La comptabilisation quotidienne continue de lire T_Pdv_SA : ces colonnes en sont le
-    ''' miroir, tenu à jour par l'application à chaque modification d'un groupe. Le décompte des
-    ''' désynchronisés permet de détecter une dérive (écriture directe en base, mise à jour
-    ''' interrompue) et de la corriger d'un clic.
+    ''' Ne lister que la table condamnerait l'exploitation tant que la migration n'a pas abouti :
+    ''' les anciens groupes disparaîtraient des listes déroulantes et plus aucun sous-agent ne
+    ''' pourrait leur être rattaché. Les groupes hérités sont donc repris avec les valeurs lues
+    ''' dans T_Pdv_SA et marqués EstEnregistre = False ; une confirmation suffit à les enregistrer.
+    '''
+    ''' Si T_GroupeStatistique n'existe pas encore, seuls les groupes hérités sont retournés :
+    ''' l'application reste pleinement utilisable avant la migration.
+    '''
+    ''' Pour les groupes enregistrés, NombreDesynchronises compte les sous-agents dont les
+    ''' colonnes de T_Pdv_SA — lues par la comptabilisation quotidienne — ont dérivé des valeurs
+    ''' du groupe.
     ''' </summary>
     ''' <param name="filtre">Texte recherché dans le libellé ou les comptes, ou chaîne vide.</param>
     Public Shared Function ListerGroupes(filtre As String, ByRef messageErreur As String) As List(Of GroupeStatistiqueWU)
 
         messageErreur = String.Empty
-        Dim resultat As New List(Of GroupeStatistiqueWU)
-
-        Dim requete As String =
-            "SELECT g.Groupe, g.CompteActivite, g.CompteCommission, g.Taux, " &
-            "  (SELECT COUNT(*) FROM T_Pdv_SA p " &
-            "    WHERE LTRIM(RTRIM(p.GroupeStatistique)) = g.Groupe) AS NombreSousAgents, " &
-            "  (SELECT COUNT(*) FROM T_Pdv_SA p " &
-            "    WHERE LTRIM(RTRIM(p.GroupeStatistique)) = g.Groupe " &
-            "      AND (p.CompteCompense <> g.CompteActivite " &
-            "        OR p.CompteCommission <> g.CompteCommission " &
-            "        OR p.Taux <> g.Taux)) AS NombreDesynchronises " &
-            "FROM T_GroupeStatistique g"
 
         Dim recherche As String = If(filtre, String.Empty).Trim()
-        If recherche.Length > 0 Then
-            requete &= " WHERE g.Groupe LIKE @filtre OR g.CompteActivite LIKE @filtre " &
-                       "OR g.CompteCommission LIKE @filtre"
-        End If
-        requete &= " ORDER BY g.Groupe"
 
         Try
-            Using connexion As SqlConnection = WURepository.CreerConnexion()
-                connexion.Open()
+            Return ExecuterListeGroupes(recherche, avecTableGroupes:=True)
 
-                Using commande As New SqlCommand(requete, connexion)
-
-                    If recherche.Length > 0 Then
-                        commande.Parameters.Add("@filtre", SqlDbType.NVarChar, 255).Value = "%" & EchapperLike(recherche) & "%"
-                    End If
-
-                    Using lecteur As SqlDataReader = commande.ExecuteReader()
-                        While lecteur.Read()
-                            resultat.Add(New GroupeStatistiqueWU() With {
-                                .Nom = LireChaine(lecteur, "Groupe"),
-                                .CompteActivite = LireChaine(lecteur, "CompteActivite"),
-                                .CompteCommission = LireChaine(lecteur, "CompteCommission"),
-                                .Taux = LireDecimal(lecteur, "Taux"),
-                                .NombreSousAgents = LireEntier(lecteur, "NombreSousAgents"),
-                                .NombreDesynchronises = LireEntier(lecteur, "NombreDesynchronises")
-                            })
-                        End While
-                    End Using
-                End Using
-            End Using
+        Catch ex As SqlException When ex.Number = ERREUR_TABLE_ABSENTE
+            ' Migration non jouée : on se rabat sur les seuls groupes hérités de T_Pdv_SA.
+            Try
+                Dim herites As List(Of GroupeStatistiqueWU) = ExecuterListeGroupes(recherche, avecTableGroupes:=False)
+                messageErreur = String.Empty
+                Return herites
+            Catch exSecours As SqlException
+                messageErreur = $"Lecture des groupes statistiques impossible : {exSecours.Message}"
+            Catch exSecours As InvalidOperationException
+                messageErreur = $"Connexion SQL Server indisponible : {exSecours.Message}"
+            End Try
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_GROUPES_ABSENTE,
-                               $"Lecture des groupes statistiques impossible : {ex.Message}")
+            messageErreur = $"Lecture des groupes statistiques impossible : {ex.Message}"
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
+
+        Return New List(Of GroupeStatistiqueWU)
+    End Function
+
+    ''' <summary>
+    ''' Exécute la lecture des groupes. Avec avecTableGroupes = False, la requête ne référence
+    ''' pas du tout T_GroupeStatistique : c'est ce qui permet de fonctionner avant la migration.
+    ''' Les exceptions ne sont PAS capturées ici : l'appelant décide du repli.
+    ''' </summary>
+    Private Shared Function ExecuterListeGroupes(recherche As String, avecTableGroupes As Boolean) As List(Of GroupeStatistiqueWU)
+
+        Dim resultat As New List(Of GroupeStatistiqueWU)
+
+        ' Valeurs des groupes tels que portés par les sous-agents : servent aux groupes hérités.
+        Const groupesPdv As String =
+            "SELECT LTRIM(RTRIM(GroupeStatistique)) AS Groupe, " &
+            "       MIN(CompteCompense) AS CompteActivite, " &
+            "       MIN(CompteCommission) AS CompteCommission, " &
+            "       MIN(Taux) AS Taux, COUNT(*) AS NombreSousAgents " &
+            "FROM T_Pdv_SA " &
+            "WHERE GroupeStatistique IS NOT NULL AND LTRIM(RTRIM(GroupeStatistique)) <> '' " &
+            "GROUP BY LTRIM(RTRIM(GroupeStatistique))"
+
+        Dim requete As String
+
+        If avecTableGroupes Then
+            requete =
+                "SELECT g.Groupe, g.CompteActivite, g.CompteCommission, g.Taux, " &
+                "  (SELECT COUNT(*) FROM T_Pdv_SA p " &
+                "    WHERE LTRIM(RTRIM(p.GroupeStatistique)) = g.Groupe) AS NombreSousAgents, " &
+                "  (SELECT COUNT(*) FROM T_Pdv_SA p " &
+                "    WHERE LTRIM(RTRIM(p.GroupeStatistique)) = g.Groupe " &
+                "      AND (p.CompteCompense <> g.CompteActivite " &
+                "        OR p.CompteCommission <> g.CompteCommission " &
+                "        OR p.Taux <> g.Taux)) AS NombreDesynchronises, " &
+                "  1 AS EstEnregistre " &
+                "FROM T_GroupeStatistique g " &
+                "UNION ALL " &
+                "SELECT h.Groupe, h.CompteActivite, h.CompteCommission, h.Taux, " &
+                "       h.NombreSousAgents, 0 AS NombreDesynchronises, 0 AS EstEnregistre " &
+                $"FROM ({groupesPdv}) h " &
+                "WHERE NOT EXISTS (SELECT 1 FROM T_GroupeStatistique g2 WHERE g2.Groupe = h.Groupe)"
+        Else
+            requete =
+                "SELECT h.Groupe, h.CompteActivite, h.CompteCommission, h.Taux, " &
+                "       h.NombreSousAgents, 0 AS NombreDesynchronises, 0 AS EstEnregistre " &
+                $"FROM ({groupesPdv}) h"
+        End If
+
+        ' Le filtre est appliqué autour de l'union : il porte de la même façon sur les deux sources.
+        If recherche.Length > 0 Then
+            requete = $"SELECT * FROM ({requete}) t " &
+                      "WHERE t.Groupe LIKE @filtre OR t.CompteActivite LIKE @filtre " &
+                      "OR t.CompteCommission LIKE @filtre ORDER BY t.Groupe"
+        Else
+            requete = $"SELECT * FROM ({requete}) t ORDER BY t.Groupe"
+        End If
+
+        Using connexion As SqlConnection = WURepository.CreerConnexion()
+            connexion.Open()
+
+            Using commande As New SqlCommand(requete, connexion)
+
+                If recherche.Length > 0 Then
+                    commande.Parameters.Add("@filtre", SqlDbType.NVarChar, 255).Value = "%" & EchapperLike(recherche) & "%"
+                End If
+
+                Using lecteur As SqlDataReader = commande.ExecuteReader()
+                    While lecteur.Read()
+                        resultat.Add(New GroupeStatistiqueWU() With {
+                            .Nom = LireChaine(lecteur, "Groupe"),
+                            .CompteActivite = LireChaine(lecteur, "CompteActivite"),
+                            .CompteCommission = LireChaine(lecteur, "CompteCommission"),
+                            .Taux = LireDecimal(lecteur, "Taux"),
+                            .NombreSousAgents = LireEntier(lecteur, "NombreSousAgents"),
+                            .NombreDesynchronises = LireEntier(lecteur, "NombreDesynchronises"),
+                            .EstEnregistre = LireEntier(lecteur, "EstEnregistre") <> 0
+                        })
+                    End While
+                End Using
+            End Using
+        End Using
 
         Return resultat
     End Function

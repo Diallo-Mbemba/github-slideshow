@@ -104,9 +104,21 @@ Public Class FrmGroupesStatistiques
     Private Sub SignalerDesynchronisation()
 
         Dim desynchronises As Integer = 0
+        Dim herites As Integer = 0
+
         For Each groupe As GroupeStatistiqueWU In _liste
-            If groupe.EstDesynchronise Then desynchronises += 1
+            If Not groupe.EstEnregistre Then
+                herites += 1
+            ElseIf groupe.EstDesynchronise Then
+                desynchronises += 1
+            End If
         Next
+
+        If herites > 0 Then
+            lblStatut.Text = $"{herites} groupe(s) hérité(s) de l'ancien paramétrage (en jaune), pas encore " &
+                             "enregistré(s) : sélectionnez-les et cliquez sur « Enregistrer » pour les reprendre."
+            Return
+        End If
 
         If desynchronises = 0 Then Return
 
@@ -122,6 +134,7 @@ Public Class FrmGroupesStatistiques
         DefinirEntete("Taux", "Taux")
         DefinirEntete("NombreSousAgents", "Sous-agents")
         DefinirEntete("NombreDesynchronises", "Désynchronisés")
+        DefinirEntete("EstEnregistre", "Enregistré")
 
         ' Propriété calculée, sans intérêt dans la grille : la colonne « Désynchronisés » la dit mieux.
         If dgvListe.Columns.Contains("EstDesynchronise") Then
@@ -137,12 +150,20 @@ Public Class FrmGroupesStatistiques
         MettreEnEvidenceDesynchronises()
     End Sub
 
-    ''' <summary>Met en évidence, en rouge, les groupes dont des sous-agents ont dérivé.</summary>
+    ''' <summary>
+    ''' Met en évidence les lignes demandant une action : en jaune les groupes hérités de
+    ''' l'ancien paramétrage, pas encore enregistrés dans la table ; en rose ceux dont des
+    ''' sous-agents ne portent plus les valeurs du groupe.
+    ''' </summary>
     Private Sub MettreEnEvidenceDesynchronises()
 
         For Each ligne As DataGridViewRow In dgvListe.Rows
             Dim groupe As GroupeStatistiqueWU = TryCast(ligne.DataBoundItem, GroupeStatistiqueWU)
-            If groupe IsNot Nothing AndAlso groupe.EstDesynchronise Then
+            If groupe Is Nothing Then Continue For
+
+            If Not groupe.EstEnregistre Then
+                ligne.DefaultCellStyle.BackColor = Drawing.Color.LightGoldenrodYellow
+            ElseIf groupe.EstDesynchronise Then
                 ligne.DefaultCellStyle.BackColor = Drawing.Color.MistyRose
             End If
         Next
@@ -194,7 +215,11 @@ Public Class FrmGroupesStatistiques
         txtCompteCommission.Text = groupe.CompteCommission
         txtTaux.Text = groupe.Taux.ToString("0.00", Globalization.CultureInfo.CurrentCulture)
 
-        If groupe.EstDesynchronise Then
+        If Not groupe.EstEnregistre Then
+            lblStatut.Text = $"Groupe hérité « {groupe.Nom} » : {groupe.NombreSousAgents} sous-agent(s), " &
+                             "valeurs lues dans T_Pdv_SA. Cliquez sur « Enregistrer » pour le reprendre " &
+                             "dans la table des groupes."
+        ElseIf groupe.EstDesynchronise Then
             lblStatut.Text = $"Groupe « {groupe.Nom} » : {groupe.NombreSousAgents} sous-agent(s), dont " &
                              $"{groupe.NombreDesynchronises} ne portant plus les valeurs du groupe."
         Else
@@ -218,9 +243,16 @@ Public Class FrmGroupesStatistiques
         Dim groupe As GroupeStatistiqueWU = GroupeSelectionne()
 
         txtNom.ReadOnly = Not _enCreation
-        btnSupprimer.Enabled = Not _enCreation AndAlso groupe IsNot Nothing
+        btnSupprimer.Enabled = Not _enCreation AndAlso groupe IsNot Nothing AndAlso groupe.EstEnregistre
         btnSynchroniser.Enabled = Not _enCreation AndAlso groupe IsNot Nothing
-        grpDetail.Text = If(_enCreation, "Nouveau groupe statistique", "Fiche du groupe statistique")
+
+        If _enCreation Then
+            grpDetail.Text = "Nouveau groupe statistique"
+        ElseIf groupe IsNot Nothing AndAlso Not groupe.EstEnregistre Then
+            grpDetail.Text = "Groupe hérité — à enregistrer dans la table des groupes"
+        Else
+            grpDetail.Text = "Fiche du groupe statistique"
+        End If
     End Sub
 
 #End Region
@@ -298,10 +330,14 @@ Public Class FrmGroupesStatistiques
             Return
         End If
 
+        ' Un groupe hérité de l'ancien paramétrage n'a pas encore de ligne dans la table :
+        ' l'enregistrer, c'est l'y INSÉRER, pas modifier une ligne inexistante.
+        Dim existant As GroupeStatistiqueWU = GroupeSelectionne()
+        Dim insertion As Boolean = _enCreation OrElse (existant IsNot Nothing AndAlso Not existant.EstEnregistre)
+
         ' Modifier un groupe change les comptes et le taux de TOUS ses sous-agents : la portée
         ' réelle de l'opération doit être annoncée avant, pas découverte après.
-        Dim existant As GroupeStatistiqueWU = GroupeSelectionne()
-        If Not _enCreation AndAlso existant IsNot Nothing AndAlso existant.NombreSousAgents > 0 Then
+        If Not insertion AndAlso existant IsNot Nothing AndAlso existant.NombreSousAgents > 0 Then
 
             Dim confirmation As DialogResult = MessageBox.Show(
                 $"Les {existant.NombreSousAgents} sous-agent(s) du groupe « {existant.Nom} » hériteront " &
@@ -320,7 +356,7 @@ Public Class FrmGroupesStatistiques
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            Dim reussi As Boolean = If(_enCreation,
+            Dim reussi As Boolean = If(insertion,
                                        PdvRepository.AjouterGroupe(groupe, messageErreur),
                                        PdvRepository.ModifierGroupe(groupe, messageErreur))
 
@@ -330,7 +366,7 @@ Public Class FrmGroupesStatistiques
             End If
 
             _modifie = True
-            Dim creation As Boolean = _enCreation
+            Dim creation As Boolean = insertion
             _enCreation = False
 
             ' Le groupe est la source de vérité ; les colonnes de T_Pdv_SA en sont le miroir,

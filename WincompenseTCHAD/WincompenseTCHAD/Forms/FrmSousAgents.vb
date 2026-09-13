@@ -312,7 +312,9 @@ Public Class FrmSousAgents
 
         lblStatut.Text = $"Groupe « {groupe.Nom} » : {groupe.NombreSousAgents} sous-agent(s), " &
                          $"taux {groupe.Taux:0.00}, activité {groupe.CompteActivite}, " &
-                         $"commission {groupe.CompteCommission}."
+                         $"commission {groupe.CompteCommission}." &
+                         If(groupe.EstEnregistre, String.Empty,
+                            "  [groupe hérité, pas encore enregistré dans la table des groupes]")
     End Sub
 
     ''' <summary>
@@ -356,9 +358,15 @@ Public Class FrmSousAgents
     ''' Valide le groupe statistique saisi et retourne le libellé à enregistrer.
     '''
     ''' Le groupe est OBLIGATOIRE : c'est de lui que le sous-agent tient son compte d'activité,
-    ''' son compte de commission et son taux. Un libellé inconnu n'est pas créé à la volée —
-    ''' un groupe se définit par trois valeurs, pas par un simple nom : l'écran des groupes
-    ''' s'ouvre alors, pré-rempli.
+    ''' son compte de commission et son taux.
+    '''
+    ''' Trois cas :
+    '''   - groupe enregistré dans T_GroupeStatistique : retenu tel quel ;
+    '''   - groupe HÉRITÉ, encore porté par les seuls sous-agents de T_Pdv_SA : accepté, avec
+    '''     proposition de l'enregistrer au passage. Le refus n'est jamais bloquant — sans quoi
+    '''     une migration non aboutie empêcherait tout rattachement à un groupe existant ;
+    '''   - libellé totalement inconnu : l'écran des groupes s'ouvre, pré-rempli, car un groupe
+    '''     se définit par trois valeurs et non par un simple nom.
     '''
     ''' Retourne Nothing si le groupe n'est finalement pas déterminé : l'enregistrement doit
     ''' alors être abandonné.
@@ -382,10 +390,18 @@ Public Class FrmSousAgents
         Dim existant As GroupeStatistiqueWU = TrouverGroupe(saisie)
 
         If existant IsNot Nothing Then
+
+            ' Groupe hérité de l'ancien paramétrage : on propose de le régulariser, sans l'exiger.
+            If Not existant.EstEnregistre Then
+                ProposerEnregistrementGroupeHerite(existant)
+                existant = If(TrouverGroupe(saisie), existant)
+            End If
+
             ' Aligne la casse sur celle enregistrée : « reseau » saisi rejoint « RESEAU ».
             If Not String.Equals(existant.Nom, saisie, StringComparison.Ordinal) Then
                 cboGroupeStatistique.Text = existant.Nom
             End If
+
             Return existant.Nom
         End If
 
@@ -420,15 +436,53 @@ Public Class FrmSousAgents
         Return existant.Nom
     End Function
 
+    ''' <summary>
+    ''' Propose d'inscrire dans T_GroupeStatistique un groupe hérité de l'ancien paramétrage,
+    ''' avec les valeurs que portent déjà ses sous-agents. Un refus n'empêche rien : le
+    ''' sous-agent est rattaché au groupe dans tous les cas.
+    ''' </summary>
+    Private Sub ProposerEnregistrementGroupeHerite(groupe As GroupeStatistiqueWU)
+
+        Dim reponse As DialogResult = MessageBox.Show(
+            $"Le groupe « {groupe.Nom} » provient de l'ancien paramétrage : il est porté par " &
+            $"{groupe.NombreSousAgents} sous-agent(s) mais ne figure pas encore dans la table des groupes." &
+            Environment.NewLine & Environment.NewLine &
+            "L'y enregistrer maintenant, avec ses valeurs actuelles ?" & Environment.NewLine & Environment.NewLine &
+            $"    compte d'activité    : {groupe.CompteActivite}" & Environment.NewLine &
+            $"    compte de commission : {groupe.CompteCommission}" & Environment.NewLine &
+            $"    taux                 : {groupe.Taux:0.00}" & Environment.NewLine & Environment.NewLine &
+            "Répondre « Non » n'empêche pas d'y rattacher ce sous-agent.",
+            "Groupe hérité non enregistré", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If reponse <> DialogResult.Yes Then
+            lblStatut.Text = $"Groupe « {groupe.Nom} » utilisé sans être enregistré dans la table des groupes."
+            Return
+        End If
+
+        Dim messageErreur As String = String.Empty
+
+        If PdvRepository.AjouterGroupe(groupe, messageErreur) Then
+            lblStatut.Text = $"Groupe « {groupe.Nom} » enregistré dans la table des groupes."
+            ChargerGroupes()
+            Return
+        End If
+
+        ' Échec le plus fréquent : un de ses comptes appartient déjà à un autre groupe. Le
+        ' rattachement du sous-agent reste possible, le paramétrage est simplement à arbitrer.
+        MessageBox.Show(
+            messageErreur & Environment.NewLine & Environment.NewLine &
+            $"Le sous-agent peut tout de même être rattaché au groupe « {groupe.Nom} ».",
+            "Groupe non enregistré", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+    End Sub
+
 #End Region
 
 #Region "Recherche"
 
-    Private Sub txtRecherche_TextChanged(sender As Object, e As EventArgs) Handles txtRecherche.TextChanged
-        ' Rien ici : la recherche est lancée par « Actualiser » ou par la touche Entrée, afin de
-        ' ne pas interroger la base à chaque caractère frappé.
-    End Sub
-
+    ''' <summary>
+    ''' La recherche se déclenche sur Entrée (ou sur « Actualiser »), jamais à chaque caractère
+    ''' frappé : inutile d'interroger la base à chaque touche.
+    ''' </summary>
     Private Sub txtRecherche_KeyDown(sender As Object, e As KeyEventArgs) Handles txtRecherche.KeyDown
         If e.KeyCode = Keys.Enter Then
             e.SuppressKeyPress = True
