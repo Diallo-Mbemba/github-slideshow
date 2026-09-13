@@ -251,7 +251,48 @@ Public Class FrmPrincipal
                 Using pinceau As New SolidBrush(Color.White)
                     e.Graphics.DrawString(FILIGRANE, police, pinceau, cadre, alignement)
                 End Using
+
+                RayerLeFiligrane(e.Graphics, police, zone.BackColor, largeur, hauteur, taille)
             End Using
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' Fait passer des rayures en travers du mot.
+    '''
+    ''' Elles reprennent exactement la couleur de fond de la zone MDI : sur le fond, elles sont
+    ''' donc invisibles, et n'apparaissent qu'en travers des lettres blanches, qu'elles découpent
+    ''' en lames. Peindre par-dessus avec la couleur du fond revient à effacer par bandes.
+    '''
+    ''' Elles sont tracées en dernier, après l'ombre et après le mot, faute de quoi l'ombre
+    ''' resterait pleine là où la lettre est coupée.
+    ''' </summary>
+    Private Shared Sub RayerLeFiligrane(surface As Graphics, police As Font, couleurFond As Color,
+                                        largeur As Integer, hauteur As Integer, taille As Single)
+
+        Dim mesure As SizeF = surface.MeasureString(FILIGRANE, police)
+
+        ' La bande déborde un peu du mot : l'ombre portée est décalée de trois pixels, et les
+        ' rayures doivent la traverser elle aussi.
+        Dim bande As New RectangleF(
+            (CSng(largeur) - mesure.Width) / 2.0F - 2.0F,
+            (CSng(hauteur) - mesure.Height) / 2.0F - 2.0F,
+            mesure.Width + 8.0F,
+            mesure.Height + 8.0F)
+
+        ' Sept rayures environ sur la hauteur des lettres : assez pour que l'effet se voie,
+        ' assez peu pour que le mot reste lisible.
+        Dim periode As Single = taille / 7.0F
+        Dim epaisseur As Single = periode * 0.38F
+
+        Using pinceauRayure As New SolidBrush(couleurFond)
+
+            Dim y As Single = bande.Y
+
+            While y < bande.Bottom
+                surface.FillRectangle(pinceauRayure, bande.X, y, bande.Width, epaisseur)
+                y += periode
+            End While
         End Using
     End Sub
 
