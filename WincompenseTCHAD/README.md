@@ -454,6 +454,14 @@ Tout est replié à l'ouverture : un état de gestion se lit d'abord au niveau d
 Le tri des colonnes est désactivé sur cette page — il détacherait une transaction de son point
 de vente.
 
+> **Un point de vente ne se déroule pas ?** C'est qu'aucun détail n'est enregistré pour ces
+> journées : leur agrégat est bien là, mais les MTCN qui le composent n'ont jamais été écrits.
+> Cause la plus fréquente : ces journées ont été comptabilisées **avant** la mise en place du
+> suivi des MTCN. L'application le dit explicitement à l'ouverture du rapport, et la barre
+> d'état indique en permanence le nombre de transactions détaillées. Pour l'obtenir : exécuter
+> `Scripts\06_HistoriqueMTCN.sql`, puis recharger les rapports de ces journées et regénérer
+> leur pièce comptable — une journée regénérée remplace proprement la précédente.
+
 `T_HistoriqueWU` agrège la journée par point de vente : elle ne peut pas porter le MTCN, qui
 identifie **une** transaction. La table **`T_HistoriqueMTCN`** (script
 `Scripts\06_HistoriqueMTCN.sql`) conserve donc le détail, une ligne par transaction.

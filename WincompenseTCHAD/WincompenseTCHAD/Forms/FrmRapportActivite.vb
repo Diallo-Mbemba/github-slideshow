@@ -60,6 +60,9 @@ Public Class FrmRapportActivite
     ''' <summary>Empêche le filtre de relancer l'affichage pendant qu'on le remplit.</summary>
     Private _chargementEnCours As Boolean = False
 
+    ''' <summary>L'absence de détail n'est expliquée qu'une fois par ouverture du rapport.</summary>
+    Private _detailSignale As Boolean = False
+
     Public Sub New()
         InitializeComponent()
     End Sub
@@ -102,6 +105,8 @@ Public Class FrmRapportActivite
 #Region "Affichage"
 
     Private Sub btnAfficher_Click(sender As Object, e As EventArgs) Handles btnAfficher.Click
+        ' Nouvelle période demandée : l'absence de détail mérite d'être signalée à nouveau.
+        _detailSignale = False
         AfficherRapport()
     End Sub
 
@@ -136,6 +141,56 @@ Public Class FrmRapportActivite
         Finally
             Cursor = Cursors.Default
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' Explique l'absence de détail plutôt que de laisser l'utilisateur devant des points de
+    ''' vente qui ne se déroulent pas.
+    '''
+    ''' Deux causes, très différentes : la table du détail n'existe pas encore, ou les journées
+    ''' ont été comptabilisées AVANT la mise en place du suivi des MTCN — leur agrégat est bien
+    ''' là, mais leur détail n'a jamais été écrit. Le message dit laquelle, et quoi faire.
+    ''' </summary>
+    Private Sub SignalerDetailIndisponible(erreurDetail As String)
+
+        ' Le détail est là : rien à signaler.
+        If _operations.Count > 0 Then Return
+
+        ' Aucune activité du tout : l'absence de détail va de soi.
+        If _lignesAffichees.Count = 0 Then Return
+
+        ' L'avertissement n'est donné qu'une fois par ouverture du rapport : le répéter à chaque
+        ' changement de groupe deviendrait vite insupportable.
+        If _detailSignale Then
+            lblStatut.Text &= "  |  Aucun détail de transaction sur cette période."
+            Return
+        End If
+
+        _detailSignale = True
+
+        If Not String.IsNullOrEmpty(erreurDetail) Then
+            MessageBox.Show(erreurDetail, "Détail des transactions indisponible",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            lblStatut.Text &= "  |  Détail des transactions indisponible."
+            Return
+        End If
+
+        MessageBox.Show(
+            "Aucun détail de transaction n'est enregistré pour cette période." &
+            Environment.NewLine & Environment.NewLine &
+            "Les points de vente ne pourront donc pas être déroulés : leurs cumuls sont bien là, " &
+            "mais les MTCN qui les composent n'ont jamais été écrits." & Environment.NewLine &
+            Environment.NewLine &
+            "Cause la plus fréquente : ces journées ont été comptabilisées AVANT la mise en place " &
+            "du suivi des MTCN." & Environment.NewLine & Environment.NewLine &
+            "Pour l'obtenir :" & Environment.NewLine &
+            "   1. exécuter le script Scripts\06_HistoriqueMTCN.sql s'il ne l'a pas encore été ;" & Environment.NewLine &
+            "   2. recharger les rapports de ces journées et regénérer leur pièce comptable." & Environment.NewLine &
+            Environment.NewLine &
+            "Une journée regénérée remplace proprement la précédente : l'opération est sans risque.",
+            "Aucun détail de transaction", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        lblStatut.Text &= "  |  Aucun détail : journées comptabilisées avant le suivi des MTCN."
     End Sub
 
     ''' <summary>
@@ -194,8 +249,6 @@ Public Class FrmRapportActivite
                                                              _groupeChoisi, erreurDetail)
 
         If Not String.IsNullOrEmpty(erreurDetail) Then
-            ' Le détail manque, mais les états agrégés restent valables : on le signale sans
-            ' priver l'utilisateur du reste du rapport.
             _operations = New List(Of TransactionWU)
         End If
 
@@ -222,7 +275,10 @@ Public Class FrmRapportActivite
 
         lblStatut.Text = $"{RapportActiviteService.CompterJours(_lignesAffichees)} journée(s), " &
                          $"{RapportActiviteService.CompterPointsDeVente(_lignesAffichees)} point(s) de vente" &
-                         If(String.IsNullOrEmpty(_groupeChoisi), ".", $" — groupe « {_groupeChoisi} ».")
+                         If(String.IsNullOrEmpty(_groupeChoisi), String.Empty, $" — groupe « {_groupeChoisi} »") &
+                         $", {_operations.Count} transaction(s) détaillée(s)."
+
+        SignalerDetailIndisponible(erreurDetail)
     End Sub
 
     ''' <summary>Synthèse : deux colonnes, les intitulés de section en gras et sans valeur.</summary>
@@ -293,7 +349,6 @@ Public Class FrmRapportActivite
             grille.Columns("Variation").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
         End If
 
-        DefinirEntete(grille, "Deroule", String.Empty)
         DefinirEntete(grille, "MTCN", "MTCN")
         DefinirEntete(grille, "Statut", "Statut")
 
@@ -310,9 +365,16 @@ Public Class FrmRapportActivite
             For Each colonne As DataGridViewColumn In grille.Columns
                 colonne.SortMode = DataGridViewColumnSortMode.NotSortable
             Next
-            grille.Columns("Deroule").AutoSizeMode = DataGridViewAutoSizeColumnMode.None
-            grille.Columns("Deroule").Width = 26
-            grille.Columns("Deroule").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            With grille.Columns("Deroule")
+                .Visible = True
+                .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                .MinimumWidth = 28
+                .Width = 28
+                .HeaderText = "+/-"
+                .ToolTipText = "Cliquez un point de vente pour dérouler ses transactions"
+                .DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+                .DefaultCellStyle.Font = New Drawing.Font(grille.Font, Drawing.FontStyle.Bold)
+            End With
         End If
 
         MettreEnEvidenceTotaux(grille)
@@ -386,6 +448,9 @@ Public Class FrmRapportActivite
     ''' points de vente. Le détail ne s'ouvre que lorsqu'on le demande.
     ''' </summary>
     Private Sub ReplierToutLeDetail()
+
+        ' Une ligne courante ne peut pas être masquée : on relâche la sélection avant de replier.
+        dgvParPdv.CurrentCell = Nothing
 
         For Each ligne As DataGridViewRow In dgvParPdv.Rows
             If NiveauDeLaLigne(ligne) = RapportActiviteService.NIVEAU_TRANSACTION Then
