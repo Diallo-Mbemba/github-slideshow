@@ -2,3 +2,9 @@ _site/
 .sass-cache/
 .jekyll-metadata
 .bundle
+
+# Fichiers d'état utilisateur Visual Studio (jamais partagés)
+.vs/
+*.suo
+*.user
+slnx.sqlite
