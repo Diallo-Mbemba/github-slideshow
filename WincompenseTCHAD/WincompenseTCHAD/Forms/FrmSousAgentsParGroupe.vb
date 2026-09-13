@@ -331,7 +331,12 @@ Public Class FrmSousAgentsParGroupe
 
         Cursor = Cursors.WaitCursor
         Try
-            Dim recapitulatif As New BlocExcel("Récapitulatif par groupe statistique", _recapitulatif)
+            ' Le récapitulatif se restreint au groupe retenu : l'état porte sur ce groupe, la
+            ' liste des vingt autres n'y a pas sa place. En affichage « tous les groupes », il
+            ' les reprend évidemment tous.
+            Dim tableRecapitulatif As DataTable = If(tous, _recapitulatif, RecapitulatifDuGroupe(groupeChoisi))
+
+            Dim recapitulatif As New BlocExcel("Récapitulatif par groupe statistique", tableRecapitulatif)
             recapitulatif.Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
                 {"SousAgents", "Sous-agents"},
                 {"CompteActivite", "Compte d'activité"},
@@ -367,6 +372,10 @@ Public Class FrmSousAgentsParGroupe
             }
             ' Le filtre automatique va au tableau de détail : c'est celui que l'on fouille.
             detail.AvecFiltre = True
+
+            ' Le titre du bloc nomme le groupe : il est mis en exergue comme le reste de ce qui
+            ' le désigne dans l'état.
+            detail.TitreEnExergue = Not tous
 
             ' Le groupe retenu est mis en exergue : sur un état imprimé, c'est la première
             ' chose que doit voir le lecteur. En affichage « tous les groupes », il n'y a
@@ -406,6 +415,25 @@ Public Class FrmSousAgentsParGroupe
             Cursor = Cursors.Default
         End Try
     End Sub
+
+    ''' <summary>
+    ''' Copie du récapitulatif restreinte à un seul groupe.
+    '''
+    ''' Les lignes sont recopiées une à une plutôt que sélectionnées par une expression de
+    ''' filtre : un libellé de groupe peut contenir une apostrophe, qui romprait l'expression.
+    ''' </summary>
+    Private Function RecapitulatifDuGroupe(groupe As String) As DataTable
+
+        Dim table As DataTable = _recapitulatif.Clone()
+
+        For Each ligne As DataRow In _recapitulatif.Rows
+            If String.Equals(Convert.ToString(ligne("Groupe")), groupe, StringComparison.OrdinalIgnoreCase) Then
+                table.ImportRow(ligne)
+            End If
+        Next
+
+        Return table
+    End Function
 
     ''' <summary>
     ''' Nom de fichier proposé : il porte le groupe exporté et la date, de sorte que plusieurs

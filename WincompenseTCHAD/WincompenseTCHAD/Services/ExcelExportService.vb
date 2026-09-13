@@ -57,6 +57,12 @@ Public Class BlocExcel
     Public Property Formats As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
 
     ''' <summary>
+    ''' Met le titre du bloc en exergue (fond jaune), au même titre que les sous-titres et les
+    ''' lignes désignées par ExergueColonne / ExergueValeur.
+    ''' </summary>
+    Public Property TitreEnExergue As Boolean = False
+
+    ''' <summary>
     ''' Nom de la colonne servant à repérer les lignes à mettre en exergue. Vide : aucune mise
     ''' en exergue. Utilisée avec ExergueValeur.
     ''' </summary>
@@ -295,6 +301,11 @@ Public NotInheritable Class ExcelExportService
             Dim plageTitre As Object = feuille.Range(feuille.Cells(ligne, 1), feuille.Cells(ligne, nombreColonnes))
             plageTitre.Font.Bold = True
             plageTitre.Font.Size = 11
+
+            If bloc.TitreEnExergue Then
+                plageTitre.Interior.Color = JAUNE_EXERGUE
+            End If
+
             ligne += 1
         End If
 
