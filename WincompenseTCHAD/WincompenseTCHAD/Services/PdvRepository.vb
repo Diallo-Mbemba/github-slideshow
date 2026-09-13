@@ -495,9 +495,16 @@ Public NotInheritable Class PdvRepository
     End Sub
 
     Private Shared Function CompterSousAgentsDuGroupe(nomGroupe As String, connexion As SqlConnection) As Integer
+        Return CompterSousAgentsDuGroupe(nomGroupe, connexion, Nothing)
+    End Function
+
+    ''' <param name="transaction">Transaction en cours, ou Nothing hors transaction.</param>
+    Private Shared Function CompterSousAgentsDuGroupe(nomGroupe As String, connexion As SqlConnection,
+                                                      transaction As SqlTransaction) As Integer
 
         Using commande As New SqlCommand(
-            "SELECT COUNT(*) FROM T_Pdv_SA WHERE LTRIM(RTRIM(GroupeStatistique)) = @groupe", connexion)
+            "SELECT COUNT(*) FROM T_Pdv_SA WHERE LTRIM(RTRIM(GroupeStatistique)) = @groupe",
+            connexion, transaction)
 
             commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = nomGroupe.Trim()
 
@@ -701,6 +708,236 @@ Public NotInheritable Class PdvRepository
             Return False
         End Try
     End Function
+
+#End Region
+
+#Region "Application d'une demande autorisée"
+
+    '
+    ' Ces méthodes sont le seul chemin d'écriture ouvert depuis l'arrivée du double regard.
+    ' Elles s'exécutent dans la connexion et la transaction de la décision : l'écriture et
+    ' le marquage de la demande tiennent ensemble, ou ni l'un ni l'autre.
+    '
+    ' Les colonnes de traçabilité reçoivent l'identifiant de CELUI QUI A SAISI, non de celui qui
+    ' autorise : c'est lui l'auteur du contenu. Qui a autorisé se lit dans T_DemandeWU, qui
+    ' conserve les deux noms — chaque table porte ainsi ce pour quoi elle est faite.
+    '
+
+    ''' <summary>Porte dans T_Pdv_SA une demande autorisée portant sur un sous-agent.</summary>
+    Public Shared Function AppliquerSousAgent(demande As DemandeWU, connexion As SqlConnection,
+                                              transaction As SqlTransaction,
+                                              ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If demande.Operation = OperationWU.Suppression Then
+            Return AppliquerSuppression("T_Pdv_SA", "Code_Pdv", demande.Cle, "sous-agent",
+                                        connexion, transaction, messageErreur)
+        End If
+
+        Dim creation As Boolean = demande.Operation = OperationWU.Creation
+
+        Dim requete As String =
+            If(creation,
+               "INSERT INTO T_Pdv_SA (Code_Pdv, Designationagence, GroupeStatistique, Taux, " &
+               "CompteCompense, CompteCommission, codeagence, DateCreation, CreePar) " &
+               "VALUES (@cle, @designation, @groupe, @taux, @activite, @commission, " &
+               "@rattachement, GETDATE(), @auteur)",
+               "UPDATE T_Pdv_SA SET Designationagence = @designation, GroupeStatistique = @groupe, " &
+               "Taux = @taux, CompteCompense = @activite, CompteCommission = @commission, " &
+               "codeagence = @rattachement, DateModification = GETDATE(), ModifiePar = @auteur " &
+               "WHERE Code_Pdv = @cle")
+
+        Return ExecuterApplication(requete, demande, creation, "sous-agent",
+                                   connexion, transaction, messageErreur)
+    End Function
+
+    ''' <summary>Porte dans T_Pdv_EC une demande autorisée portant sur une agence propre.</summary>
+    Public Shared Function AppliquerAgence(demande As DemandeWU, connexion As SqlConnection,
+                                           transaction As SqlTransaction,
+                                           ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If demande.Operation = OperationWU.Suppression Then
+            Return AppliquerSuppression("T_Pdv_EC", "Codesite", demande.Cle, "agence",
+                                        connexion, transaction, messageErreur)
+        End If
+
+        Dim creation As Boolean = demande.Operation = OperationWU.Creation
+
+        Dim requete As String =
+            If(creation,
+               "INSERT INTO T_Pdv_EC (Codesite, Designationagence, [CodeAgenc-Voyager], " &
+               "DateCreation, CreePar) " &
+               "VALUES (@cle, @designation, @rattachement, GETDATE(), @auteur)",
+               "UPDATE T_Pdv_EC SET Designationagence = @designation, " &
+               "[CodeAgenc-Voyager] = @rattachement, DateModification = GETDATE(), " &
+               "ModifiePar = @auteur WHERE Codesite = @cle")
+
+        Return ExecuterApplication(requete, demande, creation, "agence",
+                                   connexion, transaction, messageErreur)
+    End Function
+
+    ''' <summary>Porte une demande autorisée portant sur un groupe statistique.</summary>
+    Public Shared Function AppliquerGroupe(demande As DemandeWU, connexion As SqlConnection,
+                                           transaction As SqlTransaction,
+                                           ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If demande.Operation = OperationWU.Synchronisation Then
+            Return AppliquerSynchronisation(demande, connexion, transaction, messageErreur)
+        End If
+
+        If demande.Operation = OperationWU.Suppression Then
+
+            ' Le garde-fou d'origine reste valable ici : supprimer un groupe encore porté par des
+            ' sous-agents leur ferait perdre en silence leur compte d'activité, leur compte de
+            ' commission et leur taux.
+            Dim rattaches As Integer = CompterSousAgentsDuGroupe(demande.Cle, connexion, transaction)
+
+            If rattaches > 0 Then
+                messageErreur = $"Le groupe « {demande.Cle} » ne peut pas être supprimé : " &
+                                $"{rattaches} sous-agent(s) y sont rattachés." & Environment.NewLine & Environment.NewLine &
+                                "La demande ne peut pas être autorisée en l'état. Rattachez d'abord " &
+                                "ces sous-agents à un autre groupe, ou rejetez la demande."
+                Return False
+            End If
+
+            Return AppliquerSuppression("T_GroupeStatistique", "Groupe", demande.Cle, "groupe",
+                                        connexion, transaction, messageErreur)
+        End If
+
+        Dim creation As Boolean = demande.Operation = OperationWU.Creation
+
+        Dim requete As String =
+            If(creation,
+               "INSERT INTO T_GroupeStatistique (Groupe, CompteActivite, CompteCommission, Taux, " &
+               "DateCreation, CreePar) " &
+               "VALUES (@cle, @activite, @commission, @taux, GETDATE(), @auteur)",
+               "UPDATE T_GroupeStatistique SET CompteActivite = @activite, " &
+               "CompteCommission = @commission, Taux = @taux, DateModification = GETDATE(), " &
+               "ModifiePar = @auteur WHERE Groupe = @cle")
+
+        If Not ExecuterApplication(requete, demande, creation, "groupe",
+                                   connexion, transaction, messageErreur) Then
+            Return False
+        End If
+
+        ' Le groupe est la source de vérité ; les colonnes de T_Pdv_SA en sont le miroir, que la
+        ' comptabilisation quotidienne continue de lire. Une modification autorisée les réaligne
+        ' donc aussitôt, dans la même transaction — sans quoi la pièce comptable du lendemain
+        ' utiliserait encore les anciens comptes, et personne ne verrait l'écart.
+        '
+        ' Une création n'a rien à réaligner : le groupe n'a pas encore de sous-agent.
+        If creation Then Return True
+
+        Return AppliquerSynchronisation(demande, connexion, transaction, messageErreur)
+    End Function
+
+    ''' <summary>
+    ''' Reporte les valeurs d'un groupe sur tous les sous-agents qui le portent.
+    '''
+    ''' Aucune ligne touchée n'est une anomalie : le groupe n'a peut-être plus de sous-agent.
+    ''' On laisse donc passer, contrairement aux autres opérations.
+    ''' </summary>
+    Private Shared Function AppliquerSynchronisation(demande As DemandeWU, connexion As SqlConnection,
+                                                     transaction As SqlTransaction,
+                                                     ByRef messageErreur As String) As Boolean
+
+        Const requete As String =
+            "UPDATE T_Pdv_SA SET CompteCompense = @activite, CompteCommission = @commission, " &
+            "Taux = @taux, DateModification = GETDATE(), ModifiePar = @auteur " &
+            "WHERE LTRIM(RTRIM(GroupeStatistique)) = @cle"
+
+        Try
+            Using commande As New SqlCommand(requete, connexion, transaction)
+                AjouterParametresDemande(commande, demande)
+                commande.ExecuteNonQuery()
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = $"Synchronisation des sous-agents du groupe « {demande.Cle} » " &
+                            $"impossible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    Private Shared Function AppliquerSuppression(table As String, colonneCle As String, cle As String,
+                                                 objet As String, connexion As SqlConnection,
+                                                 transaction As SqlTransaction,
+                                                 ByRef messageErreur As String) As Boolean
+
+        Try
+            Using commande As New SqlCommand($"DELETE FROM {table} WHERE {colonneCle} = @cle",
+                                             connexion, transaction)
+
+                commande.Parameters.Add("@cle", SqlDbType.NVarChar, 255).Value = cle.Trim()
+
+                If commande.ExecuteNonQuery() = 0 Then
+                    messageErreur = $"Aucune suppression : le {objet} « {cle} » n'existe plus." &
+                                    Environment.NewLine &
+                                    "Il a peut-être été supprimé depuis un autre poste."
+                    Return False
+                End If
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = $"Suppression du {objet} « {cle} » impossible : {ex.Message}"
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    Private Shared Function ExecuterApplication(requete As String, demande As DemandeWU,
+                                                creation As Boolean, objet As String,
+                                                connexion As SqlConnection, transaction As SqlTransaction,
+                                                ByRef messageErreur As String) As Boolean
+        Try
+            Using commande As New SqlCommand(requete, connexion, transaction)
+
+                AjouterParametresDemande(commande, demande)
+
+                If commande.ExecuteNonQuery() = 0 Then
+                    messageErreur = $"Aucune fiche modifiée : le {objet} « {demande.Cle} » " &
+                                    "n'existe plus." & Environment.NewLine &
+                                    "Il a peut-être été supprimé depuis un autre poste."
+                    Return False
+                End If
+            End Using
+
+        Catch ex As SqlException
+            Dim action As String = If(creation, "créer", "modifier")
+            messageErreur = MessageErreurEcriture(ex, demande.Cle, objet, action)
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    ''' <summary>Paramètres communs à toutes les applications de demande.</summary>
+    Private Shared Sub AjouterParametresDemande(commande As SqlCommand, demande As DemandeWU)
+
+        commande.Parameters.Add("@cle", SqlDbType.NVarChar, 255).Value = demande.Cle.Trim()
+        commande.Parameters.Add("@designation", SqlDbType.NVarChar, 255).Value = If(demande.Designation, String.Empty)
+        commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = If(demande.GroupeStatistique, String.Empty)
+        commande.Parameters.Add("@activite", SqlDbType.NVarChar, 255).Value = If(demande.CompteActivite, String.Empty)
+        commande.Parameters.Add("@commission", SqlDbType.NVarChar, 255).Value = If(demande.CompteCommission, String.Empty)
+        commande.Parameters.Add("@rattachement", SqlDbType.NVarChar, 255).Value = If(demande.CodeRattachement, String.Empty)
+
+        ' DECIMAL(4,2) : précision et échelle cadrées, valeur arrondie côté application, pour
+        ' qu'aucun arrondi ne se produise en silence dans SQL Server.
+        Dim parametreTaux As SqlParameter = commande.Parameters.Add("@taux", SqlDbType.Decimal)
+        parametreTaux.Precision = 4
+        parametreTaux.Scale = 2
+        parametreTaux.Value = Decimal.Round(demande.Taux, 2)
+
+        commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = demande.SaisiPar
+    End Sub
 
 #End Region
 

@@ -29,6 +29,8 @@ Partial Class FrmPrincipal
         Me.mnuSousAgents = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuAgences = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuGroupes = New System.Windows.Forms.ToolStripMenuItem()
+        Me.SEP5 = New System.Windows.Forms.ToolStripSeparator()
+        Me.mnuDemandes = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP2 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuComptes = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuSecurite = New System.Windows.Forms.ToolStripMenuItem()
@@ -84,7 +86,7 @@ Partial Class FrmPrincipal
         '
         'mnuParametrage
         '
-        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP2, Me.mnuComptes})
+        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes})
         Me.mnuParametrage.Name = "mnuParametrage"
         Me.mnuParametrage.Size = New System.Drawing.Size(100, 20)
         Me.mnuParametrage.Text = "&Paramétrage"
@@ -106,6 +108,17 @@ Partial Class FrmPrincipal
         Me.mnuGroupes.Name = "mnuGroupes"
         Me.mnuGroupes.Size = New System.Drawing.Size(240, 22)
         Me.mnuGroupes.Text = "&Groupes statistiques"
+        '
+        'SEP5
+        '
+        Me.SEP5.Name = "SEP5"
+        Me.SEP5.Size = New System.Drawing.Size(220, 6)
+        '
+        'mnuDemandes
+        '
+        Me.mnuDemandes.Name = "mnuDemandes"
+        Me.mnuDemandes.Size = New System.Drawing.Size(240, 22)
+        Me.mnuDemandes.Text = "&Autorisations du référentiel"
         '
         'SEP2
         '
@@ -238,6 +251,8 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuSousAgents As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuAgences As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuGroupes As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents SEP5 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents mnuDemandes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP2 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuComptes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuSecurite As System.Windows.Forms.ToolStripMenuItem

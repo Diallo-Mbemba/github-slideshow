@@ -77,6 +77,7 @@ Public Class FrmUtilisateurs
         table.Columns.Add("Identifiant", GetType(String))
         table.Columns.Add("Nom et prénom", GetType(String))
         table.Columns.Add("Rôle", GetType(String))
+        table.Columns.Add("Fonction", GetType(String))
         table.Columns.Add("État", GetType(String))
         table.Columns.Add("Échecs", GetType(Integer))
         table.Columns.Add("Dernière connexion", GetType(String))
@@ -90,6 +91,7 @@ Public Class FrmUtilisateurs
             table.Rows.Add(utilisateur.Identifiant,
                            utilisateur.NomComplet,
                            utilisateur.LibelleRole,
+                           utilisateur.LibelleFonction,
                            LibelleEtat(utilisateur),
                            utilisateur.EchecsConsecutifs,
                            LibelleDate(utilisateur.DerniereConnexion),

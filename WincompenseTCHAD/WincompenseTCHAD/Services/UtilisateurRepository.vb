@@ -167,7 +167,7 @@ Public NotInheritable Class UtilisateurRepository
         messageErreur = String.Empty
 
         Const requete As String =
-            "SELECT Identifiant, NomComplet, Role, Empreinte, Sel, Iterations, Actif, " &
+            "SELECT Identifiant, NomComplet, Role, Fonction, Empreinte, Sel, Iterations, Actif, " &
             "DoitChangerMotDePasse, EchecsConsecutifs, DateVerrouillage, DerniereConnexion, " &
             "DateCreation, CreePar, DateModification, ModifiePar " &
             "FROM " & TABLE_UTILISATEUR & " WHERE Identifiant = @identifiant"
@@ -203,7 +203,7 @@ Public NotInheritable Class UtilisateurRepository
         Dim resultat As New List(Of UtilisateurWU)
 
         Const requete As String =
-            "SELECT Identifiant, NomComplet, Role, Empreinte, Sel, Iterations, Actif, " &
+            "SELECT Identifiant, NomComplet, Role, Fonction, Empreinte, Sel, Iterations, Actif, " &
             "DoitChangerMotDePasse, EchecsConsecutifs, DateVerrouillage, DerniereConnexion, " &
             "DateCreation, CreePar, DateModification, ModifiePar " &
             "FROM " & TABLE_UTILISATEUR & " ORDER BY Role, Identifiant"
@@ -238,6 +238,7 @@ Public NotInheritable Class UtilisateurRepository
             .Identifiant = LireChaine(lecteur, "Identifiant"),
             .NomComplet = LireChaine(lecteur, "NomComplet"),
             .Role = UtilisateurWU.RoleDepuisLibelle(LireChaine(lecteur, "Role")),
+            .Fonction = UtilisateurWU.FonctionDepuisLibelle(LireChaine(lecteur, "Fonction")),
             .Empreinte = LireChaine(lecteur, "Empreinte"),
             .Sel = LireChaine(lecteur, "Sel"),
             .Iterations = LireEntier(lecteur, "Iterations"),
@@ -277,10 +278,11 @@ Public NotInheritable Class UtilisateurRepository
         Dim empreinte As String = MotDePasseService.Hacher(motDePasseInitial, sel, iterations)
 
         Const requete As String =
-            "INSERT INTO " & TABLE_UTILISATEUR & " (Identifiant, NomComplet, Role, Empreinte, Sel, " &
-            "Iterations, Actif, DoitChangerMotDePasse, EchecsConsecutifs, DateCreation, CreePar) " &
-            "VALUES (@identifiant, @nom, @role, @empreinte, @sel, @iterations, @actif, 1, 0, " &
-            "GETDATE(), @creePar)"
+            "INSERT INTO " & TABLE_UTILISATEUR & " (Identifiant, NomComplet, Role, Fonction, " &
+            "Empreinte, Sel, Iterations, Actif, DoitChangerMotDePasse, EchecsConsecutifs, " &
+            "DateCreation, CreePar) " &
+            "VALUES (@identifiant, @nom, @role, @fonction, @empreinte, @sel, @iterations, " &
+            "@actif, 1, 0, GETDATE(), @creePar)"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -290,6 +292,7 @@ Public NotInheritable Class UtilisateurRepository
                     commande.Parameters.Add("@identifiant", SqlDbType.NVarChar, 50).Value = utilisateur.Identifiant
                     commande.Parameters.Add("@nom", SqlDbType.NVarChar, 150).Value = utilisateur.NomComplet
                     commande.Parameters.Add("@role", SqlDbType.NVarChar, 20).Value = UtilisateurWU.LibelleDepuisRole(utilisateur.Role)
+                    commande.Parameters.Add("@fonction", SqlDbType.NVarChar, 20).Value = ValeurFonction(utilisateur)
                     commande.Parameters.Add("@empreinte", SqlDbType.NVarChar, 256).Value = empreinte
                     commande.Parameters.Add("@sel", SqlDbType.NVarChar, 128).Value = sel
                     commande.Parameters.Add("@iterations", SqlDbType.Int).Value = iterations
@@ -336,14 +339,16 @@ Public NotInheritable Class UtilisateurRepository
         End If
 
         Const requete As String =
-            "UPDATE " & TABLE_UTILISATEUR & " SET NomComplet = @nom, Role = @role, Actif = @actif, " &
-            "DateModification = GETDATE(), ModifiePar = @modifiePar WHERE Identifiant = @identifiant"
+            "UPDATE " & TABLE_UTILISATEUR & " SET NomComplet = @nom, Role = @role, " &
+            "Fonction = @fonction, Actif = @actif, DateModification = GETDATE(), " &
+            "ModifiePar = @modifiePar WHERE Identifiant = @identifiant"
 
         Return Executer(requete, messageErreur,
                         Sub(commande)
                             commande.Parameters.Add("@identifiant", SqlDbType.NVarChar, 50).Value = utilisateur.Identifiant
                             commande.Parameters.Add("@nom", SqlDbType.NVarChar, 150).Value = utilisateur.NomComplet
                             commande.Parameters.Add("@role", SqlDbType.NVarChar, 20).Value = UtilisateurWU.LibelleDepuisRole(utilisateur.Role)
+                            commande.Parameters.Add("@fonction", SqlDbType.NVarChar, 20).Value = ValeurFonction(utilisateur)
                             commande.Parameters.Add("@actif", SqlDbType.Bit).Value = utilisateur.Actif
                             commande.Parameters.Add("@modifiePar", SqlDbType.NVarChar, 50).Value = ParOuScript()
                         End Sub)
@@ -542,6 +547,18 @@ Public NotInheritable Class UtilisateurRepository
     Private Shared Function ParOuScript() As String
         Dim identifiant As String = SessionWU.Identifiant
         Return If(String.IsNullOrEmpty(identifiant), "installation", identifiant)
+    End Function
+
+    ''' <summary>
+    ''' Valeur à écrire dans la colonne Fonction. « Aucune » s'enregistre en NULL et non en
+    ''' chaîne vide : la contrainte CHECK de la base n'accepte que INPUTER, AUTHORIZER ou NULL.
+    ''' </summary>
+    Private Shared Function ValeurFonction(utilisateur As UtilisateurWU) As Object
+
+        Dim libelle As String = UtilisateurWU.LibelleDepuisFonction(utilisateur.Fonction)
+        If libelle.Length = 0 Then Return DBNull.Value
+
+        Return libelle
     End Function
 
     ''' <summary>Exécute une commande d'écriture et traduit les erreurs courantes.</summary>

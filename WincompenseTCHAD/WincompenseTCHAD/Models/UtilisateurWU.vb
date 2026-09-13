@@ -14,6 +14,22 @@ Public Enum RoleWU
 End Enum
 
 ''' <summary>
+''' Fonction de l'utilisateur dans le double regard sur le référentiel des points de vente.
+'''
+''' Le rôle dit le domaine — compense, commercial, administration. La fonction dit le pouvoir :
+''' saisir, ou autoriser. Les deux ne se cumulent pas sur une même personne, faute de quoi le
+''' double regard n'en serait plus un.
+''' </summary>
+Public Enum FonctionWU
+    ''' <summary>Aucune : l'utilisateur ne peut ni saisir ni autoriser le référentiel.</summary>
+    Aucune = 0
+    ''' <summary>Saisit les créations, modifications et suppressions. Elles restent en attente.</summary>
+    Inputer = 1
+    ''' <summary>Autorise ou rejette les saisies des autres. Jamais les siennes.</summary>
+    Authorizer = 2
+End Enum
+
+''' <summary>
 ''' Un utilisateur de l'application (table T_UtilisateurWU).
 '''
 ''' Le mot de passe n'apparaît nulle part : seule son empreinte PBKDF2 est conservée, avec son
@@ -28,11 +44,17 @@ Public Class UtilisateurWU
     Public Const ROLE_COMMERCIAL As String = "COMMERCIAL"
     Public Const ROLE_ADMIN As String = "ADMIN"
 
+    Public Const FONCTION_INPUTER As String = "INPUTER"
+    Public Const FONCTION_AUTHORIZER As String = "AUTHORIZER"
+
 #End Region
 
     Public Property Identifiant As String = String.Empty
     Public Property NomComplet As String = String.Empty
     Public Property Role As RoleWU = RoleWU.Inconnu
+
+    ''' <summary>Fonction dans le double regard sur le référentiel. Aucune par défaut.</summary>
+    Public Property Fonction As FonctionWU = FonctionWU.Aucune
 
     Public Property Empreinte As String = String.Empty
     Public Property Sel As String = String.Empty
@@ -68,6 +90,30 @@ Public Class UtilisateurWU
     Public ReadOnly Property PeutGererLesPointsDeVente As Boolean
         Get
             Return Role = RoleWU.Commercial OrElse Role = RoleWU.Administrateur
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Déposer une création, une modification ou une suppression sur le référentiel.
+    '''
+    ''' Le droit ne suffit pas à écrire : la saisie part en attente et n'existe pour personne
+    ''' tant qu'un authorizer ne l'a pas autorisée.
+    ''' </summary>
+    Public ReadOnly Property PeutSaisirLesPointsDeVente As Boolean
+        Get
+            Return PeutGererLesPointsDeVente AndAlso Fonction = FonctionWU.Inputer
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Autoriser ou rejeter les saisies déposées par d'autres.
+    '''
+    ''' Jamais les siennes : la règle ne dépend pas de ce droit mais de l'identité de celui qui
+    ''' a saisi, et elle est vérifiée à la décision — y compris pour un administrateur.
+    ''' </summary>
+    Public ReadOnly Property PeutAutoriserLesPointsDeVente As Boolean
+        Get
+            Return PeutGererLesPointsDeVente AndAlso Fonction = FonctionWU.Authorizer
         End Get
     End Property
 
@@ -142,6 +188,60 @@ Public Class UtilisateurWU
             Return New String() {"Agent de la compense", "Commercial", "Administrateur"}
         End Get
     End Property
+
+    ''' <summary>Fonction correspondant au libellé enregistré.</summary>
+    Public Shared Function FonctionDepuisLibelle(libelle As String) As FonctionWU
+
+        Select Case If(libelle, String.Empty).Trim().ToUpperInvariant()
+            Case FONCTION_INPUTER : Return FonctionWU.Inputer
+            Case FONCTION_AUTHORIZER : Return FonctionWU.Authorizer
+            Case Else : Return FonctionWU.Aucune
+        End Select
+    End Function
+
+    ''' <summary>Libellé enregistré correspondant à la fonction. Vide pour « aucune ».</summary>
+    Public Shared Function LibelleDepuisFonction(fonction As FonctionWU) As String
+
+        Select Case fonction
+            Case FonctionWU.Inputer : Return FONCTION_INPUTER
+            Case FonctionWU.Authorizer : Return FONCTION_AUTHORIZER
+            Case Else : Return String.Empty
+        End Select
+    End Function
+
+    ''' <summary>Libellé lisible d'une fonction.</summary>
+    Public Shared Function LibelleLisibleDepuisFonction(fonction As FonctionWU) As String
+
+        Select Case fonction
+            Case FonctionWU.Inputer : Return "Inputer (saisit)"
+            Case FonctionWU.Authorizer : Return "Authorizer (autorise)"
+            Case Else : Return "Aucune"
+        End Select
+    End Function
+
+    ''' <summary>Libellé lisible de la fonction de cet utilisateur.</summary>
+    Public ReadOnly Property LibelleFonction As String
+        Get
+            Return LibelleLisibleDepuisFonction(Fonction)
+        End Get
+    End Property
+
+    ''' <summary>Libellés lisibles des fonctions, dans l'ordre où elles sont proposées.</summary>
+    Public Shared ReadOnly Property FonctionsProposees As String()
+        Get
+            Return New String() {"Aucune", "Inputer (saisit)", "Authorizer (autorise)"}
+        End Get
+    End Property
+
+    ''' <summary>Fonction correspondant à un libellé lisible (celui d'une liste déroulante).</summary>
+    Public Shared Function FonctionDepuisLibelleLisible(libelle As String) As FonctionWU
+
+        Select Case If(libelle, String.Empty).Trim()
+            Case "Inputer (saisit)" : Return FonctionWU.Inputer
+            Case "Authorizer (autorise)" : Return FonctionWU.Authorizer
+            Case Else : Return FonctionWU.Aucune
+        End Select
+    End Function
 
     ''' <summary>Rôle correspondant à un libellé lisible (celui d'une liste déroulante).</summary>
     Public Shared Function RoleDepuisLibelleLisible(libelle As String) As RoleWU

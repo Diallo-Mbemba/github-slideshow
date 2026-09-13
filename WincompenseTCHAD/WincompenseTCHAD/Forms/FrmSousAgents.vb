@@ -4,10 +4,13 @@ Option Explicit On
 Imports System.Windows.Forms
 
 ''' <summary>
-''' Gestion des sous-agents Western Union (table T_Pdv_SA) : consultation, création,
-''' modification et suppression.
+''' Gestion des sous-agents Western Union (table T_Pdv_SA) : consultation, et saisie des
+''' créations, modifications et suppressions.
 '''
-''' Le formulaire n'exécute aucune requête SQL lui-même : tout passe par PdvRepository.
+''' Depuis l'entrée en vigueur du double regard, cet écran n'écrit plus rien : il DÉPOSE des
+''' demandes, que seul un authorizer peut porter dans T_Pdv_SA. Les lectures passent par
+''' PdvRepository, les saisies par DemandeRepository ; le formulaire n'exécute aucune requête
+''' SQL lui-même.
 ''' Il travaille en deux modes, matérialisés par _enCreation :
 '''   - CONSULTATION/MODIFICATION : une fiche existante est sélectionnée dans la liste ;
 '''     l'Account est affiché mais verrouillé — c'est la clé sous laquelle les rapports
@@ -44,8 +47,31 @@ Public Class FrmSousAgents
             Return
         End If
 
+        AjusterAuxDroits()
         ChargerGroupes()
         ChargerListe()
+    End Sub
+
+    ''' <summary>
+    ''' N'ouvre la saisie qu'à un inputer.
+    '''
+    ''' Les autres — un authorizer, un commercial sans fonction — gardent l'écran en
+    ''' consultation : pouvoir relire le référentiel n'est pas pouvoir le changer.
+    ''' </summary>
+    Private Sub AjusterAuxDroits()
+
+        Dim saisit As Boolean = SessionWU.PeutSaisirLesPointsDeVente
+
+        btnNouveau.Enabled = saisit
+        btnEnregistrer.Enabled = saisit
+        btnSupprimer.Enabled = saisit
+        btnNouveauGroupe.Enabled = saisit
+
+        If saisit Then
+            lblStatut.Text = "Toute saisie part en attente : elle prendra effet après autorisation."
+        Else
+            lblStatut.Text = "Consultation seule : la saisie est réservée à la fonction « inputer »."
+        End If
     End Sub
 
     ''' <summary>Recharge la liste depuis la base en appliquant le filtre de recherche courant.</summary>
@@ -472,14 +498,16 @@ Public Class FrmSousAgents
 
         Dim messageErreur As String = String.Empty
 
-        If PdvRepository.AjouterGroupe(groupe, messageErreur) Then
-            lblStatut.Text = $"Groupe « {groupe.Nom} » enregistré dans la table des groupes."
-            ChargerGroupes()
+        Dim demande As DemandeWU = DemandeWU.DepuisGroupe(groupe, OperationWU.Creation)
+
+        If DemandeRepository.Soumettre(demande, messageErreur) Then
+            lblStatut.Text = $"Groupe « {groupe.Nom} » — demande d'enregistrement déposée, " &
+                             "en attente d'autorisation."
             Return
         End If
 
-        ' Échec le plus fréquent : un de ses comptes appartient déjà à un autre groupe. Le
-        ' rattachement du sous-agent reste possible, le paramétrage est simplement à arbitrer.
+        ' Le rattachement du sous-agent reste possible même si la demande n'a pas pu être
+        ' déposée : le groupe hérité continue d'exister dans T_Pdv_SA.
         MessageBox.Show(
             messageErreur & Environment.NewLine & Environment.NewLine &
             $"Le sous-agent peut tout de même être rattaché au groupe « {groupe.Nom} ».",
@@ -590,23 +618,23 @@ Public Class FrmSousAgents
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            Dim reussi As Boolean = If(_enCreation,
-                                       PdvRepository.AjouterSousAgent(fiche, messageErreur),
-                                       PdvRepository.ModifierSousAgent(fiche, messageErreur))
 
-            If Not reussi Then
-                MessageBox.Show(messageErreur, "Enregistrement impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' La fiche ne part pas dans T_Pdv_SA mais dans la file des demandes : elle n'existera
+            ' pour la comptabilisation qu'une fois autorisée par quelqu'un d'autre.
+            Dim demande As DemandeWU = DemandeWU.DepuisSousAgent(
+                fiche, If(_enCreation, OperationWU.Creation, OperationWU.Modification))
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
-            lblStatut.Text = If(_enCreation,
-                                $"Sous-agent « {fiche.CodePdv} » créé.",
-                                $"Sous-agent « {fiche.CodePdv} » modifié.")
+            lblStatut.Text = $"{demande.Intitule} — demande déposée, en attente d'autorisation."
             _enCreation = False
 
-
-            ' Un groupe qui vient d'être créé n'existait dans aucune fiche : il devient
-            ' sélectionnable dès maintenant pour les saisies suivantes.
+            ' La liste des groupes est relue, mais un groupe tout juste demandé n'y figurera pas
+            ' encore : lui aussi attend son autorisation. Il reste sélectionnable dans la fiche,
+            ' la liste déroulante acceptant la saisie libre.
             ChargerGroupes()
 
         Finally
@@ -627,7 +655,7 @@ Public Class FrmSousAgents
             "Les rapports Western Union portant cet Account ne seront plus rattachés à aucun point " &
             "de vente : ils apparaîtront en INCONNU et leur pièce comptable utilisera le compte " &
             "courant WU au lieu du compte de compensation." & Environment.NewLine & Environment.NewLine &
-            "Cette suppression est irréversible.",
+            "La suppression ne prendra effet qu'une fois autorisée par un authorizer.",
             "Confirmer la suppression", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2)
 
         If reponse <> DialogResult.Yes Then Return
@@ -635,12 +663,15 @@ Public Class FrmSousAgents
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            If Not PdvRepository.SupprimerSousAgent(fiche.CodePdv, messageErreur) Then
-                MessageBox.Show(messageErreur, "Suppression impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+
+            Dim demande As DemandeWU = DemandeWU.DepuisSousAgent(fiche, OperationWU.Suppression)
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
-            lblStatut.Text = $"Sous-agent « {fiche.CodePdv} » supprimé."
+            lblStatut.Text = $"{demande.Intitule} — demande déposée, en attente d'autorisation."
 
             ' Supprimer le dernier sous-agent d'un groupe fait disparaître ce groupe : la liste
             ' déroulante doit cesser de le proposer.

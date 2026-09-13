@@ -29,7 +29,14 @@ Public NotInheritable Class SessionWU
     Public Shared ReadOnly Property Description As String
         Get
             If Utilisateur Is Nothing Then Return "Non connecté"
-            Return $"{Utilisateur.NomComplet} ({Utilisateur.Identifiant}) — {Utilisateur.LibelleRole}"
+            ' La variable ne s'appelle pas « description » : VB ne distingue pas la casse, elle
+            ' masquerait la propriété Description à l'intérieur de laquelle elle est déclarée.
+            Dim libelle As String =
+                $"{Utilisateur.NomComplet} ({Utilisateur.Identifiant}) — {Utilisateur.LibelleRole}"
+
+            If Utilisateur.Fonction = FonctionWU.Aucune Then Return libelle
+
+            Return $"{libelle} · {Utilisateur.LibelleFonction}"
         End Get
     End Property
 
@@ -87,6 +94,20 @@ Public NotInheritable Class SessionWU
     Public Shared ReadOnly Property PeutGererLesPointsDeVente As Boolean
         Get
             Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutGererLesPointsDeVente
+        End Get
+    End Property
+
+    ''' <summary>Déposer une saisie sur le référentiel des points de vente.</summary>
+    Public Shared ReadOnly Property PeutSaisirLesPointsDeVente As Boolean
+        Get
+            Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutSaisirLesPointsDeVente
+        End Get
+    End Property
+
+    ''' <summary>Autoriser ou rejeter les saisies déposées par d'autres.</summary>
+    Public Shared ReadOnly Property PeutAutoriserLesPointsDeVente As Boolean
+        Get
+            Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutAutoriserLesPointsDeVente
         End Get
     End Property
 

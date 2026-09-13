@@ -26,7 +26,7 @@ l'interdisaient.
 | Menu | Écrans |
 |---|---|
 | **Compensation** | Traitement de la compense, Rapport d'activité |
-| **Paramétrage** | Sous-agents, Agences propres, Groupes statistiques, Comptes systèmes |
+| **Paramétrage** | Sous-agents, Agences propres, Groupes statistiques, Autorisations du référentiel, Comptes systèmes |
 | **Sécurité** | Mon mot de passe, Utilisateurs et connexions |
 | **Fenêtres** | Cascade, mosaïques, fermeture de toutes les fenêtres, et la liste des fenêtres ouvertes |
 
@@ -72,7 +72,8 @@ WincompenseTCHAD/
     │   ├── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
     │   ├── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
     │   ├── TransactionWU.vb                ' Une transaction identifiée par son MTCN
-    │   └── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
+    │   ├── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
+    │   └── DemandeWU.vb                    ' Une écriture proposée sur le référentiel
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
@@ -85,7 +86,8 @@ WincompenseTCHAD/
     │   ├── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     │   ├── MotDePasseService.vb            ' Empreintes PBKDF2, robustesse, mots de passe provisoires
     │   ├── SessionWU.vb                    ' Utilisateur connecté et droits : point d'accès unique
-    │   └── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
+    │   ├── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
+    │   └── DemandeRepository.vb            ' File des demandes : dépôt, autorisation, rejet
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -101,7 +103,8 @@ WincompenseTCHAD/
         ├── FrmConnexion.vb                 ' Écran de connexion, amorçage du premier administrateur
         ├── FrmChangerMotDePasse.vb         ' Changement de mot de passe (imposé ou volontaire)
         ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
-        └── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
+        ├── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
+        └── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
 
 Scripts/
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
@@ -111,7 +114,8 @@ Scripts/
 ├── 05_HistoriqueWU.sql                    ' Historique des journées comptabilisées
 ├── 06_HistoriqueMTCN.sql                  ' Détail des transactions, MTCN par MTCN
 ├── 07_Utilisateurs.sql                    ' Utilisateurs, journal des connexions, traçabilité
-└── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
+├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
+└── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
 ```
 
 ## Hypothèses métier retenues (à valider)
@@ -580,6 +584,105 @@ La répartition banque / sous-agent des commissions. Elle dépend du taux du gro
 de l'édition**, et non au moment des opérations : un rapport rétroactif deviendrait faux dès
 qu'un taux change. L'historique conserve les commissions totales, qui elles ne bougent pas.
 
+## Double regard sur le référentiel
+
+Toute écriture sur les **sous-agents**, les **agences propres** et les **groupes statistiques**
+passe par deux personnes : un **inputer** la saisit, un **authorizer** l'autorise. Tant qu'elle
+n'est pas autorisée, elle n'existe pour personne — ni pour la comptabilisation quotidienne, ni
+pour les applications tierces qui lisent ces tables.
+
+Le but n'est pas d'ajouter une étape, c'est qu'une seule personne ne puisse pas, seule, changer
+une donnée qui détermine des écritures comptables. Un taux passé de 90 % à 99 %, ou un compte de
+commission remplacé, se voit dans une pièce comptable le lendemain — mais il est trop tard.
+
+### Les dix écritures couvertes
+
+| Objet | Opérations |
+|---|---|
+| Sous-agents (`T_Pdv_SA`) | Créer · Modifier · Supprimer |
+| Agences propres (`T_Pdv_EC`) | Créer · Modifier · Supprimer |
+| Groupes statistiques (`T_GroupeStatistique`) | Créer · Modifier · Supprimer |
+| Groupes → sous-agents | **Synchroniser** |
+
+La synchronisation est la plus sensible : un seul clic réécrit le compte d'activité, le compte de
+commission et le taux de **tous** les sous-agents du groupe. Sans elle, le dispositif ne
+protégerait rien — il suffirait de passer par le groupe.
+
+### Rôle et fonction
+
+Le **rôle** dit le domaine, la **fonction** dit le pouvoir.
+
+| | Inputer | Authorizer | Aucune |
+|---|---|---|---|
+| Ouvrir les écrans du référentiel | ✔ | ✔ | ✔ (consultation) |
+| Saisir une création, modification, suppression | ✔ | | |
+| Autoriser ou rejeter | | ✔ | |
+
+La fonction ne se propose qu'aux rôles `COMMERCIAL` et `ADMIN` : un agent de la compense n'a
+aucun accès au référentiel, lui en attribuer une n'aurait aucun effet.
+
+### Les six règles
+
+1. **Personne ne décide de sa propre saisie** — y compris un administrateur. C'est tout le
+   dispositif. La règle est appliquée par `DemandeRepository`, **et redoublée par une contrainte
+   `CHECK` de la base** : un `UPDATE` fait à la main dans Management Studio ne peut pas davantage
+   la contourner.
+2. **Une seule demande en attente par objet.** Deux demandes contradictoires sur le même
+   sous-agent s'appliqueraient sinon dans l'ordre où l'authorizer les traite. Garanti par un
+   index unique filtré.
+3. **Le rejet est motivé**, et le motif est lu par celui qui a saisi.
+4. **Rien n'est effacé.** Les demandes autorisées et rejetées restent dans la file : c'est la
+   piste d'audit — qui a proposé quoi, qui a décidé, quand.
+5. **L'écriture et la décision tiennent dans une seule transaction.** Une demande marquée
+   autorisée alors que l'écriture a échoué laisserait croire que la donnée est en base.
+6. **Les données déjà présentes sont réputées autorisées.** Pas de validation rétroactive.
+
+### Pourquoi une file séparée, et non une colonne « Statut »
+
+Un commentaire de `PdvRepository` rappelle que les colonnes de `T_Pdv_SA` sont lues par la
+comptabilisation quotidienne **et par d'autres applications**. Une ligne non autorisée qui
+séjournerait dans cette table serait vue par ces applications, qui n'ont aucune raison de
+connaître le nouveau statut : le contrôle serait contourné sans que personne n'y touche.
+
+Avec la file `T_DemandeWU`, les trois tables du référentiel ne contiennent **que** de la donnée
+autorisée. Aucun lecteur, interne ou externe, n'a été modifié.
+
+Une seule table couvre les trois objets, qui partagent presque tous leurs champs. Les vues
+`V_Demande_SousAgent`, `V_Demande_Agence` et `V_Demande_Groupe` rendent les noms de colonnes de
+chaque table cible, pour qu'un auditeur lise `CompteCompense` et non un nom générique.
+
+### L'écran « Autorisations du référentiel »
+
+Menu **Paramétrage**. La grille du haut liste les demandes en attente ; celle du bas montre,
+champ par champ, **la valeur actuelle et la valeur demandée**, les lignes qui changent étant
+mises en évidence. Autoriser sans voir ce qu'on autorise ne serait qu'un clic de plus.
+
+L'entrée de menu porte le **nombre de demandes en attente** : sans ce rappel, une demande peut
+dormir une semaine parce que personne ne sait qu'elle existe.
+
+Un second onglet conserve les demandes décidées, avec leur auteur, leur décideur et le motif des
+rejets.
+
+### Cohérence du groupe et de son miroir
+
+Enregistrer un groupe réalignait aussitôt ses sous-agents, `T_Pdv_SA` étant le miroir que lit la
+comptabilisation. Cette règle est conservée : **autoriser une modification de groupe réaligne ses
+sous-agents dans la même transaction**. Sans cela, le groupe serait à jour et ses sous-agents
+non, et la pièce comptable du lendemain utiliserait les anciens comptes sans que rien ne le
+signale.
+
+### Mise en service
+
+Après `Scripts\09_Demandes.sql`, **aucun utilisateur n'a de fonction** — pas même
+l'administrateur. Personne ne peut donc créer de sous-agent tant que les fonctions ne sont pas
+attribuées, dans l'écran « Utilisateurs et connexions ».
+
+C'est voulu : la première décision à prendre est qui saisit et qui autorise. Il faut au moins un
+inputer et au moins un authorizer, et **ce ne peut pas être la même personne**.
+
+Prévoyez **plusieurs authorizers** : avec un seul, une semaine d'absence bloque toute création de
+point de vente.
+
 ## Utilisateurs, rôles et traçabilité
 
 L'application **exige une identification** avant d'afficher le moindre écran : `Program.Main`
@@ -825,6 +928,9 @@ charges pour un gain nul.
   commentaire à la fin de `Scripts\08_RolesSQLServer.sql` faute de connaître votre domaine.
 - Durée de vie d'un mot de passe : aucune expiration périodique n'est imposée aujourd'hui.
   Faut-il en ajouter une, et à quelle échéance ?
+- Les comptes comptables (`SystemeWU`) restent hors du double regard, sur décision de la banque.
+  Ce sont pourtant les neuf comptes qui déterminent toute la pièce comptable, et seul
+  l'administrateur y touche — seul.
 - Usage exact du compte inter bancaire 381000101 pour l'écart d'arrondi global (voir hypothèse 6).
 - Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la

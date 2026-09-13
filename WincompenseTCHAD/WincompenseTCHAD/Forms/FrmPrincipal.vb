@@ -79,6 +79,11 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmComptesSysteme)()
     End Sub
 
+    Private Sub mnuDemandes_Click(sender As Object, e As EventArgs) Handles mnuDemandes.Click
+        AfficherEnfant(Of FrmDemandes)()
+        RafraichirLeCompteurDeDemandes()
+    End Sub
+
 #End Region
 
 #Region "Sécurité"
@@ -128,6 +133,8 @@ Public Class FrmPrincipal
         mnuAgences.Available = pointsDeVente
         mnuGroupes.Available = pointsDeVente
         mnuComptes.Available = comptes
+        mnuDemandes.Available = pointsDeVente
+        SEP5.Available = pointsDeVente
         SEP2.Available = pointsDeVente AndAlso comptes
 
         ' Un menu dont toutes les entrées sont masquées resterait affiché, et s'ouvrirait sur
@@ -345,11 +352,29 @@ Public Class FrmPrincipal
         AfficherEtatBase()
 
         tsslUtilisateur.Text = SessionWU.Description
+        RafraichirLeCompteurDeDemandes()
 
         ' Aucun écran n'est ouvert d'office : l'application s'ouvre sur sa zone de travail, et
         ' c'est l'utilisateur qui choisit par où commencer. Ouvrir le traitement de la compense
         ' d'emblée imposait cet écran au commercial, qui n'y a pas accès, et faisait attendre
         ' l'agent de compense les jours où il venait seulement consulter un rapport.
+    End Sub
+
+    ''' <summary>
+    ''' Inscrit le nombre de demandes en attente dans l'entrée de menu.
+    '''
+    ''' Sans ce rappel, une demande peut dormir une semaine parce que personne ne sait qu'elle
+    ''' existe — et pendant ce temps un sous-agent créé n'est rattaché à rien.
+    ''' </summary>
+    Private Sub RafraichirLeCompteurDeDemandes()
+
+        If Not mnuDemandes.Available Then Return
+
+        Dim enAttente As Integer = DemandeRepository.CompterEnAttente()
+
+        mnuDemandes.Text = If(enAttente > 0,
+                              $"&Autorisations du référentiel ({enAttente})",
+                              "&Autorisations du référentiel")
     End Sub
 
     ''' <summary>

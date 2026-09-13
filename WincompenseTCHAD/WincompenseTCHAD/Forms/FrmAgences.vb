@@ -38,8 +38,31 @@ Public Class FrmAgences
             Return
         End If
 
+        AjusterAuxDroits()
         ChargerListe()
     End Sub
+
+    ''' <summary>
+    ''' N'ouvre la saisie qu'à un inputer.
+    '''
+    ''' Les autres — un authorizer, un commercial sans fonction — gardent l'écran en
+    ''' consultation : pouvoir relire le référentiel n'est pas pouvoir le changer.
+    ''' </summary>
+    Private Sub AjusterAuxDroits()
+
+        Dim saisit As Boolean = SessionWU.PeutSaisirLesPointsDeVente
+
+        btnNouveau.Enabled = saisit
+        btnEnregistrer.Enabled = saisit
+        btnSupprimer.Enabled = saisit
+
+        If saisit Then
+            lblStatut.Text = "Toute saisie part en attente : elle prendra effet après autorisation."
+        Else
+            lblStatut.Text = "Consultation seule : la saisie est réservée à la fonction « inputer »."
+        End If
+    End Sub
+
 
     Private Sub ChargerListe(Optional codeASelectionner As String = Nothing)
 
@@ -222,18 +245,18 @@ Public Class FrmAgences
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            Dim reussi As Boolean = If(_enCreation,
-                                       PdvRepository.AjouterAgence(fiche, messageErreur),
-                                       PdvRepository.ModifierAgence(fiche, messageErreur))
 
-            If Not reussi Then
-                MessageBox.Show(messageErreur, "Enregistrement impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' La fiche ne part pas dans T_Pdv_EC mais dans la file des demandes : elle n'existera
+            ' pour la comptabilisation qu'une fois autorisée par quelqu'un d'autre.
+            Dim demande As DemandeWU = DemandeWU.DepuisAgence(
+                fiche, If(_enCreation, OperationWU.Creation, OperationWU.Modification))
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
-            lblStatut.Text = If(_enCreation,
-                                $"Agence « {fiche.CodeSite} » créée.",
-                                $"Agence « {fiche.CodeSite} » modifiée.")
+            lblStatut.Text = $"{demande.Intitule} — demande déposée, en attente d'autorisation."
             _enCreation = False
 
         Finally
@@ -253,7 +276,8 @@ Public Class FrmAgences
             Environment.NewLine & Environment.NewLine &
             "Les rapports Western Union portant cet Account ne seront plus rattachés à aucun point " &
             "de vente : ils apparaîtront en INCONNU dans la grille de contrôle." &
-            Environment.NewLine & Environment.NewLine & "Cette suppression est irréversible.",
+            Environment.NewLine & Environment.NewLine &
+            "La suppression ne prendra effet qu'une fois autorisée par un authorizer.",
             "Confirmer la suppression", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2)
 
         If reponse <> DialogResult.Yes Then Return
@@ -261,12 +285,15 @@ Public Class FrmAgences
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            If Not PdvRepository.SupprimerAgence(fiche.CodeSite, messageErreur) Then
-                MessageBox.Show(messageErreur, "Suppression impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+
+            Dim demande As DemandeWU = DemandeWU.DepuisAgence(fiche, OperationWU.Suppression)
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
-            lblStatut.Text = $"Agence « {fiche.CodeSite} » supprimée."
+            lblStatut.Text = $"{demande.Intitule} — demande déposée, en attente d'autorisation."
 
         Finally
             Cursor = Cursors.Default

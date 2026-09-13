@@ -25,7 +25,7 @@ Public Class FrmGroupesStatistiques
     ''' <summary>Libellé à pré-remplir à l'ouverture, lorsque le formulaire est appelé pour créer un groupe précis.</summary>
     Private ReadOnly _nomAPreremplir As String
 
-    ''' <summary>Vrai si au moins un groupe a été créé ou modifié pendant la session du formulaire.</summary>
+    ''' <summary>Vrai si au moins une demande a été déposée pendant la session du formulaire.</summary>
     Public ReadOnly Property ModificationEnregistree As Boolean
         Get
             Return _modifie
@@ -61,11 +61,33 @@ Public Class FrmGroupesStatistiques
             Return
         End If
 
+        AjusterAuxDroits()
+
 
         ChargerListe()
 
         If _nomAPreremplir.Length > 0 Then
             PreparerCreation(_nomAPreremplir)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' N'ouvre la saisie qu'à un inputer. Les autres gardent l'écran en consultation :
+    ''' pouvoir relire le référentiel n'est pas pouvoir le changer.
+    ''' </summary>
+    Private Sub AjusterAuxDroits()
+
+        Dim saisit As Boolean = SessionWU.PeutSaisirLesPointsDeVente
+
+        btnNouveau.Enabled = saisit
+        btnEnregistrer.Enabled = saisit
+        btnSupprimer.Enabled = saisit
+        btnSynchroniser.Enabled = saisit
+
+        If saisit Then
+            lblStatut.Text = "Toute saisie part en attente : elle prendra effet après autorisation."
+        Else
+            lblStatut.Text = "Consultation seule : la saisie est réservée à la fonction « inputer »."
         End If
     End Sub
 
@@ -367,37 +389,22 @@ Public Class FrmGroupesStatistiques
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            Dim reussi As Boolean = If(insertion,
-                                       PdvRepository.AjouterGroupe(groupe, messageErreur),
-                                       PdvRepository.ModifierGroupe(groupe, messageErreur))
 
-            If Not reussi Then
-                MessageBox.Show(messageErreur, "Enregistrement impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' Le groupe ne part pas dans T_GroupeStatistique mais dans la file des demandes.
+            ' L'alignement des sous-agents qui suivait aussitôt l'enregistrement se fera à
+            ' l'autorisation, dans la même transaction : le groupe et son miroir dans T_Pdv_SA
+            ' ne peuvent pas diverger.
+            Dim demande As DemandeWU = DemandeWU.DepuisGroupe(
+                groupe, If(insertion, OperationWU.Creation, OperationWU.Modification))
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
             _modifie = True
-            Dim creation As Boolean = insertion
             _enCreation = False
-
-            ' Le groupe est la source de vérité ; les colonnes de T_Pdv_SA en sont le miroir,
-            ' que la comptabilisation quotidienne continue de lire. Elles sont donc réalignées
-            ' aussitôt — sans quoi la pièce comptable utiliserait les anciens comptes.
-            Dim nombreSynchronises As Integer = 0
-            Dim erreurSynchro As String = String.Empty
-
-            If PdvRepository.SynchroniserSousAgentsDuGroupe(groupe, nombreSynchronises, erreurSynchro) Then
-                lblStatut.Text = If(creation,
-                                    $"Groupe « {groupe.Nom} » créé.",
-                                    $"Groupe « {groupe.Nom} » modifié ; {nombreSynchronises} sous-agent(s) réaligné(s).")
-            Else
-                MessageBox.Show(
-                    erreurSynchro & Environment.NewLine & Environment.NewLine &
-                    $"Le groupe « {groupe.Nom} » a bien été enregistré, mais ses sous-agents portent encore " &
-                    "les anciennes valeurs." & Environment.NewLine &
-                    "Utilisez « Synchroniser les sous-agents » pour les réaligner.",
-                    "Sous-agents non réalignés", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            End If
+            lblStatut.Text = $"{demande.Intitule} — demande déposée, en attente d'autorisation."
 
         Finally
             Cursor = Cursors.Default
@@ -431,8 +438,11 @@ Public Class FrmGroupesStatistiques
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            If Not PdvRepository.SupprimerGroupe(groupe.Nom, messageErreur) Then
-                MessageBox.Show(messageErreur, "Suppression impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+
+            Dim demande As DemandeWU = DemandeWU.DepuisGroupe(groupe, OperationWU.Suppression)
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
@@ -462,23 +472,29 @@ Public Class FrmGroupesStatistiques
             $"    compte d'activité    : {groupe.CompteActivite}" & Environment.NewLine &
             $"    compte de commission : {groupe.CompteCommission}" & Environment.NewLine &
             $"    taux                 : {groupe.Taux:0.00}" & Environment.NewLine & Environment.NewLine &
-            "Les valeurs actuellement portées par ces sous-agents seront écrasées.",
+            "Les valeurs actuellement portées par ces sous-agents seront écrasées, " &
+            "une fois la demande autorisée.",
             "Synchroniser les sous-agents", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
 
         If reponse <> DialogResult.Yes Then Return
 
         Cursor = Cursors.WaitCursor
         Try
-            Dim nombreModifies As Integer = 0
             Dim messageErreur As String = String.Empty
 
-            If Not PdvRepository.SynchroniserSousAgentsDuGroupe(groupe, nombreModifies, messageErreur) Then
-                MessageBox.Show(messageErreur, "Synchronisation impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' La synchronisation réécrit les comptes et le taux de TOUS les sous-agents du
+            ' groupe d'un seul coup : c'est l'écriture la plus lourde de l'application, et donc
+            ' celle qu'il serait le moins acceptable de laisser passer sans second regard.
+            Dim demande As DemandeWU = DemandeWU.DepuisGroupe(groupe, OperationWU.Synchronisation)
+
+            If Not DemandeRepository.Soumettre(demande, messageErreur) Then
+                MessageBox.Show(messageErreur, "Demande non déposée", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
             _modifie = True
-            lblStatut.Text = $"{nombreModifies} sous-agent(s) du groupe « {groupe.Nom} » réaligné(s)."
+            lblStatut.Text = $"Synchronisation du groupe « {groupe.Nom} » — demande déposée, " &
+                             "en attente d'autorisation."
 
         Finally
             Cursor = Cursors.Default

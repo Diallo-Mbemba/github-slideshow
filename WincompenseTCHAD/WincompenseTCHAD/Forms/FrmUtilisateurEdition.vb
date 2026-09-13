@@ -43,6 +43,8 @@ Public Class FrmUtilisateurEdition
     Private Sub FrmUtilisateurEdition_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
         cboRole.Items.AddRange(UtilisateurWU.RolesProposes)
+        cboFonction.Items.AddRange(UtilisateurWU.FonctionsProposees)
+        cboFonction.SelectedIndex = 0
 
         lblRegles.Text =
             $"Le mot de passe initial comporte au moins {MotDePasseService.LONGUEUR_MINIMALE} caractères, " &
@@ -56,6 +58,7 @@ Public Class FrmUtilisateurEdition
         End If
 
         AfficherDroits()
+        AccorderLaFonctionAuRole()
     End Sub
 
     Private Sub PreparerCreation()
@@ -91,6 +94,7 @@ Public Class FrmUtilisateurEdition
 
         txtNomComplet.Text = _existant.NomComplet
         cboRole.SelectedItem = _existant.LibelleRole
+        cboFonction.SelectedItem = _existant.LibelleFonction
         chkActif.Checked = _existant.Actif
 
         ' Le mot de passe ne se modifie pas ici : les champs disparaissent plutôt que d'être
@@ -118,13 +122,14 @@ Public Class FrmUtilisateurEdition
                                  "Aucun accès au paramétrage."
 
             Case RoleWU.Commercial
-                lblDroits.Text = "Crée et modifie les sous-agents, les agences propres et les groupes " &
-                                 "statistiques. Consulte les rapports d'activité. " &
-                                 "Aucun accès au traitement de la compense."
+                lblDroits.Text = "Consulte les sous-agents, les agences propres et les groupes " &
+                                 "statistiques, et les rapports d'activité. Ce qu'il peut y faire " &
+                                 "dépend de la fonction ci-dessous. Aucun accès à la compense."
 
             Case RoleWU.Administrateur
                 lblDroits.Text = "Tous les droits des deux autres rôles, plus les comptes systèmes " &
-                                 "de la pièce comptable et la gestion des utilisateurs."
+                                 "de la pièce comptable et la gestion des utilisateurs. Sur le " &
+                                 "référentiel, il est soumis au double regard comme les autres."
 
             Case Else
                 lblDroits.Text = "Aucun rôle sélectionné : le compte n'aurait accès à rien."
@@ -133,7 +138,28 @@ Public Class FrmUtilisateurEdition
 
     Private Sub cboRole_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboRole.SelectedIndexChanged
         AfficherDroits()
+        AccorderLaFonctionAuRole()
     End Sub
+
+    ''' <summary>
+    ''' Un agent de la compense n'a aucun accès au référentiel : lui attribuer une fonction
+    ''' n'aurait aucun effet, et laisser le choix ouvert laisserait croire le contraire.
+    ''' </summary>
+    Private Sub AccorderLaFonctionAuRole()
+
+        Dim role As RoleWU = UtilisateurWU.RoleDepuisLibelleLisible(Convert.ToString(cboRole.SelectedItem))
+        Dim concerne As Boolean = role = RoleWU.Commercial OrElse role = RoleWU.Administrateur
+
+        cboFonction.Enabled = concerne
+        If Not concerne Then cboFonction.SelectedIndex = 0
+    End Sub
+
+    ''' <summary>Fonction retenue dans la liste déroulante.</summary>
+    Private Function FonctionChoisie() As FonctionWU
+
+        If Not cboFonction.Enabled Then Return FonctionWU.Aucune
+        Return UtilisateurWU.FonctionDepuisLibelleLisible(Convert.ToString(cboFonction.SelectedItem))
+    End Function
 
 #End Region
 
@@ -154,6 +180,7 @@ Public Class FrmUtilisateurEdition
             .Identifiant = txtIdentifiant.Text.Trim(),
             .NomComplet = txtNomComplet.Text.Trim(),
             .Role = UtilisateurWU.RoleDepuisLibelleLisible(Convert.ToString(cboRole.SelectedItem)),
+            .Fonction = FonctionChoisie(),
             .Actif = chkActif.Checked
         }
 
