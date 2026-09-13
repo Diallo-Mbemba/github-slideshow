@@ -680,8 +680,18 @@ Public Class FrmSousAgents
     ''' </summary>
     Private Sub btnParGroupe_Click(sender As Object, e As EventArgs) Handles btnParGroupe.Click
 
-        ' Non modal : l'utilisateur consulte la liste tout en modifiant une fiche. Le formulaire
-        ' se libère seul à sa fermeture (pas de Using : sa durée de vie dépasse cette méthode).
+        ' Dans le conteneur MDI, l'état s'ouvre comme fenêtre fille : il se range avec les
+        ' autres et se retrouve dans le menu Fenêtres. Hors MDI — si l'écran a été ouvert en
+        ' boîte de dialogue — il reste une fenêtre flottante non modale, l'utilisateur devant
+        ' pouvoir consulter la liste tout en modifiant une fiche.
+        Dim principal As FrmPrincipal = TryCast(Me.MdiParent, FrmPrincipal)
+
+        If principal IsNot Nothing Then
+            principal.AfficherEnfant(Of FrmSousAgentsParGroupe)()
+            Return
+        End If
+
+        ' Pas de Using : la durée de vie du formulaire dépasse celle de cette méthode.
         Dim etat As New FrmSousAgentsParGroupe()
         etat.Show(Me)
     End Sub

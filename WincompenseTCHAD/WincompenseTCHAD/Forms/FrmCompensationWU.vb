@@ -57,7 +57,7 @@ Public Class FrmCompensationWU
 
 #End Region
 
-#Region "Démarrage et paramétrage des comptes"
+#Region "Démarrage"
 
     ''' <summary>
     ''' Au démarrage, les comptes comptables de la pièce sont lus dans la table SystemeWU.
@@ -76,32 +76,8 @@ Public Class FrmCompensationWU
     End Sub
 
     ''' <summary>
-    ''' Ouvre le paramétrage des comptes comptables. Les comptes modifiés sont pris en compte
-    ''' immédiatement ; une pièce déjà calculée, elle, n'est pas recalculée — l'utilisateur est
-    ''' donc invité à relancer le calcul pour qu'elle reflète le nouveau paramétrage.
-    ''' </summary>
-    Private Sub btnParametres_Click(sender As Object, e As EventArgs) Handles btnParametres.Click
-
-        Using formulaire As New FrmComptesSysteme()
-            formulaire.ShowDialog(Me)
-
-            If Not formulaire.ModificationEnregistree Then Return
-
-            tsslStatut.Text = "Comptes comptables mis à jour."
-
-            If _listeCalculs IsNot Nothing AndAlso _listeCalculs.Count > 0 Then
-                MessageBox.Show(
-                    "Les comptes comptables ont été modifiés." & Environment.NewLine & Environment.NewLine &
-                    "Relancez « Afficher / Calculer » avant de générer la pièce, afin qu'elle " &
-                    "utilise bien le nouveau paramétrage.",
-                    "Paramétrage modifié", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-        End Using
-    End Sub
-
-    ''' <summary>
-    ''' Enregistre la journée dans l'historique (table T_HistoriqueWU), source des rapports
-    ''' d'activité sur une période.
+    ''' Enregistre la journée dans l'historique (tables T_HistoriqueWU et T_HistoriqueMTCN),
+    ''' source des rapports d'activité sur une période.
     '''
     ''' L'échec de l'historisation n'annule JAMAIS la pièce comptable : celle-ci est déjà
     ''' générée et équilibrée, elle reste la priorité. L'utilisateur est simplement averti que
@@ -134,58 +110,6 @@ Public Class FrmCompensationWU
             "Journée non historisée", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         tsslStatut.Text &= "  |  Journée NON historisée."
-    End Sub
-
-    ''' <summary>
-    ''' Ouvre le rapport d'activité sur une période. Fenêtre non modale : elle peut rester
-    ''' affichée pendant la comptabilisation d'une nouvelle journée.
-    ''' </summary>
-    Private Sub btnRapport_Click(sender As Object, e As EventArgs) Handles btnRapport.Click
-        Dim rapport As New FrmRapportActivite()
-        rapport.Show(Me)
-    End Sub
-
-    ''' <summary>
-    ''' Ouvre la gestion des groupes statistiques (T_GroupeStatistique), qui portent le compte
-    ''' d'activité, le compte de commission et le taux dont les sous-agents héritent.
-    ''' </summary>
-    Private Sub btnGroupes_Click(sender As Object, e As EventArgs) Handles btnGroupes.Click
-        Using formulaire As New FrmGroupesStatistiques()
-            formulaire.ShowDialog(Me)
-        End Using
-        SignalerParametrageModifie("des groupes statistiques")
-    End Sub
-
-    ''' <summary>
-    ''' Ouvre la gestion des sous-agents (T_Pdv_SA). À la fermeture, un calcul déjà affiché est
-    ''' invalidé : les points de vente ont pu changer, la grille de contrôle ne reflète donc
-    ''' plus le paramétrage. L'utilisateur est invité à relancer le calcul.
-    ''' </summary>
-    Private Sub btnSousAgents_Click(sender As Object, e As EventArgs) Handles btnSousAgents.Click
-        Using formulaire As New FrmSousAgents()
-            formulaire.ShowDialog(Me)
-        End Using
-        SignalerParametrageModifie("des sous-agents")
-    End Sub
-
-    ''' <summary>Ouvre la gestion des agences propres Ecobank (T_Pdv_EC).</summary>
-    Private Sub btnAgences_Click(sender As Object, e As EventArgs) Handles btnAgences.Click
-        Using formulaire As New FrmAgences()
-            formulaire.ShowDialog(Me)
-        End Using
-        SignalerParametrageModifie("des agences")
-    End Sub
-
-    ''' <summary>
-    ''' Avertit que le calcul affiché peut être devenu obsolète après un passage dans un écran
-    ''' de paramétrage. Le formulaire ne sait pas si une modification a réellement eu lieu : il
-    ''' vaut mieux une invitation inutile qu'une pièce comptable établie sur un paramétrage périmé.
-    ''' </summary>
-    Private Sub SignalerParametrageModifie(quoi As String)
-
-        If _listeCalculs Is Nothing OrElse _listeCalculs.Count = 0 Then Return
-
-        tsslStatut.Text = $"Paramétrage {quoi} éventuellement modifié : relancez le calcul."
     End Sub
 
 #End Region

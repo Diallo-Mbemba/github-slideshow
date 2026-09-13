@@ -85,6 +85,12 @@
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
+    <Compile Include="Forms\FrmPrincipal.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmPrincipal.Designer.vb">
+      <DependentUpon>FrmPrincipal.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmCompensationWU.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -137,6 +143,9 @@
     <Compile Include="Program.vb" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Forms\FrmPrincipal.resx">
+      <DependentUpon>FrmPrincipal.vb</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmCompensationWU.resx">
       <DependentUpon>FrmCompensationWU.vb</DependentUpon>
     </EmbeddedResource>

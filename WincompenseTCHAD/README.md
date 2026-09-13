@@ -13,6 +13,34 @@ en VB.NET (.NET Framework 4.8 / Visual Studio 2019 / SQL Server Express).
    `.\SQLEXPRESS` pour créer les tables `T_Pdv_SA` / `T_Pdv_EC` et les données de test.
 5. Compiler et lancer (F5).
 
+## L'application : une fenêtre MDI
+
+`FrmPrincipal` est le conteneur MDI et le point d'accès unique aux écrans. Chacun s'ouvre en
+fenêtre fille, ce qui permet d'en consulter plusieurs à la fois — comparer un rapport d'activité
+et le paramétrage d'un sous-agent, par exemple — là où des boîtes de dialogue modales
+l'interdisaient.
+
+| Menu | Écrans |
+|---|---|
+| **Compensation** | Traitement de la compense, Rapport d'activité |
+| **Paramétrage** | Sous-agents, Agences propres, Groupes statistiques, Comptes systèmes |
+| **Fenêtres** | Cascade, mosaïques, fermeture de toutes les fenêtres, et la liste des fenêtres ouvertes |
+
+**Un écran déjà ouvert n'est jamais dupliqué** : il est ramené au premier plan, et rétabli s'il
+était réduit. Sans cette règle, dix clics sur un menu produiraient dix copies de la même liste,
+chacune avec ses propres données, et l'utilisateur ne saurait plus laquelle fait foi.
+
+Les boutons de paramétrage qui encombraient l'écran de traitement ont disparu : le menu les
+porte désormais, et les deux libellés de fichiers chargés occupent toute la largeur. Restent
+seuls sur cet écran les boutons de son propre enchaînement — charger, calculer, générer.
+
+La barre d'état rappelle en permanence **le serveur et la base** auxquels l'application est
+reliée : une confusion entre l'environnement de test et la production se voit immédiatement.
+
+Deux ouvertures restent volontairement **modales**, parce qu'elles appartiennent à un
+enchaînement et non à la navigation : la création d'un groupe depuis la fiche d'un sous-agent
+(bouton « … ») et l'affichage d'une pièce comptable.
+
 ## Architecture
 
 ```
@@ -41,6 +69,7 @@ WincompenseTCHAD/
     │   ├── WUCalculationService.vb         ' Formules, répartition, arrondi
     │   └── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     └── Forms/
+        ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
         ├── FrmCompensationWU.Designer.vb
         ├── FrmCompensationWU.resx

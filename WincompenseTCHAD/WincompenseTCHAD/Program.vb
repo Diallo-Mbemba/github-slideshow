@@ -10,7 +10,8 @@ Module Program
     Sub Main()
         Application.EnableVisualStyles()
         Application.SetCompatibleTextRenderingDefault(False)
-        Application.Run(New FrmCompensationWU())
+        ' La fenêtre MDI est le point d'entrée : elle ouvre elle-même l'écran de traitement.
+        Application.Run(New FrmPrincipal())
     End Sub
 
 End Module
