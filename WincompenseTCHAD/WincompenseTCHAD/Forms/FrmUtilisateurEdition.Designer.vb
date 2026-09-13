@@ -31,6 +31,7 @@ Partial Class FrmUtilisateurEdition
         Me.lblDroits = New System.Windows.Forms.Label()
         Me.lblFonction = New System.Windows.Forms.Label()
         Me.cboFonction = New System.Windows.Forms.ComboBox()
+        Me.lblAideFonction = New System.Windows.Forms.Label()
         Me.chkActif = New System.Windows.Forms.CheckBox()
         Me.lblMotDePasse = New System.Windows.Forms.Label()
         Me.txtMotDePasse = New System.Windows.Forms.TextBox()
@@ -144,11 +145,20 @@ Partial Class FrmUtilisateurEdition
         Me.cboFonction.Size = New System.Drawing.Size(332, 24)
         Me.cboFonction.TabIndex = 21
         '
+        'lblAideFonction
+        '
+        Me.lblAideFonction.ForeColor = System.Drawing.SystemColors.GrayText
+        Me.lblAideFonction.Location = New System.Drawing.Point(176, 268)
+        Me.lblAideFonction.Name = "lblAideFonction"
+        Me.lblAideFonction.Size = New System.Drawing.Size(332, 20)
+        Me.lblAideFonction.TabIndex = 22
+        Me.lblAideFonction.Text = "Facultative : elle s'attribue aussi plus tard."
+        '
         'chkActif
         '
         Me.chkActif.Checked = True
         Me.chkActif.CheckState = System.Windows.Forms.CheckState.Checked
-        Me.chkActif.Location = New System.Drawing.Point(176, 278)
+        Me.chkActif.Location = New System.Drawing.Point(176, 302)
         Me.chkActif.Name = "chkActif"
         Me.chkActif.Size = New System.Drawing.Size(332, 24)
         Me.chkActif.TabIndex = 8
@@ -157,7 +167,7 @@ Partial Class FrmUtilisateurEdition
         '
         'lblMotDePasse
         '
-        Me.lblMotDePasse.Location = New System.Drawing.Point(18, 312)
+        Me.lblMotDePasse.Location = New System.Drawing.Point(18, 336)
         Me.lblMotDePasse.Name = "lblMotDePasse"
         Me.lblMotDePasse.Size = New System.Drawing.Size(152, 24)
         Me.lblMotDePasse.TabIndex = 9
@@ -166,7 +176,7 @@ Partial Class FrmUtilisateurEdition
         '
         'txtMotDePasse
         '
-        Me.txtMotDePasse.Location = New System.Drawing.Point(176, 310)
+        Me.txtMotDePasse.Location = New System.Drawing.Point(176, 334)
         Me.txtMotDePasse.MaxLength = 128
         Me.txtMotDePasse.Name = "txtMotDePasse"
         Me.txtMotDePasse.Size = New System.Drawing.Size(332, 22)
@@ -175,7 +185,7 @@ Partial Class FrmUtilisateurEdition
         '
         'lblConfirmation
         '
-        Me.lblConfirmation.Location = New System.Drawing.Point(18, 348)
+        Me.lblConfirmation.Location = New System.Drawing.Point(18, 372)
         Me.lblConfirmation.Name = "lblConfirmation"
         Me.lblConfirmation.Size = New System.Drawing.Size(152, 24)
         Me.lblConfirmation.TabIndex = 11
@@ -184,7 +194,7 @@ Partial Class FrmUtilisateurEdition
         '
         'txtConfirmation
         '
-        Me.txtConfirmation.Location = New System.Drawing.Point(176, 346)
+        Me.txtConfirmation.Location = New System.Drawing.Point(176, 370)
         Me.txtConfirmation.MaxLength = 128
         Me.txtConfirmation.Name = "txtConfirmation"
         Me.txtConfirmation.Size = New System.Drawing.Size(332, 22)
@@ -194,7 +204,7 @@ Partial Class FrmUtilisateurEdition
         'lblRegles
         '
         Me.lblRegles.ForeColor = System.Drawing.Color.DimGray
-        Me.lblRegles.Location = New System.Drawing.Point(18, 376)
+        Me.lblRegles.Location = New System.Drawing.Point(18, 400)
         Me.lblRegles.Name = "lblRegles"
         Me.lblRegles.Size = New System.Drawing.Size(490, 44)
         Me.lblRegles.TabIndex = 13
@@ -203,7 +213,7 @@ Partial Class FrmUtilisateurEdition
         'lblMessage
         '
         Me.lblMessage.ForeColor = System.Drawing.Color.Firebrick
-        Me.lblMessage.Location = New System.Drawing.Point(18, 422)
+        Me.lblMessage.Location = New System.Drawing.Point(18, 446)
         Me.lblMessage.Name = "lblMessage"
         Me.lblMessage.Size = New System.Drawing.Size(490, 32)
         Me.lblMessage.TabIndex = 14
@@ -211,7 +221,7 @@ Partial Class FrmUtilisateurEdition
         '
         'btnEnregistrer
         '
-        Me.btnEnregistrer.Location = New System.Drawing.Point(232, 458)
+        Me.btnEnregistrer.Location = New System.Drawing.Point(232, 482)
         Me.btnEnregistrer.Name = "btnEnregistrer"
         Me.btnEnregistrer.Size = New System.Drawing.Size(134, 34)
         Me.btnEnregistrer.TabIndex = 15
@@ -220,7 +230,7 @@ Partial Class FrmUtilisateurEdition
         '
         'btnAnnuler
         '
-        Me.btnAnnuler.Location = New System.Drawing.Point(374, 458)
+        Me.btnAnnuler.Location = New System.Drawing.Point(374, 482)
         Me.btnAnnuler.Name = "btnAnnuler"
         Me.btnAnnuler.Size = New System.Drawing.Size(134, 34)
         Me.btnAnnuler.TabIndex = 16
@@ -233,7 +243,7 @@ Partial Class FrmUtilisateurEdition
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnAnnuler
-        Me.ClientSize = New System.Drawing.Size(520, 504)
+        Me.ClientSize = New System.Drawing.Size(520, 528)
         Me.Controls.Add(Me.btnAnnuler)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.lblMessage)
@@ -243,6 +253,7 @@ Partial Class FrmUtilisateurEdition
         Me.Controls.Add(Me.txtMotDePasse)
         Me.Controls.Add(Me.lblMotDePasse)
         Me.Controls.Add(Me.chkActif)
+        Me.Controls.Add(Me.lblAideFonction)
         Me.Controls.Add(Me.cboFonction)
         Me.Controls.Add(Me.lblFonction)
         Me.Controls.Add(Me.lblDroits)
@@ -276,6 +287,7 @@ Partial Class FrmUtilisateurEdition
     Friend WithEvents lblDroits As System.Windows.Forms.Label
     Friend WithEvents lblFonction As System.Windows.Forms.Label
     Friend WithEvents cboFonction As System.Windows.Forms.ComboBox
+    Friend WithEvents lblAideFonction As System.Windows.Forms.Label
     Friend WithEvents chkActif As System.Windows.Forms.CheckBox
     Friend WithEvents lblMotDePasse As System.Windows.Forms.Label
     Friend WithEvents txtMotDePasse As System.Windows.Forms.TextBox

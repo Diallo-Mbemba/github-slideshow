@@ -152,6 +152,16 @@ Public Class FrmUtilisateurEdition
 
         cboFonction.Enabled = concerne
         If Not concerne Then cboFonction.SelectedIndex = 0
+
+        If Not concerne Then
+            lblAideFonction.Text = "Sans objet : ce rôle n'a aucun accès au référentiel."
+        ElseIf _existant Is Nothing AndAlso _premierAdministrateur Then
+            ' Le premier administrateur peut se passer de fonction : il commencera par créer
+            ' les comptes et leur attribuer inputer et authorizer.
+            lblAideFonction.Text = "Facultative. Vous pourrez l'attribuer ensuite, à vous comme aux autres."
+        Else
+            lblAideFonction.Text = "Facultative. Un inputer et un authorizer doivent être deux personnes."
+        End If
     End Sub
 
     ''' <summary>Fonction retenue dans la liste déroulante.</summary>
