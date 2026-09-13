@@ -46,11 +46,6 @@ Public Class FrmChangerMotDePasse
 
     Private Sub FrmChangerMotDePasse_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
-        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
-        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
-        ThemeWU.Appliquer(Me, String.Empty, btnValider)
-        DimensionsWU.Adapter(Me, False)
-
         lblUtilisateur.Text = $"Compte « {_identifiant} »"
 
         lblRegles.Text =

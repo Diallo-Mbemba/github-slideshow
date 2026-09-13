@@ -43,11 +43,6 @@ Public Class FrmSousAgentsParGroupe
 #Region "Chargement"
 
     Private Sub FrmSousAgentsParGroupe_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
-        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
-        ThemeWU.Appliquer(Me, "Sous-agents par groupe statistique", btnExporter)
-        DimensionsWU.Adapter(Me, True)
         ChargerDonnees()
     End Sub
 

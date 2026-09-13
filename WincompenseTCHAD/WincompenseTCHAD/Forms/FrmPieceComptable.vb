@@ -42,16 +42,6 @@ Public Class FrmPieceComptable
 
 #Region "Affichage"
 
-    Private Sub FrmPieceComptable_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-        ' Le bandeau nomme l'écran ; lblTitre continue d'annoncer de quelle pièce il s’agit.
-        ' Les deux ne font pas double emploi : l’un est fixe, l’autre change à chaque pièce.
-        ThemeWU.Appliquer(Me, "Pièce comptable", btnOuvrirExcel)
-        ' Pas de remplissage : cette pièce s'ouvre en boîte de dialogue modale. L'étirer sur
-        ' tout l'écran masquerait l'écran de traitement d'où elle vient.
-        DimensionsWU.Adapter(Me, False)
-    End Sub
-
     Private Sub AfficherPiece()
 
         dgvPiece.DataSource = _dtPiece

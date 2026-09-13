@@ -42,11 +42,6 @@ Public Class FrmUtilisateurEdition
 
     Private Sub FrmUtilisateurEdition_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
-        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
-        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
-        ThemeWU.Appliquer(Me, String.Empty, btnEnregistrer)
-        DimensionsWU.Adapter(Me, False)
-
         cboRole.Items.AddRange(UtilisateurWU.RolesProposes)
 
         lblRegles.Text =

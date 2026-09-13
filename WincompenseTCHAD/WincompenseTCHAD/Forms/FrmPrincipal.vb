@@ -185,12 +185,6 @@ Public Class FrmPrincipal
 
     Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
-        ' Le conteneur MDI ne reçoit pas de bandeau : son menu tient déjà ce rôle. Il reçoit en
-        ' revanche la police commune et le fond de sa zone de travail, gris Windows par défaut.
-        ThemeWU.Appliquer(Me, String.Empty)
-        ThemeWU.HabillerZoneMdi(Me)
-        DimensionsWU.AdapterFenetrePrincipale(Me)
-
         AppliquerLesDroits()
         AfficherEtatBase()
 

@@ -59,12 +59,6 @@ Public NotInheritable Class PieceComptableService
         dt.Columns.Add("TotalCredit", GetType(Decimal))
         dt.Columns.Add("Solde", GetType(Decimal))
         dt.Columns.Add("EcartArrondi", GetType(Long))
-
-        ' Raison de l'anomalie, en toutes lettres. La couleur de la ligne donne la gravité,
-        ' cette colonne donne le cas exact : sans elle, l'agent voit qu'il y a un problème
-        ' sans savoir lequel.
-        dt.Columns.Add("Etat", GetType(String))
-
         dt.Columns.Add("ErreurSQL", GetType(Boolean))
         dt.Columns.Add("DonneesManquantes", GetType(Boolean))
 
@@ -100,14 +94,9 @@ Public NotInheritable Class PieceComptableService
             ligne("TotalDebit") = calc.TotalDebit
             ligne("TotalCredit") = calc.TotalCredit
             ligne("Solde") = calc.Solde
-
-            Dim ecart As Long = CalculerEcartArrondi(calc)
-            ligne("EcartArrondi") = ecart
+            ligne("EcartArrondi") = CalculerEcartArrondi(calc)
             ligne("ErreurSQL") = calc.ErreurSQL
             ligne("DonneesManquantes") = calc.DonneesManquantes
-
-            ligne("Etat") = EtatLigneWU.Determiner(calc.ErreurSQL, calc.DonneesManquantes,
-                                                   calc.TypePdv, calc.Solde, ecart).Libelle
 
             dt.Rows.Add(ligne)
         Next

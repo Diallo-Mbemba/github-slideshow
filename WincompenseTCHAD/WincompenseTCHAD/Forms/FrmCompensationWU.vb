@@ -15,9 +15,6 @@ Imports System.Linq
 ''' </summary>
 Public Class FrmCompensationWU
 
-    ''' <summary>Nom de l'entrée de légende, pour ne pas la poser deux fois.</summary>
-    Private Const NOM_LEGENDE As String = "tsslLegendeWU"
-
     ''' <summary>Constructeur requis par le Concepteur Windows Forms : initialise tous les contrôles.</summary>
     Public Sub New()
         InitializeComponent()
@@ -69,11 +66,6 @@ Public Class FrmCompensationWU
     ''' mais avec un paramétrage qui n'est peut-être plus celui de la Direction Comptable.
     ''' </summary>
     Private Sub FrmCompensationWU_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
-        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
-        ThemeWU.Appliquer(Me, "Traitement de la compense", btnAfficher)
-        DimensionsWU.Adapter(Me, True)
 
         If Not SessionWU.PeutTraiterLaCompense Then
             MessageBox.Show("Le traitement de la compense est réservé aux agents de la compense et aux administrateurs.",
@@ -372,7 +364,6 @@ Public Class FrmCompensationWU
             FormaterColonnesNumeriques()
             MasquerColonnesTechniques()
             MettreEnEvidenceAnomalies()
-            PoserLegendeDesEtats()
 
             tsslLignesActivite.Text = $"Lignes activité : {dtActivite.Rows.Count}"
             tsslLignesReglement.Text = $"Lignes règlement : {dtReglement.Rows.Count}"
@@ -529,12 +520,6 @@ Public Class FrmCompensationWU
             dgvControle.Columns("TauxSA").DefaultCellStyle.Format = "P1"
         End If
 
-        ' Le nom de la colonne vient de la DataTable et ne porte pas d'accent : l'en-tête, si.
-        If dgvControle.Columns.Contains("Etat") Then
-            dgvControle.Columns("Etat").HeaderText = "État"
-            dgvControle.Columns("Etat").MinimumWidth = 130
-        End If
-
         ' L'écart d'arrondi est un montant entier en FCFA (0 ou ±1 en fonctionnement normal).
         If dgvControle.Columns.Contains("EcartArrondi") Then
             dgvControle.Columns("EcartArrondi").DefaultCellStyle.Format = "N0"
@@ -552,95 +537,35 @@ Public Class FrmCompensationWU
     End Sub
 
     ''' <summary>
-    ''' Colore les lignes selon leur gravité et nomme la raison dans la colonne « État ».
-    '''
-    ''' Les cinq cas d'origine sont conservés — erreur SQL, Account inconnu, paramétrage absent,
-    ''' écart d'arrondi anormal, solde non nul — mais ils ne sont plus rendus par cinq pastels
-    ''' que rien ne distinguait à l'œil. La couleur ne porte que la gravité, sur trois niveaux,
-    ''' et le libellé porte la raison exacte.
+    ''' Met en évidence visuellement (section 12) : Type INCONNU, Solde ≠ 0, erreur SQL, données manquantes.
+    ''' L'ordre ci-dessous reflète la priorité de gravité (erreur SQL prioritaire sur le reste).
     ''' </summary>
     Private Sub MettreEnEvidenceAnomalies()
-
-        Dim policeEtat As New Font(dgvControle.Font, FontStyle.Bold)
-
         For Each ligne As DataGridViewRow In dgvControle.Rows
 
-            Dim etat As EtatLigneWU = EtatLigneWU.Determiner(
-                Convert.ToBoolean(ligne.Cells("ErreurSQL").Value),
-                Convert.ToBoolean(ligne.Cells("DonneesManquantes").Value),
-                Convert.ToString(ligne.Cells("Type").Value),
-                Convert.ToDecimal(ligne.Cells("Solde").Value),
-                Convert.ToInt64(ligne.Cells("EcartArrondi").Value))
+            Dim erreurSql As Boolean = Convert.ToBoolean(ligne.Cells("ErreurSQL").Value)
+            Dim donneesManquantes As Boolean = Convert.ToBoolean(ligne.Cells("DonneesManquantes").Value)
+            Dim type As String = Convert.ToString(ligne.Cells("Type").Value)
+            Dim solde As Decimal = Convert.ToDecimal(ligne.Cells("Solde").Value)
+            Dim ecartArrondi As Long = Convert.ToInt64(ligne.Cells("EcartArrondi").Value)
 
-            If etat.EstNormale Then
-                ' Ligne saine : on la laisse au style de la grille, alternance comprise.
-                ligne.DefaultCellStyle.BackColor = Color.Empty
-                ligne.DefaultCellStyle.ForeColor = Color.Empty
-                Continue For
+            If erreurSql Then
+                ligne.DefaultCellStyle.BackColor = Color.MistyRose
+                ligne.DefaultCellStyle.ForeColor = Color.DarkRed
+            ElseIf String.Equals(type, "INCONNU", StringComparison.OrdinalIgnoreCase) Then
+                ligne.DefaultCellStyle.BackColor = Color.LightYellow
+            ElseIf donneesManquantes Then
+                ligne.DefaultCellStyle.BackColor = Color.Gainsboro
+            ElseIf Math.Abs(ecartArrondi) > ConstantesWU.SEUIL_ECART_LIGNE_ANORMAL Then
+                ' Écart trop important pour un simple arrondi : paramétrage probablement incomplet.
+                ligne.DefaultCellStyle.BackColor = Color.LightSalmon
+            ElseIf solde <> 0D Then
+                ligne.DefaultCellStyle.BackColor = Color.Khaki
+            Else
+                ligne.DefaultCellStyle.BackColor = dgvControle.DefaultCellStyle.BackColor
             End If
-
-            ligne.DefaultCellStyle.BackColor = etat.Fond
-            ligne.DefaultCellStyle.ForeColor = etat.Encre
-
-            ' Une ligne en anomalie ne doit pas perdre sa couleur quand on la sélectionne :
-            ' c'est précisément celle qu'on vient de cliquer pour l'examiner.
-            ligne.DefaultCellStyle.SelectionBackColor = etat.Fond
-            ligne.DefaultCellStyle.SelectionForeColor = etat.Encre
-
-            If Not dgvControle.Columns.Contains("Etat") Then Continue For
-
-            ' Le filet coloré de la maquette demanderait un dessin personnalisé de chaque
-            ' cellule. Le libellé en gras et en couleur tient le même rôle pour bien moins cher.
-            With ligne.Cells("Etat").Style
-                .ForeColor = etat.Filet
-                .SelectionForeColor = etat.Filet
-                .Font = policeEtat
-            End With
         Next
     End Sub
-
-    ''' <summary>
-    ''' Ajoute la légende des trois niveaux de gravité dans la barre d'état.
-    '''
-    ''' Elle y est logée plutôt que sous la grille : la barre est déjà présente sur toute la
-    ''' largeur, elle reste visible quoi qu'il arrive, et aucun contrôle n'a besoin d'être
-    ''' déplacé pour lui faire place.
-    ''' </summary>
-    Private Sub PoserLegendeDesEtats()
-
-        If statusStripPrincipal.Items.ContainsKey(NOM_LEGENDE) Then Return
-
-        Dim separateur As New ToolStripStatusLabel() With {
-            .Name = NOM_LEGENDE,
-            .Text = "Gravité :",
-            .ForeColor = ThemeWU.ENCRE_DISCRETE,
-            .Margin = New Padding(12, 3, 2, 2)
-        }
-        statusStripPrincipal.Items.Add(separateur)
-
-        AjouterPastilleLegende(GraviteWU.Bloquant, "Bloquant")
-        AjouterPastilleLegende(GraviteWU.AVerifier, "À vérifier")
-        AjouterPastilleLegende(GraviteWU.Incomplet, "Incomplet")
-    End Sub
-
-    Private Sub AjouterPastilleLegende(gravite As GraviteWU, libelle As String)
-
-        Dim modele As EtatLigneWU = EtatLigneWU.Determiner(
-            gravite = GraviteWU.Bloquant,
-            gravite = GraviteWU.Incomplet,
-            If(gravite = GraviteWU.AVerifier, CalculWU.TYPE_INCONNU, "SA"),
-            0D, 0L)
-
-        statusStripPrincipal.Items.Add(New ToolStripStatusLabel() With {
-            .Text = "  " & libelle & "  ",
-            .BackColor = modele.Fond,
-            .ForeColor = modele.Filet,
-            .BorderSides = ToolStripStatusLabelBorderSides.All,
-            .BorderStyle = Border3DStyle.Flat,
-            .Margin = New Padding(2, 3, 2, 3)
-        })
-    End Sub
-
 
 #End Region
 

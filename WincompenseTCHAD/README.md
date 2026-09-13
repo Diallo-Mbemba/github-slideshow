@@ -49,99 +49,6 @@ Deux ouvertures restent volontairement **modales**, parce qu'elles appartiennent
 enchaînement et non à la navigation : la création d'un groupe depuis la fiche d'un sous-agent
 (bouton « … ») et l'affichage d'une pièce comptable.
 
-## Habillage des écrans
-
-La charte est portée par un seul fichier, `Services/ThemeWU.vb`, appliqué à l'ouverture de chaque
-fenêtre. Changer l'habillage se fait donc à un seul endroit, au lieu de reprendre treize fichiers
-`.Designer.vb` — que le concepteur de Visual Studio réécrit d'ailleurs à sa façon dès qu'on y ouvre
-un formulaire, ce qui défairait une partie du travail.
-
-**En contrepartie, l'aperçu du concepteur ne montre pas le thème.** Il ne se voit qu'à l'exécution
-(F5). C'est le prix de la réversibilité : supprimer les deux lignes ajoutées dans un `Load` rend
-l'écran à son apparence d'origine.
-
-### La charte (variante A, retenue par la banque)
-
-| Rôle | Couleur |
-|---|---|
-| Bandeau de titre | `#101010`, texte or `#FFD200` |
-| En-têtes de grille, bouton principal | Ardoise `#2E3A46` |
-| Fond des écrans | `#F5F6F8` |
-| Lignes alternées | `#FAFAFA` |
-| Quadrillage | `#E3E3E3` |
-| Fond de la zone MDI | `#20262C` |
-
-Police **Segoe UI 9 pt** sur les treize écrans, contre quatre auparavant — les neuf autres
-héritaient du Microsoft Sans Serif 8,25 pt de Windows Forms, la police par défaut de 2002. C'est le
-changement le plus discret et celui qui date le moins l'application.
-
-### Le bandeau, sur les treize écrans
-
-Hauteur unique de **44 px**, titre en 15 pt. Quatre écrans en portaient déjà un, encadré et en trois
-tailles différentes (24, 22 et 16 pt) : il cède la place au bandeau commun et ce qui le suivait
-remonte d'autant, la fenêtre rétrécissant de la différence.
-
-Les neuf autres le reçoivent sans qu'aucune coordonnée ne soit recalculée : leurs contrôles sont
-déplacés dans un panneau d'accueil qui occupe tout l'espace restant, si bien que leurs positions et
-leurs ancrages restent valables tels quels. La fenêtre grandit de 44 px pour que la zone de travail
-reste celle que le concepteur avait prévue.
-
-La fenêtre MDI fait exception : son menu tient déjà ce rôle.
-
-### Les grilles
-
-En-têtes ardoise sur texte blanc, lignes alternées, quadrillage clair, hauteur de ligne portée de 22
-à 24 px. La colonne d'en-tête de ligne disparaît : elle était vide, ne servait à rien ici, et coûtait
-25 px sur chacune des **quatorze grilles** de l'application.
-
-**La sélection n'efface plus la couleur d'anomalie.** Elle repeignait jusqu'ici toute la ligne en
-bleu Windows — y compris la couleur qu'on venait justement de cliquer pour l'examiner. Les lignes en
-anomalie conservent désormais leur fond quand on les sélectionne.
-
-### Trois niveaux de gravité, et la raison en toutes lettres
-
-La grille de contrôle distinguait cinq cas par cinq couleurs pastel, dont trois jaunâtres et deux
-rosées, sans aucune légende. Sur un écran de bureau ordinaire, un agent ne les distinguait pas, et
-rien ne lui disait ce que chacune signifiait.
-
-Les cinq cas sont **conservés** : c'est leur restitution qui change. La couleur ne porte plus que la
-gravité, sur trois niveaux nettement séparés ; la raison exacte est écrite dans une nouvelle colonne
-**« État »**, et une légende des trois niveaux s'affiche dans la barre d'état.
-
-| Gravité | Couleur | Cas |
-|---|---|---|
-| **Bloquant** | `#FDE7E5` / `#B42318` | Erreur SQL |
-| **À vérifier** | `#FEF3E2` / `#B54708` | Account inconnu · Écart anormal · Solde non nul |
-| **Incomplet** | `#F2F4F6` / `#98A2B3` | Paramétrage absent |
-
-L'ordre de priorité entre les cas est inchangé : erreur SQL d'abord, puis Account inconnu, puis
-données manquantes, puis écart d'arrondi anormal, puis solde non nul.
-
-### Les fenêtres s'adaptent à l'écran du poste
-
-Les dimensions posées par le concepteur — 1200 × 700 pour la fenêtre principale, 1184 × 629 pour le
-traitement de la compense, 1040 × 680 pour le rapport d'activité — supposaient un écran large. Sur un
-poste en 1366 × 768, la fenêtre du rapport d'activité ne tenait pas dans la zone MDI une fois le menu
-et la barre d'état déduits : une partie de la grille sortait de l'écran, hors d'atteinte.
-
-`Services/DimensionsWU.vb` ne vise plus aucune résolution particulière. Chaque fenêtre se mesure à la
-place réellement disponible au moment où elle s'ouvre — la zone MDI pour une fenêtre fille, la zone
-de travail de l'écran pour une fenêtre indépendante, barre des tâches déduite. Elle s'y réduit si
-elle est trop grande, et l'occupe à 97 % si son contenu gagne à s'étendre : c'est le cas des écrans
-de liste, pas celui des boîtes de dialogue, qu'il serait absurde d'étirer sur tout l'écran autour de
-quatre champs.
-
-Une taille minimale à 72 % de la taille d'origine empêche de réduire une fenêtre au point que ses
-contrôles ancrés se chevauchent — elle-même plafonnée à ce que l'écran peut afficher, faute de quoi
-une fenêtre deviendrait impossible à replacer sur un petit poste.
-
-### Ce qui manque encore
-
-**L'icône de l'application.** Aucun fichier `.ico` n'est fourni à ce jour : les fenêtres portent donc
-l'icône générique de Windows Forms. Dès qu'un `.ico` multi-résolutions (16, 32, 48 et 256 px) sera
-disponible, il suffira de le déclarer dans `ApplicationIcon` du `.vbproj` et de l'affecter aux
-formulaires.
-
 ## Architecture
 
 ```
@@ -159,8 +66,7 @@ WincompenseTCHAD/
     │   ├── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
     │   ├── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
     │   ├── TransactionWU.vb                ' Une transaction identifiée par son MTCN
-    │   ├── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
-    │   └── EtatLigneWU.vb                  ' Gravité et raison d'une ligne de la grille de contrôle
+    │   └── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
@@ -173,9 +79,7 @@ WincompenseTCHAD/
     │   ├── PieceComptableService.vb        ' Grille de contrôle, pièce comptable, équilibrage, export Excel
     │   ├── MotDePasseService.vb            ' Empreintes PBKDF2, robustesse, mots de passe provisoires
     │   ├── SessionWU.vb                    ' Utilisateur connecté et droits : point d'accès unique
-    │   ├── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
-    │   ├── ThemeWU.vb                      ' Charte visuelle : couleurs, polices, bandeau, grilles
-    │   └── DimensionsWU.vb                 ' Adaptation des fenêtres à l'écran du poste
+    │   └── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -915,7 +819,6 @@ charges pour un gain nul.
   commentaire à la fin de `Scripts\08_RolesSQLServer.sql` faute de connaître votre domaine.
 - Durée de vie d'un mot de passe : aucune expiration périodique n'est imposée aujourd'hui.
   Faut-il en ajouter une, et à quelle échéance ?
-- Icône de l'application : aucun fichier `.ico` n'a encore été fourni (voir « Habillage des écrans »).
 - Usage exact du compte inter bancaire 381000101 pour l'écart d'arrondi global (voir hypothèse 6).
 - Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la

@@ -34,11 +34,6 @@ Public Class FrmConnexion
 
     Private Sub FrmConnexion_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
-        ' Habillage et adaptation à l'écran du poste, avant tout autre traitement : la fenêtre
-        ' prend sa taille définitive une fois pour toutes, et les contrôles ancrés suivent.
-        ThemeWU.Appliquer(Me, String.Empty, btnConnexion)
-        DimensionsWU.Adapter(Me, False)
-
         AfficherBase()
         VerifierPremierDemarrage()
         txtIdentifiant.Focus()
