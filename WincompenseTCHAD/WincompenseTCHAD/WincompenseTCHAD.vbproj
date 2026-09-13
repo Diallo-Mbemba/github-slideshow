@@ -75,6 +75,7 @@
     <Compile Include="Models\ComptesSystemeWU.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
+    <Compile Include="Models\TransactionWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />

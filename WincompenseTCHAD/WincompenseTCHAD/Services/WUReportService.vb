@@ -439,6 +439,62 @@ Public NotInheritable Class WUReportService
         Return resultat
     End Function
 
+    ''' <summary>
+    ''' Extrait du rapport d'activité le détail des transactions, une par ligne, identifiées par
+    ''' leur MTCN.
+    '''
+    ''' Contrairement à CalculerActivite, qui agrège et écarte les annulations des montants, la
+    ''' liste retournée CONSERVE toutes les lignes, annulations comprises : c'est précisément
+    ''' pour pouvoir retrouver une transaction, quelle qu'ait été son issue, que ce détail est
+    ''' historisé.
+    '''
+    ''' Les lignes sans Account ou sans MTCN sont ignorées : elles ne seraient rattachables à
+    ''' rien et ne se retrouveraient pas.
+    ''' </summary>
+    ''' <param name="jour">Journée d'activité, reportée sur chaque transaction.</param>
+    Public Shared Function ExtraireTransactions(dtActivite As DataTable, jour As Date) As List(Of TransactionWU)
+
+        Dim resultat As New List(Of TransactionWU)
+
+        If dtActivite Is Nothing Then Return resultat
+
+        For Each row As DataRow In dtActivite.Rows
+
+            Dim account As String = ObtenirValeurTexte(row, "Account").Trim()
+            Dim mtcn As String = ObtenirValeurTexte(row, "MTCN").Trim()
+
+            If account.Length = 0 OrElse mtcn.Length = 0 Then Continue For
+
+            Dim indicateur As String = ObtenirValeurTexte(row, "SendPayIndicator").Trim().ToUpperInvariant()
+
+            Dim sens As String
+            Dim montant As Decimal
+
+            Select Case indicateur
+                Case "S"
+                    sens = TransactionWU.SENS_ENVOI
+                    montant = ToDecimalSafe(ObtenirValeur(row, "RecPrincipalREC"))
+                Case "P"
+                    sens = TransactionWU.SENS_PAIEMENT
+                    montant = ToDecimalSafe(ObtenirValeur(row, "PayPrincipalPAY"))
+                Case Else
+                    ' Indicateur inconnu : la ligne n'est ni un envoi ni un paiement, rien à tracer.
+                    Continue For
+            End Select
+
+            resultat.Add(New TransactionWU() With {
+                .DateActivite = jour.Date,
+                .Account = account,
+                .MTCN = mtcn,
+                .Sens = sens,
+                .Statut = ObtenirValeurTexte(row, ConstantesWU.COLONNE_STATUS_ACTIVITE).Trim(),
+                .Montant = montant
+            })
+        Next
+
+        Return resultat
+    End Function
+
 #End Region
 
 #Region "Agrégation du rapport de règlement"

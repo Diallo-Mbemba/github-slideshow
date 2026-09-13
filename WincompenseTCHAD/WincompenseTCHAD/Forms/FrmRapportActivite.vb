@@ -19,6 +19,12 @@ Public Class FrmRapportActivite
     ''' <summary>Entrée du filtre affichant l'ensemble des groupes.</summary>
     Private Const TOUS_LES_GROUPES As String = "(tous les groupes)"
 
+    ''' <summary>
+    ''' Nombre de transactions au-delà duquel l'inclusion du détail dans le PDF est soumise à
+    ''' confirmation : une vingtaine de pages, soit environ une semaine d'activité.
+    ''' </summary>
+    Private Const SEUIL_MTCN_VOLUMINEUX As Integer = 2000
+
     ''' <summary>Lignes d'historique de la période, TOUS groupes confondus.</summary>
     Private _lignes As New List(Of LigneHistoriqueWU)
 
@@ -32,12 +38,19 @@ Public Class FrmRapportActivite
     ''' <summary>Groupe statistique retenu, ou chaîne vide pour tous les groupes.</summary>
     Private _groupeChoisi As String = String.Empty
 
+    ''' <summary>
+    ''' Agences propres du paramétrage, lues une fois à l'ouverture : elles complètent l'état
+    ''' par point de vente avec celles restées sans activité sur la période.
+    ''' </summary>
+    Private _agences As New List(Of PointDeVenteEC)
+
     ''' <summary>Les cinq états, conservés pour l'export : ce qui part dans Excel est ce qui est à l'écran.</summary>
     Private _synthese As DataTable
     Private _parJour As DataTable
     Private _parPdv As DataTable
     Private _parGroupe As DataTable
     Private _commissions As DataTable
+    Private _transactions As DataTable
 
     ''' <summary>Empêche le filtre de relancer l'affichage pendant qu'on le remplit.</summary>
     Private _chargementEnCours As Boolean = False
@@ -101,6 +114,11 @@ Public Class FrmRapportActivite
             Dim messageErreur As String = String.Empty
             _lignes = HistoriqueRepository.ListerPeriode(dtpDebut.Value.Date, dtpFin.Value.Date, messageErreur)
 
+            ' Le paramétrage des agences propres est relu avec la période : une agence créée
+            ' entre-temps doit apparaître, même sans activité.
+            Dim erreurAgences As String = String.Empty
+            _agences = PdvRepository.ListerAgences(String.Empty, erreurAgences)
+
             If Not String.IsNullOrEmpty(messageErreur) Then
                 lblStatut.Text = "Lecture impossible : voir le message affiché."
                 MessageBox.Show(messageErreur, "Historique", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -158,15 +176,38 @@ Public Class FrmRapportActivite
 
         _synthese = RapportActiviteService.ConstruireSynthese(_lignesAffichees)
         _parJour = RapportActiviteService.ConstruireParJour(_lignesAffichees)
-        _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees)
+        ' Les agences propres sans activité doivent figurer à zéro : elles sont lues dans le
+        ' paramétrage, l'historique ne pouvant évidemment pas contenir ce qui n'a pas eu lieu.
+        ' Un filtre par groupe ne les concerne pas : une agence propre n'appartient à aucun
+        ' groupe statistique, ceux-ci ne s'appliquant qu'aux sous-agents.
+        Dim agences As List(Of PointDeVenteEC) = If(String.IsNullOrEmpty(_groupeChoisi), _agences, Nothing)
+        _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees, agences)
         _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
         _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
+
+        ' Le détail des MTCN est relu à part : il ne se déduit pas de l'agrégat, et le filtre
+        ' par groupe est appliqué par la base plutôt que de rapatrier toute la période.
+        Dim erreurMtcn As String = String.Empty
+        Dim operations As List(Of TransactionWU) =
+            HistoriqueRepository.ListerTransactions(dtpDebut.Value.Date, dtpFin.Value.Date,
+                                                    _groupeChoisi, erreurMtcn)
+
+        If Not String.IsNullOrEmpty(erreurMtcn) Then
+            ' Le détail manque, mais les cinq autres états restent valables : on le signale
+            ' sans priver l'utilisateur du reste du rapport.
+            operations = New List(Of TransactionWU)
+            lblStatut.Text = "Détail des MTCN indisponible."
+        End If
+
+        _transactions = RapportActiviteService.ConstruireTransactions(operations)
 
         AfficherSynthese()
         AfficherDetail(dgvParJour, _parJour, "Date", "Date")
         AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
         AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
         AfficherDetail(dgvCommissions, _commissions, "Date", "Date")
+        AfficherDetail(dgvMtcn, _transactions, "Date", "Date")
+        MettreEnEvidenceAnnulations()
 
         btnExporter.Enabled = _lignesAffichees.Count > 0
 
@@ -223,6 +264,8 @@ Public Class FrmRapportActivite
         DefinirEntete(grille, "PrincipalEnvoi", "Principal envoyé")
         DefinirEntete(grille, "NbPaiements", "Paiements")
         DefinirEntete(grille, "PrincipalPaye", "Principal payé")
+        DefinirEntete(grille, "NbAnnulations", "Annulations")
+        DefinirEntete(grille, "Montant", "Montant")
         DefinirEntete(grille, "TotalTaxes", "Total taxes")
         DefinirEntete(grille, "CommissionEnvoi", "Commission Envoi")
         DefinirEntete(grille, "CommissionPaiement", "Commission Paiement")
@@ -231,11 +274,12 @@ Public Class FrmRapportActivite
         DefinirEntete(grille, "Variation", "Variation / veille")
         DefinirEntete(grille, "Cumul", "Cumul période")
 
-        For Each nom As String In New String() {"NbEnvois", "NbPaiements", "PointsDeVente",
+        For Each nom As String In New String() {"NbEnvois", "NbPaiements", "NbAnnulations", "PointsDeVente",
                                                 "PrincipalEnvoi", "PrincipalPaye", "Commissions",
                                                 "TVA", "TTA", "TotalTaxes",
                                                 "CommissionEnvoi", "CommissionPaiement",
-                                                "CommissionTransfert", "TotalCommissions", "Cumul"}
+                                                "CommissionTransfert", "TotalCommissions", "Cumul",
+                                                "Montant"}
             If Not grille.Columns.Contains(nom) Then Continue For
             grille.Columns(nom).DefaultCellStyle.Format = "N0"
             grille.Columns(nom).DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
@@ -250,6 +294,21 @@ Public Class FrmRapportActivite
         grille.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
 
         MettreEnEvidenceTotaux(grille)
+    End Sub
+
+    ''' <summary>
+    ''' Signale en rouge les transactions annulées : ce sont elles que l'on cherche le plus
+    ''' souvent dans ce détail.
+    ''' </summary>
+    Private Sub MettreEnEvidenceAnnulations()
+
+        If Not dgvMtcn.Columns.Contains("Statut") Then Return
+
+        For Each ligne As DataGridViewRow In dgvMtcn.Rows
+            If String.Equals(Convert.ToString(ligne.Cells("Statut").Value), "ANNULÉE", StringComparison.Ordinal) Then
+                ligne.DefaultCellStyle.BackColor = Drawing.Color.MistyRose
+            End If
+        Next
     End Sub
 
     ''' <summary>
@@ -305,6 +364,24 @@ Public Class FrmRapportActivite
             Return
         End If
 
+        ' Le détail des MTCN peut représenter des milliers de lignes, soit des dizaines de pages
+        ' imprimées. Sur un mois complet, l'inclure sans le dire produirait un document que
+        ' personne n'attendait : la question est posée, elle ne l'est pas quand le volume reste
+        ' raisonnable.
+        Dim inclureMtcn As Boolean = _transactions IsNot Nothing AndAlso _transactions.Rows.Count > 0
+
+        If inclureMtcn AndAlso _transactions.Rows.Count > SEUIL_MTCN_VOLUMINEUX Then
+
+            Dim reponse As DialogResult = MessageBox.Show(
+                $"Le détail des transactions compte {_transactions.Rows.Count:N0} lignes, " &
+                "soit plusieurs dizaines de pages." & Environment.NewLine & Environment.NewLine &
+                "L'inclure dans le document PDF ?" & Environment.NewLine & Environment.NewLine &
+                "Répondre « Non » produit le rapport sans ce détail ; il reste consultable à l'écran.",
+                "Détail des transactions volumineux", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+            inclureMtcn = (reponse = DialogResult.Yes)
+        End If
+
         sfdExport.FileName = NomFichierPropose()
         If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
 
@@ -326,7 +403,7 @@ Public Class FrmRapportActivite
             ExcelExportService.ExporterEnPdf(
                 "ECOBANK TCHAD — RAPPORT D'ACTIVITÉ WESTERN UNION",
                 sousTitres,
-                ConstruireBlocs(),
+                ConstruireBlocs(inclureMtcn),
                 "Rapport activité",
                 sfdExport.FileName)
 
@@ -352,11 +429,13 @@ Public Class FrmRapportActivite
         End Try
     End Sub
 
-    ''' <summary>Les quatre états, dans l'ordre des onglets, avec leurs intitulés et formats.</summary>
-    Private Function ConstruireBlocs() As List(Of BlocExcel)
+    ''' <summary>Les états, dans l'ordre des onglets, avec leurs intitulés et formats.</summary>
+    ''' <param name="inclureMtcn">Inclut le détail des transactions, dont le volume peut être élevé.</param>
+    Private Function ConstruireBlocs(inclureMtcn As Boolean) As List(Of BlocExcel)
 
         Dim formatsChiffres As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
-            {"NbEnvois", "# ##0"}, {"NbPaiements", "# ##0"}, {"PointsDeVente", "# ##0"},
+            {"NbEnvois", "# ##0"}, {"NbPaiements", "# ##0"}, {"NbAnnulations", "# ##0"},
+            {"PointsDeVente", "# ##0"},
             {"PrincipalEnvoi", "# ##0"}, {"PrincipalPaye", "# ##0"}, {"Commissions", "# ##0"},
             {"TVA", "# ##0"}, {"TTA", "# ##0"}, {"TotalTaxes", "# ##0"}
         }
@@ -365,7 +444,7 @@ Public Class FrmRapportActivite
             {"Designation", "Désignation"}, {"PointsDeVente", "Points de vente"},
             {"NbEnvois", "Envois"}, {"PrincipalEnvoi", "Principal envoyé"},
             {"NbPaiements", "Paiements"}, {"PrincipalPaye", "Principal payé"},
-            {"TotalTaxes", "Total taxes"}
+            {"NbAnnulations", "Annulations"}, {"TotalTaxes", "Total taxes"}
         }
 
         Dim synthese As New BlocExcel("1. Synthèse de la période", _synthese)
@@ -403,7 +482,21 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions}
+        Dim blocs As New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions}
+
+        If inclureMtcn Then
+            blocs.Add(New BlocExcel("6. Détail des transactions (MTCN)", _transactions) With {
+                .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                    {"Designation", "Désignation"}, {"Montant", "Montant"}
+                },
+                .Formats = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                    {"Montant", "# ##0"}
+                },
+                .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
+            })
+        End If
+
+        Return blocs
     End Function
 
     ''' <summary>

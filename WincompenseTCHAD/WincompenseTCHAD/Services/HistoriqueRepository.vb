@@ -32,6 +32,12 @@ Public NotInheritable Class HistoriqueRepository
         "Tant qu'elle est absente, les journées comptabilisées ne sont pas historisées et les " &
         "rapports d'activité restent vides."
 
+    ''' <summary>Message posé lorsque la table du détail des transactions n'existe pas.</summary>
+    Public Const MESSAGE_TABLE_MTCN_ABSENTE As String =
+        "La table T_HistoriqueMTCN n'existe pas encore dans la base." & vbCrLf & vbCrLf &
+        "Exécutez le script Scripts\06_HistoriqueMTCN.sql : il la crée." & vbCrLf &
+        "Tant qu'elle est absente, le détail des MTCN n'est pas conservé."
+
 #Region "Écriture"
 
     ''' <summary>
@@ -47,12 +53,19 @@ Public NotInheritable Class HistoriqueRepository
     ''' <param name="jour">Journée d'activité comptabilisée.</param>
     ''' <param name="calculs">Résultat du calcul, un élément par Account.</param>
     ''' <param name="nombreEnregistrees">Nombre de lignes effectivement écrites.</param>
+    ''' <param name="transactions">
+    ''' Détail des transactions de la journée, écrit dans T_HistoriqueMTCN au sein de la MÊME
+    ''' transaction : les deux tables ne peuvent pas diverger. Peut être Nothing.
+    ''' </param>
     Public Shared Function EnregistrerJournee(jour As Date, calculs As IEnumerable(Of CalculWU),
+                                              transactions As IEnumerable(Of TransactionWU),
                                               ByRef nombreEnregistrees As Integer,
+                                              ByRef nombreTransactions As Integer,
                                               ByRef messageErreur As String) As Boolean
 
         messageErreur = String.Empty
         nombreEnregistrees = 0
+        nombreTransactions = 0
 
         If calculs Is Nothing Then
             messageErreur = "Aucun calcul à historiser."
@@ -97,6 +110,18 @@ Public NotInheritable Class HistoriqueRepository
                             nombreEnregistrees += 1
                         Next
 
+                        ' Identification des points de vente, pour compléter le détail des
+                        ' transactions : le rapport d'activité ne la porte pas.
+                        Dim identification As New Dictionary(Of String, CalculWU)(StringComparer.OrdinalIgnoreCase)
+                        For Each calc As CalculWU In calculs
+                            If calc IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(calc.Account) Then
+                                identification(calc.Account) = calc
+                            End If
+                        Next
+
+                        nombreTransactions = EcrireTransactions(connexion, transaction, jour,
+                                                                transactions, identification)
+
                         transaction.Commit()
 
                     Catch
@@ -112,13 +137,17 @@ Public NotInheritable Class HistoriqueRepository
 
         Catch ex As SqlException
             nombreEnregistrees = 0
+            nombreTransactions = 0
             messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
+                               MESSAGE_TABLE_ABSENTE & vbCrLf & vbCrLf &
+                               "Si seule T_HistoriqueMTCN manque, exécutez aussi " &
+                               "Scripts\06_HistoriqueMTCN.sql.",
                                $"Historisation de la journée du {jour:dd/MM/yyyy} impossible : {ex.Message}")
             Return False
 
         Catch ex As InvalidOperationException
             nombreEnregistrees = 0
+            nombreTransactions = 0
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
             Return False
         End Try
@@ -163,6 +192,138 @@ Public NotInheritable Class HistoriqueRepository
         parametre.Scale = 2
         parametre.Value = Decimal.Round(valeur, 2)
     End Sub
+
+#End Region
+
+#Region "Détail des transactions (T_HistoriqueMTCN)"
+
+    Private Const TABLE_MTCN As String = "T_HistoriqueMTCN"
+
+    ''' <summary>
+    ''' Écrit le détail des transactions de la journée. Appelée DANS la transaction qui écrit
+    ''' l'agrégat : les deux tables ne peuvent donc pas diverger.
+    '''
+    ''' L'identification du point de vente est complétée depuis les calculs de la journée, le
+    ''' rapport d'activité ne la portant pas.
+    ''' </summary>
+    Private Shared Function EcrireTransactions(connexion As SqlConnection, transaction As SqlTransaction,
+                                               jour As Date, transactions As IEnumerable(Of TransactionWU),
+                                               identification As Dictionary(Of String, CalculWU)) As Integer
+
+        Using commande As New SqlCommand("DELETE FROM " & TABLE_MTCN & " WHERE DateActivite = @jour",
+                                         connexion, transaction)
+            commande.Parameters.Add("@jour", SqlDbType.Date).Value = jour.Date
+            commande.ExecuteNonQuery()
+        End Using
+
+        If transactions Is Nothing Then Return 0
+
+        Const insertion As String =
+            "INSERT INTO " & TABLE_MTCN & " (DateActivite, Account, MTCN, Sens, Statut, Montant, " &
+            "Designation, GroupeStatistique, TypePdv) " &
+            "VALUES (@jour, @account, @mtcn, @sens, @statut, @montant, @designation, @groupe, @type)"
+
+        Dim ecrites As Integer = 0
+
+        For Each operation As TransactionWU In transactions
+
+            If operation Is Nothing OrElse String.IsNullOrWhiteSpace(operation.MTCN) Then Continue For
+
+            Dim calc As CalculWU = Nothing
+            identification.TryGetValue(operation.Account, calc)
+
+            Using commande As New SqlCommand(insertion, connexion, transaction)
+
+                commande.Parameters.Add("@jour", SqlDbType.Date).Value = jour.Date
+                commande.Parameters.Add("@account", SqlDbType.NVarChar, 255).Value = operation.Account
+                commande.Parameters.Add("@mtcn", SqlDbType.NVarChar, 50).Value = operation.MTCN
+                commande.Parameters.Add("@sens", SqlDbType.NVarChar, 10).Value = operation.Sens
+                commande.Parameters.Add("@statut", SqlDbType.NVarChar, 10).Value = If(operation.Statut, String.Empty)
+
+                Dim parametreMontant As SqlParameter = commande.Parameters.Add("@montant", SqlDbType.Decimal)
+                parametreMontant.Precision = 18
+                parametreMontant.Scale = 2
+                parametreMontant.Value = Decimal.Round(operation.Montant, 2)
+
+                commande.Parameters.Add("@designation", SqlDbType.NVarChar, 255).Value =
+                    If(calc Is Nothing, String.Empty, If(calc.Designation, String.Empty))
+                commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value =
+                    If(calc Is Nothing, String.Empty, If(calc.GroupeStatistique, String.Empty))
+                commande.Parameters.Add("@type", SqlDbType.NVarChar, 20).Value =
+                    If(calc Is Nothing, String.Empty, If(calc.TypePdv, String.Empty))
+
+                commande.ExecuteNonQuery()
+            End Using
+
+            ecrites += 1
+        Next
+
+        Return ecrites
+    End Function
+
+    ''' <summary>
+    ''' Retourne le détail des transactions d'une période, éventuellement restreint à un groupe
+    ''' statistique. Triées par date, point de vente puis MTCN.
+    ''' </summary>
+    ''' <param name="groupe">Groupe statistique, ou chaîne vide pour tous.</param>
+    Public Shared Function ListerTransactions(debut As Date, fin As Date, groupe As String,
+                                              ByRef messageErreur As String) As List(Of TransactionWU)
+
+        messageErreur = String.Empty
+        Dim resultat As New List(Of TransactionWU)
+
+        Dim requete As String =
+            "SELECT DateActivite, Account, MTCN, Sens, Statut, Montant, " &
+            "Designation, GroupeStatistique, TypePdv " &
+            "FROM " & TABLE_MTCN & " " &
+            "WHERE DateActivite >= @debut AND DateActivite <= @fin"
+
+        Dim filtreGroupe As String = If(groupe, String.Empty).Trim()
+        If filtreGroupe.Length > 0 Then
+            requete &= " AND LTRIM(RTRIM(ISNULL(GroupeStatistique, ''))) = @groupe"
+        End If
+        requete &= " ORDER BY DateActivite, Account, MTCN"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    commande.Parameters.Add("@debut", SqlDbType.Date).Value = debut.Date
+                    commande.Parameters.Add("@fin", SqlDbType.Date).Value = fin.Date
+
+                    If filtreGroupe.Length > 0 Then
+                        commande.Parameters.Add("@groupe", SqlDbType.NVarChar, 255).Value = filtreGroupe
+                    End If
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+                            resultat.Add(New TransactionWU() With {
+                                .DateActivite = Convert.ToDateTime(lecteur("DateActivite"), Globalization.CultureInfo.InvariantCulture),
+                                .Account = LireChaine(lecteur, "Account"),
+                                .MTCN = LireChaine(lecteur, "MTCN"),
+                                .Sens = LireChaine(lecteur, "Sens"),
+                                .Statut = LireChaine(lecteur, "Statut"),
+                                .Montant = LireMontant(lecteur, "Montant"),
+                                .Designation = LireChaine(lecteur, "Designation"),
+                                .GroupeStatistique = LireChaine(lecteur, "GroupeStatistique"),
+                                .TypePdv = LireChaine(lecteur, "TypePdv")
+                            })
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_MTCN_ABSENTE,
+                               $"Lecture du détail des transactions impossible : {ex.Message}")
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return resultat
+    End Function
 
 #End Region
 

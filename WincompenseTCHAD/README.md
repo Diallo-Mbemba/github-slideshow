@@ -28,7 +28,8 @@ WincompenseTCHAD/
     │   ├── CalculWU.vb                     ' Classe métier par Account
     │   ├── ComptesSystemeWU.vb             ' Comptes comptables paramétrés (table SystemeWU)
     │   ├── PointDeVente.vb                 ' Sous-agent (T_Pdv_SA) et agence propre (T_Pdv_EC)
-    │   └── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
+    │   ├── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
+    │   └── TransactionWU.vb                ' Une transaction identifiée par son MTCN
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
@@ -391,6 +392,11 @@ exportables **en un seul document PDF**.
 | 3. Par point de vente | **Sous-agents et agences propres séparés**, chacun avec son sous-total, classés par principal envoyé décroissant |
 | 4. Par groupe statistique | Une ligne par groupe, les points de vente sans groupe formant une ligne distincte |
 | 5. Évolution des commissions | Jour par jour : les trois commissions, leur total, la variation par rapport à la veille et le cumul de la période |
+| 6. Transactions (MTCN) | Le détail transaction par transaction : date, Account, groupe, MTCN, sens, statut et montant |
+
+Les **annulations** figurent dans toutes les pages de détail — et plus seulement en synthèse —
+sous une colonne dédiée : sans elle, il était impossible de savoir *qui* annule, alors que
+c'est précisément ce que l'on veut suivre.
 
 **Filtre par groupe statistique.** Une liste déroulante restreint les cinq états à un seul
 groupe ; l'export porte alors sur ce périmètre, le nom du groupe figure en jaune dans le
@@ -431,6 +437,38 @@ Trois précisions sur ces états :
 Les quatre états sont bâtis sur **la même lecture**, agrégée différemment : leurs totaux sont
 donc nécessairement identiques d'une page à l'autre. Le rapprochement entre pages est un
 contrôle de cohérence, pas une coïncidence.
+
+### Suivi des MTCN
+
+`T_HistoriqueWU` agrège la journée par point de vente : elle ne peut pas porter le MTCN, qui
+identifie **une** transaction. La table **`T_HistoriqueMTCN`** (script
+`Scripts\06_HistoriqueMTCN.sql`) conserve donc le détail, une ligne par transaction d'envoi ou
+de paiement, et permet de retrouver et de justifier une opération précise.
+
+- Alimentée **dans la même transaction** que l'agrégat : les deux tables ne peuvent pas diverger.
+- Les **annulations y figurent**, signalées par leur statut et surlignées en rose à l'écran :
+  c'est le plus souvent une transaction annulée que l'on cherche.
+- Le filtre par groupe statistique est appliqué **par la base**, plutôt que de rapatrier toute
+  la période pour la trier ensuite.
+- Volume : de l'ordre de 400 transactions par jour, soit environ 100 000 lignes par an.
+- Pas de clé primaire sur `(DateActivite, Account, MTCN, Sens)` : rien ne garantit qu'un MTCN
+  ne puisse pas apparaître deux fois le même jour pour le même point de vente — un ajustement
+  en produirait un — et une contrainte trop stricte ferait échouer l'historisation d'une journée
+  par ailleurs valable. L'unicité technique est assurée par une colonne d'identité.
+
+Dans le PDF, le détail est inclus **après confirmation** au-delà de 2 000 transactions : sur un
+mois complet, l'ajouter sans le dire produirait des dizaines de pages que personne n'attendait.
+Il reste alors consultable à l'écran.
+
+### Agences propres restées sans activité
+
+L'état par point de vente reprend **toutes** les agences propres du paramétrage, y compris
+celles qui n'ont rien fait sur la période — elles apparaissent à zéro, et leur nombre est
+rappelé dans le sous-total. Une agence sans activité est une information de gestion ; l'omettre
+reviendrait à la rendre invisible au moment même où elle mérite d'être regardée.
+
+Ce complément ne s'applique pas lorsqu'un groupe statistique est sélectionné : une agence propre
+n'appartient à aucun groupe, ceux-ci ne concernant que les sous-agents.
 
 ### La source : l'historique des journées comptabilisées
 

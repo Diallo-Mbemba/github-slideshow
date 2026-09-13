@@ -38,6 +38,13 @@ Public Class FrmCompensationWU
     ''' l'historisation : c'est elle qui classe la journée dans le temps, et non la date du jour.
     ''' </summary>
     Private _dateActivite As Date?
+
+    ''' <summary>
+    ''' Détail des transactions de la journée, identifiées par leur MTCN. Extrait au moment du
+    ''' calcul — le rapport n'est plus en mémoire au moment de générer la pièce — et historisé
+    ''' avec l'agrégat pour permettre de retrouver une opération précise.
+    ''' </summary>
+    Private _transactions As New List(Of TransactionWU)
     Private _listeCalculs As List(Of CalculWU)
     Private _dtPieceGeneree As DataTable
 
@@ -109,12 +116,13 @@ Public Class FrmCompensationWU
         End If
 
         Dim nombreEnregistrees As Integer = 0
+        Dim nombreTransactions As Integer = 0
         Dim messageErreur As String = String.Empty
 
-        If HistoriqueRepository.EnregistrerJournee(_dateActivite.Value, _listeCalculs,
-                                                   nombreEnregistrees, messageErreur) Then
+        If HistoriqueRepository.EnregistrerJournee(_dateActivite.Value, _listeCalculs, _transactions,
+                                                   nombreEnregistrees, nombreTransactions, messageErreur) Then
             tsslStatut.Text &= $"  |  Journée du {_dateActivite.Value:dd/MM/yyyy} historisée " &
-                               $"({nombreEnregistrees} point(s) de vente)."
+                               $"({nombreEnregistrees} point(s) de vente, {nombreTransactions} transaction(s))."
             Return
         End If
 
@@ -346,6 +354,7 @@ Public Class FrmCompensationWU
         _listeCalculs = Nothing
         _dtPieceGeneree = Nothing
         _dateActivite = Nothing
+        _transactions = New List(Of TransactionWU)
         btnPieceAccount.Enabled = False
         dgvControle.DataSource = Nothing
         progressBarTraitement.Value = 0
@@ -387,6 +396,11 @@ Public Class FrmCompensationWU
 
             ' Date de la journée traitée, retenue pour l'historisation.
             _dateActivite = WUReportService.ObtenirDateActivite(dtActivite)
+
+            ' Détail des transactions, extrait tant que le rapport est en mémoire.
+            _transactions = If(_dateActivite.HasValue,
+                               WUReportService.ExtraireTransactions(dtActivite, _dateActivite.Value),
+                               New List(Of TransactionWU))
 
             ' Validation de la cohérence des dates entre les deux rapports (section 16).
             Dim messageDate As String = String.Empty

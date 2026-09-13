@@ -139,7 +139,15 @@ Public NotInheritable Class RapportActiviteService
     ''' Une ligne par point de vente, cumulée sur toute la période, classée par principal
     ''' envoyé décroissant : les points de vente qui pèsent apparaissent en tête.
     ''' </summary>
-    Public Shared Function ConstruireParPointDeVente(lignes As List(Of LigneHistoriqueWU)) As DataTable
+    ''' <param name="agencesConnues">
+    ''' Agences propres du paramétrage (T_Pdv_EC). Celles qui n'ont eu AUCUNE activité sur la
+    ''' période y figurent tout de même, à zéro : une agence qui n'a rien fait est une
+    ''' information de gestion, et l'omettre reviendrait à la rendre invisible au moment même
+    ''' où elle mérite d'être regardée. Facultatif : sans cette liste, seules les agences ayant
+    ''' travaillé apparaissent.
+    ''' </param>
+    Public Shared Function ConstruireParPointDeVente(lignes As List(Of LigneHistoriqueWU),
+                                                     Optional agencesConnues As List(Of PointDeVenteEC) = Nothing) As DataTable
 
         Dim table As New DataTable("ParPointDeVente")
         table.Columns.Add("Account", GetType(String))
@@ -166,6 +174,21 @@ Public NotInheritable Class RapportActiviteService
             cumul.Cumuler(ligne)
         Next
 
+        ' Complément : les agences propres restées sans activité sur la période.
+        If agencesConnues IsNot Nothing Then
+            For Each agence As PointDeVenteEC In agencesConnues
+
+                If agence Is Nothing OrElse String.IsNullOrWhiteSpace(agence.CodeSite) Then Continue For
+                If cumuls.ContainsKey(agence.CodeSite) Then Continue For
+
+                cumuls(agence.CodeSite) = New LigneHistoriqueWU() With {
+                    .Account = agence.CodeSite,
+                    .Designation = agence.Designation,
+                    .TypePdv = "EC"
+                }
+            Next
+        End If
+
         ' Sous-agents et agences propres sont restitués SÉPARÉMENT, chacun avec son sous-total :
         ' ce que la banque réalise par son propre réseau ne se confond pas avec ce qu'elle
         ' réalise par ses sous-agents.
@@ -181,8 +204,14 @@ Public NotInheritable Class RapportActiviteService
 
             If duType.Count = 0 Then Continue For
 
-            ' Les points de vente qui pèsent apparaissent en tête de leur catégorie.
-            duType.Sort(Function(x, y) y.PrincipalEnvoi.CompareTo(x.PrincipalEnvoi))
+            ' Les points de vente qui pèsent apparaissent en tête de leur catégorie ; ceux
+            ' restés sans activité, tous à zéro, se rangent alors par Account plutôt que dans
+            ' un ordre arbitraire.
+            duType.Sort(Function(x, y)
+                            Dim parPoids As Integer = y.PrincipalEnvoi.CompareTo(x.PrincipalEnvoi)
+                            If parPoids <> 0 Then Return parPoids
+                            Return String.Compare(x.Account, y.Account, StringComparison.OrdinalIgnoreCase)
+                        End Function)
 
             Dim entete As DataRow = table.NewRow()
             entete("Account") = typePdv
@@ -199,9 +228,16 @@ Public NotInheritable Class RapportActiviteService
                 table.Rows.Add(enregistrement)
             Next
 
+            Dim sansActivite As Integer = 0
+            For Each cumul As LigneHistoriqueWU In duType
+                If cumul.NombreEnvois = 0 AndAlso cumul.NombrePaiements = 0 AndAlso
+                   cumul.NombreAnnulations = 0 Then sansActivite += 1
+            Next
+
             Dim sousTotal As DataRow = table.NewRow()
             sousTotal("Account") = LIBELLE_SOUS_TOTAL
-            sousTotal("Designation") = $"{typePdv} — {duType.Count} point(s) de vente"
+            sousTotal("Designation") = $"{typePdv} — {duType.Count} point(s) de vente" &
+                                       If(sansActivite > 0, $", dont {sansActivite} sans activité", String.Empty)
             sousTotal("Groupe") = String.Empty
             RemplirColonnesChiffrees(sousTotal, CumulerLignes(duType))
             table.Rows.Add(sousTotal)
@@ -403,7 +439,102 @@ Public NotInheritable Class RapportActiviteService
 
 #End Region
 
+#Region "Page — Transactions (MTCN)"
+
+    ''' <summary>
+    ''' Détail des transactions identifiées par leur MTCN, pour retrouver et justifier une
+    ''' opération précise.
+    '''
+    ''' Les annulations y figurent, signalées par leur statut : c'est précisément une
+    ''' transaction annulée que l'on cherche à retrouver le plus souvent. Le pied de page
+    ''' récapitule les envois, les paiements et les annulations.
+    ''' </summary>
+    Public Shared Function ConstruireTransactions(transactions As List(Of TransactionWU)) As DataTable
+
+        Dim table As New DataTable("Transactions")
+        table.Columns.Add("Date", GetType(String))
+        table.Columns.Add("Account", GetType(String))
+        table.Columns.Add("Designation", GetType(String))
+        table.Columns.Add("Groupe", GetType(String))
+        table.Columns.Add("MTCN", GetType(String))
+        table.Columns.Add("Sens", GetType(String))
+        table.Columns.Add("Statut", GetType(String))
+        table.Columns.Add("Montant", GetType(Decimal))
+
+        If transactions Is Nothing Then Return table
+
+        Dim envois As Integer = 0
+        Dim paiements As Integer = 0
+        Dim annulations As Integer = 0
+        Dim montantEnvois As Decimal = 0D
+        Dim montantPaiements As Decimal = 0D
+
+        For Each operation As TransactionWU In transactions
+
+            If operation Is Nothing Then Continue For
+
+            Dim enregistrement As DataRow = table.NewRow()
+            enregistrement("Date") = operation.DateActivite.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture)
+            enregistrement("Account") = operation.Account
+            enregistrement("Designation") = operation.Designation
+            enregistrement("Groupe") = LibelleGroupe(operation.GroupeStatistique)
+            enregistrement("MTCN") = operation.MTCN
+            enregistrement("Sens") = operation.Sens
+            enregistrement("Statut") = LibelleStatut(operation.Statut)
+            enregistrement("Montant") = operation.Montant
+            table.Rows.Add(enregistrement)
+
+            If operation.EstAnnulee Then
+                annulations += 1
+                ' Une transaction annulée ne compte pas dans les volumes : elle est dénombrée
+                ' à part, comme partout ailleurs dans les rapports.
+                Continue For
+            End If
+
+            If String.Equals(operation.Sens, TransactionWU.SENS_ENVOI, StringComparison.Ordinal) Then
+                envois += 1
+                montantEnvois += operation.Montant
+            Else
+                paiements += 1
+                montantPaiements += operation.Montant
+            End If
+        Next
+
+        If table.Rows.Count = 0 Then Return table
+
+        Dim total As DataRow = table.NewRow()
+        total("Date") = LIBELLE_TOTAL
+        total("Account") = String.Empty
+        total("Designation") = $"{envois} envoi(s), {paiements} paiement(s), {annulations} annulation(s)"
+        total("Groupe") = String.Empty
+        total("MTCN") = String.Empty
+        total("Sens") = String.Empty
+        total("Statut") = String.Empty
+        total("Montant") = montantEnvois + montantPaiements
+        table.Rows.Add(total)
+
+        Return table
+    End Function
+
+    ''' <summary>
+    ''' Traduit le statut Western Union en libellé lisible. Un statut inconnu est restitué tel
+    ''' quel plutôt que masqué : mieux vaut un code brut qu'une information perdue.
+    ''' </summary>
+    Public Shared Function LibelleStatut(statut As String) As String
+
+        Select Case If(statut, String.Empty).Trim().ToUpperInvariant()
+            Case "S" : Return "Réglée"
+            Case "W" : Return "En attente"
+            Case "C" : Return "ANNULÉE"
+            Case "" : Return String.Empty
+            Case Else : Return statut.Trim()
+        End Select
+    End Function
+
+#End Region
+
 #Region "Utilitaires de construction"
+
 
     ''' <summary>Table de détail à colonne d'en-tête libre (date, par exemple) puis colonnes chiffrées.</summary>
     Private Shared Function CreerTableDetail(nom As String, premiereColonne As String, type As Type) As DataTable
@@ -421,6 +552,9 @@ Public NotInheritable Class RapportActiviteService
         table.Columns.Add("PrincipalEnvoi", GetType(Decimal))
         table.Columns.Add("NbPaiements", GetType(Integer))
         table.Columns.Add("PrincipalPaye", GetType(Decimal))
+        ' Les annulations figuraient en synthèse mais manquaient au détail : sans elles, il était
+        ' impossible de savoir QUI annule, alors que c'est précisément ce qu'on veut suivre.
+        table.Columns.Add("NbAnnulations", GetType(Integer))
         table.Columns.Add("Commissions", GetType(Decimal))
         table.Columns.Add("TVA", GetType(Decimal))
         table.Columns.Add("TTA", GetType(Decimal))
@@ -433,6 +567,7 @@ Public NotInheritable Class RapportActiviteService
         enregistrement("PrincipalEnvoi") = cumul.PrincipalEnvoi
         enregistrement("NbPaiements") = cumul.NombrePaiements
         enregistrement("PrincipalPaye") = cumul.PrincipalPaye
+        enregistrement("NbAnnulations") = cumul.NombreAnnulations
         enregistrement("Commissions") = cumul.TotalCommissions
         enregistrement("TVA") = cumul.TVA
         ' Les deux TTA sont regroupées : envoi et réception relèvent de la même taxe, seule

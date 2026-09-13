@@ -41,7 +41,9 @@ Partial Class FrmRapportActivite
         Me.tabParGroupe = New System.Windows.Forms.TabPage()
         Me.dgvParGroupe = New System.Windows.Forms.DataGridView()
         Me.tabCommissions = New System.Windows.Forms.TabPage()
+        Me.tabMtcn = New System.Windows.Forms.TabPage()
         Me.dgvCommissions = New System.Windows.Forms.DataGridView()
+        Me.dgvMtcn = New System.Windows.Forms.DataGridView()
         Me.sfdExport = New System.Windows.Forms.SaveFileDialog()
         Me.tabRapport.SuspendLayout()
         Me.tabSynthese.SuspendLayout()
@@ -53,7 +55,9 @@ Partial Class FrmRapportActivite
         Me.tabParGroupe.SuspendLayout()
         CType(Me.dgvParGroupe, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.tabCommissions.SuspendLayout()
+        Me.tabMtcn.SuspendLayout()
         CType(Me.dgvCommissions, System.ComponentModel.ISupportInitialize).BeginInit()
+        CType(Me.dgvMtcn, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
         'lblDu
@@ -135,6 +139,7 @@ Partial Class FrmRapportActivite
         Me.tabRapport.Controls.Add(Me.tabParPdv)
         Me.tabRapport.Controls.Add(Me.tabParGroupe)
         Me.tabRapport.Controls.Add(Me.tabCommissions)
+        Me.tabRapport.Controls.Add(Me.tabMtcn)
         Me.tabRapport.Location = New System.Drawing.Point(12, 80)
         Me.tabRapport.Name = "tabRapport"
         Me.tabRapport.SelectedIndex = 0
@@ -308,6 +313,32 @@ Partial Class FrmRapportActivite
         Me.lblStatut.TabIndex = 11
         Me.lblStatut.Text = ""
         '
+        'tabMtcn
+        '
+        Me.tabMtcn.Controls.Add(Me.dgvMtcn)
+        Me.tabMtcn.Location = New System.Drawing.Point(4, 22)
+        Me.tabMtcn.Name = "tabMtcn"
+        Me.tabMtcn.Padding = New System.Windows.Forms.Padding(3)
+        Me.tabMtcn.Size = New System.Drawing.Size(1008, 486)
+        Me.tabMtcn.TabIndex = 5
+        Me.tabMtcn.Text = "Transactions (MTCN)"
+        Me.tabMtcn.UseVisualStyleBackColor = True
+        '
+        'dgvMtcn
+        '
+        Me.dgvMtcn.AllowUserToAddRows = False
+        Me.dgvMtcn.AllowUserToDeleteRows = False
+        Me.dgvMtcn.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        Me.dgvMtcn.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.dgvMtcn.Location = New System.Drawing.Point(3, 3)
+        Me.dgvMtcn.MultiSelect = False
+        Me.dgvMtcn.Name = "dgvMtcn"
+        Me.dgvMtcn.ReadOnly = True
+        Me.dgvMtcn.RowHeadersWidth = 25
+        Me.dgvMtcn.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+        Me.dgvMtcn.Size = New System.Drawing.Size(1002, 480)
+        Me.dgvMtcn.TabIndex = 0
+        '
         'FrmRapportActivite
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -340,7 +371,9 @@ Partial Class FrmRapportActivite
         Me.tabParGroupe.ResumeLayout(False)
         CType(Me.dgvParGroupe, System.ComponentModel.ISupportInitialize).EndInit()
         Me.tabCommissions.ResumeLayout(False)
+        Me.tabMtcn.ResumeLayout(False)
         CType(Me.dgvCommissions, System.ComponentModel.ISupportInitialize).EndInit()
+        CType(Me.dgvMtcn, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
     End Sub
 
@@ -365,7 +398,9 @@ Partial Class FrmRapportActivite
     Friend WithEvents tabParGroupe As System.Windows.Forms.TabPage
     Friend WithEvents dgvParGroupe As System.Windows.Forms.DataGridView
     Friend WithEvents tabCommissions As System.Windows.Forms.TabPage
+    Friend WithEvents tabMtcn As System.Windows.Forms.TabPage
     Friend WithEvents dgvCommissions As System.Windows.Forms.DataGridView
+    Friend WithEvents dgvMtcn As System.Windows.Forms.DataGridView
     Friend WithEvents sfdExport As System.Windows.Forms.SaveFileDialog
 
 End Class
