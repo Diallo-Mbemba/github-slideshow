@@ -149,6 +149,7 @@ Public Class FrmCompensationWU
         ReinitialiserResultats()
         MettreAJourEtatBoutons()
         AfficherPeriodeChargee()
+        ConfirmerChargement(infos, "Rapport d'activité")
     End Sub
 
     ''' <summary>
@@ -171,6 +172,7 @@ Public Class FrmCompensationWU
         ReinitialiserResultats()
         MettreAJourEtatBoutons()
         AfficherPeriodeChargee()
+        ConfirmerChargement(infos, "Rapport de règlement")
     End Sub
 
     ''' <summary>
@@ -363,6 +365,7 @@ Public Class FrmCompensationWU
             dgvControle.DataSource = dtControle
             FormaterColonnesNumeriques()
             MasquerColonnesTechniques()
+            AjusterColonnesControle()
             MettreEnEvidenceAnomalies()
 
             tsslLignesActivite.Text = $"Lignes activité : {dtActivite.Rows.Count}"
@@ -393,6 +396,8 @@ Public Class FrmCompensationWU
                     "  4. votre compte Windows a accès à cette base.",
                     "Base SQL Server inaccessible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End If
+
+            AlerterSurLesAccountsNonParametres()
 
         Catch ex As RapportInvalideException
             MessageBox.Show(ex.Message, "Anomalie de rapport", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -527,6 +532,141 @@ Public Class FrmCompensationWU
         End If
     End Sub
 
+    ''' <summary>
+    ''' Range et dimensionne les colonnes de la grille de contrôle.
+    '''
+    ''' L'écart d'arrondi se trouvait en avant-dernière position, hors de l'écran : c'est
+    ''' pourtant lui qu'on vient vérifier. Il remonte donc en tête, avec le solde, juste après
+    ''' ce qui identifie la ligne. L'Account reste figé à gauche pendant le défilement
+    ''' horizontal, sans quoi on ne sait plus de quel point de vente on lit les montants.
+    ''' </summary>
+    Private Sub AjusterColonnesControle()
+
+        Dim tete As String() = {"Account", "Designation", "Type", "EcartArrondi", "Solde"}
+        Dim rang As Integer = 0
+
+        For Each nom As String In tete
+            If Not dgvControle.Columns.Contains(nom) Then Continue For
+            dgvControle.Columns(nom).DisplayIndex = rang
+            rang += 1
+        Next
+
+        For Each colonne As DataGridViewColumn In dgvControle.Columns
+            colonne.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+        Next
+
+        ' Les en-têtes viennent des noms de colonnes de la DataTable, sans accent ni espace.
+        RenommerEnTete("EcartArrondi", "Écart arrondi")
+        RenommerEnTete("Designation", "Désignation")
+        RenommerEnTete("CodeAgence", "Code agence")
+        RenommerEnTete("TauxSA", "Taux SA")
+        RenommerEnTete("CompteCompense", "Compte compensation")
+        RenommerEnTete("CompteCommission", "Compte commission")
+
+        If dgvControle.Columns.Contains("Account") Then
+            dgvControle.Columns("Account").Frozen = True
+        End If
+    End Sub
+
+    Private Sub RenommerEnTete(nomColonne As String, enTete As String)
+
+        If Not dgvControle.Columns.Contains(nomColonne) Then Return
+        dgvControle.Columns(nomColonne).HeaderText = enTete
+    End Sub
+
+    ''' <summary>
+    ''' Signale les Accounts que la base ne connaît pas, ou qu'elle connaît mal.
+    '''
+    ''' Ils ne bloquent pas le calcul, mais leur pièce comptable ira sur le compte courant WU
+    ''' au lieu du compte de compensation du point de vente. Découvert après coup, l'écart se
+    ''' corrige à la main, écriture par écriture : il vaut mieux le voir tout de suite.
+    ''' </summary>
+    Private Sub AlerterSurLesAccountsNonParametres()
+
+        If _listeCalculs Is Nothing OrElse _listeCalculs.Count = 0 Then Return
+
+        ' Une base injoignable a déjà fait l'objet de son propre avertissement : tous les
+        ' Accounts y seraient INCONNU, et répéter la liste entière n'apprendrait rien.
+        If Not String.IsNullOrEmpty(_messageErreurConnexionSql) Then Return
+
+        Dim inconnus As List(Of CalculWU) = _listeCalculs.Where(Function(c) c.EstInconnu).ToList()
+        Dim incomplets As List(Of CalculWU) =
+            _listeCalculs.Where(Function(c) Not c.EstInconnu AndAlso c.DonneesManquantes).ToList()
+
+        If inconnus.Count = 0 AndAlso incomplets.Count = 0 Then Return
+
+        Dim message As New Text.StringBuilder()
+
+        If inconnus.Count > 0 Then
+            message.AppendLine($"{inconnus.Count} Account(s) absent(s) du paramétrage :")
+            message.AppendLine(Enumerer(inconnus))
+            message.AppendLine()
+        End If
+
+        If incomplets.Count > 0 Then
+            message.AppendLine($"{incomplets.Count} Account(s) au paramétrage incomplet :")
+            message.AppendLine(Enumerer(incomplets))
+            message.AppendLine()
+        End If
+
+        message.AppendLine("Leur pièce comptable utilisera le compte courant WU au lieu du compte de")
+        message.AppendLine("compensation du point de vente, et aucune commission ne leur sera affectée.")
+        message.AppendLine()
+        message.AppendLine("Créez-les dans l'écran des sous-agents ou des agences, puis relancez le calcul.")
+
+        MessageBox.Show(message.ToString(), "Accounts non paramétrés",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning)
+    End Sub
+
+    ''' <summary>Liste les Accounts, en s'arrêtant avant de remplir l'écran.</summary>
+    Private Shared Function Enumerer(calculs As List(Of CalculWU)) As String
+
+        Const MAXIMUM As Integer = 15
+
+        Dim lignes As List(Of String) =
+            calculs.Take(MAXIMUM).Select(Function(c) $"    {c.Account}").ToList()
+
+        If calculs.Count > MAXIMUM Then
+            lignes.Add($"    ... et {calculs.Count - MAXIMUM} autre(s), visibles dans la grille.")
+        End If
+
+        Return String.Join(Environment.NewLine, lignes)
+    End Function
+
+    ''' <summary>
+    ''' Confirme le chargement d'un rapport et dit ce qu'il reste à faire.
+    '''
+    ''' Le libellé du fichier s'inscrivait en petit dans la barre d'état, où il passait
+    ''' inaperçu : un agent pouvait croire avoir chargé alors que la boîte de dialogue avait
+    ''' été refermée sans sélection.
+    ''' </summary>
+    Private Sub ConfirmerChargement(infos As InfosFichierRapport, libelleType As String)
+
+        If infos Is Nothing Then Return
+
+        Dim periode As String =
+            If(infos.Periode Is Nothing,
+               "période non détectée dans le nom du fichier",
+               $"période : {infos.Periode}")
+
+        Dim suite As String
+
+        If _infosActivite Is Nothing Then
+            suite = "Chargez maintenant le rapport d'activité (étape 1)."
+        ElseIf _infosReglement Is Nothing Then
+            suite = "Chargez maintenant le rapport de règlement (étape 2)."
+        Else
+            suite = "Les deux rapports sont chargés : lancez le calcul (étape 3)."
+        End If
+
+        MessageBox.Show(
+            $"{libelleType} chargé." & Environment.NewLine & Environment.NewLine &
+            $"    fichier : {infos.NomFichier}" & Environment.NewLine &
+            $"    {periode}" & Environment.NewLine & Environment.NewLine &
+            suite,
+            "Chargement terminé", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
     ''' <summary>Masque les colonnes techniques utilisées uniquement pour la mise en évidence des anomalies.</summary>
     Private Sub MasquerColonnesTechniques()
         For Each nomColonne As String In {"ErreurSQL", "DonneesManquantes"}
@@ -627,56 +767,22 @@ Public Class FrmCompensationWU
             Return
         End If
 
-        Dim chemin As String = DemanderLeChemin(CoreBankingService.NomDeFichier(dateActivite))
-        If chemin.Length = 0 Then Return
+        Dim numeroLot As String = CoreBankingService.NumeroDeLot(dateActivite)
 
-        Try
-            Cursor = Cursors.WaitCursor
+        ' Le fichier est présenté avant d'être écrit. Il impacte réellement les comptes : le
+        ' produire sans que personne ne l'ait regardé reviendrait à signer sans lire.
+        Using apercu As New FrmFichierCoreBanking(fichier, dateActivite, dateValeur, numeroLot)
 
-            ' Seul AMOUNT est écrit en nombre : tout le reste est du texte, sans quoi Excel
-            ' réinterpréterait les numéros de compte et les numéros de lot.
-            ExcelExportService.ExporterTableBrute(fichier, New String() {"AMOUNT"}, "CoreBanking", chemin)
+            apercu.ShowDialog(Me)
 
-            Dim numeroLot As String = CoreBankingService.NumeroDeLot(dateActivite)
-            Dim report As String = CalendrierWU.Explication(dateActivite, dateValeur)
-
-            MessageBox.Show(
-                $"Fichier produit : {IO.Path.GetFileName(chemin)}" & Environment.NewLine & Environment.NewLine &
-                $"    lignes           : {fichier.Rows.Count}" & Environment.NewLine &
-                $"    journée traitée  : {dateActivite:dd/MM/yyyy}" & Environment.NewLine &
-                $"    date de valeur   : {dateValeur:dd/MM/yyyy}" & Environment.NewLine &
-                $"    numéro de lot    : {numeroLot}" & Environment.NewLine &
-                If(report.Length > 0, Environment.NewLine & report & Environment.NewLine, String.Empty) &
-                Environment.NewLine &
-                "Le numéro de lot est dérivé de la journée traitée : réexporter cette journée " &
-                "redonnera le même numéro, ce qui permet au core banking de reconnaître un " &
-                "double chargement.",
-                "Fichier core banking", MessageBoxButtons.OK, MessageBoxIcon.Information)
-
-            tsslStatut.Text = $"Fichier core banking produit : {fichier.Rows.Count} ligne(s), lot {numeroLot}."
-
-        Catch ex As Exception
-            MessageBox.Show("Production du fichier impossible : " & ex.Message,
-                            "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        Finally
-            Cursor = Cursors.Default
-        End Try
-    End Sub
-
-    ''' <summary>Demande où enregistrer le fichier. Chaîne vide si l'utilisateur renonce.</summary>
-    Private Function DemanderLeChemin(nomPropose As String) As String
-
-        Using dialogue As New SaveFileDialog()
-
-            dialogue.Title = "Enregistrer le fichier destiné au core banking"
-            dialogue.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
-            dialogue.FileName = nomPropose
-            dialogue.OverwritePrompt = True
-
-            If dialogue.ShowDialog(Me) <> DialogResult.OK Then Return String.Empty
-            Return dialogue.FileName
+            If apercu.FichierProduit Then
+                tsslStatut.Text = $"Fichier core banking produit : {fichier.Rows.Count} ligne(s), " &
+                                  $"lot {numeroLot} — {IO.Path.GetFileName(apercu.CheminProduit)}."
+            Else
+                tsslStatut.Text = "Fichier core banking consulté, non produit."
+            End If
         End Using
-    End Function
+    End Sub
 
     Private Sub btnGenererPiece_Click(sender As Object, e As EventArgs) Handles btnGenererPiece.Click
 

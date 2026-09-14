@@ -306,10 +306,15 @@ Public NotInheritable Class ExcelExportService
     ''' <param name="colonnesNumeriques">Noms des colonnes à écrire en nombres.</param>
     ''' <param name="nomFeuille">Nom de la feuille.</param>
     ''' <param name="cheminFichier">Chemin complet du classeur à créer.</param>
+    ''' <param name="ouvrirApres">
+    ''' Vrai pour présenter le classeur à l'utilisateur une fois écrit, comme le fait la pièce
+    ''' comptable. Un fichier produit sans être montré laisse toujours un doute sur son contenu.
+    ''' </param>
     Public Shared Sub ExporterTableBrute(table As DataTable,
                                          colonnesNumeriques As IEnumerable(Of String),
                                          nomFeuille As String,
-                                         cheminFichier As String)
+                                         cheminFichier As String,
+                                         ouvrirApres As Boolean)
 
         If table Is Nothing OrElse table.Rows.Count = 0 Then
             Throw New InvalidOperationException("Aucune donnée à exporter.")
@@ -401,6 +406,10 @@ Public NotInheritable Class ExcelExportService
             LibererObjet(classeur)
             LibererObjet(excelApp)
         End Try
+
+        ' L'ouverture se fait APRÈS la libération : l'instance d'Excel qui a écrit le fichier
+        ' travaillait masquée, et c'est celle de l'utilisateur qui doit le présenter.
+        If ouvrirApres Then OuvrirDocument(cheminFichier)
     End Sub
 
     ''' <summary>

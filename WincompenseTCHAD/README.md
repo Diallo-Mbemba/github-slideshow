@@ -39,6 +39,27 @@ qui choisit par où commencer. Ouvrir le traitement de la compense d'emblée imp
 commercial, qui n'y a pas accès, et faisait attendre l'agent de compense les jours où il venait
 seulement consulter un rapport.
 
+### L'écran de traitement dit son propre enchaînement
+
+Les boutons sont numérotés et rangés dans l'ordre où on les actionne — charger l'activité,
+charger le règlement, calculer, générer la pièce, produire le fichier — de sorte que la fenêtre
+décrit l'enchaînement sans qu'il faille l'avoir appris.
+
+Chaque chargement de rapport se termine par un **message explicite** : le fichier retenu, sa
+période, et ce qu'il reste à faire. Le libellé s'inscrivait jusqu'ici en petit dans la barre
+d'état, où un agent pouvait le manquer et croire avoir chargé alors que la boîte de dialogue
+avait été refermée sans sélection.
+
+Après le calcul, une **alerte liste les Accounts non paramétrés** — absents de la base, ou au
+paramétrage incomplet. Ils ne bloquent rien, mais leur pièce ira sur le compte courant WU au lieu
+du compte de compensation du point de vente ; découvert après coup, l'écart se corrige à la main,
+écriture par écriture.
+
+Dans la grille de contrôle, **l'écart d'arrondi remonte en quatrième colonne**. Il se trouvait en
+avant-dernière position sur vingt-huit, donc hors de l'écran — alors que c'est lui qu'on vient
+vérifier. L'Account reste figé à gauche pendant le défilement horizontal, sans quoi on ne sait
+plus de quel point de vente on lit les montants.
+
 **Un écran déjà ouvert n'est jamais dupliqué** : il est ramené au premier plan, et rétabli s'il
 était réduit. Sans cette règle, dix clics sur un menu produiraient dix copies de la même liste,
 chacune avec ses propres données, et l'utilisateur ne saurait plus laquelle fait foi.
@@ -107,7 +128,8 @@ WincompenseTCHAD/
         ├── FrmChangerMotDePasse.vb         ' Changement de mot de passe (imposé ou volontaire)
         ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
         ├── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
-        └── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
+        ├── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
+        └── FrmFichierCoreBanking.vb        ' Consultation du fichier d'interface avant export
 
 Scripts/
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
@@ -594,8 +616,14 @@ La pièce comptable reste l'objet de contrôle, lisible par un comptable. Le fic
 dérive : c'est la forme sous laquelle le core banking accepte d'**impacter réellement** les
 comptes des sous-agents et les comptes internes de la banque.
 
-Bouton **« Fichier core banking… »** sur l'écran de traitement, actif une fois la pièce générée :
-ce qui est chargé doit être exactement ce que le comptable a vu et validé à l'écran.
+Bouton **« 5. Fichier core banking… »** sur l'écran de traitement, actif une fois la pièce
+générée : ce qui est chargé doit être exactement ce que le comptable a vu et validé à l'écran.
+
+**Le fichier est présenté avant d'être écrit.** Un écran de consultation montre les treize
+colonnes telles qu'elles seront produites — pas une version arrangée pour la lecture — avec le
+nombre de lignes, la date de valeur et le contrôle d'équilibre sous les yeux. L'export n'écrit
+rien tant qu'il n'est pas demandé, et **refuse de s'activer sur un fichier déséquilibré**. Une
+fois produit, le classeur s'ouvre aussitôt, comme la pièce comptable.
 
 ### Les treize colonnes
 

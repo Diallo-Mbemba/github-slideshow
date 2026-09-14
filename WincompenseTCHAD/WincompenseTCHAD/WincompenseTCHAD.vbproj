@@ -178,6 +178,12 @@
     <Compile Include="Forms\FrmDemandes.Designer.vb">
       <DependentUpon>FrmDemandes.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmFichierCoreBanking.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmFichierCoreBanking.Designer.vb">
+      <DependentUpon>FrmFichierCoreBanking.vb</DependentUpon>
+    </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="Program.vb" />
   </ItemGroup>
@@ -223,6 +229,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmDemandes.resx">
       <DependentUpon>FrmDemandes.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmFichierCoreBanking.resx">
+      <DependentUpon>FrmFichierCoreBanking.vb</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

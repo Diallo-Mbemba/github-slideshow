@@ -51,57 +51,57 @@ Partial Class FrmCompensationWU
         '
         Me.btnActivite.Location = New System.Drawing.Point(12, 12)
         Me.btnActivite.Name = "btnActivite"
-        Me.btnActivite.Size = New System.Drawing.Size(180, 32)
+        Me.btnActivite.Size = New System.Drawing.Size(186, 32)
         Me.btnActivite.TabIndex = 0
-        Me.btnActivite.Text = "Charger rapport activité"
+        Me.btnActivite.Text = "1. Charger rapport activité"
         Me.btnActivite.UseVisualStyleBackColor = True
         '
         'btnReglement
         '
-        Me.btnReglement.Location = New System.Drawing.Point(198, 12)
+        Me.btnReglement.Location = New System.Drawing.Point(204, 12)
         Me.btnReglement.Name = "btnReglement"
-        Me.btnReglement.Size = New System.Drawing.Size(180, 32)
+        Me.btnReglement.Size = New System.Drawing.Size(196, 32)
         Me.btnReglement.TabIndex = 1
-        Me.btnReglement.Text = "Charger rapport règlement"
+        Me.btnReglement.Text = "2. Charger rapport règlement"
         Me.btnReglement.UseVisualStyleBackColor = True
         '
         'btnCoreBanking
         '
-        Me.btnCoreBanking.Location = New System.Drawing.Point(390, 12)
+        Me.btnCoreBanking.Location = New System.Drawing.Point(778, 12)
         Me.btnCoreBanking.Name = "btnCoreBanking"
-        Me.btnCoreBanking.Size = New System.Drawing.Size(204, 32)
+        Me.btnCoreBanking.Size = New System.Drawing.Size(196, 32)
         Me.btnCoreBanking.TabIndex = 20
-        Me.btnCoreBanking.Text = "Fichier core banking..."
+        Me.btnCoreBanking.Text = "5. Fichier core banking..."
         Me.btnCoreBanking.UseVisualStyleBackColor = True
         '
         'btnAfficher
         '
         Me.btnAfficher.Enabled = False
-        Me.btnAfficher.Location = New System.Drawing.Point(600, 12)
+        Me.btnAfficher.Location = New System.Drawing.Point(406, 12)
         Me.btnAfficher.Name = "btnAfficher"
-        Me.btnAfficher.Size = New System.Drawing.Size(160, 32)
+        Me.btnAfficher.Size = New System.Drawing.Size(170, 32)
         Me.btnAfficher.TabIndex = 2
-        Me.btnAfficher.Text = "Afficher / Calculer"
+        Me.btnAfficher.Text = "3. Afficher / Calculer"
         Me.btnAfficher.UseVisualStyleBackColor = True
         '
         'btnGenererPiece
         '
         Me.btnGenererPiece.Enabled = False
-        Me.btnGenererPiece.Location = New System.Drawing.Point(766, 12)
+        Me.btnGenererPiece.Location = New System.Drawing.Point(582, 12)
         Me.btnGenererPiece.Name = "btnGenererPiece"
-        Me.btnGenererPiece.Size = New System.Drawing.Size(180, 32)
+        Me.btnGenererPiece.Size = New System.Drawing.Size(190, 32)
         Me.btnGenererPiece.TabIndex = 3
-        Me.btnGenererPiece.Text = "Générer pièce comptable"
+        Me.btnGenererPiece.Text = "4. Générer pièce comptable"
         Me.btnGenererPiece.UseVisualStyleBackColor = True
         '
         'btnPieceAccount
         '
         Me.btnPieceAccount.Enabled = False
-        Me.btnPieceAccount.Location = New System.Drawing.Point(952, 12)
+        Me.btnPieceAccount.Location = New System.Drawing.Point(980, 12)
         Me.btnPieceAccount.Name = "btnPieceAccount"
-        Me.btnPieceAccount.Size = New System.Drawing.Size(210, 32)
+        Me.btnPieceAccount.Size = New System.Drawing.Size(192, 32)
         Me.btnPieceAccount.TabIndex = 4
-        Me.btnPieceAccount.Text = "Pièce de l'Account sélectionné"
+        Me.btnPieceAccount.Text = "Pièce de l'Account"
         Me.btnPieceAccount.UseVisualStyleBackColor = True
         '
         'lblActivite
