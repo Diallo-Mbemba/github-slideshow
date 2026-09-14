@@ -30,6 +30,10 @@ Partial Class FrmParametresConnexion
         Me.lblDelai = New System.Windows.Forms.Label()
         Me.nudDelai = New System.Windows.Forms.NumericUpDown()
         Me.lblSecondes = New System.Windows.Forms.Label()
+        Me.grpChaine = New System.Windows.Forms.GroupBox()
+        Me.chkChaineComplete = New System.Windows.Forms.CheckBox()
+        Me.lblAideChaine = New System.Windows.Forms.Label()
+        Me.txtChaine = New System.Windows.Forms.TextBox()
         Me.grpPartage = New System.Windows.Forms.GroupBox()
         Me.lblPartage = New System.Windows.Forms.Label()
         Me.txtPartage = New System.Windows.Forms.TextBox()
@@ -41,6 +45,7 @@ Partial Class FrmParametresConnexion
         Me.btnFermer = New System.Windows.Forms.Button()
         CType(Me.nudDelai, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.grpServeur.SuspendLayout()
+        Me.grpChaine.SuspendLayout()
         Me.grpPartage.SuspendLayout()
         Me.SuspendLayout()
         '
@@ -138,16 +143,56 @@ Partial Class FrmParametresConnexion
         Me.lblSecondes.TabIndex = 6
         Me.lblSecondes.Text = "secondes — authentification Windows intégrée, aucun mot de passe."
         '
+        'grpChaine
+        '
+        Me.grpChaine.Controls.Add(Me.chkChaineComplete)
+        Me.grpChaine.Controls.Add(Me.lblAideChaine)
+        Me.grpChaine.Controls.Add(Me.txtChaine)
+        Me.grpChaine.Location = New System.Drawing.Point(12, 206)
+        Me.grpChaine.Name = "grpChaine"
+        Me.grpChaine.Size = New System.Drawing.Size(560, 104)
+        Me.grpChaine.TabIndex = 3
+        Me.grpChaine.TabStop = False
+        Me.grpChaine.Text = "Chaîne fournie par la banque"
+        '
+        'chkChaineComplete
+        '
+        Me.chkChaineComplete.Location = New System.Drawing.Point(14, 24)
+        Me.chkChaineComplete.Name = "chkChaineComplete"
+        Me.chkChaineComplete.Size = New System.Drawing.Size(530, 20)
+        Me.chkChaineComplete.TabIndex = 0
+        Me.chkChaineComplete.Text = "Employer une chaîne de connexion complète, telle qu'elle a été fournie"
+        Me.chkChaineComplete.UseVisualStyleBackColor = True
+        '
+        'lblAideChaine
+        '
+        Me.lblAideChaine.ForeColor = System.Drawing.SystemColors.ControlDarkDark
+        Me.lblAideChaine.Location = New System.Drawing.Point(32, 46)
+        Me.lblAideChaine.Name = "lblAideChaine"
+        Me.lblAideChaine.Size = New System.Drawing.Size(512, 18)
+        Me.lblAideChaine.TabIndex = 1
+        Me.lblAideChaine.Text = "Elle remplace le serveur et la base ci-dessus. Aucun mot de passe ne doit y figure" &
+            "r."
+        '
+        'txtChaine
+        '
+        Me.txtChaine.Enabled = False
+        Me.txtChaine.Location = New System.Drawing.Point(14, 68)
+        Me.txtChaine.MaxLength = 1000
+        Me.txtChaine.Name = "txtChaine"
+        Me.txtChaine.Size = New System.Drawing.Size(530, 20)
+        Me.txtChaine.TabIndex = 2
+        '
         'grpPartage
         '
         Me.grpPartage.Controls.Add(Me.lblPartage)
         Me.grpPartage.Controls.Add(Me.txtPartage)
         Me.grpPartage.Controls.Add(Me.chkPropager)
         Me.grpPartage.Controls.Add(Me.lblAidePartage)
-        Me.grpPartage.Location = New System.Drawing.Point(12, 208)
+        Me.grpPartage.Location = New System.Drawing.Point(12, 318)
         Me.grpPartage.Name = "grpPartage"
         Me.grpPartage.Size = New System.Drawing.Size(560, 122)
-        Me.grpPartage.TabIndex = 3
+        Me.grpPartage.TabIndex = 4
         Me.grpPartage.TabStop = False
         Me.grpPartage.Text = "Fichier partagé"
         '
@@ -188,36 +233,36 @@ Partial Class FrmParametresConnexion
         '
         'btnTester
         '
-        Me.btnTester.Location = New System.Drawing.Point(12, 344)
+        Me.btnTester.Location = New System.Drawing.Point(12, 454)
         Me.btnTester.Name = "btnTester"
         Me.btnTester.Size = New System.Drawing.Size(150, 32)
-        Me.btnTester.TabIndex = 4
+        Me.btnTester.TabIndex = 5
         Me.btnTester.Text = "Tester la connexion"
         Me.btnTester.UseVisualStyleBackColor = True
         '
         'lblResultat
         '
-        Me.lblResultat.Location = New System.Drawing.Point(174, 340)
+        Me.lblResultat.Location = New System.Drawing.Point(174, 450)
         Me.lblResultat.Name = "lblResultat"
         Me.lblResultat.Size = New System.Drawing.Size(398, 40)
-        Me.lblResultat.TabIndex = 5
+        Me.lblResultat.TabIndex = 6
         '
         'btnEnregistrer
         '
-        Me.btnEnregistrer.Location = New System.Drawing.Point(352, 390)
+        Me.btnEnregistrer.Location = New System.Drawing.Point(352, 502)
         Me.btnEnregistrer.Name = "btnEnregistrer"
         Me.btnEnregistrer.Size = New System.Drawing.Size(120, 32)
-        Me.btnEnregistrer.TabIndex = 6
+        Me.btnEnregistrer.TabIndex = 7
         Me.btnEnregistrer.Text = "Enregistrer"
         Me.btnEnregistrer.UseVisualStyleBackColor = True
         '
         'btnFermer
         '
         Me.btnFermer.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.btnFermer.Location = New System.Drawing.Point(478, 390)
+        Me.btnFermer.Location = New System.Drawing.Point(478, 502)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(94, 32)
-        Me.btnFermer.TabIndex = 7
+        Me.btnFermer.TabIndex = 8
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -226,12 +271,13 @@ Partial Class FrmParametresConnexion
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(584, 434)
+        Me.ClientSize = New System.Drawing.Size(584, 546)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.lblResultat)
         Me.Controls.Add(Me.btnTester)
         Me.Controls.Add(Me.grpPartage)
+        Me.Controls.Add(Me.grpChaine)
         Me.Controls.Add(Me.grpServeur)
         Me.Controls.Add(Me.lblOrigine)
         Me.Controls.Add(Me.lblTitre)
@@ -245,6 +291,8 @@ Partial Class FrmParametresConnexion
         CType(Me.nudDelai, System.ComponentModel.ISupportInitialize).EndInit()
         Me.grpServeur.ResumeLayout(False)
         Me.grpServeur.PerformLayout()
+        Me.grpChaine.ResumeLayout(False)
+        Me.grpChaine.PerformLayout()
         Me.grpPartage.ResumeLayout(False)
         Me.ResumeLayout(False)
 
@@ -260,6 +308,10 @@ Partial Class FrmParametresConnexion
     Friend WithEvents lblDelai As System.Windows.Forms.Label
     Friend WithEvents nudDelai As System.Windows.Forms.NumericUpDown
     Friend WithEvents lblSecondes As System.Windows.Forms.Label
+    Friend WithEvents grpChaine As System.Windows.Forms.GroupBox
+    Friend WithEvents chkChaineComplete As System.Windows.Forms.CheckBox
+    Friend WithEvents lblAideChaine As System.Windows.Forms.Label
+    Friend WithEvents txtChaine As System.Windows.Forms.TextBox
     Friend WithEvents grpPartage As System.Windows.Forms.GroupBox
     Friend WithEvents lblPartage As System.Windows.Forms.Label
     Friend WithEvents txtPartage As System.Windows.Forms.TextBox

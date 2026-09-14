@@ -47,13 +47,27 @@ BASE=GWC_WINCOMPENSE_ETD
 DELAI=10
 
 # ---------------------------------------------------------------------------
-#  CAS EXCEPTIONNEL - chaine de connexion complete
+#  SI LA BANQUE FOURNIT UNE CHAINE DE CONNEXION COMPLETE
 # ---------------------------------------------------------------------------
-#  Si CHAINE est renseignee, elle prime sur SERVEUR, BASE et DELAI.
-#  Ne s'en servir que sur demande de l'editeur : la forme ci-dessus suffit a
-#  tout ce dont la banque a besoin, et se relit sans risque d'erreur.
+#  Coller la chaine telle quelle apres CHAINE=, sur UNE SEULE LIGNE, puis mettre
+#  les lignes SERVEUR / BASE / DELAI ci-dessus en commentaire (ou les effacer).
 #
-#  L'authentification est TOUJOURS celle de Windows : aucun mot de passe ne
-#  doit figurer ici, ce fichier etant lisible par tous les utilisateurs.
+#  CHAINE prime sur SERVEUR, BASE et DELAI : renseigner les deux ferait coexister
+#  deux descriptions du meme serveur, dont une seule compte.
 #
-# CHAINE=Server=SRV-SQL01;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;Connect Timeout=10;
+#  A employer quand la chaine porte des mots-cles que les trois lignes ci-dessus
+#  ne savent pas exprimer : chiffrement impose (Encrypt), partenaire de secours
+#  (Failover Partner), groupe de disponibilite (MultiSubnetFailover), nom
+#  d'application, port particulier.
+#
+#  Le meme reglage se fait depuis l'application, sans toucher a ce fichier :
+#  Securite > Connexion a la base de donnees, case "Employer une chaine de
+#  connexion complete". L'ecran teste la chaine avant de l'enregistrer.
+#
+#  AUCUN MOT DE PASSE ICI. Ce fichier est lisible par tous les utilisateurs de
+#  l'application - c'est ce qui permet a un changement de serveur de valoir pour
+#  tout le monde. Un mot de passe y serait donc lisible en clair par tous. Si la
+#  chaine fournie contient User ID / Password, demander a la banque la version en
+#  authentification Windows : Integrated Security=True.
+#
+# CHAINE=Server=SRV-SQL01;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;Connect Timeout=10;Encrypt=True;TrustServerCertificate=True;

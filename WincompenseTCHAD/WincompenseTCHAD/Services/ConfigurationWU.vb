@@ -77,6 +77,29 @@ Public NotInheritable Class ConfigurationWU
     End Property
 
     ''' <summary>
+    ''' Chaîne complète inscrite dans la configuration en service (clé CHAINE), ou chaîne vide.
+    '''
+    ''' La banque fournit parfois une chaîne toute faite, avec des mots-clés que SERVEUR, BASE
+    ''' et DELAI ne savent pas exprimer : chiffrement imposé, partenaire de secours, nom
+    ''' d'application. L'écran d'administration a besoin de savoir qu'une telle chaîne est en
+    ''' place, faute de quoi il l'écraserait en enregistrant trois valeurs décomposées.
+    ''' </summary>
+    Public Shared ReadOnly Property ChaineComplete As String
+        Get
+            Dim local As Dictionary(Of String, String) = LireFichier(CheminLocal)
+            Dim partage As String = LireCle(local, CLE_PARTAGE)
+
+            ' Même ordre que la résolution : le partage commande, le local suit.
+            If partage.Length > 0 Then
+                Dim valeurs As Dictionary(Of String, String) = LireFichier(partage)
+                If valeurs.Count > 0 Then Return LireCle(valeurs, CLE_CHAINE)
+            End If
+
+            Return LireCle(local, CLE_CHAINE)
+        End Get
+    End Property
+
+    ''' <summary>
     ''' Chemin du fichier partagé, tel qu'il est inscrit sur ce poste. Chaîne vide si le poste
     ''' n'a pas été installé, ou si l'installation n'a pas désigné de partage.
     ''' </summary>
@@ -356,10 +379,6 @@ Public NotInheritable Class ConfigurationWU
 
     ''' <summary>
     ''' Enregistre le serveur et la base, sur ce poste et — si demandé — sur le partage.
-    '''
-    ''' L'écriture sur le partage est faite EN PREMIER : c'est elle qui peut échouer, faute de
-    ''' droits, et il vaut mieux ne rien avoir changé du tout que d'avoir un poste réglé sur un
-    ''' serveur que les autres ignorent.
     ''' </summary>
     ''' <param name="serveur">Nom ou adresse de l'instance SQL Server.</param>
     ''' <param name="base">Nom de la base.</param>
@@ -384,6 +403,69 @@ Public NotInheritable Class ConfigurationWU
             {CLE_BASE, If(String.IsNullOrWhiteSpace(base), BASE_PAR_DEFAUT, base.Trim())},
             {CLE_DELAI, If(delai > 0, delai, DELAI_PAR_DEFAUT).ToString()}
         }
+
+        Return EcrireLaConfiguration(valeurs, cheminPartage, ecrireSurLePartage, messageErreur)
+    End Function
+
+    ''' <summary>
+    ''' Enregistre une chaîne de connexion complète, telle que la banque l'a fournie.
+    '''
+    ''' Elle est écrite sous la clé CHAINE, et SERVEUR / BASE / DELAI ne sont pas écrits du
+    ''' tout : les laisser à côté ferait coexister deux descriptions du même serveur, dont une
+    ''' seule compte, et la lecture du fichier deviendrait trompeuse.
+    ''' </summary>
+    ''' <param name="chaine">Chaîne de connexion complète.</param>
+    ''' <param name="cheminPartage">Fichier partagé. Chaîne vide pour n'écrire que localement.</param>
+    ''' <param name="ecrireSurLePartage">Vrai pour propager le changement à toute la banque.</param>
+    ''' <param name="messageErreur">Motif de l'échec, le cas échéant.</param>
+    ''' <returns>Vrai si tout ce qui était demandé a été écrit.</returns>
+    Public Shared Function EnregistrerChaineComplete(chaine As String, cheminPartage As String,
+                                                     ecrireSurLePartage As Boolean,
+                                                     ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If String.IsNullOrWhiteSpace(chaine) Then
+            messageErreur = "La chaîne de connexion est vide."
+            Return False
+        End If
+
+        ' Une chaîne sur plusieurs lignes serait coupée à la relecture : le fichier se lit ligne
+        ' par ligne. Un collage depuis un courriel en apporte facilement une.
+        Dim surUneLigne As String = chaine.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+
+        ' Contrôle de forme avant d'engager toute la banque : une chaîne mal formée refusée ici
+        ' vaut mieux qu'une application qui ne démarre plus nulle part.
+        Try
+            Dim essai As New System.Data.SqlClient.SqlConnectionStringBuilder(surUneLigne)
+
+            If String.IsNullOrWhiteSpace(essai.DataSource) Then
+                messageErreur = "Cette chaîne n'indique aucun serveur (mot-clé Server ou Data Source)."
+                Return False
+            End If
+
+        Catch ex As ArgumentException
+            messageErreur = "Cette chaîne de connexion n'est pas exploitable : " & ex.Message
+            Return False
+        End Try
+
+        Dim valeurs As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+            {CLE_CHAINE, surUneLigne}
+        }
+
+        Return EcrireLaConfiguration(valeurs, cheminPartage, ecrireSurLePartage, messageErreur)
+    End Function
+
+    ''' <summary>
+    ''' Écrit la configuration, sur le partage puis sur le poste.
+    '''
+    ''' L'écriture sur le partage est faite EN PREMIER : c'est elle qui peut échouer, faute de
+    ''' droits, et il vaut mieux ne rien avoir changé du tout que d'avoir un poste réglé sur un
+    ''' serveur que les autres ignorent.
+    ''' </summary>
+    Private Shared Function EcrireLaConfiguration(valeurs As Dictionary(Of String, String),
+                                                  cheminPartage As String, ecrireSurLePartage As Boolean,
+                                                  ByRef messageErreur As String) As Boolean
 
         If ecrireSurLePartage Then
 

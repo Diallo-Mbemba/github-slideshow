@@ -166,6 +166,36 @@ enregistrer. Rien d'autre.
 Le script teste la connexion **avant** d'écrire. `-Force` passe outre, pour une
 bascule préparée alors que le nouveau serveur n'est pas encore en ligne.
 
+### d) Si la banque fournit une chaîne de connexion complète
+
+Il arrive que la banque ne donne pas un nom de serveur mais une chaîne toute faite, avec des
+mots-clés que `SERVEUR` et `BASE` ne savent pas exprimer : chiffrement imposé (`Encrypt`),
+partenaire de secours (`Failover Partner`), groupe de disponibilité (`MultiSubnetFailover`),
+port particulier, nom d'application.
+
+**Dans l'application** — menu *Sécurité → Connexion à la base de données…* : cocher
+**« Employer une chaîne de connexion complète »**, coller la chaîne, **tester**, puis
+enregistrer. Le serveur, la base et le délai se grisent : ils ne comptent plus.
+
+**Dans le fichier** — coller la chaîne après `CHAINE=`, **sur une seule ligne**, et mettre en
+commentaire les lignes `SERVEUR` / `BASE` / `DELAI` :
+
+```
+# SERVEUR=...
+# BASE=...
+CHAINE=Server=SRV-SQL01;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;Encrypt=True;
+```
+
+`CHAINE` **prime** sur `SERVEUR`, `BASE` et `DELAI`. Renseigner les deux ferait coexister deux
+descriptions du même serveur, dont une seule compte.
+
+> **Aucun mot de passe dans le fichier partagé.** Il est lisible par tous les utilisateurs de
+> l'application — c'est ce qui permet à un changement de serveur de valoir pour tout le monde ;
+> un mot de passe y serait donc lisible en clair par tous. Si la chaîne fournie contient
+> `User ID` / `Password`, demandez la version en authentification Windows
+> (`Integrated Security=True`). L'application refuse de propager sur le partage une chaîne
+> portant un mot de passe, et fait confirmer si le réglage ne vaut que pour un poste.
+
 ### Ce qui reste à faire côté base
 
 Changer de serveur ne déplace pas les données. Sur le nouveau serveur, il faut :

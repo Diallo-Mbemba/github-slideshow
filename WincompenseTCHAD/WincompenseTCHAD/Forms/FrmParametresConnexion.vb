@@ -47,6 +47,14 @@ Public Class FrmParametresConnexion
         txtPartage.Text = ConfigurationWU.CheminDuPartage
         chkPropager.Checked = txtPartage.Text.Length > 0
 
+        ' Une chaîne complète déjà posée doit se voir : sans cela, l'écran afficherait un
+        ' serveur et une base décomposés, et les enregistrer écraserait la chaîne — avec les
+        ' mots-clés qu'elle porte et que trois champs ne savent pas exprimer.
+        Dim complete As String = ConfigurationWU.ChaineComplete
+        chkChaineComplete.Checked = complete.Length > 0
+        txtChaine.Text = complete
+        AppliquerLeMode()
+
         lblOrigine.Text = $"Chaîne en service : {ConfigurationWU.Origine()}." & Environment.NewLine &
                           $"Configuration de ce poste : {ConfigurationWU.CheminLocal}"
     End Sub
@@ -76,6 +84,33 @@ Public Class FrmParametresConnexion
         Return valeur
     End Function
 
+    Private Sub chkChaineComplete_CheckedChanged(sender As Object, e As EventArgs) Handles chkChaineComplete.CheckedChanged
+        AppliquerLeMode()
+    End Sub
+
+    ''' <summary>
+    ''' Rend actif l'un des deux modes et grise l'autre.
+    '''
+    ''' Les deux ne coexistent jamais : la clé CHAINE prime sur SERVEUR, BASE et DELAI, et
+    ''' laisser les deux saisies ouvertes ferait croire que la seconde compte encore.
+    ''' </summary>
+    Private Sub AppliquerLeMode()
+
+        Dim complete As Boolean = chkChaineComplete.Checked
+
+        txtChaine.Enabled = complete
+
+        txtServeur.Enabled = Not complete
+        txtBase.Enabled = Not complete
+        nudDelai.Enabled = Not complete
+
+        If complete AndAlso txtChaine.Text.Trim().Length = 0 Then
+            ' Départ de saisie : la chaîne en service évite de tout retaper quand la banque n'a
+            ' changé qu'un mot-clé.
+            txtChaine.Text = WURepository.ObtenirChaineConnexion()
+        End If
+    End Sub
+
 #End Region
 
 #Region "Test de la connexion"
@@ -104,12 +139,27 @@ Public Class FrmParametresConnexion
     ''' </summary>
     Private Function Tester(ByRef message As String) As Boolean
 
-        If txtServeur.Text.Trim().Length = 0 Then
-            message = "Indiquez d'abord le serveur."
-            Return False
-        End If
+        Dim chaine As String
 
-        Dim chaine As String = ConfigurationWU.ChaineDepuis(txtServeur.Text, txtBase.Text, CInt(nudDelai.Value))
+        If chkChaineComplete.Checked Then
+
+            If txtChaine.Text.Trim().Length = 0 Then
+                message = "Collez d'abord la chaîne de connexion fournie."
+                Return False
+            End If
+
+            ' Sur une ligne, comme elle sera écrite : tester autre chose que ce qu'on
+            ' enregistre n'aurait aucune valeur.
+            chaine = txtChaine.Text.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+        Else
+
+            If txtServeur.Text.Trim().Length = 0 Then
+                message = "Indiquez d'abord le serveur."
+                Return False
+            End If
+
+            chaine = ConfigurationWU.ChaineDepuis(txtServeur.Text, txtBase.Text, CInt(nudDelai.Value))
+        End If
 
         Try
             Using connexion As New SqlConnection(chaine)
@@ -148,13 +198,22 @@ Public Class FrmParametresConnexion
 
         If Not ConfirmerLaPropagation() Then Return
 
+        If Not ConfirmerLAbsenceDeMotDePasse() Then Return
+
         Dim messageErreur As String = String.Empty
 
         Cursor = Cursors.WaitCursor
 
-        Dim enregistre As Boolean = ConfigurationWU.Enregistrer(
-            txtServeur.Text, txtBase.Text, CInt(nudDelai.Value),
-            txtPartage.Text.Trim(), chkPropager.Checked, messageErreur)
+        Dim enregistre As Boolean
+
+        If chkChaineComplete.Checked Then
+            enregistre = ConfigurationWU.EnregistrerChaineComplete(
+                txtChaine.Text, txtPartage.Text.Trim(), chkPropager.Checked, messageErreur)
+        Else
+            enregistre = ConfigurationWU.Enregistrer(
+                txtServeur.Text, txtBase.Text, CInt(nudDelai.Value),
+                txtPartage.Text.Trim(), chkPropager.Checked, messageErreur)
+        End If
 
         Cursor = Cursors.Default
 
@@ -179,6 +238,48 @@ Public Class FrmParametresConnexion
 
         AfficherLaConfigurationEnService()
     End Sub
+
+    ''' <summary>
+    ''' Refuse de poser un mot de passe SQL sur le partage, et le fait confirmer ailleurs.
+    '''
+    ''' Le fichier partagé est lisible par tous les utilisateurs de l'application : c'est ce qui
+    ''' permet à un changement de serveur de valoir pour tout le monde. Un mot de passe écrit là
+    ''' serait donc lisible par tous, en clair. La banque est en authentification Windows, où la
+    ''' question ne se pose pas ; une chaîne fournie par un tiers peut néanmoins en contenir un.
+    ''' </summary>
+    Private Function ConfirmerLAbsenceDeMotDePasse() As Boolean
+
+        If Not chkChaineComplete.Checked Then Return True
+
+        Dim chaine As String = txtChaine.Text
+        Dim porteUnMotDePasse As Boolean =
+            chaine.IndexOf("Password", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+            chaine.IndexOf("Pwd", StringComparison.OrdinalIgnoreCase) >= 0
+
+        If Not porteUnMotDePasse Then Return True
+
+        If chkPropager.Checked Then
+            MessageBox.Show(
+                "Cette chaîne contient un mot de passe, et le fichier partagé est lisible par tous" &
+                Environment.NewLine &
+                "les utilisateurs de l'application : il y serait en clair." & Environment.NewLine & Environment.NewLine &
+                "Demandez à la banque une chaîne en authentification Windows " &
+                "(Integrated Security=True)," & Environment.NewLine &
+                "ou décochez la propagation pour ne régler que ce poste.",
+                "Mot de passe sur le partage", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End If
+
+        Return MessageBox.Show(
+            "Cette chaîne contient un mot de passe. Il sera écrit en clair dans le fichier de" &
+            Environment.NewLine &
+            "configuration de ce poste." & Environment.NewLine & Environment.NewLine &
+            "L'authentification Windows évite ce risque, et c'est le mode retenu par la banque." &
+            Environment.NewLine & Environment.NewLine &
+            "Enregistrer tout de même sur ce poste ?",
+            "Mot de passe en clair", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) = DialogResult.Yes
+    End Function
 
     ''' <summary>
     ''' Fait confirmer un changement qui engage toute la banque, et rappelle qu'il vaut mieux

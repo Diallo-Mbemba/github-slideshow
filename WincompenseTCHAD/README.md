@@ -220,6 +220,16 @@ base restent donnés par `Scripts\08_RolesSQLServer.sql`.
    registre — l'informatique doit pouvoir agir sans outil et sans casser une balise.
 3. **`Configurer-Connexion.ps1`**, pour une migration faite hors des heures de bureau.
 
+Quand la banque fournit non pas un nom de serveur mais une **chaîne de connexion complète** —
+chiffrement imposé, partenaire de secours, port particulier —, elle se colle telle quelle : case
+« Employer une chaîne de connexion complète » dans l'écran, ou clé `CHAINE=` dans le fichier.
+Elle prime alors sur le serveur et la base, qui se grisent : deux descriptions du même serveur
+dont une seule compterait rendraient le fichier trompeur.
+
+Une chaîne portant un mot de passe n'est **jamais** propagée sur le partage : il y serait lisible
+en clair par tous les utilisateurs, puisque le partage doit être lisible par tous pour que le
+dispositif fonctionne. L'application le refuse, et renvoie vers l'authentification Windows.
+
 Les trois testent ou font tester la connexion avant d'écrire : un serveur mal orthographié propagé
 à toute la banque arrêterait tout le monde, et se corrigerait depuis un poste qui ne se connecte
 plus.
