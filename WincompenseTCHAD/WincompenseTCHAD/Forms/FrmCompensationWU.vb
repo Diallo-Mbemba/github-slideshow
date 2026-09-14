@@ -595,7 +595,10 @@ Public Class FrmCompensationWU
 
         If inconnus.Count = 0 AndAlso incomplets.Count = 0 Then Return
 
-        Dim message As New Text.StringBuilder()
+        ' System.Text est écrit en entier : dans un formulaire, le membre hérité Me.Text masque
+        ' l'espace de noms Text, et « Text.StringBuilder » se lit comme un membre de la chaîne
+        ' du titre de la fenêtre.
+        Dim message As New System.Text.StringBuilder()
 
         If inconnus.Count > 0 Then
             message.AppendLine($"{inconnus.Count} Account(s) absent(s) du paramétrage :")
