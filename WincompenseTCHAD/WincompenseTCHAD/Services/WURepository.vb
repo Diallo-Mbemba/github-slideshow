@@ -1,7 +1,6 @@
 Option Strict On
 Option Explicit On
 
-Imports System.Configuration
 Imports System.Data
 Imports System.Data.SqlClient
 
@@ -17,21 +16,14 @@ Public NotInheritable Class WURepository
     End Sub
 
     ''' <summary>
-    ''' Construit la chaîne de connexion SQL Server à utiliser.
-    ''' Lue depuis App.config (clé "GWC_WINCOMPENSE_ETD") si disponible, sinon valeur par défaut
-    ''' pointant vers .\SQLEXPRESS / GWC_WINCOMPENSE_ETD en authentification Windows intégrée.
+    ''' Chaîne de connexion SQL Server à employer.
+    '''
+    ''' Elle n'est plus lue ici : ConfigurationWU la cherche dans le fichier partagé, dans la
+    ''' copie locale du poste, puis dans App.config. La banque change souvent de serveur, et ce
+    ''' changement doit se faire en modifiant un seul fichier, pas en repassant sur les postes.
     ''' </summary>
     Public Shared Function ObtenirChaineConnexion() As String
-        Try
-            Dim config As ConnectionStringSettings = ConfigurationManager.ConnectionStrings("GWC_WINCOMPENSE_ETD")
-            If config IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(config.ConnectionString) Then
-                Return config.ConnectionString
-            End If
-        Catch
-            ' En cas de problème de lecture de configuration, on retombe sur la valeur par défaut ci-dessous.
-        End Try
-
-        Return "Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;Connect Timeout=10;"
+        Return ConfigurationWU.ChaineDeConnexion()
     End Function
 
     ''' <summary>

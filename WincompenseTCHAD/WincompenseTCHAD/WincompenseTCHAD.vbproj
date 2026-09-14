@@ -94,6 +94,7 @@
     <Compile Include="Services\DemandeRepository.vb" />
     <Compile Include="Services\CoreBankingService.vb" />
     <Compile Include="Services\CalendrierWU.vb" />
+    <Compile Include="Services\ConfigurationWU.vb" />
     <Compile Include="Forms\FrmPrincipal.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -111,6 +112,12 @@
     </Compile>
     <Compile Include="Forms\FrmPieceComptable.Designer.vb">
       <DependentUpon>FrmPieceComptable.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmParametresConnexion.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmParametresConnexion.Designer.vb">
+      <DependentUpon>FrmParametresConnexion.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\FrmComptesSysteme.vb">
       <SubType>Form</SubType>
@@ -196,6 +203,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPieceComptable.resx">
       <DependentUpon>FrmPieceComptable.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmParametresConnexion.resx">
+      <DependentUpon>FrmParametresConnexion.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmComptesSysteme.resx">
       <DependentUpon>FrmComptesSysteme.vb</DependentUpon>

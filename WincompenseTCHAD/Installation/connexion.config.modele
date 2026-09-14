@@ -1,0 +1,51 @@
+# ===========================================================================
+#  Wincompense TCHAD - connexion commune a tous les postes
+# ===========================================================================
+#
+#  CE FICHIER COMMANDE TOUS LES POSTES DE LA BANQUE.
+#
+#  A poser sur le partage reseau, par exemple :
+#      \\SRV-FICHIERS\Wincompense\connexion.config
+#
+#  POUR CHANGER DE SERVEUR
+#      Modifier la ligne SERVEUR ci-dessous, enregistrer, et c'est tout.
+#      Les postes le prendront a leur prochain demarrage. Il n'y a ni
+#      reinstallation, ni passage sur les machines.
+#
+#  DROITS A POSER SUR CE FICHIER
+#      Lecture     : tous les utilisateurs de Wincompense.
+#      Ecriture    : l'informatique et l'administrateur Wincompense seulement.
+#      Un utilisateur qui pourrait ecrire ici deviendrait maitre de la
+#      connexion de toute la banque.
+#
+#  FORME DU FICHIER
+#      Une ligne CLE=VALEUR. Le caractere # ouvre un commentaire.
+#      Les accents sont a eviter : ce fichier se lit en UTF-8.
+#
+# ===========================================================================
+
+# Nom ou adresse de l'instance SQL Server.
+#   Exemples :  SRV-SQL01
+#               SRV-SQL01\SQLEXPRESS
+#               192.168.10.25,1433
+SERVEUR=SRV-SQL01
+
+# Nom de la base. Il ne change pas.
+BASE=GWC_WINCOMPENSE_ETD
+
+# Delai d'attente de la connexion, en secondes.
+# Trop court, un serveur lent parait injoignable ; trop long, l'agent attend
+# devant un ecran fige avant d'apprendre que rien ne repond.
+DELAI=10
+
+# ---------------------------------------------------------------------------
+#  CAS EXCEPTIONNEL - chaine de connexion complete
+# ---------------------------------------------------------------------------
+#  Si CHAINE est renseignee, elle prime sur SERVEUR, BASE et DELAI.
+#  Ne s'en servir que sur demande de l'editeur : la forme ci-dessus suffit a
+#  tout ce dont la banque a besoin, et se relit sans risque d'erreur.
+#
+#  L'authentification est TOUJOURS celle de Windows : aucun mot de passe ne
+#  doit figurer ici, ce fichier etant lisible par tous les utilisateurs.
+#
+# CHAINE=Server=SRV-SQL01;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;Connect Timeout=10;

@@ -37,6 +37,8 @@ Partial Class FrmPrincipal
         Me.mnuMonMotDePasse = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP4 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuUtilisateurs = New System.Windows.Forms.ToolStripMenuItem()
+        Me.SEP6 = New System.Windows.Forms.ToolStripSeparator()
+        Me.mnuConnexionBase = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuFenetres = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuCascade = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuMosaiqueH = New System.Windows.Forms.ToolStripMenuItem()
@@ -133,7 +135,7 @@ Partial Class FrmPrincipal
         '
         'mnuSecurite
         '
-        Me.mnuSecurite.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuMonMotDePasse, Me.SEP4, Me.mnuUtilisateurs})
+        Me.mnuSecurite.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuMonMotDePasse, Me.SEP4, Me.mnuUtilisateurs, Me.SEP6, Me.mnuConnexionBase})
         Me.mnuSecurite.Name = "mnuSecurite"
         Me.mnuSecurite.Size = New System.Drawing.Size(100, 20)
         Me.mnuSecurite.Text = "&Sécurité"
@@ -154,6 +156,17 @@ Partial Class FrmPrincipal
         Me.mnuUtilisateurs.Name = "mnuUtilisateurs"
         Me.mnuUtilisateurs.Size = New System.Drawing.Size(260, 22)
         Me.mnuUtilisateurs.Text = "&Utilisateurs et connexions"
+        '
+        'SEP6
+        '
+        Me.SEP6.Name = "SEP6"
+        Me.SEP6.Size = New System.Drawing.Size(240, 6)
+        '
+        'mnuConnexionBase
+        '
+        Me.mnuConnexionBase.Name = "mnuConnexionBase"
+        Me.mnuConnexionBase.Size = New System.Drawing.Size(260, 22)
+        Me.mnuConnexionBase.Text = "&Connexion à la base de données..."
         '
         'mnuFenetres
         '
@@ -259,6 +272,8 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuMonMotDePasse As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP4 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuUtilisateurs As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents SEP6 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents mnuConnexionBase As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuFenetres As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuCascade As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuMosaiqueH As System.Windows.Forms.ToolStripMenuItem

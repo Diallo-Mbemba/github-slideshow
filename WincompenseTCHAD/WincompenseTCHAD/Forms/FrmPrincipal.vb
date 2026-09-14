@@ -138,6 +138,22 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmUtilisateurs)()
     End Sub
 
+    ''' <summary>
+    ''' Ouvre l'écran de connexion à la base, réservé à l'administrateur.
+    '''
+    ''' Il est modal, et non fenêtre fille : changer de serveur pendant qu'un traitement est en
+    ''' cours dans une autre fenêtre donnerait une journée moitié lue sur un serveur, moitié sur
+    ''' l'autre. L'état de la base est relu ensuite, pour que la barre d'état dise la vérité.
+    ''' </summary>
+    Private Sub mnuConnexionBase_Click(sender As Object, e As EventArgs) Handles mnuConnexionBase.Click
+
+        Using parametres As New FrmParametresConnexion()
+            parametres.ShowDialog(Me)
+        End Using
+
+        AfficherEtatBase()
+    End Sub
+
     Private Sub mnuMonMotDePasse_Click(sender As Object, e As EventArgs) Handles mnuMonMotDePasse.Click
 
         If SessionWU.Utilisateur Is Nothing Then Return
@@ -188,6 +204,11 @@ Public Class FrmPrincipal
         mnuParametrage.Available = pointsDeVente OrElse comptes
 
         mnuUtilisateurs.Available = utilisateurs
+
+        ' Changer de serveur engage toute la banque : seul l'administrateur, qui gère déjà les
+        ' utilisateurs, peut ouvrir cet écran.
+        mnuConnexionBase.Available = utilisateurs
+        SEP6.Available = utilisateurs
         SEP4.Available = utilisateurs
     End Sub
 

@@ -138,7 +138,8 @@ WincompenseTCHAD/
     │   ├── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
     │   ├── DemandeRepository.vb            ' File des demandes : dépôt, autorisation, rejet
     │   ├── CoreBankingService.vb           ' Fichier d'interface : construction, numéro de lot
-    │   └── CalendrierWU.vb                 ' Jours ouvrés : week-ends et jours fériés
+    │   ├── CalendrierWU.vb                 ' Jours ouvrés : week-ends et jours fériés
+    │   └── ConfigurationWU.vb              ' Où est le serveur : partage réseau, copie locale, secours
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -156,7 +157,8 @@ WincompenseTCHAD/
         ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
         ├── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
         ├── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
-        └── FrmFichierCoreBanking.vb        ' Consultation du fichier d'interface avant export
+        ├── FrmFichierCoreBanking.vb        ' Consultation du fichier d'interface avant export
+        └── FrmParametresConnexion.vb       ' Changement de serveur, pour ce poste ou pour toute la banque
 
 Scripts/
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
@@ -169,16 +171,91 @@ Scripts/
 ├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
 ├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
 └── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
+
+Installation/
+├── Wincompense.iss                        ' Script Inno Setup : produit WincompenseTCHAD_Setup.exe
+├── connexion.config.modele                ' Modèle du fichier à poser sur le partage réseau
+├── Configurer-Connexion.ps1               ' Changement de serveur en ligne de commande
+└── LISEZMOI-Installation.md               ' Déploiement, changement de serveur, dépannage
 ```
+
+## Installation sur les postes, et changement de serveur
+
+La banque change souvent de serveur. Tout le dispositif est bâti autour de cette contrainte :
+**changer de serveur ne doit pas envoyer un technicien dans les bureaux.**
+
+### La connexion ne vit pas avec l'application
+
+La chaîne vivait dans `WincompenseTCHAD.exe.config`, à côté de l'exécutable. Trois défauts qui se
+cumulaient : le fichier est dans `Program Files`, donc protégé ; il est propre à chaque poste ; et
+une réinstallation l'écrase.
+
+Elle est désormais cherchée dans un ordre où le premier trouvé l'emporte :
+
+| Rang | Emplacement | À quoi il sert |
+|---|---|---|
+| 1 | Variable d'environnement `WINCOMPENSE_CONNEXION` | Dépannage, poste de test |
+| 2 | **Fichier partagé** désigné à l'installation | **La source de vérité** |
+| 3 | `%PROGRAMDATA%\Wincompense\wincompense.config` | Copie locale, rafraîchie à chaque lecture réussie du partage |
+| 4 | `App.config` | Poste de développement |
+| 5 | Valeur compilée `.\SQLEXPRESS` | Dernier recours |
+
+**Changer de serveur, c'est modifier une ligne dans un fichier.** Les postes la prennent au
+démarrage suivant.
+
+Le rang 3 n'est pas un doublon : c'est lui qui fait travailler le poste le matin où le partage est
+injoignable. Sans lui, une coupure du serveur de fichiers arrêterait la compense de toute la
+banque. La copie est rafraîchie pendant que le partage répond, jamais quand il ne répond plus.
+
+L'authentification est celle de **Windows**. Aucun mot de passe ne circule — et c'est précisément
+ce qui autorise à poser la configuration sur un partage lisible par tous. Les droits d'accès à la
+base restent donnés par `Scripts\08_RolesSQLServer.sql`.
+
+### Trois façons de changer de serveur
+
+1. **Menu Sécurité → Connexion à la base de données…**, réservé à l'administrateur Wincompense.
+   L'écran teste la connexion avant d'enregistrer, dit **d'où vient** la chaîne en service, et
+   fait confirmer tout réglage appliqué à l'ensemble des postes.
+2. **Le Bloc-notes** : le fichier partagé est une suite de lignes `CLE=VALEUR`. Ni XML, ni
+   registre — l'informatique doit pouvoir agir sans outil et sans casser une balise.
+3. **`Configurer-Connexion.ps1`**, pour une migration faite hors des heures de bureau.
+
+Les trois testent ou font tester la connexion avant d'écrire : un serveur mal orthographié propagé
+à toute la banque arrêterait tout le monde, et se corrigerait depuis un poste qui ne se connecte
+plus.
+
+### Le programme d'installation
+
+`Installation\Wincompense.iss` produit `WincompenseTCHAD_Setup.exe` avec **Inno Setup 6**
+(gratuit). Il vérifie .NET Framework 4.8, copie l'application et les scripts SQL, **demande le
+serveur et le chemin du partage**, écrit la configuration, crée le fichier partagé s'il n'existe
+pas encore, et pose les raccourcis.
+
+Deux points méritent d'être signalés :
+
+- le dossier `%PROGRAMDATA%\Wincompense` est créé avec le droit de modification pour les
+  utilisateurs. Sans cela, l'application ne pourrait pas rafraîchir sa copie locale, et
+  l'administrateur ne pourrait pas changer de serveur depuis l'écran prévu pour cela ;
+- le fichier partagé n'est créé que s'il **n'existe pas**. Sur le deuxième poste installé, il
+  porte déjà le réglage de la banque : l'écraser avec la saisie d'un technicien ferait basculer
+  tout le monde par accident.
+
+La désinstallation laisse `%PROGRAMDATA%\Wincompense` en place, pour qu'une réinstallation
+retrouve le serveur sans ressaisie, et ne touche jamais au fichier partagé, qui appartient à la
+banque et non au poste.
+
+Le détail — prérequis, droits à poser sur le partage, dépannage — est dans
+`Installation\LISEZMOI-Installation.md`.
 
 ## Hypothèses métier retenues (à valider)
 
 1. **InclureLigneReglement** : toutes les lignes du rapport de règlement sont incluses par défaut
    (y compris `TransactionType = "A"`), dès lors que l'Account est renseigné. Fonction isolée,
    volontairement simple, à affiner selon consigne métier ultérieure.
-2. **Comptes INCONNU** : toujours affichés dans la grille de contrôle (jamais ignorés) ; pour la
-   pièce comptable, traités par défaut comme une agence propre (100 % banque, compte courant WU),
-   avec surlignage d'anomalie. *À confirmer.*
+2. **Comptes INCONNU** : toujours affichés dans la grille de contrôle et repris dans l'historique
+   d'activité, mais **jamais comptabilisés** — voir « Un Account non paramétré n'est pas
+   comptabilisé » plus haut. Leur activité reste à régulariser, et l'écran la chiffre avant de
+   générer la pièce.
 3. **Structure des écritures de la pièce comptable** : validée par rapprochement algébrique avec
    un exemple réel du classeur `PieceComptabilsationTchad.xlsx` (agence sous-agent "BOLOLO").
    Une seule ligne de mouvement net (`NetMouvement = PrincipalEnvoi+ChargeEnvoi+Taxes−PrincipalPaye`,
