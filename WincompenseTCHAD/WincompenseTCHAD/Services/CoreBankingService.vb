@@ -35,15 +35,19 @@ Public NotInheritable Class CoreBankingService
     ''' tirage aléatoire produirait deux numéros différents pour un même fichier réexporté, et
     ''' les comptes seraient impactés en double sans que rien ne le signale.
     '''
-    ''' Il est donc dérivé de la date de compensation elle-même : le nombre de jours écoulés
-    ''' depuis une origine fixe, écrit en base 36. Deux propriétés en découlent — une journée
-    ''' donne toujours le même numéro, et deux journées n'en partagent jamais un, pendant plus de
-    ''' quatre mille ans. L'origine est choisie pour que les numéros aient aujourd'hui la forme
-    ''' de ceux de la banque.
+    ''' Il est donc dérivé de la date elle-même : le nombre de jours écoulés depuis une origine
+    ''' fixe, écrit en base 36. Deux propriétés en découlent — une journée donne toujours le même
+    ''' numéro, et deux journées n'en partagent jamais un, pendant plus de quatre mille ans.
+    ''' L'origine est choisie pour que les numéros aient aujourd'hui la forme de ceux de la banque.
+    '''
+    ''' C'est la JOURNÉE D'ACTIVITÉ qui le détermine, et non la date de valeur. Depuis que celle-ci
+    ''' est reportée au premier jour ouvré, l'activité du vendredi, du samedi et du dimanche porte
+    ''' la même date de valeur — le lundi. Trois fichiers distincts auraient alors partagé un même
+    ''' numéro de lot, et le core banking les aurait pris pour trois chargements du même.
     ''' </summary>
-    Public Shared Function NumeroDeLot(dateCompensation As Date) As String
+    Public Shared Function NumeroDeLot(dateActivite As Date) As String
 
-        Dim jours As Integer = CInt((dateCompensation.Date - ConstantesWU.CB_ORIGINE_LOT.Date).TotalDays)
+        Dim jours As Integer = CInt((dateActivite.Date - ConstantesWU.CB_ORIGINE_LOT.Date).TotalDays)
 
         ' Une date antérieure à l'origine n'a pas de sens ici, mais ne doit pas faire échouer
         ' l'export : elle repart de zéro plutôt que de produire un numéro négatif.
@@ -67,10 +71,11 @@ Public NotInheritable Class CoreBankingService
     ''' Transforme la pièce comptable en table à treize colonnes.
     ''' </summary>
     ''' <param name="dtPiece">Pièce comptable produite par PieceComptableService.</param>
-    ''' <param name="dateCompensation">Date de valeur portée par toutes les lignes (J+1).</param>
+    ''' <param name="dateActivite">Journée traitée. Elle détermine le numéro de lot.</param>
+    ''' <param name="dateValeur">Date portée par toutes les lignes : le premier jour ouvré suivant.</param>
     ''' <param name="messageErreur">Motif du refus, le cas échéant.</param>
     ''' <returns>La table à charger, ou Nothing si la pièce ne s'y prête pas.</returns>
-    Public Shared Function Construire(dtPiece As DataTable, dateCompensation As Date,
+    Public Shared Function Construire(dtPiece As DataTable, dateActivite As Date, dateValeur As Date,
                                       ByRef messageErreur As String) As DataTable
 
         messageErreur = String.Empty
@@ -82,7 +87,7 @@ Public NotInheritable Class CoreBankingService
 
         If Not ControlerEquilibre(dtPiece, messageErreur) Then Return Nothing
 
-        Dim numeroLot As String = NumeroDeLot(dateCompensation)
+        Dim numeroLot As String = NumeroDeLot(dateActivite)
         Dim table As DataTable = TableVide()
 
         For Each ligne As DataRow In dtPiece.Rows
@@ -98,11 +103,11 @@ Public NotInheritable Class CoreBankingService
             ' les auxiliaires de la pièce écartent déjà ce cas — mais une telle ligne n'aurait
             ' rien à impacter et n'a pas à encombrer le fichier.
             If debit <> 0L Then
-                Ajouter(table, compte, libelle, debit, True, codeAgence, dateCompensation, numeroLot)
+                Ajouter(table, compte, libelle, debit, True, codeAgence, dateValeur, numeroLot)
             End If
 
             If credit <> 0L Then
-                Ajouter(table, compte, libelle, credit, False, codeAgence, dateCompensation, numeroLot)
+                Ajouter(table, compte, libelle, credit, False, codeAgence, dateValeur, numeroLot)
             End If
         Next
 
@@ -169,10 +174,10 @@ Public NotInheritable Class CoreBankingService
 
     Private Shared Sub Ajouter(table As DataTable, compte As String, libelle As String,
                                montant As Long, auDebit As Boolean, codeAgence As String,
-                               dateCompensation As Date, numeroLot As String)
+                               dateValeur As Date, numeroLot As String)
 
         Dim ligne As LigneCoreBankingWU = LigneCoreBankingWU.Construire(
-            compte, libelle, montant, auDebit, codeAgence, dateCompensation, numeroLot)
+            compte, libelle, montant, auDebit, codeAgence, dateValeur, numeroLot)
 
         table.Rows.Add(ligne.DETBSJRNL,
                        ligne.BRN,
@@ -194,13 +199,13 @@ Public NotInheritable Class CoreBankingService
 #Region "Nom du fichier"
 
     ''' <summary>
-    ''' Nom proposé pour le fichier. Le core banking n'en impose aucun ; celui-ci porte la date
-    ''' de compensation et le numéro de lot, de sorte qu'un fichier retrouvé dans un dossier se
-    ''' rattache sans ambiguïté à sa journée.
+    ''' Nom proposé pour le fichier. Le core banking n'en impose aucun ; celui-ci porte la
+    ''' journée d'activité et son numéro de lot, de sorte qu'un fichier retrouvé dans un dossier
+    ''' se rattache sans ambiguïté à la journée qu'il comptabilise.
     ''' </summary>
-    Public Shared Function NomDeFichier(dateCompensation As Date) As String
+    Public Shared Function NomDeFichier(dateActivite As Date) As String
 
-        Return $"WU_CORE_{dateCompensation:yyyyMMdd}_{NumeroDeLot(dateCompensation)}.xlsx"
+        Return $"WU_CORE_{dateActivite:yyyyMMdd}_{NumeroDeLot(dateActivite)}.xlsx"
     End Function
 
 #End Region

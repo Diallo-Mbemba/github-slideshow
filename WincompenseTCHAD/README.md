@@ -89,7 +89,8 @@ WincompenseTCHAD/
     │   ├── SessionWU.vb                    ' Utilisateur connecté et droits : point d'accès unique
     │   ├── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
     │   ├── DemandeRepository.vb            ' File des demandes : dépôt, autorisation, rejet
-    │   └── CoreBankingService.vb           ' Fichier d'interface : construction, numéro de lot
+    │   ├── CoreBankingService.vb           ' Fichier d'interface : construction, numéro de lot
+    │   └── CalendrierWU.vb                 ' Jours ouvrés : week-ends et jours fériés
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -117,7 +118,8 @@ Scripts/
 ├── 06_HistoriqueMTCN.sql                  ' Détail des transactions, MTCN par MTCN
 ├── 07_Utilisateurs.sql                    ' Utilisateurs, journal des connexions, traçabilité
 ├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
-└── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
+├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
+└── 10_JoursFeries.sql                     ' Jours fériés : date de valeur au premier jour ouvré
 ```
 
 ## Hypothèses métier retenues (à valider)
@@ -631,6 +633,26 @@ Pour que la règle 2 soit possible, la pièce comptable porte désormais une col
 Elle ne s'affiche pas à l'écran et ne change aucun montant : sans elle, rien ne permettait de
 savoir à quel point de vente appartient une ligne.
 
+### Date de valeur : le premier jour ouvré suivant
+
+L'activité du jour J est portée en valeur au **premier jour ouvré suivant** — ni samedi, ni
+dimanche, ni jour férié. Une écriture datée d'un jour chômé est rejetée par le core banking, ou
+repoussée d'office sans que personne ne le sache.
+
+Les samedis et dimanches se déduisent du calendrier. Les jours fériés, non : ils changent chaque
+année, et les fêtes musulmanes suivent le calendrier lunaire. Ils sont donc tenus dans la table
+`T_JourFerieWU`, créée par `Scripts\10_JoursFeries.sql` et complétée par la banque sans
+recompiler l'application.
+
+**Le script sème les fêtes à date fixe et les lundis de Pâques jusqu'en 2030 — 35 dates — et
+rien d'autre.** Les fêtes musulmanes sont annoncées chaque année et ne se calculent pas d'avance :
+elles doivent être ajoutées à mesure. Tant qu'une année n'a aucun jour férié enregistré,
+l'application le signale avant de produire le fichier et demande confirmation : une année vide
+donnerait des dates d'apparence normale, et l'erreur ne se découvrirait qu'au rejet du fichier.
+
+Quand la date est reportée, le message final dit pourquoi — « Report de 3 jours : samedi 30/05,
+dimanche 31/05 sont chômés ».
+
 ### Le numéro de lot n'est pas tiré au hasard
 
 C'est délibéré, et c'est le point le plus important de ce format.
@@ -640,11 +662,18 @@ présente deux fois la même journée**. Un tirage aléatoire produirait deux nu
 un même fichier réexporté, et les comptes seraient impactés en double sans que rien ne le
 signale.
 
-Il est donc dérivé de la date de compensation : le nombre de jours écoulés depuis une origine
-fixe, écrit en base 36 sur quatre caractères. Deux propriétés en découlent — **une journée donne
-toujours le même numéro**, et **deux journées n'en partagent jamais un**, pendant plus de quatre
-mille ans. L'origine est calée pour que les numéros aient aujourd'hui la forme de ceux de la
-banque : le 31 mai 2026 donne `07q4`.
+Il est donc dérivé de la date : le nombre de jours écoulés depuis une origine fixe, écrit en
+base 36 sur quatre caractères. Deux propriétés en découlent — **une journée donne toujours le
+même numéro**, et **deux journées n'en partagent jamais un**, pendant plus de quatre mille ans.
+L'origine est calée pour que les numéros aient aujourd'hui la forme de ceux de la banque : le
+31 mai 2026 donne `07q4`.
+
+C'est la **journée d'activité** qui le détermine, et non la date de valeur. Depuis que celle-ci
+est reportée au premier jour ouvré, l'activité du vendredi, du samedi et du dimanche porte la
+même date de valeur — le lundi. Dérivé de la date de valeur, le numéro aurait été identique pour
+ces trois journées, et le core banking les aurait prises pour trois chargements du même fichier.
+
+Le nom du fichier porte pour la même raison la journée d'activité : `WU_CORE_<aaaammjj>_<lot>.xlsx`.
 
 Aucune table n'a été ajoutée : le numéro se recalcule, il n'a pas à être conservé.
 
@@ -663,8 +692,8 @@ Toutes les colonnes sont écrites en **texte**, sauf `AMOUNT` écrit en nombre. 
 réinterprète ce qu'il croit reconnaître : un numéro de compte perdrait ses zéros de tête, et un
 numéro de lot comme `0741` deviendrait le nombre 741 quand `07p1` resterait du texte.
 
-Le nom proposé est `WU_CORE_<aaaammjj>_<lot>.xlsx` — la banque n'en impose aucun, celui-ci
-rattache sans ambiguïté un fichier retrouvé dans un dossier à sa journée.
+La banque n'impose aucun nom de fichier ; celui retenu rattache sans ambiguïté un fichier
+retrouvé dans un dossier à la journée qu'il comptabilise.
 
 ## Double regard sur le référentiel
 
@@ -1018,8 +1047,6 @@ charges pour un gain nul.
 - Les comptes 379100319 et 379200585 sont écrits dans `ConstantesWU` et non paramétrés dans
   `SystemeWU` : la banque les a donnés tels quels, et ils décrivent une règle d'aiguillage propre
   au format, non un paramétrage comptable. À basculer en paramètre si le plan comptable bouge.
-- Date de compensation : prise à J+1 en jours calendaires. Faut-il sauter les week-ends et les
-  jours fériés ?
 - Usage exact du compte inter bancaire 381000101 pour l'écart d'arrondi global (voir hypothèse 6).
 - Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la

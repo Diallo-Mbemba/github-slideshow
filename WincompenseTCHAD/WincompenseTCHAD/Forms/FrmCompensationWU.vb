@@ -593,11 +593,33 @@ Public Class FrmCompensationWU
             Return
         End If
 
-        ' Compensation J+1 : l'activité du jour J est portée en valeur au lendemain.
-        Dim dateCompensation As Date = _dateActivite.Value.Date.AddDays(1)
+        ' L'activité du jour J est portée en valeur au PREMIER JOUR OUVRÉ suivant : ni samedi,
+        ' ni dimanche, ni jour férié. Une écriture datée d'un jour chômé est rejetée par le core
+        ' banking, ou repoussée d'office sans que personne ne le sache.
+        Dim dateActivite As Date = _dateActivite.Value.Date
+        Dim dateValeur As Date = CalendrierWU.ProchainJourOuvre(dateActivite)
+
+        ' Une année sans jour férié enregistré donne des dates d'apparence normale : l'anomalie
+        ' ne se découvrirait qu'au rejet du fichier. On la signale avant, pas après.
+        Dim avertissement As String = CalendrierWU.Avertissement(dateValeur.Year)
+
+        If avertissement.Length > 0 Then
+            Dim suite As DialogResult = MessageBox.Show(
+                avertissement & Environment.NewLine & Environment.NewLine &
+                $"Date de valeur retenue : {dateValeur:dd/MM/yyyy}." & Environment.NewLine &
+                "Produire le fichier tout de même ?",
+                "Jours fériés incomplets", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2)
+
+            If suite <> DialogResult.Yes Then
+                tsslStatut.Text = "Fichier core banking abandonné : jours fériés à compléter."
+                Return
+            End If
+        End If
 
         Dim messageErreur As String = String.Empty
-        Dim fichier As DataTable = CoreBankingService.Construire(_dtPieceGeneree, dateCompensation, messageErreur)
+        Dim fichier As DataTable = CoreBankingService.Construire(_dtPieceGeneree, dateActivite,
+                                                                 dateValeur, messageErreur)
 
         If fichier Is Nothing Then
             MessageBox.Show(messageErreur, "Fichier non produit", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -605,7 +627,7 @@ Public Class FrmCompensationWU
             Return
         End If
 
-        Dim chemin As String = DemanderLeChemin(CoreBankingService.NomDeFichier(dateCompensation))
+        Dim chemin As String = DemanderLeChemin(CoreBankingService.NomDeFichier(dateActivite))
         If chemin.Length = 0 Then Return
 
         Try
@@ -615,15 +637,20 @@ Public Class FrmCompensationWU
             ' réinterpréterait les numéros de compte et les numéros de lot.
             ExcelExportService.ExporterTableBrute(fichier, New String() {"AMOUNT"}, "CoreBanking", chemin)
 
-            Dim numeroLot As String = CoreBankingService.NumeroDeLot(dateCompensation)
+            Dim numeroLot As String = CoreBankingService.NumeroDeLot(dateActivite)
+            Dim report As String = CalendrierWU.Explication(dateActivite, dateValeur)
 
             MessageBox.Show(
                 $"Fichier produit : {IO.Path.GetFileName(chemin)}" & Environment.NewLine & Environment.NewLine &
-                $"    lignes         : {fichier.Rows.Count}" & Environment.NewLine &
-                $"    date de valeur : {dateCompensation:dd/MM/yyyy}" & Environment.NewLine &
-                $"    numéro de lot  : {numeroLot}" & Environment.NewLine & Environment.NewLine &
-                "Le numéro de lot est dérivé de la date : réexporter cette journée redonnera le " &
-                "même numéro, ce qui permet au core banking de reconnaître un double chargement.",
+                $"    lignes           : {fichier.Rows.Count}" & Environment.NewLine &
+                $"    journée traitée  : {dateActivite:dd/MM/yyyy}" & Environment.NewLine &
+                $"    date de valeur   : {dateValeur:dd/MM/yyyy}" & Environment.NewLine &
+                $"    numéro de lot    : {numeroLot}" & Environment.NewLine &
+                If(report.Length > 0, Environment.NewLine & report & Environment.NewLine, String.Empty) &
+                Environment.NewLine &
+                "Le numéro de lot est dérivé de la journée traitée : réexporter cette journée " &
+                "redonnera le même numéro, ce qui permet au core banking de reconnaître un " &
+                "double chargement.",
                 "Fichier core banking", MessageBoxButtons.OK, MessageBoxIcon.Information)
 
             tsslStatut.Text = $"Fichier core banking produit : {fichier.Rows.Count} ligne(s), lot {numeroLot}."
