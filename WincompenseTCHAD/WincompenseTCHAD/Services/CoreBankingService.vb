@@ -40,10 +40,11 @@ Public NotInheritable Class CoreBankingService
     ''' numéro, et deux journées n'en partagent jamais un, pendant plus de quatre mille ans.
     ''' L'origine est choisie pour que les numéros aient aujourd'hui la forme de ceux de la banque.
     '''
-    ''' C'est la JOURNÉE D'ACTIVITÉ qui le détermine, et non la date de valeur. Depuis que celle-ci
-    ''' est reportée au premier jour ouvré, l'activité du vendredi, du samedi et du dimanche porte
-    ''' la même date de valeur — le lundi. Trois fichiers distincts auraient alors partagé un même
-    ''' numéro de lot, et le core banking les aurait pris pour trois chargements du même.
+    ''' C'est la JOURNÉE D'ACTIVITÉ qui le détermine, et non la date de valeur. Celle-ci est le
+    ''' jour de la compense : rattraper le lundi les journées du vendredi, du samedi et du
+    ''' dimanche leur donnerait la même date de valeur. Trois fichiers distincts auraient alors
+    ''' partagé un même numéro de lot, et le core banking les aurait pris pour trois chargements
+    ''' du même.
     ''' </summary>
     Public Shared Function NumeroDeLot(dateActivite As Date) As String
 
@@ -72,7 +73,7 @@ Public NotInheritable Class CoreBankingService
     ''' </summary>
     ''' <param name="dtPiece">Pièce comptable produite par PieceComptableService.</param>
     ''' <param name="dateActivite">Journée traitée. Elle détermine le numéro de lot.</param>
-    ''' <param name="dateValeur">Date portée par toutes les lignes : le premier jour ouvré suivant.</param>
+    ''' <param name="dateValeur">Date portée par toutes les lignes (VALDT) : le jour de la compense.</param>
     ''' <param name="messageErreur">Motif du refus, le cas échéant.</param>
     ''' <returns>La table à charger, ou Nothing si la pièce ne s'y prête pas.</returns>
     Public Shared Function Construire(dtPiece As DataTable, dateActivite As Date, dateValeur As Date,

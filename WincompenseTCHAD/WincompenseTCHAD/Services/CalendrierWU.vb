@@ -7,10 +7,10 @@ Imports System.Data.SqlClient
 ''' <summary>
 ''' Jours ouvrés de la banque : ni samedi, ni dimanche, ni jour férié.
 '''
-''' La compensation porte l'activité du jour J en valeur au premier jour ouvré suivant. Une
-''' écriture datée d'un jour chômé est rejetée par le core banking, ou repoussée d'office au jour
-''' suivant sans que personne ne le sache — et la date de valeur ne correspond alors plus à ce
-''' que la comptabilité attend.
+''' Les écritures portent en valeur LE JOUR DE LA COMPENSE, c'est-à-dire le jour où elles sont
+''' effectivement passées. Ce calendrier ne calcule donc plus cette date : il sert à la
+''' contrôler. Une écriture datée d'un jour chômé est rejetée par le core banking, ou repoussée
+''' d'office au jour suivant sans que personne ne le sache — mieux vaut le dire avant.
 '''
 ''' Les samedis et dimanches se déduisent du calendrier. Les jours fériés, non : ils changent
 ''' chaque année, et les fêtes musulmanes suivent le calendrier lunaire. Ils sont donc lus dans
@@ -52,10 +52,12 @@ Public NotInheritable Class CalendrierWU
     End Function
 
     ''' <summary>
-    ''' Premier jour ouvré STRICTEMENT postérieur à la date donnée.
+    ''' Premier jour ouvré STRICTEMENT postérieur à la date donnée : l'activité du vendredi, du
+    ''' samedi et du dimanche donne le lundi — ou le mardi si le lundi est férié.
     '''
-    ''' C'est la date de valeur des écritures : l'activité du vendredi, du samedi et du dimanche
-    ''' est donc portée au lundi — ou au mardi si le lundi est férié.
+    ''' Ce n'est plus la règle de la date de valeur, qui est désormais le jour de la compense.
+    ''' La fonction reste en service pour proposer une date de report lorsqu'un jour chômé est
+    ''' rencontré, et parce qu'elle répond à une question du métier qui se repose souvent.
     ''' </summary>
     Public Shared Function ProchainJourOuvre(depuis As Date) As Date
 
@@ -71,25 +73,37 @@ Public NotInheritable Class CalendrierWU
     End Function
 
     ''' <summary>
-    ''' Explique en clair le passage de la date d'activité à la date de valeur, pour que
-    ''' l'utilisateur voie pourquoi elle a été décalée.
+    ''' Explique en clair le rapport entre la journée traitée et la date portée par les
+    ''' écritures, pour que l'utilisateur voie de combien la compense est décalée — et si la
+    ''' date retenue pose un problème.
     ''' </summary>
+    ''' <param name="dateActivite">Journée d'activité traitée.</param>
+    ''' <param name="dateValeur">Date portée par les écritures : le jour de la compense.</param>
     Public Shared Function Explication(dateActivite As Date, dateValeur As Date) As String
 
         Dim ecart As Integer = CInt((dateValeur.Date - dateActivite.Date).TotalDays)
 
-        If ecart <= 1 Then Return String.Empty
+        Dim phrase As String
 
-        Dim chomes As New List(Of String)
-        Dim jour As Date = dateActivite.Date.AddDays(1)
+        Select Case ecart
+            Case Is < 0
+                ' Le rapport porte une journée postérieure à aujourd'hui : c'est le fichier
+                ' chargé qu'il faut vérifier, pas la date de valeur.
+                phrase = $"La journée traitée ({dateActivite:dd/MM/yyyy}) est POSTÉRIEURE au jour de " &
+                         "la compense : vérifiez le rapport chargé."
+            Case 0
+                phrase = "Compense passée le jour même de l'activité."
+            Case 1
+                phrase = "Compense du lendemain (J+1)."
+            Case Else
+                phrase = $"Compense passée {ecart} jours après la journée traitée."
+        End Select
 
-        While jour < dateValeur.Date
-            chomes.Add($"{NomDuJour(jour)} {jour:dd/MM}")
-            jour = jour.AddDays(1)
-        End While
+        If EstJourOuvre(dateValeur) Then Return phrase
 
-        Return $"Report de {ecart} jours : {String.Join(", ", chomes)} " &
-               If(chomes.Count > 1, "sont chômés.", "est chômé.")
+        Return phrase & " " &
+               $"Attention : le {NomDuJour(dateValeur)} {dateValeur:dd/MM} est chômé — " &
+               $"prochain jour ouvré : {ProchainJourOuvre(dateValeur):dd/MM/yyyy}."
     End Function
 
     Private Shared Function NomDuJour(jour As Date) As String

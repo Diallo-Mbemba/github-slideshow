@@ -744,28 +744,16 @@ Public Class FrmCompensationWU
             Return
         End If
 
-        ' L'activité du jour J est portée en valeur au PREMIER JOUR OUVRÉ suivant : ni samedi,
-        ' ni dimanche, ni jour férié. Une écriture datée d'un jour chômé est rejetée par le core
-        ' banking, ou repoussée d'office sans que personne ne le sache.
+        ' La date de valeur est LE JOUR DE LA COMPENSE, c'est-à-dire aujourd'hui : les écritures
+        ' portent la date du jour où elles sont effectivement passées, et non une date déduite
+        ' de la journée d'activité. Une journée rattrapée trois jours plus tard prend donc la
+        ' date du rattrapage, ce qui est aussi ce que le relevé de compte montrera.
         Dim dateActivite As Date = _dateActivite.Value.Date
-        Dim dateValeur As Date = CalendrierWU.ProchainJourOuvre(dateActivite)
+        Dim dateValeur As Date = Date.Today
 
-        ' Une année sans jour férié enregistré donne des dates d'apparence normale : l'anomalie
-        ' ne se découvrirait qu'au rejet du fichier. On la signale avant, pas après.
-        Dim avertissement As String = CalendrierWU.Avertissement(dateValeur.Year)
-
-        If avertissement.Length > 0 Then
-            Dim suite As DialogResult = MessageBox.Show(
-                avertissement & Environment.NewLine & Environment.NewLine &
-                $"Date de valeur retenue : {dateValeur:dd/MM/yyyy}." & Environment.NewLine &
-                "Produire le fichier tout de même ?",
-                "Jours fériés incomplets", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2)
-
-            If suite <> DialogResult.Yes Then
-                tsslStatut.Text = "Fichier core banking abandonné : jours fériés à compléter."
-                Return
-            End If
+        If Not ConfirmerLaDateDeValeur(dateValeur) Then
+            tsslStatut.Text = "Fichier core banking abandonné : date de valeur à vérifier."
+            Return
         End If
 
         Dim messageErreur As String = String.Empty
@@ -794,6 +782,35 @@ Public Class FrmCompensationWU
             End If
         End Using
     End Sub
+
+    ''' <summary>
+    ''' Contrôle la date de valeur avant de produire le fichier, et demande confirmation si
+    ''' quelque chose cloche. Retourne False si l'opération doit être abandonnée.
+    '''
+    ''' Deux anomalies méritent qu'on s'arrête : un jour chômé, parce que le core banking
+    ''' rejette l'écriture ou la repousse d'office sans que personne ne le sache ; une année
+    ''' dont aucun jour férié n'est enregistré, parce que la date paraît alors normale et que
+    ''' l'erreur ne se découvrirait qu'au rejet du fichier.
+    ''' </summary>
+    Private Function ConfirmerLaDateDeValeur(dateValeur As Date) As Boolean
+
+        Dim alerte As String
+
+        If Not CalendrierWU.EstJourOuvre(dateValeur) Then
+            alerte = $"Le {dateValeur:dd/MM/yyyy} est un jour chômé pour la banque." & Environment.NewLine &
+                     "Le core banking peut rejeter le fichier, ou reporter d'office les écritures."
+        Else
+            alerte = CalendrierWU.Avertissement(dateValeur.Year)
+            If alerte.Length = 0 Then Return True
+        End If
+
+        Return MessageBox.Show(
+            alerte & Environment.NewLine & Environment.NewLine &
+            $"Date de valeur retenue : {dateValeur:dd/MM/yyyy}." & Environment.NewLine &
+            "Produire le fichier tout de même ?",
+            "Date de valeur à vérifier", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) = DialogResult.Yes
+    End Function
 
     Private Sub btnGenererPiece_Click(sender As Object, e As EventArgs) Handles btnGenererPiece.Click
 

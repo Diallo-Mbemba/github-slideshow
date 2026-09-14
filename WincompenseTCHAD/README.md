@@ -168,7 +168,7 @@ Scripts/
 ├── 07_Utilisateurs.sql                    ' Utilisateurs, journal des connexions, traçabilité
 ├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
 ├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
-└── 10_JoursFeries.sql                     ' Jours fériés : date de valeur au premier jour ouvré
+└── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
 ```
 
 ## Hypothèses métier retenues (à valider)
@@ -669,7 +669,7 @@ fois produit, le classeur s'ouvre aussitôt, comme la pièce comptable.
 | 7 | `DRCR` | `D` ou `C` |
 | 8 | `ACBRN` | voir ci-dessous |
 | 9 | `TXNCD` | `U24` au débit, `F15` au crédit |
-| 10 | `VALDT` | date de compensation (J+1), au format `jj/mm/aaaa` |
+| 10 | `VALDT` | jour de la compense, c'est-à-dire la date du jour, au format `jj/mm/aaaa` |
 | 11 | `INSTR_NO` | vide |
 | 12 | `ADDLTEXT` | libellé de l'écriture |
 | 13 | `COST_CENTER` | `10000` |
@@ -692,11 +692,21 @@ Pour que la règle 2 soit possible, la pièce comptable porte désormais une col
 Elle ne s'affiche pas à l'écran et ne change aucun montant : sans elle, rien ne permettait de
 savoir à quel point de vente appartient une ligne.
 
-### Date de valeur : le premier jour ouvré suivant
+### Date de valeur : le jour de la compense
 
-L'activité du jour J est portée en valeur au **premier jour ouvré suivant** — ni samedi, ni
-dimanche, ni jour férié. Une écriture datée d'un jour chômé est rejetée par le core banking, ou
-repoussée d'office sans que personne ne le sache.
+`VALDT` porte **le jour où la compense est passée**, c'est-à-dire la date du jour. Les écritures
+sont datées du moment où elles impactent réellement les comptes, et non d'une date déduite de la
+journée d'activité. Une journée rattrapée trois jours plus tard prend donc la date du rattrapage
+— celle que le relevé de compte montrera.
+
+Dans le cas nominal, la compense du jour J se passe le lendemain : `VALDT` vaut J+1 sans qu'il
+ait fallu le calculer.
+
+La date n'est plus déduite, mais elle reste **contrôlée**. Une écriture datée d'un jour chômé est
+rejetée par le core banking, ou repoussée d'office sans que personne ne le sache : si la compense
+est passée un samedi, un dimanche ou un jour férié, l'application le signale, indique le prochain
+jour ouvré et demande confirmation avant de produire le fichier. Elle ne décale jamais la date
+d'elle-même — c'est la banque qui décide.
 
 Les samedis et dimanches se déduisent du calendrier. Les jours fériés, non : ils changent chaque
 année, et les fêtes musulmanes suivent le calendrier lunaire. Ils sont donc tenus dans la table
@@ -707,10 +717,12 @@ recompiler l'application.
 rien d'autre.** Les fêtes musulmanes sont annoncées chaque année et ne se calculent pas d'avance :
 elles doivent être ajoutées à mesure. Tant qu'une année n'a aucun jour férié enregistré,
 l'application le signale avant de produire le fichier et demande confirmation : une année vide
-donnerait des dates d'apparence normale, et l'erreur ne se découvrirait qu'au rejet du fichier.
+laisserait passer un jour férié sans que rien ne le signale.
 
-Quand la date est reportée, le message final dit pourquoi — « Report de 3 jours : samedi 30/05,
-dimanche 31/05 sont chômés ».
+La fenêtre d'aperçu dit en une ligne le rapport entre la journée traitée et la date portée —
+« Compense du lendemain (J+1) », « Compense passée 3 jours après la journée traitée » — et
+prévient lorsque le rapport chargé porte une journée postérieure à aujourd'hui, ce qui trahit un
+fichier qui n'est pas le bon.
 
 ### Le numéro de lot n'est pas tiré au hasard
 
@@ -727,10 +739,10 @@ même numéro**, et **deux journées n'en partagent jamais un**, pendant plus de
 L'origine est calée pour que les numéros aient aujourd'hui la forme de ceux de la banque : le
 31 mai 2026 donne `07q4`.
 
-C'est la **journée d'activité** qui le détermine, et non la date de valeur. Depuis que celle-ci
-est reportée au premier jour ouvré, l'activité du vendredi, du samedi et du dimanche porte la
-même date de valeur — le lundi. Dérivé de la date de valeur, le numéro aurait été identique pour
-ces trois journées, et le core banking les aurait prises pour trois chargements du même fichier.
+C'est la **journée d'activité** qui le détermine, et non la date de valeur. Celle-ci étant le
+jour de la compense, rattraper le lundi les journées du vendredi, du samedi et du dimanche leur
+donnerait la même date de valeur. Dérivé de cette date, le numéro aurait été identique pour ces
+trois journées, et le core banking les aurait prises pour trois chargements du même fichier.
 
 Le nom du fichier porte pour la même raison la journée d'activité : `WU_CORE_<aaaammjj>_<lot>.xlsx`.
 
