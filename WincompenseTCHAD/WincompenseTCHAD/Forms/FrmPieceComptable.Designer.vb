@@ -25,7 +25,7 @@ Partial Class FrmPieceComptable
         Me.dgvPiece = New System.Windows.Forms.DataGridView()
         Me.lblTotaux = New System.Windows.Forms.Label()
         Me.lblEcart = New System.Windows.Forms.Label()
-        Me.btnOuvrirExcel = New System.Windows.Forms.Button()
+        Me.btnExporter = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
         CType(Me.dgvPiece, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
@@ -88,15 +88,15 @@ Partial Class FrmPieceComptable
         Me.lblEcart.Size = New System.Drawing.Size(600, 32)
         Me.lblEcart.TabIndex = 4
         '
-        'btnOuvrirExcel
+        'btnExporter
         '
-        Me.btnOuvrirExcel.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.btnOuvrirExcel.Location = New System.Drawing.Point(628, 486)
-        Me.btnOuvrirExcel.Name = "btnOuvrirExcel"
-        Me.btnOuvrirExcel.Size = New System.Drawing.Size(150, 32)
-        Me.btnOuvrirExcel.TabIndex = 5
-        Me.btnOuvrirExcel.Text = "Ouvrir dans Excel"
-        Me.btnOuvrirExcel.UseVisualStyleBackColor = True
+        Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.btnExporter.Location = New System.Drawing.Point(618, 486)
+        Me.btnExporter.Name = "btnExporter"
+        Me.btnExporter.Size = New System.Drawing.Size(160, 32)
+        Me.btnExporter.TabIndex = 5
+        Me.btnExporter.Text = "Exporter vers Excel"
+        Me.btnExporter.UseVisualStyleBackColor = True
         '
         'btnFermer
         '
@@ -117,7 +117,7 @@ Partial Class FrmPieceComptable
         Me.CancelButton = Me.btnFermer
         Me.ClientSize = New System.Drawing.Size(900, 534)
         Me.Controls.Add(Me.btnFermer)
-        Me.Controls.Add(Me.btnOuvrirExcel)
+        Me.Controls.Add(Me.btnExporter)
         Me.Controls.Add(Me.lblEcart)
         Me.Controls.Add(Me.lblTotaux)
         Me.Controls.Add(Me.dgvPiece)
@@ -139,7 +139,7 @@ Partial Class FrmPieceComptable
     Friend WithEvents dgvPiece As System.Windows.Forms.DataGridView
     Friend WithEvents lblTotaux As System.Windows.Forms.Label
     Friend WithEvents lblEcart As System.Windows.Forms.Label
-    Friend WithEvents btnOuvrirExcel As System.Windows.Forms.Button
+    Friend WithEvents btnExporter As System.Windows.Forms.Button
     Friend WithEvents btnFermer As System.Windows.Forms.Button
 
 End Class

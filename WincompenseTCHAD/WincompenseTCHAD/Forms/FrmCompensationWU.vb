@@ -134,7 +134,7 @@ Public Class FrmCompensationWU
     ''' </summary>
     Private Sub btnActivite_Click(sender As Object, e As EventArgs) Handles btnActivite.Click
 
-        If ofdActivite.ShowDialog() <> DialogResult.OK Then Return
+        If ofdActivite.ShowDialog(Me) <> DialogResult.OK Then Return
 
         Dim infos As InfosFichierRapport = WUFichierService.AnalyserFichier(ofdActivite.FileName)
 
@@ -158,7 +158,7 @@ Public Class FrmCompensationWU
     ''' </summary>
     Private Sub btnReglement_Click(sender As Object, e As EventArgs) Handles btnReglement.Click
 
-        If ofdReglement.ShowDialog() <> DialogResult.OK Then Return
+        If ofdReglement.ShowDialog(Me) <> DialogResult.OK Then Return
 
         Dim infos As InfosFichierRapport = WUFichierService.AnalyserFichier(ofdReglement.FileName)
 
@@ -577,9 +577,11 @@ Public Class FrmCompensationWU
     ''' <summary>
     ''' Signale les Accounts que la base ne connaît pas, ou qu'elle connaît mal.
     '''
-    ''' Ils ne bloquent pas le calcul, mais leur pièce comptable ira sur le compte courant WU
-    ''' au lieu du compte de compensation du point de vente. Découvert après coup, l'écart se
-    ''' corrige à la main, écriture par écriture : il vaut mieux le voir tout de suite.
+    ''' Deux populations, deux conséquences très différentes, d'où deux listes distinctes :
+    ''' celle des Accounts qui ne seront pas comptabilisés du tout faute de comptes connus, et
+    ''' celle des Accounts qui le seront mais dont une donnée manque (typiquement un Account
+    ''' présent au règlement et absent de l'activité). Les confondre ferait croire à une perte
+    ''' d'écritures là où il n'y en a pas — ou l'inverse, ce qui serait pire.
     ''' </summary>
     Private Sub AlerterSurLesAccountsNonParametres()
 
@@ -589,35 +591,37 @@ Public Class FrmCompensationWU
         ' Accounts y seraient INCONNU, et répéter la liste entière n'apprendrait rien.
         If Not String.IsNullOrEmpty(_messageErreurConnexionSql) Then Return
 
-        Dim inconnus As List(Of CalculWU) = _listeCalculs.Where(Function(c) c.EstInconnu).ToList()
-        Dim incomplets As List(Of CalculWU) =
-            _listeCalculs.Where(Function(c) Not c.EstInconnu AndAlso c.DonneesManquantes).ToList()
+        Dim ecartes As List(Of CalculWU) = LesAccountsEcartes()
+        Dim signales As List(Of CalculWU) =
+            _listeCalculs.Where(Function(c) c.EstComptabilisable AndAlso c.DonneesManquantes).ToList()
 
-        If inconnus.Count = 0 AndAlso incomplets.Count = 0 Then Return
+        If ecartes.Count = 0 AndAlso signales.Count = 0 Then Return
 
         ' System.Text est écrit en entier : dans un formulaire, le membre hérité Me.Text masque
         ' l'espace de noms Text, et « Text.StringBuilder » se lit comme un membre de la chaîne
         ' du titre de la fenêtre.
         Dim message As New System.Text.StringBuilder()
 
-        If inconnus.Count > 0 Then
-            message.AppendLine($"{inconnus.Count} Account(s) absent(s) du paramétrage :")
-            message.AppendLine(Enumerer(inconnus))
+        If ecartes.Count > 0 Then
+            message.AppendLine($"{ecartes.Count} Account(s) ne seront PAS comptabilisés :")
+            message.AppendLine(EnumererAvecMotif(ecartes))
             message.AppendLine()
+            message.AppendLine("Ils n'apparaîtront ni dans la pièce comptable, ni dans le fichier destiné au")
+            message.AppendLine("core banking. Leur activité restera à régulariser tant que leur paramétrage")
+            message.AppendLine("n'aura pas été créé.")
+            message.AppendLine()
+            message.AppendLine("Créez-les dans l'écran des sous-agents ou des agences, puis relancez le calcul.")
         End If
 
-        If incomplets.Count > 0 Then
-            message.AppendLine($"{incomplets.Count} Account(s) au paramétrage incomplet :")
-            message.AppendLine(Enumerer(incomplets))
+        If signales.Count > 0 Then
+            If ecartes.Count > 0 Then message.AppendLine()
+            message.AppendLine($"{signales.Count} Account(s) comptabilisés malgré une donnée manquante :")
+            message.AppendLine(Enumerer(signales))
             message.AppendLine()
+            message.AppendLine("Leurs écritures sont bien produites ; la grille les signale en gris.")
         End If
 
-        message.AppendLine("Leur pièce comptable utilisera le compte courant WU au lieu du compte de")
-        message.AppendLine("compensation du point de vente, et aucune commission ne leur sera affectée.")
-        message.AppendLine()
-        message.AppendLine("Créez-les dans l'écran des sous-agents ou des agences, puis relancez le calcul.")
-
-        MessageBox.Show(message.ToString(), "Accounts non paramétrés",
+        MessageBox.Show(message.ToString(), "Accounts à vérifier",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning)
     End Sub
 
@@ -672,7 +676,7 @@ Public Class FrmCompensationWU
 
     ''' <summary>Masque les colonnes techniques utilisées uniquement pour la mise en évidence des anomalies.</summary>
     Private Sub MasquerColonnesTechniques()
-        For Each nomColonne As String In {"ErreurSQL", "DonneesManquantes"}
+        For Each nomColonne As String In {"ErreurSQL", "DonneesManquantes", "NonComptabilise"}
             If dgvControle.Columns.Contains(nomColonne) Then
                 dgvControle.Columns(nomColonne).Visible = False
             End If
@@ -680,7 +684,8 @@ Public Class FrmCompensationWU
     End Sub
 
     ''' <summary>
-    ''' Met en évidence visuellement (section 12) : Type INCONNU, Solde ≠ 0, erreur SQL, données manquantes.
+    ''' Met en évidence visuellement (section 12) : erreur SQL, Account non comptabilisé,
+    ''' données manquantes, écart d'arrondi anormal, solde ≠ 0.
     ''' L'ordre ci-dessous reflète la priorité de gravité (erreur SQL prioritaire sur le reste).
     ''' </summary>
     Private Sub MettreEnEvidenceAnomalies()
@@ -688,14 +693,17 @@ Public Class FrmCompensationWU
 
             Dim erreurSql As Boolean = Convert.ToBoolean(ligne.Cells("ErreurSQL").Value)
             Dim donneesManquantes As Boolean = Convert.ToBoolean(ligne.Cells("DonneesManquantes").Value)
-            Dim type As String = Convert.ToString(ligne.Cells("Type").Value)
+            Dim nonComptabilise As Boolean = Convert.ToBoolean(ligne.Cells("NonComptabilise").Value)
             Dim solde As Decimal = Convert.ToDecimal(ligne.Cells("Solde").Value)
             Dim ecartArrondi As Long = Convert.ToInt64(ligne.Cells("EcartArrondi").Value)
 
             If erreurSql Then
                 ligne.DefaultCellStyle.BackColor = Color.MistyRose
                 ligne.DefaultCellStyle.ForeColor = Color.DarkRed
-            ElseIf String.Equals(type, "INCONNU", StringComparison.OrdinalIgnoreCase) Then
+            ElseIf nonComptabilise Then
+                ' Account écarté de la pièce : absent du paramétrage, ou sous-agent sans compte
+                ' de compensation ou de commission. C'est l'anomalie la plus lourde après une
+                ' erreur SQL, puisque son activité n'est pas comptabilisée du tout.
                 ligne.DefaultCellStyle.BackColor = Color.LightYellow
             ElseIf donneesManquantes Then
                 ligne.DefaultCellStyle.BackColor = Color.Gainsboro
@@ -795,6 +803,14 @@ Public Class FrmCompensationWU
             Return
         End If
 
+        ' Les Accounts dont la banque ne connaît pas les comptes ne sont pas comptabilisés. Le
+        ' comptable doit le savoir AVANT de générer, et savoir combien cela représente : la
+        ' pièce qu'il s'apprête à charger ne couvrira pas toute l'activité de la journée.
+        If Not ConfirmerLesAccountsEcartes() Then
+            tsslStatut.Text = "Génération abandonnée : Accounts non paramétrés à créer."
+            Return
+        End If
+
         Try
             Cursor = Cursors.WaitCursor
 
@@ -815,15 +831,122 @@ Public Class FrmCompensationWU
             ' Un simple affichage ne doit rien laisser dans l'historique.
             HistoriserLaJournee()
 
-            OuvrirPieceDansExcel()
-
         Catch ex As Exception
             MessageBox.Show("Erreur lors de la génération de la pièce comptable : " & ex.Message,
                              "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
         Finally
             Cursor = Cursors.Default
         End Try
+
+        AfficherLaPieceGlobale()
     End Sub
+
+    ''' <summary>
+    ''' Présente la pièce globale à l'écran, avant tout export.
+    '''
+    ''' La pièce n'est plus envoyée directement dans Excel : elle engage la comptabilité de la
+    ''' banque, et se regarde d'abord. L'export reste à portée d'un bouton, et ouvre le classeur
+    ''' aussitôt écrit — comme le fichier destiné au core banking.
+    ''' </summary>
+    Private Sub AfficherLaPieceGlobale()
+
+        If _dtPieceGeneree Is Nothing OrElse _dtPieceGeneree.Rows.Count = 0 Then Return
+
+        Dim journee As String = If(_dateActivite.HasValue, $"{_dateActivite.Value:dd/MM/yyyy}", "journée indéterminée")
+        Dim ecartes As List(Of CalculWU) = LesAccountsEcartes()
+
+        Dim sousTitre As String =
+            $"{_listeCalculs.Count - ecartes.Count} Account(s) comptabilisé(s) sur {_listeCalculs.Count}" &
+            If(ecartes.Count = 0,
+               "     tous les Accounts de la journée sont paramétrés.",
+               $"     {ecartes.Count} Account(s) écarté(s), faute de paramétrage.")
+
+        Using apercu As New FrmPieceComptable(_dtPieceGeneree, $"Pièce comptable globale — journée du {journee}", sousTitre)
+
+            If _dateActivite.HasValue Then
+                apercu.NomFichierPropose = PieceComptableService.NomDeFichier(_dateActivite.Value)
+            End If
+
+            apercu.ShowDialog(Me)
+
+            If apercu.PieceExportee Then
+                tsslStatut.Text = $"Pièce comptable exportée ({_dtPieceGeneree.Rows.Count} écritures) : " &
+                                  IO.Path.GetFileName(apercu.CheminExporte)
+            End If
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' Accounts de la journée que la banque ne sait pas comptabiliser : absents du paramétrage,
+    ''' ou sous-agents sans compte de compensation ou sans compte de commission
+    ''' (voir CalculWU.EstComptabilisable).
+    ''' </summary>
+    Private Function LesAccountsEcartes() As List(Of CalculWU)
+
+        If _listeCalculs Is Nothing Then Return New List(Of CalculWU)()
+        Return _listeCalculs.Where(Function(c) Not c.EstComptabilisable).ToList()
+    End Function
+
+    ''' <summary>
+    ''' Annonce les Accounts qui ne seront pas comptabilisés et demande s'il faut continuer.
+    ''' Retourne False si la génération doit être abandonnée.
+    '''
+    ''' La réponse par défaut est « Non » : mieux vaut créer le point de vente manquant et
+    ''' relancer le calcul que charger une pièce incomplète dans le core banking, où la
+    ''' correction se fera écriture par écriture.
+    ''' </summary>
+    Private Function ConfirmerLesAccountsEcartes() As Boolean
+
+        Dim ecartes As List(Of CalculWU) = LesAccountsEcartes()
+        If ecartes.Count = 0 Then Return True
+
+        If ecartes.Count = _listeCalculs.Count Then
+            MessageBox.Show(
+                "Aucun Account de cette journée n'est paramétré : la pièce comptable serait vide." &
+                Environment.NewLine & Environment.NewLine &
+                "Vérifiez la connexion à la base, puis créez les points de vente manquants " &
+                "dans l'écran des sous-agents ou des agences.",
+                "Génération impossible", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End If
+
+        Dim montantEcarte As Decimal = ecartes.Sum(Function(c) Math.Abs(c.NetMouvement))
+
+        Dim message As New System.Text.StringBuilder()
+        message.AppendLine($"{ecartes.Count} Account(s) ne seront PAS comptabilisés, faute de paramétrage :")
+        message.AppendLine()
+        message.AppendLine(EnumererAvecMotif(ecartes))
+        message.AppendLine()
+        message.AppendLine($"Mouvement non comptabilisé : {montantEcarte:N0} FCFA (valeur absolue).")
+        message.AppendLine()
+        message.AppendLine("Leurs écritures n'apparaîtront ni dans la pièce comptable, ni dans le fichier")
+        message.AppendLine("destiné au core banking. L'activité correspondante restera à régulariser.")
+        message.AppendLine()
+        message.AppendLine("Créez ces points de vente, puis relancez le calcul — ou générez la pièce")
+        message.AppendLine("sans eux si la régularisation est traitée par ailleurs.")
+        message.AppendLine()
+        message.AppendLine("Générer la pièce sans ces Accounts ?")
+
+        Return MessageBox.Show(message.ToString(), "Accounts non comptabilisés",
+                               MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                               MessageBoxDefaultButton.Button2) = DialogResult.Yes
+    End Function
+
+    ''' <summary>Liste les Accounts écartés avec leur motif, en s'arrêtant avant de remplir l'écran.</summary>
+    Private Shared Function EnumererAvecMotif(calculs As List(Of CalculWU)) As String
+
+        Const MAXIMUM As Integer = 15
+
+        Dim lignes As List(Of String) =
+            calculs.Take(MAXIMUM).Select(Function(c) $"    {c.Account} — {c.MotifNonComptabilise}").ToList()
+
+        If calculs.Count > MAXIMUM Then
+            lignes.Add($"    ... et {calculs.Count - MAXIMUM} autre(s), visibles dans la grille.")
+        End If
+
+        Return String.Join(Environment.NewLine, lignes)
+    End Function
 
     ''' <summary>
     ''' Affiche la pièce comptable du seul point de vente sélectionné dans la grille de contrôle.
@@ -870,6 +993,20 @@ Public Class FrmCompensationWU
             Return
         End If
 
+        ' Un Account écarté ne produit aucune écriture : une pièce vide laisserait croire à
+        ' une journée sans activité pour ce point de vente, alors que c'est son paramétrage
+        ' qui manque.
+        If Not calc.EstComptabilisable Then
+            MessageBox.Show(
+                $"L'Account {calc.Account} n'est pas comptabilisé : {calc.MotifNonComptabilise}." &
+                Environment.NewLine & Environment.NewLine &
+                "Il n'apparaît ni dans la pièce comptable, ni dans le fichier destiné au core banking." &
+                Environment.NewLine &
+                "Créez-le dans l'écran des sous-agents ou des agences, puis relancez le calcul.",
+                "Account non comptabilisé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
         Try
             Cursor = Cursors.WaitCursor
 
@@ -889,6 +1026,11 @@ Public Class FrmCompensationWU
                                       $"     Compte de commission : {If(String.IsNullOrWhiteSpace(calc.CompteCommission), "(non paramétré)", calc.CompteCommission)}"
 
             Using formulaire As New FrmPieceComptable(dtPieceAccount, titre, sousTitre)
+
+                ' Le nom porte l'Account : un dossier contenant la pièce globale et plusieurs
+                ' pièces de points de vente doit rester lisible sans ouvrir les classeurs.
+                formulaire.NomFichierPropose = $"PieceWU_{calc.Account}.xlsx"
+
                 formulaire.ShowDialog(Me)
             End Using
 
@@ -899,27 +1041,6 @@ Public Class FrmCompensationWU
                              "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
         Finally
             Cursor = Cursors.Default
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' Ouvre directement la pièce comptable générée dans Microsoft Excel (fenêtre visible),
-    ''' sans boîte de dialogue d'enregistrement — le classeur est sauvegardé dans un fichier
-    ''' temporaire et laissé ouvert pour consultation/impression/enregistrement immédiat.
-    ''' Un échec (Excel absent du poste, etc.) n'invalide jamais la pièce comptable déjà
-    ''' générée en mémoire : un message d'avertissement est affiché à la place.
-    ''' </summary>
-    Private Sub OuvrirPieceDansExcel()
-        If _dtPieceGeneree Is Nothing OrElse _dtPieceGeneree.Rows.Count = 0 Then Return
-
-        Try
-            Dim cheminTemp As String = PieceComptableService.OuvrirPieceComptableExcel(_dtPieceGeneree)
-            tsslStatut.Text = $"Pièce comptable ouverte dans Excel ({_dtPieceGeneree.Rows.Count} lignes) : {cheminTemp}"
-        Catch ex As Exception
-            MessageBox.Show(
-                "Impossible d'ouvrir la pièce comptable dans Excel : " & ex.Message & Environment.NewLine &
-                "La pièce comptable reste disponible (DataTable dtPiece en mémoire).",
-                "Ouverture Excel", MessageBoxButtons.OK, MessageBoxIcon.Warning)
         End Try
     End Sub
 

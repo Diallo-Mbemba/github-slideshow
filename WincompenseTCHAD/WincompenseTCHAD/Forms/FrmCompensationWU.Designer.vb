@@ -91,7 +91,7 @@ Partial Class FrmCompensationWU
         Me.btnGenererPiece.Name = "btnGenererPiece"
         Me.btnGenererPiece.Size = New System.Drawing.Size(190, 32)
         Me.btnGenererPiece.TabIndex = 3
-        Me.btnGenererPiece.Text = "4. Générer pièce comptable"
+        Me.btnGenererPiece.Text = "4. Pièce comptable..."
         Me.btnGenererPiece.UseVisualStyleBackColor = True
         '
         'btnPieceAccount

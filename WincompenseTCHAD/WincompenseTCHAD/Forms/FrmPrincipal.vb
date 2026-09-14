@@ -47,12 +47,58 @@ Public Class FrmPrincipal
         Dim nouveau As New T()
         nouveau.MdiParent = Me
 
-        ' Une fenêtre fille ne se centre pas sur son parent : le réglage prévu pour un affichage
-        ' modal placerait la fenêtre hors de la zone MDI.
-        nouveau.StartPosition = FormStartPosition.WindowsDefaultLocation
+        ' CenterParent et CenterScreen ne conviennent pas à une fenêtre fille : le premier ne
+        ' vaut que pour un affichage modal, le second la placerait au centre de l'écran, donc
+        ' à cheval sur les bords de la zone MDI. Le placement est donc calculé à la main.
+        nouveau.StartPosition = FormStartPosition.Manual
+        CentrerDansLaZoneMdi(nouveau)
 
         nouveau.Show()
         Return nouveau
+    End Function
+
+    ''' <summary>
+    ''' Centre une fenêtre fille dans la zone de travail MDI, en la rétrécissant d'abord si
+    ''' elle y est trop grande.
+    '''
+    ''' Une fenêtre ouverte en haut à gauche, à sa taille de conception, débordait de la zone
+    ''' sur les postes à petit écran : ses boutons du bas devenaient inaccessibles sans faire
+    ''' défiler. Le dimensionnement précède donc le centrage, faute de quoi on centrerait une
+    ''' fenêtre plus large que la place disponible.
+    ''' </summary>
+    Private Sub CentrerDansLaZoneMdi(enfant As Form)
+
+        If enfant Is Nothing Then Return
+
+        Dim zone As MdiClient = ZoneMdi()
+        If zone Is Nothing Then Return
+
+        Dim disponible As Size = zone.ClientSize
+        If disponible.Width <= 0 OrElse disponible.Height <= 0 Then Return
+
+        ' MinimumSize peut refuser le rétrécissement : la taille réellement obtenue est donc
+        ' relue sur la fenêtre, et non supposée égale à celle qu'on vient de lui demander.
+        enfant.Size = New Size(Math.Min(enfant.Width, disponible.Width),
+                               Math.Min(enfant.Height, disponible.Height))
+
+        enfant.Location = New Point(Math.Max(0, (disponible.Width - enfant.Width) \ 2),
+                                    Math.Max(0, (disponible.Height - enfant.Height) \ 2))
+    End Sub
+
+    ''' <summary>
+    ''' Zone de travail MDI, c'est-à-dire le fond gris sur lequel s'ouvrent les fenêtres filles.
+    ''' Windows Forms l'ajoute lui-même aux contrôles du conteneur, sans l'exposer autrement que
+    ''' par ce parcours. Retourne Nothing tant que la fenêtre n'est pas construite.
+    ''' </summary>
+    Private Function ZoneMdi() As MdiClient
+
+        For Each controle As Control In Me.Controls
+
+            Dim zone As MdiClient = TryCast(controle, MdiClient)
+            If zone IsNot Nothing Then Return zone
+        Next
+
+        Return Nothing
     End Function
 
     Private Sub mnuTraitement_Click(sender As Object, e As EventArgs) Handles mnuTraitement.Click
@@ -192,18 +238,14 @@ Public Class FrmPrincipal
     ''' </summary>
     Private Sub PoserFiligrane()
 
-        For Each controle As Control In Me.Controls
+        Dim zone As MdiClient = ZoneMdi()
+        If zone Is Nothing Then Return
 
-            Dim zone As MdiClient = TryCast(controle, MdiClient)
-            If zone Is Nothing Then Continue For
+        AddHandler zone.Paint, AddressOf ZoneMdi_Paint
 
-            AddHandler zone.Paint, AddressOf ZoneMdi_Paint
-
-            ' Sans redessin au redimensionnement, le mot resterait centré sur l'ancienne largeur
-            ' et se retrouverait de travers dès qu'on agrandit la fenêtre.
-            AddHandler zone.Resize, AddressOf ZoneMdi_Resize
-            Return
-        Next
+        ' Sans redessin au redimensionnement, le mot resterait centré sur l'ancienne largeur
+        ' et se retrouverait de travers dès qu'on agrandit la fenêtre.
+        AddHandler zone.Resize, AddressOf ZoneMdi_Resize
     End Sub
 
     Private Sub ZoneMdi_Resize(sender As Object, e As EventArgs)

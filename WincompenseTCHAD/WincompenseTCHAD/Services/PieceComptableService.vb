@@ -1,4 +1,4 @@
-' Option Strict est désactivé UNIQUEMENT dans ce fichier car ExporterPieceExcel utilise la
+' Option Strict est désactivé UNIQUEMENT dans ce fichier car l'écriture du classeur utilise la
 ' liaison tardive (late binding) sur Microsoft Excel via Type.GetTypeFromProgID, afin de ne pas
 ' imposer de référence COM obligatoire au projet lorsque Excel n'est pas installé (section 1).
 ' Tout le reste du fichier (grille de contrôle, pièce comptable, équilibrage) reste fortement typé.
@@ -7,7 +7,6 @@ Option Explicit On
 
 Imports System.Data
 Imports System.Globalization
-Imports System.IO
 Imports System.Linq
 
 ''' <summary>
@@ -62,6 +61,11 @@ Public NotInheritable Class PieceComptableService
         dt.Columns.Add("ErreurSQL", GetType(Boolean))
         dt.Columns.Add("DonneesManquantes", GetType(Boolean))
 
+        ' Colonne technique, masquée dans la grille : elle porte le fait qu'un Account soit
+        ' écarté de la pièce comptable, ce qui est une conséquence plus lourde qu'une simple
+        ' donnée manquante et mérite sa propre mise en évidence.
+        dt.Columns.Add("NonComptabilise", GetType(Boolean))
+
         If listeCalculs Is Nothing Then Return dt
 
         For Each calc As CalculWU In listeCalculs
@@ -97,6 +101,7 @@ Public NotInheritable Class PieceComptableService
             ligne("EcartArrondi") = CalculerEcartArrondi(calc)
             ligne("ErreurSQL") = calc.ErreurSQL
             ligne("DonneesManquantes") = calc.DonneesManquantes
+            ligne("NonComptabilise") = Not calc.EstComptabilisable
 
             dt.Rows.Add(ligne)
         Next
@@ -152,6 +157,15 @@ Public NotInheritable Class PieceComptableService
         Dim comptes As ComptesSystemeWU = ComptesSystemeWU.Actuels
 
         For Each calc As CalculWU In listeCalculs
+
+            ' Un Account dont la banque ne connaît pas les comptes n'est pas comptabilisé : il
+            ' est purement et simplement absent de la pièce (voir CalculWU.EstComptabilisable).
+            ' Sa ligne de mouvement irait sinon sur le compte courant WU, c'est-à-dire sur un
+            ' compte qui n'est pas le sien, et la correction se ferait à la main après coup.
+            If Not calc.EstComptabilisable Then
+                calc.EcartArrondi = 0L
+                Continue For
+            End If
 
             Dim compteMouvement As String
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
@@ -233,6 +247,14 @@ Public NotInheritable Class PieceComptableService
     Private Shared Function CalculerEcartArrondi(calc As CalculWU) As Long
 
         If calc Is Nothing Then Return 0L
+
+        ' Un Account non comptabilisé n'apporte aucune ligne à la pièce : il ne peut donc pas
+        ' en apporter l'écart d'arrondi. Afficher un écart pour lui laisserait croire qu'il
+        ' pèse sur l'équilibre global alors qu'il n'y figure pas.
+        If Not calc.EstComptabilisable Then
+            calc.EcartArrondi = 0L
+            Return 0L
+        End If
 
         Dim totalCommissionsEtTaxes As Decimal =
             calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
@@ -369,67 +391,44 @@ Public NotInheritable Class PieceComptableService
 #Region "Export Excel (optionnel, section 1)"
 
     ''' <summary>
-    ''' Exporte la pièce comptable vers un classeur Excel via Microsoft Excel Interop.
-    ''' Nécessite l'ajout de la référence COM "Microsoft Excel XX.0 Object Library" au projet.
-    ''' Isolée dans sa propre fonction : toute la logique métier fonctionne sans Excel installé.
+    ''' Nom de fichier proposé pour l'export de la pièce comptable d'une journée, sur le modèle
+    ''' du fichier destiné au core banking : PieceWU_aaaammjj.xlsx. La journée figure dans le
+    ''' nom pour qu'un dossier d'exports reste lisible sans ouvrir les classeurs.
     ''' </summary>
-    ''' <param name="dtPiece">Pièce comptable à exporter.</param>
-    ''' <param name="cheminFichier">Chemin complet du fichier .xlsx à générer.</param>
-    Public Shared Sub ExporterPieceExcel(dtPiece As DataTable, cheminFichier As String)
-
-        If dtPiece Is Nothing OrElse dtPiece.Rows.Count = 0 Then
-            Throw New InvalidOperationException("Aucune donnée à exporter : générez la pièce comptable avant l'export.")
-        End If
-
-        Dim excelApp As Object = Nothing
-        Dim classeur As Object = Nothing
-        Dim feuille As Object = Nothing
-
-        Try
-            Dim typeExcel As Type = Type.GetTypeFromProgID("Excel.Application")
-            If typeExcel Is Nothing Then
-                Throw New InvalidOperationException("Microsoft Excel n'est pas installé sur ce poste.")
-            End If
-
-            excelApp = Activator.CreateInstance(typeExcel)
-            excelApp.Visible = False
-            excelApp.DisplayAlerts = False
-
-            classeur = excelApp.Workbooks.Add()
-            feuille = classeur.Worksheets(1)
-            RemplirFeuillePiece(feuille, dtPiece)
-            classeur.SaveAs(cheminFichier)
-
-        Finally
-            Try
-                If classeur IsNot Nothing Then classeur.Close(False)
-            Catch
-            End Try
-            Try
-                If excelApp IsNot Nothing Then excelApp.Quit()
-            Catch
-            End Try
-
-            If feuille IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(feuille)
-            If classeur IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(classeur)
-            If excelApp IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(excelApp)
-        End Try
-    End Sub
+    Public Shared Function NomDeFichier(dateActivite As Date) As String
+        Return $"PieceWU_{dateActivite:yyyyMMdd}.xlsx"
+    End Function
 
     ''' <summary>
-    ''' Génère la pièce comptable et l'ouvre DIRECTEMENT dans Microsoft Excel (fenêtre visible),
-    ''' sans passer par une boîte de dialogue d'enregistrement. Le classeur est sauvegardé dans
-    ''' un fichier temporaire (pour avoir un nom et être persisté sur disque) puis laissé OUVERT
-    ''' pour consultation/impression/enregistrement manuel immédiat par l'utilisateur.
-    ''' Nécessite Microsoft Excel installé sur le poste ; utilise la liaison tardive comme
-    ''' ExporterPieceExcel (voir remarque sur Option Strict Off en tête de fichier).
+    ''' Exporte la pièce comptable à l'emplacement choisi par l'utilisateur PUIS laisse le
+    ''' classeur ouvert sous ses yeux, comme le fait le fichier destiné au core banking :
+    ''' un export qu'on ne voit pas est un export dont on doute.
     ''' </summary>
-    ''' <param name="dtPiece">Pièce comptable à ouvrir (générée par GenererPieceComptable).</param>
-    ''' <returns>Chemin du fichier temporaire dans lequel le classeur a été sauvegardé.</returns>
-    Public Shared Function OuvrirPieceComptableExcel(dtPiece As DataTable) As String
+    ''' <returns>Le chemin du fichier produit.</returns>
+    Public Shared Function ExporterEtOuvrirPieceExcel(dtPiece As DataTable, cheminFichier As String) As String
+        Return EcrireClasseurPiece(dtPiece, cheminFichier)
+    End Function
+
+    ''' <summary>
+    ''' Écrit la pièce comptable dans un classeur Excel, par liaison tardive (voir la remarque
+    ''' sur Option Strict Off en tête de fichier), et laisse le classeur OUVERT sous les yeux
+    ''' de l'utilisateur.
+    '''
+    ''' Excel n'est jamais quitté en cas de succès : c'est tout l'intérêt de la méthode. Seule
+    ''' une erreur referme ce qui a pu être ouvert, pour ne pas laisser un classeur incomplet
+    ''' à l'écran.
+    ''' </summary>
+    ''' <param name="dtPiece">Pièce comptable à écrire.</param>
+    ''' <param name="cheminFichier">Chemin complet du fichier .xlsx.</param>
+    ''' <returns>Le chemin du fichier écrit.</returns>
+    Private Shared Function EcrireClasseurPiece(dtPiece As DataTable, cheminFichier As String) As String
 
         If dtPiece Is Nothing OrElse dtPiece.Rows.Count = 0 Then
-            Throw New InvalidOperationException("Aucune donnée à afficher : générez la pièce comptable avant de l'ouvrir.")
+            Throw New InvalidOperationException("Aucune donnée à exporter : générez la pièce comptable au préalable.")
+        End If
+
+        If String.IsNullOrWhiteSpace(cheminFichier) Then
+            Throw New ArgumentException("Chemin de fichier non renseigné.", NameOf(cheminFichier))
         End If
 
         Dim excelApp As Object = Nothing
@@ -449,9 +448,7 @@ Public NotInheritable Class PieceComptableService
             classeur = excelApp.Workbooks.Add()
             feuille = classeur.Worksheets(1)
             RemplirFeuillePiece(feuille, dtPiece)
-
-            Dim cheminTemp As String = Path.Combine(Path.GetTempPath(), $"PieceWU_{Date.Now:yyyyMMdd_HHmmss}.xlsx")
-            classeur.SaveAs(cheminTemp)
+            classeur.SaveAs(cheminFichier)
 
             ' Mise au premier plan de la fenêtre Excel : purement cosmétique, et volontairement
             ' protégée par un Try/Catch silencieux. L'objet Application n'expose pas Activate()
@@ -465,11 +462,11 @@ Public NotInheritable Class PieceComptableService
                 ' Ignoré volontairement : Excel est ouvert, seule la mise au premier plan a échoué.
             End Try
 
-            Return cheminTemp
+            Return cheminFichier
 
         Catch
-            ' En cas d'échec, on ferme proprement ce qui a pu être ouvert avant de relancer l'erreur
-            ' (contrairement au cas nominal, ici Excel ne doit pas rester ouvert sur un classeur en échec).
+            ' En cas d'échec, Excel ne doit pas rester ouvert sur un classeur incomplet : on
+            ' referme ce qui a pu être ouvert avant de relancer l'erreur à l'appelant.
             Try
                 If classeur IsNot Nothing Then classeur.Close(False)
             Catch
@@ -481,10 +478,8 @@ Public NotInheritable Class PieceComptableService
             Throw
 
         Finally
-            ' NOTE : contrairement à ExporterPieceExcel, on ne ferme PAS le classeur et on ne quitte
-            ' PAS Excel ici en cas de succès : c'est tout l'intérêt de cette méthode, laisser la
-            ' pièce ouverte et visible pour l'utilisateur. Seules les références COM intermédiaires
-            ' (feuille, classeur) sont libérées ; excelApp reste actif tant que sa fenêtre est ouverte.
+            ' Seules les références COM intermédiaires sont libérées : excelApp reste actif tant
+            ' que sa fenêtre est affichée à l'écran.
             If feuille IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(feuille)
             If classeur IsNot Nothing Then System.Runtime.InteropServices.Marshal.ReleaseComObject(classeur)
         End Try

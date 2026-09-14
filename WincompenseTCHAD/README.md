@@ -50,10 +50,26 @@ période, et ce qu'il reste à faire. Le libellé s'inscrivait jusqu'ici en peti
 d'état, où un agent pouvait le manquer et croire avoir chargé alors que la boîte de dialogue
 avait été refermée sans sélection.
 
-Après le calcul, une **alerte liste les Accounts non paramétrés** — absents de la base, ou au
-paramétrage incomplet. Ils ne bloquent rien, mais leur pièce ira sur le compte courant WU au lieu
-du compte de compensation du point de vente ; découvert après coup, l'écart se corrige à la main,
-écriture par écriture.
+Après le calcul, une **alerte liste les Accounts non paramétrés**, en distinguant deux
+populations que tout sépare : ceux qui ne seront pas comptabilisés, et ceux qui le seront malgré
+une donnée manquante.
+
+**Un Account non paramétré n'est pas comptabilisé.** Il n'apparaît ni dans la pièce comptable,
+ni dans le fichier destiné au core banking. Trois cas, et trois seulement : l'Account est absent
+de `T_Pdv_SA` comme de `T_Pdv_EC` ; c'est un sous-agent sans compte de compensation ; c'est un
+sous-agent sans compte de commission. Une agence propre connue reste toujours comptabilisée —
+ses écritures vont sur le compte courant WU par règle métier, et non faute de mieux.
+
+Auparavant, le mouvement d'un Account inconnu était posé sur le compte courant WU de la banque,
+c'est-à-dire sur un compte qui n'est pas le sien : l'écart se corrigeait ensuite à la main,
+écriture par écriture, une fois la pièce chargée. Le cas du sous-agent sans compte de commission
+était pire encore : sa rétrocession n'était posée nulle part alors que sa contrepartie restait
+comptée, et la pièce partait en déséquilibre du montant de cette commission — assez pour dépasser
+le seuil de mille francs et bloquer la génération sans en dire la raison.
+
+Avant de générer, l'écran **annonce les Accounts écartés, leur motif et le montant que cela
+représente**, et demande confirmation — la réponse par défaut étant « non ». L'activité écartée
+reste à régulariser : mieux vaut créer le point de vente manquant et relancer le calcul.
 
 Dans la grille de contrôle, **l'écart d'arrondi remonte en quatrième colonne**. Il se trouvait en
 avant-dernière position sur vingt-huit, donc hors de l'écran — alors que c'est lui qu'on vient
@@ -71,6 +87,17 @@ seuls sur cet écran les boutons de son propre enchaînement — charger, calcul
 La barre d'état rappelle en permanence **qui est connecté** et **le serveur et la base**
 auxquels l'application est reliée : une confusion entre l'environnement de test et la
 production se voit immédiatement.
+
+**La pièce comptable se regarde avant de sortir.** Elle n'est plus envoyée directement dans
+Excel : elle s'affiche d'abord dans sa fenêtre, avec ses totaux et son écart, et un bouton
+« Exporter vers Excel » écrit le classeur à l'emplacement choisi puis l'ouvre aussitôt. C'est
+exactement la marche du fichier destiné au core banking : ce qui engage la comptabilité de la
+banque doit pouvoir être lu avant d'être signé.
+
+**Les fenêtres s'ouvrent centrées.** Une fenêtre fille est placée au centre de la zone de
+travail MDI, et rétrécie d'abord si elle y est trop grande — ouverte en haut à gauche à sa
+taille de conception, elle débordait sur les postes à petit écran et ses boutons du bas
+devenaient inaccessibles. Les boîtes de dialogue se centrent sur la fenêtre qui les ouvre.
 
 Deux ouvertures restent volontairement **modales**, parce qu'elles appartiennent à un
 enchaînement et non à la navigation : la création d'un groupe depuis la fiche d'un sous-agent
@@ -517,7 +544,11 @@ Trois précisions sur ces états :
   propres : les ranger avec les secondes reviendrait à affirmer ce que précisément on ignore ;
 - la **variation** de la page 5 est laissée vide pour la première journée et lorsque la veille
   est à zéro — une variation depuis zéro n'a pas de sens, et afficher 100 % induirait en erreur ;
-- une nature de point de vente absente de la période n'apparaît pas : pas de ligne à zéro.
+- une nature de point de vente absente de la période n'apparaît pas : pas de ligne à zéro ;
+- l'historique enregistre **toute l'activité de la journée**, y compris celle des Accounts qui
+  n'ont pas été comptabilisés : le rapport dit ce qui s'est passé, la pièce dit ce qui a été
+  comptabilisé. Les deux totaux peuvent donc différer, et c'est précisément ce qui permet de
+  chiffrer ce qui reste à régulariser.
 
 Les quatre états sont bâtis sur **la même lecture**, agrégée différemment : leurs totaux sont
 donc nécessairement identiques d'une page à l'autre. Le rapprochement entre pages est un

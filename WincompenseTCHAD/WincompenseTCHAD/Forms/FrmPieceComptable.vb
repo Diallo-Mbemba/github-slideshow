@@ -5,16 +5,42 @@ Imports System.Data
 Imports System.Drawing
 Imports System.Globalization
 Imports System.Linq
+Imports System.Windows.Forms
 
 ''' <summary>
-''' Formulaire d'affichage d'une pièce comptable (globale ou limitée à un seul point de vente).
-''' Purement présentationnel : il reçoit la DataTable dtPiece déjà construite par
-''' PieceComptableService et se contente de l'afficher, d'en présenter les totaux et
-''' d'en proposer l'ouverture dans Excel.
+''' Consultation d'une pièce comptable — globale ou limitée à un seul point de vente — avant
+''' de l'exporter.
+'''
+''' L'écran est purement présentationnel : il reçoit la DataTable dtPiece déjà construite par
+''' PieceComptableService, l'affiche, en présente les totaux et n'écrit rien sur le disque tant
+''' que l'export n'est pas demandé. La pièce engage la comptabilité de la banque : elle doit
+''' pouvoir être regardée avant de sortir, exactement comme le fichier destiné au core banking.
 ''' </summary>
 Public Class FrmPieceComptable
 
     Private ReadOnly _dtPiece As DataTable
+
+    ''' <summary>Vrai si l'utilisateur a effectivement exporté la pièce.</summary>
+    Public ReadOnly Property PieceExportee As Boolean
+        Get
+            Return _exportee
+        End Get
+    End Property
+    Private _exportee As Boolean = False
+
+    ''' <summary>Chemin du classeur produit, ou chaîne vide.</summary>
+    Public ReadOnly Property CheminExporte As String
+        Get
+            Return _chemin
+        End Get
+    End Property
+    Private _chemin As String = String.Empty
+
+    ''' <summary>
+    ''' Nom de fichier proposé par défaut dans la boîte d'enregistrement. L'appelant le
+    ''' renseigne avant d'afficher l'écran ; à défaut, un nom daté du jour est employé.
+    ''' </summary>
+    Public Property NomFichierPropose As String = PieceComptableService.NomDeFichier(Date.Today)
 
     ''' <summary>Constructeur sans paramètre requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
@@ -67,6 +93,13 @@ Public Class FrmPieceComptable
             dgvPiece.Columns("Libelle").AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
             dgvPiece.Columns("Libelle").HeaderText = "Libellé"
         End If
+
+        ' Le code agence ne fait pas partie de la pièce comptable : il ne sert qu'à alimenter la
+        ' colonne ACBRN du fichier destiné au core banking. L'afficher ici ferait croire à une
+        ' colonne comptable de plus.
+        If dgvPiece.Columns.Contains("CodeAgence") Then
+            dgvPiece.Columns("CodeAgence").Visible = False
+        End If
     End Sub
 
     Private Sub AfficherTotaux()
@@ -74,7 +107,7 @@ Public Class FrmPieceComptable
         If _dtPiece Is Nothing OrElse _dtPiece.Rows.Count = 0 Then
             lblTotaux.Text = "Aucune écriture."
             lblEcart.Text = String.Empty
-            btnOuvrirExcel.Enabled = False
+            btnExporter.Enabled = False
             Return
         End If
 
@@ -100,24 +133,51 @@ Public Class FrmPieceComptable
 
 #End Region
 
-#Region "Actions"
+#Region "Export"
 
-    Private Sub btnOuvrirExcel_Click(sender As Object, e As EventArgs) Handles btnOuvrirExcel.Click
+    ''' <summary>
+    ''' Demande où enregistrer, écrit le classeur, puis l'ouvre immédiatement dans Excel :
+    ''' l'utilisateur voit ce qu'il vient de produire sans avoir à le retrouver sur son disque.
+    ''' </summary>
+    Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
+
+        Dim chemin As String = DemanderLeChemin()
+        If chemin.Length = 0 Then Return
 
         Try
             Cursor = Cursors.WaitCursor
-            Dim cheminTemp As String = PieceComptableService.OuvrirPieceComptableExcel(_dtPiece)
-            lblSousTitre.Text = $"Classeur ouvert dans Excel : {cheminTemp}"
+
+            PieceComptableService.ExporterEtOuvrirPieceExcel(_dtPiece, chemin)
+
+            _exportee = True
+            _chemin = chemin
+
+            lblSousTitre.Text = $"Pièce exportée : {chemin} — elle s'ouvre dans Excel."
 
         Catch ex As Exception
             MessageBox.Show(
-                "Impossible d'ouvrir la pièce comptable dans Excel : " & ex.Message & Environment.NewLine &
-                "La pièce reste consultable dans ce formulaire.",
-                "Ouverture Excel", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                "Impossible d'exporter la pièce comptable : " & ex.Message & Environment.NewLine &
+                "La pièce reste consultable dans cette fenêtre.",
+                "Export Excel", MessageBoxButtons.OK, MessageBoxIcon.Warning)
         Finally
             Cursor = Cursors.Default
         End Try
     End Sub
+
+    ''' <summary>Demande où enregistrer. Chaîne vide si l'utilisateur renonce.</summary>
+    Private Function DemanderLeChemin() As String
+
+        Using dialogue As New SaveFileDialog()
+
+            dialogue.Title = "Enregistrer la pièce comptable"
+            dialogue.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
+            dialogue.FileName = NomFichierPropose
+            dialogue.OverwritePrompt = True
+
+            If dialogue.ShowDialog(Me) <> DialogResult.OK Then Return String.Empty
+            Return dialogue.FileName
+        End Using
+    End Function
 
 #End Region
 

@@ -131,4 +131,57 @@ Public Class CalculWU
         End Get
     End Property
 
+    ''' <summary>
+    ''' Indique si cet Account peut être comptabilisé, c'est-à-dire si la banque sait sur quels
+    ''' comptes poser ses écritures.
+    '''
+    ''' Un Account non comptabilisable est écarté de la pièce comptable : il n'y apparaît pas
+    ''' du tout. Le comptabiliser quand même reviendrait à poser son mouvement sur le compte
+    ''' courant WU de la banque, c'est-à-dire sur un compte qui n'est pas le sien, et à laisser
+    ''' la correction se faire à la main, écriture par écriture, une fois la pièce chargée.
+    '''
+    ''' Trois cas, et trois seulement :
+    '''   - l'Account est absent de T_Pdv_SA comme de T_Pdv_EC : aucun compte n'est connu ;
+    '''   - c'est un sous-agent sans compte de compensation : son mouvement n'a pas de compte ;
+    '''   - c'est un sous-agent sans compte de commission : sa rétrocession n'a pas de compte,
+    '''     et la pièce partirait en déséquilibre du montant de cette commission.
+    '''
+    ''' Une agence propre (EC) connue est toujours comptabilisable : ses écritures vont sur le
+    ''' compte courant WU par règle métier, et non faute de mieux.
+    ''' </summary>
+    Public ReadOnly Property EstComptabilisable As Boolean
+        Get
+            Return MotifNonComptabilise.Length = 0
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Raison, en clair, pour laquelle l'Account ne peut pas être comptabilisé.
+    ''' Chaîne vide s'il est comptabilisable. Destinée à être affichée telle quelle.
+    ''' </summary>
+    Public ReadOnly Property MotifNonComptabilise As String
+        Get
+            If ErreurSQL Then Return "paramétrage non lu (erreur SQL)"
+            If EstInconnu Then Return "absent du paramétrage"
+
+            If String.Equals(TypePdv, "SA", StringComparison.OrdinalIgnoreCase) Then
+                If String.IsNullOrWhiteSpace(CompteCompense) Then Return "sous-agent sans compte de compensation"
+                If String.IsNullOrWhiteSpace(CompteCommission) Then Return "sous-agent sans compte de commission"
+            End If
+
+            Return String.Empty
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Montant net que cet Account aurait apporté à la pièce comptable :
+    ''' (principal envoyé + charges + taxes) − principal payé. Sert à chiffrer ce qui n'est pas
+    ''' comptabilisé lorsque l'Account est écarté — un nombre de lignes ne dit rien de l'enjeu.
+    ''' </summary>
+    Public ReadOnly Property NetMouvement As Decimal
+        Get
+            Return (PrincipalEnvoi + ChargeEnvoi + Taxes) - PrincipalPaye
+        End Get
+    End Property
+
 End Class
