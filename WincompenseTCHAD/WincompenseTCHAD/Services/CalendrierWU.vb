@@ -159,9 +159,10 @@ Public NotInheritable Class CalendrierWU
                    "Seuls les samedis et dimanches sont écartés : un jour férié passerait inaperçu."
         End If
 
-        Dim nombre As Integer = feries.Count(Function(j) j.Year = annee)
-
-        If nombre > 0 Then Return String.Empty
+        ' Any et non Count : sur un HashSet, Count est une propriété, et elle masque la méthode
+        ' d'extension Count de LINQ — Visual Basic lit alors l'appel comme une indexation de la
+        ' propriété. Any dit d'ailleurs mieux ce qu'on cherche, et s'arrête au premier trouvé.
+        If feries.Any(Function(j) j.Year = annee) Then Return String.Empty
 
         Return $"Aucun jour férié n'est enregistré pour {annee}." & Environment.NewLine &
                "Seuls les samedis et dimanches sont écartés : complétez T_JourFerieWU, " &
