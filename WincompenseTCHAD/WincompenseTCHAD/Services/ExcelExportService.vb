@@ -287,6 +287,139 @@ Public NotInheritable Class ExcelExportService
     ''' installé, par exemple — n'est pas remonté comme une erreur : le fichier est produit, et
     ''' c'est ce qui était demandé.
     ''' </summary>
+#Region "Export brut : un tableau, sans habillage"
+
+    ''' <summary>
+    ''' Écrit une table telle quelle dans un classeur : les en-têtes en première ligne, les
+    ''' données dessous, et rien d'autre.
+    '''
+    ''' C'est l'opposé de ExporterEtOuvrir, qui compose un état destiné à être lu par un humain.
+    ''' Ici le lecteur est un automate : un titre, un sous-titre ou une ligne vide décaleraient
+    ''' les colonnes et feraient rejeter le fichier.
+    '''
+    ''' Toutes les colonnes sont mises au format Texte avant écriture, sauf celles désignées
+    ''' comme numériques. Sans cela Excel réinterprète ce qu'il croit reconnaître : un numéro de
+    ''' compte perdrait ses zéros de tête, et un numéro de lot comme « 07p1 » resterait du texte
+    ''' quand « 0741 » deviendrait le nombre 741.
+    ''' </summary>
+    ''' <param name="table">Données à écrire, en-têtes compris.</param>
+    ''' <param name="colonnesNumeriques">Noms des colonnes à écrire en nombres.</param>
+    ''' <param name="nomFeuille">Nom de la feuille.</param>
+    ''' <param name="cheminFichier">Chemin complet du classeur à créer.</param>
+    Public Shared Sub ExporterTableBrute(table As DataTable,
+                                         colonnesNumeriques As IEnumerable(Of String),
+                                         nomFeuille As String,
+                                         cheminFichier As String)
+
+        If table Is Nothing OrElse table.Rows.Count = 0 Then
+            Throw New InvalidOperationException("Aucune donnée à exporter.")
+        End If
+
+        Dim numeriques As New List(Of String)
+        If colonnesNumeriques IsNot Nothing Then
+            For Each nom As String In colonnesNumeriques
+                numeriques.Add(nom.ToUpperInvariant())
+            Next
+        End If
+
+        Dim excelApp As Object = Nothing
+        Dim classeur As Object = Nothing
+        Dim feuille As Object = Nothing
+
+        Try
+            Dim typeExcel As Type = Type.GetTypeFromProgID("Excel.Application")
+            If typeExcel Is Nothing Then
+                Throw New InvalidOperationException(
+                    "Microsoft Excel n'est pas installé sur ce poste : le fichier ne peut pas être produit.")
+            End If
+
+            excelApp = Activator.CreateInstance(typeExcel)
+            excelApp.Visible = False
+            excelApp.DisplayAlerts = False
+
+            classeur = excelApp.Workbooks.Add()
+            feuille = classeur.Worksheets(1)
+            feuille.Name = NettoyerNomFeuille(nomFeuille)
+
+            Dim nbColonnes As Integer = table.Columns.Count
+            Dim nbLignes As Integer = table.Rows.Count
+
+            ' Le format des colonnes est posé AVANT l'écriture : appliqué après, Excel aurait
+            ' déjà converti les valeurs, et reformater n'aurait rien rendu.
+            For index As Integer = 1 To nbColonnes
+                Dim estNumerique As Boolean = numeriques.Contains(table.Columns(index - 1).ColumnName.ToUpperInvariant())
+                feuille.Columns(index).NumberFormat = If(estNumerique, "0", "@")
+            Next
+
+            ' Écriture en un seul bloc : cellule par cellule, chaque affectation est un appel COM,
+            ' et une pièce de plusieurs milliers de lignes prendrait plusieurs minutes.
+            Dim valeurs(nbLignes, nbColonnes - 1) As Object
+
+            For colonne As Integer = 0 To nbColonnes - 1
+                valeurs(0, colonne) = table.Columns(colonne).ColumnName
+            Next
+
+            For ligne As Integer = 0 To nbLignes - 1
+                For colonne As Integer = 0 To nbColonnes - 1
+
+                    Dim brut As String = Convert.ToString(table.Rows(ligne)(colonne))
+
+                    If numeriques.Contains(table.Columns(colonne).ColumnName.ToUpperInvariant()) Then
+                        Dim nombre As Long
+                        valeurs(ligne + 1, colonne) = If(Long.TryParse(brut, nombre), CObj(nombre), CObj(brut))
+                    Else
+                        valeurs(ligne + 1, colonne) = brut
+                    End If
+                Next
+            Next
+
+            Dim plage As Object = feuille.Range(feuille.Cells(1, 1), feuille.Cells(nbLignes + 1, nbColonnes))
+            plage.Value = valeurs
+
+            feuille.Range(feuille.Cells(1, 1), feuille.Cells(1, nbColonnes)).Font.Bold = True
+            feuille.Columns.AutoFit()
+            feuille.Range("A1").Select()
+
+            classeur.SaveAs(cheminFichier)
+
+        Finally
+            If classeur IsNot Nothing Then
+                Try
+                    classeur.Close(False)
+                Catch ex As Runtime.InteropServices.COMException
+                End Try
+            End If
+
+            If excelApp IsNot Nothing Then
+                Try
+                    excelApp.Quit()
+                Catch ex As Runtime.InteropServices.COMException
+                End Try
+            End If
+
+            LibererObjet(feuille)
+            LibererObjet(classeur)
+            LibererObjet(excelApp)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Relâche une référence COM. Sans cela, une instance d'Excel resterait en mémoire après
+    ''' chaque export, invisible et jamais fermée.
+    ''' </summary>
+    Private Shared Sub LibererObjet(objet As Object)
+
+        If objet Is Nothing Then Return
+
+        Try
+            Runtime.InteropServices.Marshal.ReleaseComObject(objet)
+        Catch ex As ArgumentException
+            ' L'objet n'était pas une référence COM : rien à relâcher.
+        End Try
+    End Sub
+
+#End Region
+
     Private Shared Sub OuvrirDocument(cheminFichier As String)
 
         Try

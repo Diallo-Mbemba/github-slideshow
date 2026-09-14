@@ -571,6 +571,86 @@ Public Class FrmCompensationWU
 
 #Region "Génération de la pièce comptable (btnGenererPiece)"
 
+
+    ''' <summary>
+    ''' Produit le fichier à treize colonnes chargé dans le core banking.
+    '''
+    ''' Il dérive de la pièce déjà générée, et non d'un nouveau calcul : ce qui est chargé doit
+    ''' être exactement ce que le comptable a vu et validé à l'écran.
+    ''' </summary>
+    Private Sub btnCoreBanking_Click(sender As Object, e As EventArgs) Handles btnCoreBanking.Click
+
+        If _dtPieceGeneree Is Nothing OrElse _dtPieceGeneree.Rows.Count = 0 Then
+            MessageBox.Show("Générez d'abord la pièce comptable : le fichier en dérive." & Environment.NewLine &
+                            "Ce qui est chargé dans le core banking doit être exactement ce que vous avez validé.",
+                            "Action impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        If Not _dateActivite.HasValue Then
+            MessageBox.Show("La journée traitée n'a pas pu être déterminée : impossible de dater les écritures.",
+                            "Action impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' Compensation J+1 : l'activité du jour J est portée en valeur au lendemain.
+        Dim dateCompensation As Date = _dateActivite.Value.Date.AddDays(1)
+
+        Dim messageErreur As String = String.Empty
+        Dim fichier As DataTable = CoreBankingService.Construire(_dtPieceGeneree, dateCompensation, messageErreur)
+
+        If fichier Is Nothing Then
+            MessageBox.Show(messageErreur, "Fichier non produit", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            tsslStatut.Text = "Fichier core banking non produit : " & messageErreur
+            Return
+        End If
+
+        Dim chemin As String = DemanderLeChemin(CoreBankingService.NomDeFichier(dateCompensation))
+        If chemin.Length = 0 Then Return
+
+        Try
+            Cursor = Cursors.WaitCursor
+
+            ' Seul AMOUNT est écrit en nombre : tout le reste est du texte, sans quoi Excel
+            ' réinterpréterait les numéros de compte et les numéros de lot.
+            ExcelExportService.ExporterTableBrute(fichier, New String() {"AMOUNT"}, "CoreBanking", chemin)
+
+            Dim numeroLot As String = CoreBankingService.NumeroDeLot(dateCompensation)
+
+            MessageBox.Show(
+                $"Fichier produit : {IO.Path.GetFileName(chemin)}" & Environment.NewLine & Environment.NewLine &
+                $"    lignes         : {fichier.Rows.Count}" & Environment.NewLine &
+                $"    date de valeur : {dateCompensation:dd/MM/yyyy}" & Environment.NewLine &
+                $"    numéro de lot  : {numeroLot}" & Environment.NewLine & Environment.NewLine &
+                "Le numéro de lot est dérivé de la date : réexporter cette journée redonnera le " &
+                "même numéro, ce qui permet au core banking de reconnaître un double chargement.",
+                "Fichier core banking", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+            tsslStatut.Text = $"Fichier core banking produit : {fichier.Rows.Count} ligne(s), lot {numeroLot}."
+
+        Catch ex As Exception
+            MessageBox.Show("Production du fichier impossible : " & ex.Message,
+                            "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            Cursor = Cursors.Default
+        End Try
+    End Sub
+
+    ''' <summary>Demande où enregistrer le fichier. Chaîne vide si l'utilisateur renonce.</summary>
+    Private Function DemanderLeChemin(nomPropose As String) As String
+
+        Using dialogue As New SaveFileDialog()
+
+            dialogue.Title = "Enregistrer le fichier destiné au core banking"
+            dialogue.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
+            dialogue.FileName = nomPropose
+            dialogue.OverwritePrompt = True
+
+            If dialogue.ShowDialog(Me) <> DialogResult.OK Then Return String.Empty
+            Return dialogue.FileName
+        End Using
+    End Function
+
     Private Sub btnGenererPiece_Click(sender As Object, e As EventArgs) Handles btnGenererPiece.Click
 
         If _listeCalculs Is Nothing OrElse _listeCalculs.Count = 0 Then

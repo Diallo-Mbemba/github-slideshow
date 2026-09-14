@@ -137,6 +137,12 @@ Public NotInheritable Class PieceComptableService
         dt.Columns.Add("Debit", GetType(Long))
         dt.Columns.Add("Credit", GetType(Long))
 
+        ' Code agence du point de vente qui a produit la ligne : codeagence pour un sous-agent,
+        ' CodeAgenc-Voyager pour une agence propre, tel que WURepository l'a lu selon l'Account.
+        ' Il ne s'affiche pas dans la pièce — il alimente la colonne ACBRN du fichier destiné au
+        ' core banking, qui n'a aucun autre moyen de savoir à quelle agence rattacher l'écriture.
+        dt.Columns.Add("CodeAgence", GetType(String))
+
         If listeCalculs Is Nothing Then Return dt
 
         ' Comptes comptables en service, lus une fois pour toute la pièce : ils proviennent de la
@@ -169,39 +175,39 @@ Public NotInheritable Class PieceComptableService
             CalculerEcartArrondi(calc)
 
             ' 1) Ligne de mouvement (compte de compensation du point de vente).
-            AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement)
+            AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement, calc.CodeAgence)
 
             ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
-            AjouterLigneSigneAuto(dt, comptes.CompteCourant, ConstantesWU.LIB_COMPTE_COURANT, -netCompteCourant)
+            AjouterLigneSigneAuto(dt, comptes.CompteCourant, ConstantesWU.LIB_COMPTE_COURANT, -netCompteCourant, calc.CodeAgence)
 
             ' 3) Commissions part Banque (toujours créditées, quel que soit le type de PDV).
             ' Transfert et Envoi partagent le même compte dans le paramétrage actuel (728300148),
             ' mais la table SystemeWU les porte dans deux colonnes distinctes (Cpte_Produit et
             ' Cpte_Produit_Envoi) : ils sont donc désormais dissociables sans toucher au code.
             AjouterLigneSiNonNul(dt, comptes.CommissionTransfertBanque,
-                                 ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, 0D, calc.CommissionTransfertBanque)
+                                 ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
-                                 ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque)
+                                 ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionPaiementBanque,
-                                 ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, 0D, calc.CommissionPaiementBanque)
+                                 ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
 
             ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCommission) Then
 
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     $"{ConstantesWU.LIB_COMMISSION_TRANSFERT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionTransfertSA)
+                                     $"{ConstantesWU.LIB_COMMISSION_TRANSFERT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionTransfertSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     $"{ConstantesWU.LIB_COMMISSION_PAIEMENT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionPaiementSA)
+                                     $"{ConstantesWU.LIB_COMMISSION_PAIEMENT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionPaiementSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     $"{ConstantesWU.LIB_COMMISSION_ENVOI_SA} {calc.Designation}".Trim(), 0D, calc.CommissionEnvoiSA)
+                                     $"{ConstantesWU.LIB_COMMISSION_ENVOI_SA} {calc.Designation}".Trim(), 0D, calc.CommissionEnvoiSA, calc.CodeAgence)
             End If
 
             ' 5) Taxes (impôts, TVA, TTA) : toujours créditées, à la charge de la banque.
-            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, 0D, calc.TaxeEnvoi)
-            AjouterLigneSiNonNul(dt, comptes.TVACollectee, ConstantesWU.LIB_TVA, 0D, calc.TVA)
-            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, ConstantesWU.LIB_TTA_ENVOI, 0D, calc.TTAEnvoi)
-            AjouterLigneSiNonNul(dt, comptes.TTAReception, ConstantesWU.LIB_TTA_RECEPTION, 0D, calc.TTAReception)
+            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, 0D, calc.TaxeEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TVACollectee, ConstantesWU.LIB_TVA, 0D, calc.TVA, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, ConstantesWU.LIB_TTA_ENVOI, 0D, calc.TTAEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAReception, ConstantesWU.LIB_TTA_RECEPTION, 0D, calc.TTAReception, calc.CodeAgence)
         Next
 
         Return dt
@@ -266,31 +272,41 @@ Public NotInheritable Class PieceComptableService
     ''' le signe du montant : Débit si positif, Crédit si négatif. Rien n'est ajouté si le
     ''' montant arrondi est nul.
     ''' </summary>
-    Private Shared Sub AjouterLigneSigneAuto(dt As DataTable, compte As String, libelle As String, montant As Decimal)
+    Private Shared Sub AjouterLigneSigneAuto(dt As DataTable, compte As String, libelle As String,
+                                             montant As Decimal, codeAgence As String)
         Dim montantArrondi As Long = WUCalculationService.ArrondiFCFA(montant)
         If montantArrondi = 0L Then Return
 
         If montantArrondi > 0L Then
-            AjouterLigne(dt, compte, libelle, montantArrondi, 0L)
+            AjouterLigne(dt, compte, libelle, montantArrondi, 0L, codeAgence)
         Else
-            AjouterLigne(dt, compte, libelle, 0L, -montantArrondi)
+            AjouterLigne(dt, compte, libelle, 0L, -montantArrondi, codeAgence)
         End If
     End Sub
 
     ''' <summary>Ajoute une ligne simple (Debit ou Credit) si le montant n'est pas nul une fois arrondi.</summary>
-    Private Shared Sub AjouterLigneSiNonNul(dt As DataTable, compte As String, libelle As String, debit As Decimal, credit As Decimal)
+    Private Shared Sub AjouterLigneSiNonNul(dt As DataTable, compte As String, libelle As String,
+                                            debit As Decimal, credit As Decimal, codeAgence As String)
         Dim debitArrondi As Long = WUCalculationService.ArrondiFCFA(debit)
         Dim creditArrondi As Long = WUCalculationService.ArrondiFCFA(credit)
         If debitArrondi = 0L AndAlso creditArrondi = 0L Then Return
-        AjouterLigne(dt, compte, libelle, debitArrondi, creditArrondi)
+        AjouterLigne(dt, compte, libelle, debitArrondi, creditArrondi, codeAgence)
     End Sub
 
-    Private Shared Sub AjouterLigne(dt As DataTable, compte As String, libelle As String, debit As Long, credit As Long)
+    Private Shared Sub AjouterLigne(dt As DataTable, compte As String, libelle As String,
+                                    debit As Long, credit As Long, codeAgence As String)
         Dim ligne As DataRow = dt.NewRow()
         ligne("Compte") = If(String.IsNullOrWhiteSpace(compte), ComptesSystemeWU.Actuels.CompteInterBancaire, compte)
         ligne("Libelle") = libelle
         ligne("Debit") = debit
         ligne("Credit") = credit
+
+        ' La colonne peut manquer sur une pièce construite avant l'ajout du code agence : on ne
+        ' la renseigne que si elle existe, plutôt que de faire échouer la génération.
+        If dt.Columns.Contains("CodeAgence") Then
+            ligne("CodeAgence") = If(codeAgence, String.Empty).Trim()
+        End If
+
         dt.Rows.Add(ligne)
     End Sub
 
@@ -330,13 +346,15 @@ Public NotInheritable Class PieceComptableService
         Dim compteEcart As String = ComptesSystemeWU.Actuels.CompteInterBancaire
 
         If differenceGlobale > 0D AndAlso differenceGlobale <= ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE, 0L, CLng(differenceGlobale))
+            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE, 0L,
+                         CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE)
             messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte inter bancaire {compteEcart}."
             Return True
         End If
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE, CLng(Math.Abs(differenceGlobale)), 0L)
+            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE,
+                         CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE)
             messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte inter bancaire {compteEcart}."
             Return True
         End If

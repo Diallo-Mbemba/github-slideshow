@@ -78,6 +78,7 @@
     <Compile Include="Models\TransactionWU.vb" />
     <Compile Include="Models\UtilisateurWU.vb" />
     <Compile Include="Models\DemandeWU.vb" />
+    <Compile Include="Models\LigneCoreBankingWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
@@ -91,6 +92,7 @@
     <Compile Include="Services\SessionWU.vb" />
     <Compile Include="Services\UtilisateurRepository.vb" />
     <Compile Include="Services\DemandeRepository.vb" />
+    <Compile Include="Services\CoreBankingService.vb" />
     <Compile Include="Forms\FrmPrincipal.vb">
       <SubType>Form</SubType>
     </Compile>

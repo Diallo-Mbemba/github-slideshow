@@ -27,6 +27,7 @@ Partial Class FrmCompensationWU
         Me.components = New System.ComponentModel.Container()
         Me.btnActivite = New System.Windows.Forms.Button()
         Me.btnReglement = New System.Windows.Forms.Button()
+        Me.btnCoreBanking = New System.Windows.Forms.Button()
         Me.btnAfficher = New System.Windows.Forms.Button()
         Me.btnGenererPiece = New System.Windows.Forms.Button()
         Me.btnPieceAccount = New System.Windows.Forms.Button()
@@ -63,6 +64,15 @@ Partial Class FrmCompensationWU
         Me.btnReglement.TabIndex = 1
         Me.btnReglement.Text = "Charger rapport règlement"
         Me.btnReglement.UseVisualStyleBackColor = True
+        '
+        'btnCoreBanking
+        '
+        Me.btnCoreBanking.Location = New System.Drawing.Point(390, 12)
+        Me.btnCoreBanking.Name = "btnCoreBanking"
+        Me.btnCoreBanking.Size = New System.Drawing.Size(204, 32)
+        Me.btnCoreBanking.TabIndex = 20
+        Me.btnCoreBanking.Text = "Fichier core banking..."
+        Me.btnCoreBanking.UseVisualStyleBackColor = True
         '
         'btnAfficher
         '
@@ -201,6 +211,7 @@ Partial Class FrmCompensationWU
         Me.Controls.Add(Me.lblActivite)
         Me.Controls.Add(Me.btnPieceAccount)
         Me.Controls.Add(Me.btnGenererPiece)
+        Me.Controls.Add(Me.btnCoreBanking)
         Me.Controls.Add(Me.btnAfficher)
         Me.Controls.Add(Me.btnReglement)
         Me.Controls.Add(Me.btnActivite)
@@ -218,6 +229,7 @@ Partial Class FrmCompensationWU
 
     Friend WithEvents btnActivite As System.Windows.Forms.Button
     Friend WithEvents btnReglement As System.Windows.Forms.Button
+    Friend WithEvents btnCoreBanking As System.Windows.Forms.Button
     Friend WithEvents btnAfficher As System.Windows.Forms.Button
     Friend WithEvents btnGenererPiece As System.Windows.Forms.Button
     Friend WithEvents btnPieceAccount As System.Windows.Forms.Button

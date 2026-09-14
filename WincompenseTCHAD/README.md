@@ -73,7 +73,8 @@ WincompenseTCHAD/
     │   ├── LigneHistoriqueWU.vb            ' Une journée comptabilisée pour un point de vente
     │   ├── TransactionWU.vb                ' Une transaction identifiée par son MTCN
     │   ├── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
-    │   └── DemandeWU.vb                    ' Une écriture proposée sur le référentiel
+    │   ├── DemandeWU.vb                    ' Une écriture proposée sur le référentiel
+    │   └── LigneCoreBankingWU.vb           ' Une ligne du fichier d'interface (13 colonnes)
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
@@ -87,7 +88,8 @@ WincompenseTCHAD/
     │   ├── MotDePasseService.vb            ' Empreintes PBKDF2, robustesse, mots de passe provisoires
     │   ├── SessionWU.vb                    ' Utilisateur connecté et droits : point d'accès unique
     │   ├── UtilisateurRepository.vb        ' Comptes (T_UtilisateurWU) et journal (T_ConnexionWU)
-    │   └── DemandeRepository.vb            ' File des demandes : dépôt, autorisation, rejet
+    │   ├── DemandeRepository.vb            ' File des demandes : dépôt, autorisation, rejet
+    │   └── CoreBankingService.vb           ' Fichier d'interface : construction, numéro de lot
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -584,6 +586,86 @@ La répartition banque / sous-agent des commissions. Elle dépend du taux du gro
 de l'édition**, et non au moment des opérations : un rapport rétroactif deviendrait faux dès
 qu'un taux change. L'historique conserve les commissions totales, qui elles ne bougent pas.
 
+## Fichier d'interface vers le core banking
+
+La pièce comptable reste l'objet de contrôle, lisible par un comptable. Le fichier décrit ici en
+dérive : c'est la forme sous laquelle le core banking accepte d'**impacter réellement** les
+comptes des sous-agents et les comptes internes de la banque.
+
+Bouton **« Fichier core banking… »** sur l'écran de traitement, actif une fois la pièce générée :
+ce qui est chargé doit être exactement ce que le comptable a vu et validé à l'écran.
+
+### Les treize colonnes
+
+| # | Colonne | Valeur |
+|---|---|---|
+| 1 | `DETBSJRNL` | `BBR` |
+| 2 | `BRN` | `N01` |
+| 3 | `BATCHNO` | numéro de lot, 4 caractères |
+| 4 | `SRCCODE` | `ECOSOURCE` |
+| 5 | `AMOUNT` | montant, **toujours positif**, entier FCFA |
+| 6 | `ACNO` | compte mouvementé |
+| 7 | `DRCR` | `D` ou `C` |
+| 8 | `ACBRN` | voir ci-dessous |
+| 9 | `TXNCD` | `U24` au débit, `F15` au crédit |
+| 10 | `VALDT` | date de compensation (J+1), au format `jj/mm/aaaa` |
+| 11 | `INSTR_NO` | vide |
+| 12 | `ADDLTEXT` | libellé de l'écriture |
+| 13 | `COST_CENTER` | `10000` |
+
+Une ligne de pièce portant un débit **ou** un crédit donne une ligne de fichier ; le sens part
+dans `DRCR` et le montant devient positif.
+
+### `ACBRN` : trois cas, dans cet ordre
+
+1. Les comptes **379100319** et **379200585** sont rattachés d'office à `N01`, quel que soit le
+   point de vente qui les a mouvementés.
+2. Sinon, le **code agence du point de vente** : `codeagence` pour un sous-agent,
+   `CodeAgenc-Voyager` pour une agence propre, selon l'Account — exactement ce que `WURepository`
+   lit déjà.
+3. À défaut, `N01`. Ce cas couvre la ligne d'écart d'arrondi, qui n'appartient à aucun point de
+   vente, et un point de vente dont le code agence manque encore dans la base. Laisser la colonne
+   vide ferait rejeter le fichier entier.
+
+Pour que la règle 2 soit possible, la pièce comptable porte désormais une colonne `CodeAgence`.
+Elle ne s'affiche pas à l'écran et ne change aucun montant : sans elle, rien ne permettait de
+savoir à quel point de vente appartient une ligne.
+
+### Le numéro de lot n'est pas tiré au hasard
+
+C'est délibéré, et c'est le point le plus important de ce format.
+
+Le numéro de lot est **le seul élément par lequel le core banking peut reconnaître qu'on lui
+présente deux fois la même journée**. Un tirage aléatoire produirait deux numéros différents pour
+un même fichier réexporté, et les comptes seraient impactés en double sans que rien ne le
+signale.
+
+Il est donc dérivé de la date de compensation : le nombre de jours écoulés depuis une origine
+fixe, écrit en base 36 sur quatre caractères. Deux propriétés en découlent — **une journée donne
+toujours le même numéro**, et **deux journées n'en partagent jamais un**, pendant plus de quatre
+mille ans. L'origine est calée pour que les numéros aient aujourd'hui la forme de ceux de la
+banque : le 31 mai 2026 donne `07q4`.
+
+Aucune table n'a été ajoutée : le numéro se recalcule, il n'a pas à être conservé.
+
+### Un fichier déséquilibré ne sort pas
+
+L'équilibre est revérifié au moment de produire le fichier, alors même que la pièce a déjà été
+équilibrée à sa génération. Ce fichier impacte des comptes réels et rien ne garantit qu'il soit
+produit dans la foulée : chargé déséquilibré, il déséquilibrerait la comptabilité de la banque.
+
+### Écriture du classeur
+
+Ligne d'en-tête puis données, sans titre ni ligne vide : le lecteur est un automate, et un
+décalage de colonne ferait rejeter le fichier.
+
+Toutes les colonnes sont écrites en **texte**, sauf `AMOUNT` écrit en nombre. Sans cela Excel
+réinterprète ce qu'il croit reconnaître : un numéro de compte perdrait ses zéros de tête, et un
+numéro de lot comme `0741` deviendrait le nombre 741 quand `07p1` resterait du texte.
+
+Le nom proposé est `WU_CORE_<aaaammjj>_<lot>.xlsx` — la banque n'en impose aucun, celui-ci
+rattache sans ambiguïté un fichier retrouvé dans un dossier à sa journée.
+
 ## Double regard sur le référentiel
 
 Toute écriture sur les **sous-agents**, les **agences propres** et les **groupes statistiques**
@@ -931,6 +1013,13 @@ charges pour un gain nul.
 - Les comptes comptables (`SystemeWU`) restent hors du double regard, sur décision de la banque.
   Ce sont pourtant les neuf comptes qui déterminent toute la pièce comptable, et seul
   l'administrateur y touche — seul.
+- Format de `VALDT` dans le fichier core banking : `jj/mm/aaaa` a été retenu, faute d'indication
+  contraire. À confirmer auprès de l'équipe du core banking avant le premier chargement réel.
+- Les comptes 379100319 et 379200585 sont écrits dans `ConstantesWU` et non paramétrés dans
+  `SystemeWU` : la banque les a donnés tels quels, et ils décrivent une règle d'aiguillage propre
+  au format, non un paramétrage comptable. À basculer en paramètre si le plan comptable bouge.
+- Date de compensation : prise à J+1 en jours calendaires. Faut-il sauter les week-ends et les
+  jours fériés ?
 - Usage exact du compte inter bancaire 381000101 pour l'écart d'arrondi global (voir hypothèse 6).
 - Faut-il alimenter les listes déroulantes du formulaire de paramétrage avec le plan comptable
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la

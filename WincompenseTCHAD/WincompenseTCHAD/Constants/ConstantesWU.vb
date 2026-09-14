@@ -297,4 +297,56 @@ Public NotInheritable Class ConstantesWU
 
 #End Region
 
+
+#Region "Fichier d'interface vers le core banking"
+
+    ' Le fichier chargé dans le core banking compte treize colonnes, dont neuf sont constantes
+    ' ou déduites. Les valeurs ci-dessous sont celles de la banque : elles ne se devinent pas et
+    ' ne doivent pas être modifiées sans son accord.
+
+    Public Const CB_DETBSJRNL As String = "BBR"
+    Public Const CB_BRN As String = "N01"
+    Public Const CB_SRCCODE As String = "ECOSOURCE"
+    Public Const CB_COST_CENTER As String = "10000"
+
+    ''' <summary>Code transaction d'un débit.</summary>
+    Public Const CB_TXNCD_DEBIT As String = "U24"
+
+    ''' <summary>Code transaction d'un crédit.</summary>
+    Public Const CB_TXNCD_CREDIT As String = "F15"
+
+    ''' <summary>Sens débit, tel qu'attendu dans la colonne DRCR.</summary>
+    Public Const CB_SENS_DEBIT As String = "D"
+
+    ''' <summary>Sens crédit, tel qu'attendu dans la colonne DRCR.</summary>
+    Public Const CB_SENS_CREDIT As String = "C"
+
+    ''' <summary>
+    ''' Agence du siège. Elle est portée par les deux comptes ci-dessous quel que soit le point
+    ''' de vente qui les a mouvementés, et par les lignes qui ne se rattachent à aucun point de
+    ''' vente — la ligne d'écart d'arrondi, notamment.
+    ''' </summary>
+    Public Const CB_AGENCE_SIEGE As String = "N01"
+
+    ''' <summary>
+    ''' Comptes rattachés d'office à l'agence du siège dans la colonne ACBRN.
+    '''
+    ''' Ils sont écrits ici et non dans SystemeWU : la banque les a donnés tels quels, et cette
+    ''' liste ne décrit pas un paramétrage comptable mais une règle d'aiguillage propre au
+    ''' format du core banking.
+    ''' </summary>
+    Public Shared ReadOnly CB_COMPTES_SIEGE As String() = New String() {"379100319", "379200585"}
+
+    ''' <summary>
+    ''' Origine du compteur de jours qui sert de numéro de lot. Choisie pour que les numéros
+    ''' produits aujourd'hui aient la même forme que ceux de la banque : au 22 avril 2026, le
+    ''' compteur vaut « 07p1 ».
+    ''' </summary>
+    Public Shared ReadOnly CB_ORIGINE_LOT As Date = New Date(1999, 1, 1)
+
+    ''' <summary>Longueur du numéro de lot, en caractères.</summary>
+    Public Const CB_LONGUEUR_LOT As Integer = 4
+
+#End Region
+
 End Class
