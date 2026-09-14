@@ -410,6 +410,26 @@ Public NotInheritable Class PieceComptableService
     End Function
 
     ''' <summary>
+    ''' Ouvre la pièce comptable dans Excel sans rien demander : le classeur est écrit dans un
+    ''' fichier temporaire, puis laissé ouvert pour consultation, impression ou enregistrement
+    ''' manuel immédiat.
+    '''
+    ''' L'écran de traitement présente désormais la pièce dans sa propre fenêtre avant tout
+    ''' export, et passe par ExporterEtOuvrirPieceExcel. Cette méthode-ci reste en service pour
+    ''' l'ouverture immédiate, sans choix d'emplacement — et parce qu'une version antérieure de
+    ''' FrmCompensationWU l'appelle : la retirer casserait la compilation d'un poste dont tous
+    ''' les fichiers ne seraient pas encore à jour.
+    ''' </summary>
+    ''' <param name="dtPiece">Pièce comptable à ouvrir.</param>
+    ''' <returns>Chemin du fichier temporaire dans lequel le classeur a été sauvegardé.</returns>
+    Public Shared Function OuvrirPieceComptableExcel(dtPiece As DataTable) As String
+
+        Dim cheminTemp As String = IO.Path.Combine(IO.Path.GetTempPath(),
+                                                   $"PieceWU_{Date.Now:yyyyMMdd_HHmmss}.xlsx")
+        Return EcrireClasseurPiece(dtPiece, cheminTemp)
+    End Function
+
+    ''' <summary>
     ''' Écrit la pièce comptable dans un classeur Excel, par liaison tardive (voir la remarque
     ''' sur Option Strict Off en tête de fichier), et laisse le classeur OUVERT sous les yeux
     ''' de l'utilisateur.
