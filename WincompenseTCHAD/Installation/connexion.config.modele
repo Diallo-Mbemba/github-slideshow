@@ -25,10 +25,18 @@
 # ===========================================================================
 
 # Nom ou adresse de l'instance SQL Server.
-#   Exemples :  SRV-SQL01
-#               SRV-SQL01\SQLEXPRESS
-#               192.168.10.25,1433
-SERVEUR=SRV-SQL01
+#
+#   Instance par defaut      NOM-DU-SERVEUR
+#   Instance nommee          NOM-DU-SERVEUR\SQLEXPRESS
+#   Par adresse et port      192.168.10.25,1433
+#   Base sur le poste meme   .\SQLEXPRESS
+#
+# Pour connaitre le nom exact : sur la machine qui heberge SQL Server, ouvrir
+# SQL Server Management Studio et executer  SELECT @@SERVERNAME
+#
+# ATTENTION : la valeur ci-dessous est un REMPLACEMENT A FAIRE, pas un exemple
+# a recopier. Tant qu'elle est la, l'application ne trouvera aucun serveur.
+SERVEUR=REMPLACER-PAR-LE-NOM-DU-SERVEUR
 
 # Nom de la base. Il ne change pas.
 BASE=GWC_WINCOMPENSE_ETD

@@ -29,6 +29,7 @@ Partial Class FrmConnexion
         Me.txtMotDePasse = New System.Windows.Forms.TextBox()
         Me.lblMessage = New System.Windows.Forms.Label()
         Me.btnConnexion = New System.Windows.Forms.Button()
+        Me.btnParametres = New System.Windows.Forms.Button()
         Me.btnAnnuler = New System.Windows.Forms.Button()
         Me.lblBase = New System.Windows.Forms.Label()
         Me.panelTitre.SuspendLayout()
@@ -110,6 +111,16 @@ Partial Class FrmConnexion
         Me.lblMessage.TabIndex = 6
         Me.lblMessage.Text = ""
         '
+        'btnParametres
+        '
+        Me.btnParametres.Location = New System.Drawing.Point(12, 258)
+        Me.btnParametres.Name = "btnParametres"
+        Me.btnParametres.Size = New System.Drawing.Size(132, 34)
+        Me.btnParametres.TabIndex = 10
+        Me.btnParametres.Text = "&Serveur..."
+        Me.btnParametres.UseVisualStyleBackColor = True
+        Me.btnParametres.Visible = False
+        '
         'btnConnexion
         '
         Me.btnConnexion.Location = New System.Drawing.Point(150, 258)
@@ -146,6 +157,7 @@ Partial Class FrmConnexion
         Me.CancelButton = Me.btnAnnuler
         Me.ClientSize = New System.Drawing.Size(444, 330)
         Me.Controls.Add(Me.lblBase)
+        Me.Controls.Add(Me.btnParametres)
         Me.Controls.Add(Me.btnAnnuler)
         Me.Controls.Add(Me.btnConnexion)
         Me.Controls.Add(Me.lblMessage)
@@ -176,6 +188,7 @@ Partial Class FrmConnexion
     Friend WithEvents txtMotDePasse As System.Windows.Forms.TextBox
     Friend WithEvents lblMessage As System.Windows.Forms.Label
     Friend WithEvents btnConnexion As System.Windows.Forms.Button
+    Friend WithEvents btnParametres As System.Windows.Forms.Button
     Friend WithEvents btnAnnuler As System.Windows.Forms.Button
     Friend WithEvents lblBase As System.Windows.Forms.Label
 

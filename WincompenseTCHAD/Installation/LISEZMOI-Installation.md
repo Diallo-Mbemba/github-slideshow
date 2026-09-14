@@ -204,8 +204,34 @@ une copie locale périmée modifierait un fichier sans aucun effet.
 | Le poste garde l'ancien serveur après un changement | L'application n'a pas été redémarrée, ou le réglage n'a pas été propagé | Fermer et rouvrir. Vérifier que la case « TOUS les postes » était cochée |
 | « valeur par défaut (aucune configuration trouvée) » | Poste jamais installé, ou `wincompense.config` supprimé | Relancer l'installation, ou régler par l'écran de connexion |
 | Écriture refusée sur le partage | Droits insuffisants | L'écriture est réservée à l'informatique et à l'administrateur. Rien n'a été modifié |
+| « Le serveur est introuvable ou n'est pas accessible » alors que la barre du bas affiche `SRV-SQL01` | `SRV-SQL01` est le **nom d'exemple** de la documentation, pas votre serveur | Remplacer la ligne `SERVEUR=` par le nom réel. Voir « Trouver le nom exact du serveur » ci-dessous |
+| Le nom du serveur est bon, la connexion échoue quand même | Instance nommée sans le service *SQL Server Browser*, TCP/IP désactivé, ou pare-feu | Démarrer *SQL Server Browser* ; activer TCP/IP dans *SQL Server Configuration Manager* ; ouvrir le port 1433 |
 | L'application démarre mais aucune donnée n'apparaît | Bonne connexion, mauvaise base | Tester la connexion : l'écran affiche le nom de la base qui répond |
 | Les exports Excel échouent | Excel absent du poste | Installer Excel. Les calculs et les écrans restent utilisables |
+
+### Trouver le nom exact du serveur
+
+Sur la machine qui héberge SQL Server, dans SQL Server Management Studio :
+
+```sql
+SELECT @@SERVERNAME
+```
+
+Ou, sans SSMS : *Services* Windows → chercher **SQL Server**.
+
+| Ce que le service affiche | Ce qu'il faut écrire dans `SERVEUR=` |
+|---|---|
+| `SQL Server (MSSQLSERVER)` | `NOM-DU-SERVEUR` — instance par défaut, rien à ajouter |
+| `SQL Server (SQLEXPRESS)` | `NOM-DU-SERVEUR\SQLEXPRESS` |
+| La base est sur le poste lui-même | `.\SQLEXPRESS`, ou `.` pour une instance par défaut |
+
+### Si la connexion échoue au démarrage
+
+Le bouton **« Serveur... »** apparaît alors sur l'écran de connexion. Il ouvre le
+réglage du serveur sans qu'il faille s'authentifier — impossible par définition quand
+la base ne répond pas — et retente la lecture dès la fermeture.
+
+Il reste masqué tant que tout va bien : régler le serveur n'est pas un geste quotidien.
 
 ---
 

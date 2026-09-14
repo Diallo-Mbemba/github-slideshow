@@ -57,6 +57,43 @@ Public Class FrmConnexion
     End Sub
 
     ''' <summary>
+    ''' Fait apparaître le bouton de réglage du serveur, et invite à s'en servir.
+    '''
+    ''' Il reste masqué tant que la base répond : régler le serveur n'est pas un geste
+    ''' quotidien, et un bouton toujours visible inviterait à y toucher sans raison.
+    '''
+    ''' Il est indispensable ici. L'écran de réglage vit normalement dans le menu Sécurité,
+    ''' donc DERRIÈRE la connexion — or c'est précisément quand la connexion échoue qu'il faut
+    ''' l'atteindre. Sans ce bouton, corriger un serveur imposerait de passer par le fichier de
+    ''' configuration à la main, sur chaque poste concerné.
+    ''' </summary>
+    Private Sub OffrirDeReglerLeServeur()
+
+        btnParametres.Visible = True
+
+        lblMessage.Text &= Environment.NewLine & Environment.NewLine &
+                           "Le serveur est peut-être mal indiqué : bouton « Serveur... » ci-dessous."
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre le réglage du serveur, puis retente la lecture. Si la base répond enfin, le
+    ''' message d'erreur et le bouton disparaissent : l'utilisateur voit que c'est réglé sans
+    ''' avoir à relancer l'application.
+    ''' </summary>
+    Private Sub btnParametres_Click(sender As Object, e As EventArgs) Handles btnParametres.Click
+
+        Using parametres As New FrmParametresConnexion()
+            parametres.ShowDialog(Me)
+        End Using
+
+        lblMessage.Text = String.Empty
+        btnParametres.Visible = False
+
+        AfficherBase()
+        VerifierPremierDemarrage()
+    End Sub
+
+    ''' <summary>
     ''' Au tout premier démarrage, la base ne contient aucun administrateur utilisable : sans
     ''' lui, personne ne pourrait créer de compte et l'application resterait inaccessible. On
     ''' propose alors de créer ce premier administrateur.
@@ -73,6 +110,7 @@ Public Class FrmConnexion
 
         If Not String.IsNullOrEmpty(messageErreur) Then
             lblMessage.Text = messageErreur
+            OffrirDeReglerLeServeur()
             Return
         End If
 
