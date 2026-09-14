@@ -226,8 +226,10 @@ plus.
 
 ### Le programme d'installation
 
-`Installation\Wincompense.iss` produit `WincompenseTCHAD_Setup.exe` avec **Inno Setup 6**
-(gratuit). Il vérifie .NET Framework 4.8, copie l'application et les scripts SQL, **demande le
+`Installation\Wincompense.iss` produit `WincompenseTCHAD_Setup.exe` avec **Inno Setup 6.3 ou
+supérieur**. Attention au point de licence : depuis la version 7, Inno Setup n'est plus gratuit
+pour un usage commercial, et une banque l'est — la **6.4.x**, gratuite pour tout usage, reste le
+choix le plus simple, et le script compile à l'identique. Il vérifie .NET Framework 4.8, copie l'application et les scripts SQL, **demande le
 serveur et le chemin du partage**, écrit la configuration, crée le fichier partagé s'il n'existe
 pas encore, et pose les raccourcis.
 

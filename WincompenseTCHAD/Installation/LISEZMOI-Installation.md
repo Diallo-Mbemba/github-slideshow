@@ -43,13 +43,45 @@ Les droits d'accès à la base sont donnés par `Scripts\08_RolesSQLServer.sql`.
 
 À faire une fois par version, sur le poste de développement.
 
-1. **Compiler en Release** : Visual Studio → *Générer* → *Configuration Release* →
-   *Générer la solution*. Vérifier que `WincompenseTCHAD\bin\Release\WincompenseTCHAD.exe`
-   existe et porte la bonne date.
-2. **Installer Inno Setup 6** (gratuit) : <https://jrsoftware.org/isdl.php>
-3. Ouvrir `Installation\Wincompense.iss` dans Inno Setup, puis **Build → Compile**
-   (Ctrl+F9).
+### Quelle version d'Inno Setup — à trancher par la banque
+
+**Inno Setup 7 n'est plus gratuit pour un usage commercial.** Sa fenêtre affiche
+« Non-commercial use only » et invite à acheter une licence. Une banque qui s'en sert
+pour outiller son activité est dans le cadre commercial.
+
+Deux issues, l'une et l'autre valables :
+
+| Choix | Ce que cela implique |
+|---|---|
+| **Inno Setup 6.4.x** *(recommandé)* | Gratuit pour tout usage, commercial compris. Le script ci-joint fonctionne dès la 6.3. Versions antérieures dans les archives : <https://jrsoftware.org/isdl.php> |
+| **Inno Setup 7 avec licence** | Acheter la licence auprès de jrsoftware. Rien à changer au script |
+
+Le script ne dépend d'aucune nouveauté de la version 7 : il compile à l'identique
+sous 6.3 et suivantes.
+
+### Les quatre étapes
+
+1. **Compiler en Release.** C'est l'oubli le plus fréquent, et il arrête tout.
+   Dans Visual Studio, la liste déroulante de la barre d'outils affiche *Debug* par
+   défaut : choisir **Release**, puis *Générer* → *Générer la solution*.
+   Vérifier ensuite que `WincompenseTCHAD\WincompenseTCHAD\bin\Release\WincompenseTCHAD.exe`
+   existe et porte la date du jour.
+
+   Sans cela, la compilation du script s'arrête sur un message explicite disant
+   exactement cela.
+
+2. **Installer Inno Setup**, selon le choix ci-dessus.
+
+3. Ouvrir `Installation\Wincompense.iss`, puis **Build → Compile** (Ctrl+F9).
+
 4. Le programme d'installation apparaît dans `Installation\Sortie\`.
+
+Pour compiler depuis un autre emplacement — serveur de construction, dossier
+déplacé — le chemin du dossier Release se passe en ligne de commande :
+
+```
+ISCC.exe /DDossierRelease="C:\chemin\vers\bin\Release" Wincompense.iss
+```
 
 Pour une nouvelle version, changer `VersionApplication` en tête du script. **Ne jamais
 changer `AppId`** : c'est par lui que Windows reconnaît une mise à jour plutôt qu'un

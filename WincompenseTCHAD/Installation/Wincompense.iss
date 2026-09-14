@@ -32,8 +32,23 @@
 #define Editeur             "Ecobank Tchad"
 #define ExecutablePrincipal "WincompenseTCHAD.exe"
 
-; Dossier de compilation Release, relatif a ce script.
-#define DossierRelease      "..\WincompenseTCHAD\bin\Release"
+; Dossier de compilation Release.
+;
+; SourcePath est le dossier de CE script : le chemin obtenu est donc absolu, et ne
+; depend pas du dossier courant du compilateur.
+;
+; Pour compiler depuis un autre emplacement (serveur de construction, dossier
+; deplace), passer le chemin en ligne de commande :
+;     ISCC.exe /DDossierRelease="C:\chemin\vers\bin\Release" Wincompense.iss
+#ifndef DossierRelease
+  #define DossierRelease SourcePath + "..\WincompenseTCHAD\bin\Release"
+#endif
+
+; Sans ce controle, un projet jamais compile en Release donne un message illisible
+; ("No files found matching ..."), qui laisse croire a une erreur du script.
+#if !FileExists(DossierRelease + "\" + ExecutablePrincipal)
+  #error "WincompenseTCHAD.exe est introuvable dans bin\Release : la solution n'a pas ete compilee en Release. Dans Visual Studio, choisir Release au lieu de Debug dans la liste de la barre d'outils, puis Generer > Generer la solution. Recompiler ensuite ce script."
+#endif
 
 [Setup]
 ; Cet identifiant ne doit JAMAIS changer : c'est par lui que Windows reconnait
