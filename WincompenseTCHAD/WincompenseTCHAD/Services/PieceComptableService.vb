@@ -119,8 +119,9 @@ Public NotInheritable Class PieceComptableService
     ''' PieceComptabilsationTchad.xlsx (validée sur un exemple réel de sous-agent) :
     '''
     '''   - UNE SEULE ligne de mouvement (Débit si positif, Crédit si négatif) sur le compte
-    '''     de compensation du point de vente (CompteCompense du sous-agent, ou le compte
-    '''     courant WU pour une agence propre / Account non paramétré), pour le montant net :
+    '''     de compensation du point de vente : CompteCompense pour un sous-agent, le compte
+    '''     courant WU pour une agence propre — celle-ci n'a pas de compte de compensation
+    '''     propre dans les livres de la banque (confirmé par la banque). Pour le montant net :
     '''         NetMouvement = (PrincipalEnvoi + ChargeEnvoi + Taxes) − PrincipalPaye
     '''   - UNE SEULE ligne en contrepartie sur le compte courant WU (32100003292), pour la
     '''     part nette revenant à la banque une fois les commissions et taxes affectées :

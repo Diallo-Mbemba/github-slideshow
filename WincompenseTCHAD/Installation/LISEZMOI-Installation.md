@@ -8,7 +8,8 @@ et pour changer de serveur ensuite sans y revenir.
 | `Wincompense.iss` | Script Inno Setup produisant `WincompenseTCHAD_Setup.exe` |
 | `connexion.config.modele` | Modèle du fichier à poser sur le partage réseau |
 | `Configurer-Connexion.ps1` | Changement de serveur en ligne de commande |
-| `LISEZMOI-Installation.md` | Ce document |
+| `LISEZMOI-Installation.md` | Ce document — installation technique et changement de serveur |
+| `PLAN-DEPLOIEMENT.md` | Les huit phases du déploiement à la banque, à cocher point par point |
 
 ---
 

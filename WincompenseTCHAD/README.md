@@ -176,7 +176,8 @@ Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit WincompenseTCHAD_Setup.exe
 ├── connexion.config.modele                ' Modèle du fichier à poser sur le partage réseau
 ├── Configurer-Connexion.ps1               ' Changement de serveur en ligne de commande
-└── LISEZMOI-Installation.md               ' Déploiement, changement de serveur, dépannage
+├── LISEZMOI-Installation.md               ' Déploiement, changement de serveur, dépannage
+└── PLAN-DEPLOIEMENT.md                    ' Les huit phases du déploiement, à cocher
 ```
 
 ## Installation sur les postes, et changement de serveur
@@ -1190,10 +1191,18 @@ arrondis à l'unité pratiqués par Western Union. **Aucune modification des for
 justifiée** : les remplacer par les valeurs fournies modifierait les règles du cahier des
 charges pour un gain nul.
 
+## Règles tranchées par la banque
+
+- **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
+  même enchaînement d'écritures, mêmes libellés, mêmes sens. Les trois lignes de commission
+  sous-agent n'y figurent pas parce que le taux vaut zéro et qu'une écriture à zéro n'est jamais
+  posée — ce n'est pas un traitement à part, c'est la même règle appliquée à 0 %, toute la
+  commission revenant à la banque. Sa ligne de mouvement va sur le **compte courant WU** : une
+  agence propre n'a pas de compte de compensation dans les livres de la banque.
+- **Accounts non paramétrés.** Ils ne sont **pas comptabilisés** — voir plus haut.
+
 ## Points restant à confirmer
 
-- Structure des écritures pour une **agence propre "EC"** dans la pièce comptable (aucun exemple
-  de référence de ce type disponible à ce jour ; seul un exemple sous-agent "SA" a pu être validé).
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré), et
   rattachement des comptes aux rôles `wu_compense` / `wu_commercial` / `wu_admin`, laissé en
   commentaire à la fin de `Scripts\08_RolesSQLServer.sql` faute de connaître votre domaine.
@@ -1215,7 +1224,6 @@ charges pour un gain nul.
   Tant qu'il en subsiste, la clé étrangère proposée en fin de `Scripts\04_GroupeStatistique.sql`
   ne peut pas être posée.
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.
-- Traitement définitif souhaité des Accounts `INCONNU` dans la pièce comptable.
 
 ## Test de référence (section 17)
 
