@@ -165,11 +165,29 @@ begin
     'Ces valeurs pourront etre changees ensuite sans reinstaller, par le menu ' +
     'Securite > Connexion a la base de donnees.');
 
-  PageConnexion.Add('Serveur SQL Server (exemple : SRV-SQL01 ou SRV-SQL01\SQLEXPRESS) :', False);
+  // Un seul champ pour les deux formes : la banque fournit tantot un nom de serveur,
+  // tantot une chaine de connexion complete. Faire choisir entre les deux imposerait a
+  // l'installateur de comprendre une distinction qui ne le concerne pas.
+  PageConnexion.Add('Serveur SQL Server, OU chaine de connexion complete fournie par la banque :', False);
   PageConnexion.Add('Fichier partage de connexion (exemple : \\SRV-FICHIERS\Wincompense\connexion.config) :', False);
 
   PageConnexion.Values[0] := '.\SQLEXPRESS';
   PageConnexion.Values[1] := '';
+end;
+
+// Une chaine de connexion porte toujours au moins un "mot-cle=valeur" ; un nom de
+// serveur, jamais. Le signe egal suffit donc a les distinguer, sans rien demander.
+function EstUneChaineDeConnexion(Valeur: String): Boolean;
+begin
+  Result := Pos('=', Valeur) > 0;
+end;
+
+function PorteUnMotDePasse(Valeur: String): Boolean;
+var
+  Minuscules: String;
+begin
+  Minuscules := Lowercase(Valeur);
+  Result := (Pos('password', Minuscules) > 0) or (Pos('pwd', Minuscules) > 0);
 end;
 
 function NextButtonClick(IdPage: Integer): Boolean;
@@ -180,10 +198,38 @@ begin
   begin
     if Trim(PageConnexion.Values[0]) = '' then
     begin
-      MsgBox('Indiquez le serveur SQL Server : sans lui, l''application n''a rien a joindre.',
+      MsgBox('Indiquez le serveur SQL Server, ou la chaine de connexion fournie par la banque.',
              mbError, MB_OK);
       Result := False;
       Exit;
+    end;
+
+    if EstUneChaineDeConnexion(PageConnexion.Values[0]) then
+    begin
+      if Pos('server=', Lowercase(PageConnexion.Values[0])) = 0 then
+        if Pos('data source=', Lowercase(PageConnexion.Values[0])) = 0 then
+        begin
+          MsgBox('Cette chaine de connexion n''indique aucun serveur.' + #13#10#13#10 +
+                 'Elle devrait contenir Server=... ou Data Source=...',
+                 mbError, MB_OK);
+          Result := False;
+          Exit;
+        end;
+
+      // Le fichier partage est lisible par TOUS les utilisateurs de l'application : c'est
+      // ce qui permet a un changement de serveur de valoir pour tout le monde. Un mot de
+      // passe ecrit la y serait donc lisible en clair par tous.
+      if PorteUnMotDePasse(PageConnexion.Values[0]) then
+        if Trim(PageConnexion.Values[1]) <> '' then
+        begin
+          MsgBox('Cette chaine contient un mot de passe, et le fichier partage est lisible ' +
+                 'par tous les utilisateurs de l''application : il y serait en clair.' + #13#10#13#10 +
+                 'Demandez a la banque une chaine en authentification Windows ' +
+                 '(Integrated Security=True), ou laissez le fichier partage vide pour ne ' +
+                 'regler que ce poste.', mbError, MB_OK);
+          Result := False;
+          Exit;
+        end;
     end;
 
     // Un partage vide n'est pas une erreur - le poste travaillera sur sa seule
@@ -215,8 +261,20 @@ begin
   Lignes[1] := '# Ecrit par le programme d''installation. Une ligne CLE=VALEUR.';
   Lignes[2] := '';
   Lignes[3] := 'PARTAGE=' + Trim(PageConnexion.Values[1]);
-  Lignes[4] := 'SERVEUR=' + Trim(PageConnexion.Values[0]);
-  Lignes[5] := 'BASE=GWC_WINCOMPENSE_ETD';
+
+  // CHAINE prime sur SERVEUR et BASE : ecrire les deux ferait coexister deux
+  // descriptions du meme serveur, dont une seule compte.
+  if EstUneChaineDeConnexion(PageConnexion.Values[0]) then
+  begin
+    SetArrayLength(Lignes, 5);
+    Lignes[4] := 'CHAINE=' + Trim(PageConnexion.Values[0]);
+  end
+  else
+  begin
+    SetArrayLength(Lignes, 6);
+    Lignes[4] := 'SERVEUR=' + Trim(PageConnexion.Values[0]);
+    Lignes[5] := 'BASE=GWC_WINCOMPENSE_ETD';
+  end;
 
   if not SaveStringsToUTF8File(Chemin, Lignes, False) then
     MsgBox('La configuration n''a pas pu etre ecrite dans :' + #13#10 + Chemin + #13#10#13#10 +
@@ -238,12 +296,21 @@ begin
 
   SetArrayLength(Lignes, 7);
   Lignes[0] := '# Wincompense TCHAD - connexion commune a tous les postes';
-  Lignes[1] := '# Changer de serveur : modifier la ligne SERVEUR ci-dessous, puis enregistrer.';
+  Lignes[1] := '# Changer de serveur : modifier la ligne ci-dessous, puis enregistrer.';
   Lignes[2] := '# Les postes le prendront a leur prochain demarrage.';
   Lignes[3] := '';
-  Lignes[4] := 'SERVEUR=' + Trim(PageConnexion.Values[0]);
-  Lignes[5] := 'BASE=GWC_WINCOMPENSE_ETD';
-  Lignes[6] := 'DELAI=10';
+
+  if EstUneChaineDeConnexion(PageConnexion.Values[0]) then
+  begin
+    SetArrayLength(Lignes, 5);
+    Lignes[4] := 'CHAINE=' + Trim(PageConnexion.Values[0]);
+  end
+  else
+  begin
+    Lignes[4] := 'SERVEUR=' + Trim(PageConnexion.Values[0]);
+    Lignes[5] := 'BASE=GWC_WINCOMPENSE_ETD';
+    Lignes[6] := 'DELAI=10';
+  end;
 
   if not ForceDirectories(ExtractFileDir(Chemin)) then
   begin

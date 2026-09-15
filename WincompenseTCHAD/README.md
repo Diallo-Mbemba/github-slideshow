@@ -237,6 +237,11 @@ plus.
 
 ### Le programme d'installation
 
+L'assistant d'installation accepte indifféremment **un nom de serveur ou une chaîne de
+connexion complète**, dans le même champ : la banque fournit généralement la seconde. La
+distinction se fait sur le signe `=`, qu'une chaîne porte toujours et qu'un nom de serveur ne
+porte jamais — il n'y a donc rien à choisir, et rien à expliquer au technicien qui installe.
+
 `Installation\Wincompense.iss` produit `WincompenseTCHAD_Setup.exe` avec **Inno Setup 6.3 ou
 supérieur**. Attention au point de licence : depuis la version 7, Inno Setup n'est plus gratuit
 pour un usage commercial, et une banque l'est — la **6.4.x**, gratuite pour tout usage, reste le

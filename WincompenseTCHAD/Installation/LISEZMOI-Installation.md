@@ -111,8 +111,21 @@ connexion de toute la banque.
 
 Lancer `WincompenseTCHAD_Setup.exe` **en tant qu'administrateur**. L'assistant demande :
 
-- le **serveur SQL Server** — par exemple `SRV-SQL01` ou `SRV-SQL01\SQLEXPRESS` ;
+- **le serveur SQL Server, ou la chaîne de connexion complète** — les deux formes sont acceptées
+  dans le même champ, l'assistant les distingue seul :
+
+  | Ce que la banque vous donne | Ce que vous saisissez | Ce qui est écrit |
+  |---|---|---|
+  | Un nom de serveur | `SRV-SQL01\SQLEXPRESS` | `SERVEUR=` et `BASE=` |
+  | Une chaîne de connexion | `Server=SRV-SQL01;Database=…;Integrated Security=True;` | `CHAINE=` |
+
+  La distinction se fait sur le signe `=` : une chaîne de connexion en porte toujours au moins
+  un, un nom de serveur jamais. Vous n'avez donc rien à choisir.
+
 - le **chemin du fichier partagé** — par exemple `\\SRV-FICHIERS\Wincompense\connexion.config`.
+
+L'assistant refuse une chaîne qui n'indique aucun serveur, et refuse de poser sur le partage une
+chaîne contenant un mot de passe — il serait lisible en clair par tous les utilisateurs.
 
 Il vérifie ensuite .NET Framework 4.8, copie l'application, écrit la configuration
 locale, crée le fichier partagé **s'il n'existe pas encore**, et pose les raccourcis.
