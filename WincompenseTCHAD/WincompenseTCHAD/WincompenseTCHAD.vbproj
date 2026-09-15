@@ -95,6 +95,7 @@
     <Compile Include="Services\CoreBankingService.vb" />
     <Compile Include="Services\CalendrierWU.vb" />
     <Compile Include="Services\ConfigurationWU.vb" />
+    <Compile Include="Services\MiseAJourWU.vb" />
     <Compile Include="Forms\FrmPrincipal.vb">
       <SubType>Form</SubType>
     </Compile>

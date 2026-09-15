@@ -1,0 +1,47 @@
+# ===========================================================================
+#  Wincompense TCHAD - version publiee
+# ===========================================================================
+#
+#  A poser sur le partage, A COTE de connexion.config, sous le nom :
+#      version.txt
+#
+#  Exemple :  \\SRV-FICHIERS\Wincompense\version.txt
+#
+#  A QUOI SERT CE FICHIER
+#      Les postes le lisent au demarrage et se comparent a lui. Celui qui
+#      tourne sur une version anterieure l'affiche dans sa barre d'etat, et
+#      le dit une fois a son utilisateur.
+#
+#      Rien n'est telecharge, rien n'est installe : l'informatique garde la
+#      main sur le moment de la mise a jour. Pendant la marche en parallele,
+#      deux versions differentes fausseraient la comparaison avec la piece
+#      faite a la main.
+#
+#  QUAND LE METTRE A JOUR
+#      Au moment ou vous deposez un nouveau setup.exe sur le partage, et
+#      jamais avant : un poste annoncerait une version qui n'existe pas
+#      encore, et son utilisateur chercherait un fichier introuvable.
+#
+#  FORME DU FICHIER
+#      Une ligne CLE=VALEUR. Le caractere # ouvre un commentaire.
+#      Les accents sont a eviter : ce fichier se lit en UTF-8.
+#
+#  DROITS A POSER
+#      Lecture pour tous les utilisateurs, ecriture pour l'informatique.
+#
+# ===========================================================================
+
+# Numero de version publie, tel qu'il figure dans les proprietes de
+# l'executable. Il se compare par ses nombres, jamais par son texte :
+# 1.10.0.0 est posterieure a 1.9.0.0.
+VERSION=1.1.0.0
+
+# Chemin complet du programme d'installation. Un clic sur la barre d'etat
+# ouvre son dossier dans l'Explorateur, le fichier deja selectionne.
+# Facultatif : sans lui, le message renvoie l'utilisateur vers l'informatique.
+SETUP=\\SRV-FICHIERS\Wincompense\Setup\WincompenseTCHAD_Setup_1.1.0.exe
+
+# Ce que la version apporte, en une ligne. Elle s'affiche dans le message et
+# en infobulle. Facultatif, mais un agent qui sait pourquoi on lui demande
+# une mise a jour la fait.
+NOTE=Corrige la date de valeur du fichier core banking.

@@ -98,6 +98,7 @@ Source: "..\Scripts\*.sql"; DestDir: "{app}\Scripts"; Flags: ignoreversion
 
 ; Le modele du fichier partage et le script de changement de serveur.
 Source: "connexion.config.modele"; DestDir: "{app}\Installation"; Flags: ignoreversion
+Source: "version.txt.modele"; DestDir: "{app}\Installation"; Flags: ignoreversion
 Source: "Configurer-Connexion.ps1"; DestDir: "{app}\Installation"; Flags: ignoreversion
 Source: "LISEZMOI-Installation.md"; DestDir: "{app}\Installation"; Flags: ignoreversion
 

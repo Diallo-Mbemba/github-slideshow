@@ -77,6 +77,27 @@ Public NotInheritable Class ConfigurationWU
     End Property
 
     ''' <summary>
+    ''' Dossier du fichier partagé, ou chaîne vide si ce poste n'en a pas.
+    '''
+    ''' C'est là que se rangent les fichiers communs à toute la banque : la connexion, et la
+    ''' version publiée. Les déduire du chemin déjà connu évite un second réglage à tenir à
+    ''' jour — et un second réglage qu'on oublierait de changer le jour où le partage bouge.
+    ''' </summary>
+    Public Shared ReadOnly Property DossierDuPartage As String
+        Get
+            Dim fichier As String = CheminDuPartage
+            If fichier.Length = 0 Then Return String.Empty
+
+            Try
+                Return If(Path.GetDirectoryName(fichier), String.Empty)
+            Catch
+                ' Chemin mal formé : mieux vaut ne rien proposer que de composer un chemin faux.
+                Return String.Empty
+            End Try
+        End Get
+    End Property
+
+    ''' <summary>
     ''' Chaîne complète inscrite dans la configuration en service (clé CHAINE), ou chaîne vide.
     '''
     ''' La banque fournit parfois une chaîne toute faite, avec des mots-clés que SERVEUR, BASE
@@ -371,6 +392,39 @@ Public NotInheritable Class ConfigurationWU
         Next
 
         File.WriteAllText(chemin, contenu.ToString(), Encoding.UTF8)
+    End Sub
+
+#End Region
+
+#Region "Clés libres du fichier local"
+
+    ''' <summary>
+    ''' Valeur d'une clé quelconque du fichier local de ce poste, ou chaîne vide.
+    ''' Sert aux réglages qui n'appartiennent qu'à la machine — la dernière version signalée,
+    ''' par exemple — et qui n'ont donc rien à faire sur le partage.
+    ''' </summary>
+    Public Shared Function LireValeurLocale(cle As String) As String
+        Return LireCle(LireFichier(CheminLocal), cle)
+    End Function
+
+    ''' <summary>
+    ''' Inscrit une clé dans le fichier local, en CONSERVANT tout ce qui s'y trouve déjà.
+    '''
+    ''' Le fichier porte la connexion du poste : le réécrire de zéro pour y poser une seule
+    ''' valeur le priverait de son serveur. Un échec d'écriture est ignoré — aucun des réglages
+    ''' passant par ici ne vaut qu'on interrompe le travail de l'utilisateur.
+    ''' </summary>
+    Public Shared Sub EcrireValeurLocale(cle As String, valeur As String)
+
+        Try
+            Dim valeurs As Dictionary(Of String, String) = LireFichier(CheminLocal)
+            valeurs(cle) = If(valeur, String.Empty)
+
+            EcrireFichier(CheminLocal, valeurs, "Configuration de ce poste")
+
+        Catch
+            ' Volontairement silencieux : voir le commentaire ci-dessus.
+        End Try
     End Sub
 
 #End Region

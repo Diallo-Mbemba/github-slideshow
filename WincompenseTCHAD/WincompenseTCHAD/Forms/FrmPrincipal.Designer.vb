@@ -49,6 +49,7 @@ Partial Class FrmPrincipal
         Me.barreEtat = New System.Windows.Forms.StatusStrip()
         Me.tsslUtilisateur = New System.Windows.Forms.ToolStripStatusLabel()
         Me.tsslBase = New System.Windows.Forms.ToolStripStatusLabel()
+        Me.tsslMiseAJour = New System.Windows.Forms.ToolStripStatusLabel()
         Me.menuPrincipal.SuspendLayout()
         Me.barreEtat.SuspendLayout()
         Me.SuspendLayout()
@@ -213,7 +214,7 @@ Partial Class FrmPrincipal
         '
         'barreEtat
         '
-        Me.barreEtat.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.tsslUtilisateur, Me.tsslBase})
+        Me.barreEtat.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.tsslUtilisateur, Me.tsslMiseAJour, Me.tsslBase})
         Me.barreEtat.Location = New System.Drawing.Point(0, 678)
         Me.barreEtat.Name = "barreEtat"
         Me.barreEtat.Size = New System.Drawing.Size(1200, 22)
@@ -233,6 +234,16 @@ Partial Class FrmPrincipal
         Me.tsslBase.Spring = True
         Me.tsslBase.Text = ""
         Me.tsslBase.TextAlign = System.Drawing.ContentAlignment.MiddleRight
+        '
+        'tsslMiseAJour
+        '
+        Me.tsslMiseAJour.ForeColor = System.Drawing.Color.Firebrick
+        Me.tsslMiseAJour.IsLink = True
+        Me.tsslMiseAJour.LinkColor = System.Drawing.Color.Firebrick
+        Me.tsslMiseAJour.Name = "tsslMiseAJour"
+        Me.tsslMiseAJour.Size = New System.Drawing.Size(200, 17)
+        Me.tsslMiseAJour.Text = ""
+        Me.tsslMiseAJour.Visible = False
         '
         'FrmPrincipal
         '
@@ -284,5 +295,6 @@ Partial Class FrmPrincipal
     Friend WithEvents barreEtat As System.Windows.Forms.StatusStrip
     Friend WithEvents tsslUtilisateur As System.Windows.Forms.ToolStripStatusLabel
     Friend WithEvents tsslBase As System.Windows.Forms.ToolStripStatusLabel
+    Friend WithEvents tsslMiseAJour As System.Windows.Forms.ToolStripStatusLabel
 
 End Class

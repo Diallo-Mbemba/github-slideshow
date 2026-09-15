@@ -139,6 +139,78 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
+    ''' Regarde si le partage annonce une version plus récente, et le dit.
+    '''
+    ''' Rien n'avertissait un agent qu'il travaillait sur une version dépassée : une correction
+    ''' livrée un lundi pouvait rester ignorée d'un poste pendant des semaines, et deux agents
+    ''' produire des pièces différentes à partir des mêmes rapports.
+    '''
+    ''' La mention reste dans la barre d'état tant que la version n'a pas changé ; le message,
+    ''' lui, ne paraît qu'une fois par version. Répété chaque matin, il serait fermé sans être
+    ''' lu — et le suivant, celui qui compte vraiment, le serait aussi.
+    '''
+    ''' Rien n'est bloquant, et rien n'est téléchargé : l'informatique garde la main sur le
+    ''' moment de la mise à jour. Pendant la marche en parallèle, deux versions différentes
+    ''' fausseraient la comparaison avec la pièce manuelle.
+    ''' </summary>
+    Private Sub SignalerUneVersionPlusRecente()
+
+        Dim publiee As MiseAJourWU.VersionPubliee = MiseAJourWU.Verifier()
+        If publiee Is Nothing Then Return
+
+        _setupDeLaMiseAJour = publiee.CheminSetup
+
+        tsslMiseAJour.Text = $"Version {publiee.Numero} disponible — cliquez ici"
+        tsslMiseAJour.ToolTipText = If(publiee.Note.Length > 0, publiee.Note, "Mise à jour publiée sur le partage.")
+        tsslMiseAJour.Visible = True
+
+        If MiseAJourWU.DejaSignalee(publiee.Numero) Then Return
+
+        MessageBox.Show(
+            $"La version {publiee.Numero} est publiée. Ce poste utilise la version {MiseAJourWU.VersionCourante()}." &
+            Environment.NewLine & Environment.NewLine &
+            If(publiee.Note.Length > 0, publiee.Note & Environment.NewLine & Environment.NewLine, String.Empty) &
+            If(_setupDeLaMiseAJour.Length > 0,
+               "Programme d'installation :" & Environment.NewLine & "    " & _setupDeLaMiseAJour,
+               "Rapprochez-vous de l'informatique pour l'installer.") & Environment.NewLine & Environment.NewLine &
+            "Vous pouvez continuer à travailler : la mise à jour n'est pas obligatoire aujourd'hui.",
+            "Mise à jour disponible", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        MiseAJourWU.MarquerSignalee(publiee.Numero)
+    End Sub
+
+    ''' <summary>Chemin du programme d'installation annoncé, pour le clic sur la barre d'état.</summary>
+    Private _setupDeLaMiseAJour As String = String.Empty
+
+    ''' <summary>
+    ''' Ouvre le dossier du programme d'installation dans l'Explorateur, le fichier sélectionné.
+    '''
+    ''' On n'exécute rien : installer une application est le geste de l'informatique, et le
+    ''' lancer au nom d'un agent qui n'a pas les droits échouerait de toute façon.
+    ''' </summary>
+    Private Sub tsslMiseAJour_Click(sender As Object, e As EventArgs) Handles tsslMiseAJour.Click
+
+        If _setupDeLaMiseAJour.Length = 0 Then
+            MessageBox.Show("Aucun programme d'installation n'est indiqué sur le partage." & Environment.NewLine &
+                            "Rapprochez-vous de l'informatique.",
+                            "Mise à jour", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Try
+            ' Les guillemets encadrent le chemin : un dossier au nom espacé serait sinon lu
+            ' comme plusieurs arguments, et l'Explorateur ouvrirait la mauvaise fenêtre.
+            Dim argument As String = "/select," & Chr(34) & _setupDeLaMiseAJour & Chr(34)
+            Process.Start("explorer.exe", argument)
+
+        Catch ex As Exception
+            MessageBox.Show("Impossible d'ouvrir l'emplacement :" & Environment.NewLine &
+                            _setupDeLaMiseAJour & Environment.NewLine & Environment.NewLine & ex.Message,
+                            "Mise à jour", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        End Try
+    End Sub
+
+    ''' <summary>
     ''' Ouvre l'écran de connexion à la base, réservé à l'administrateur.
     '''
     ''' Il est modal, et non fenêtre fille : changer de serveur pendant qu'un traitement est en
@@ -416,6 +488,7 @@ Public Class FrmPrincipal
 
         tsslUtilisateur.Text = SessionWU.Description
         RafraichirLeCompteurDeDemandes()
+        SignalerUneVersionPlusRecente()
 
         ' Aucun écran n'est ouvert d'office : l'application s'ouvre sur sa zone de travail, et
         ' c'est l'utilisateur qui choisit par où commencer. Ouvrir le traitement de la compense

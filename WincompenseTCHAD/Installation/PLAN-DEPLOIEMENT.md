@@ -82,6 +82,7 @@ C'est la phase la plus longue du déploiement, et la plus souvent sous-estimée.
 | ☐ | Créer le dossier partagé, par exemple `\\SRV-FICHIERS\Wincompense` | INFO |
 | ☐ | Y poser `connexion.config` et renseigner la ligne `SERVEUR=` | INFO |
 | ☐ | Droits : **lecture** pour les utilisateurs, **écriture** pour l'informatique seule | INFO |
+| ☐ | Déposer le `setup.exe` dans `Setup\` sur le partage, puis y poser `version.txt` | INFO |
 | ☐ | Compiler la solution en **Release** | PROJET |
 | ☐ | Produire `WincompenseTCHAD_Setup.exe` avec Inno Setup **6.4.x** | PROJET |
 | ☐ | Installer sur **un seul poste**, celui de l'agent de compense principal | INFO |
@@ -173,6 +174,7 @@ C'est la phase que les projets suppriment quand le calendrier presse. C'est auss
 | ☐ | Écrire la **procédure de secours** : que fait l'agent si l'application ne démarre pas à 8 h | PROJET + COMPTA | première semaine |
 | ☐ | Conserver la procédure manuelle utilisable | COMPTA | six mois |
 | ☐ | Désigner qui appelle qui, et sous quel délai | INFO | première semaine |
+| ☐ | À chaque nouvelle version : déposer le setup **puis** mettre à jour `version.txt` | INFO | à chaque livraison |
 | ☐ | Compléter `T_JourFerieWU` des fêtes musulmanes de l'année suivante | COMPTA | chaque année |
 | ☐ | Vérifier la taille de la base et la croissance du journal de transactions | INFO | chaque trimestre |
 

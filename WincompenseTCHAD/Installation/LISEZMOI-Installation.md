@@ -8,6 +8,7 @@ et pour changer de serveur ensuite sans y revenir.
 | `Wincompense.iss` | Script Inno Setup produisant `WincompenseTCHAD_Setup.exe` |
 | `connexion.config.modele` | Modèle du fichier à poser sur le partage réseau |
 | `Configurer-Connexion.ps1` | Changement de serveur en ligne de commande |
+| `version.txt.modele` | Modèle du fichier annonçant la version publiée |
 | `LISEZMOI-Installation.md` | Ce document — installation technique et changement de serveur |
 | `PLAN-DEPLOIEMENT.md` | Les huit phases du déploiement à la banque, à cocher point par point |
 
@@ -267,6 +268,48 @@ Changer de serveur ne déplace pas les données. Sur le nouveau serveur, il faut
    `Scripts\`, exécutés dans l'ordre `01_` à `10_` ;
 2. rejouer `Scripts\08_RolesSQLServer.sql` pour redonner leurs droits aux
    utilisateurs Windows.
+
+---
+
+## 5 bis. Publier une mise à jour
+
+Les postes ne se mettent pas à jour tout seuls — c'est délibéré : l'informatique garde la main
+sur le moment, et pendant la marche en parallèle deux versions différentes fausseraient la
+comparaison avec la pièce manuelle. En revanche, **aucun poste ne doit ignorer qu'une version
+plus récente existe**. Une correction livrée un lundi pouvait rester inconnue d'un poste pendant
+des semaines, et deux agents produire des pièces différentes à partir des mêmes rapports.
+
+### Ce que l'agent voit
+
+Au démarrage, l'application lit `version.txt` sur le partage et se compare à lui. Si elle est en
+retard :
+
+- une mention rouge apparaît dans la **barre d'état** : « Version 1.1.0.0 disponible — cliquez
+  ici ». Un clic ouvre le dossier du `setup.exe` dans l'Explorateur, le fichier déjà sélectionné ;
+- un **message s'affiche une seule fois** par version. Répété chaque matin, il serait fermé sans
+  être lu — et le suivant, celui qui compte vraiment, le serait aussi.
+
+Rien n'est bloquant : l'agent peut travailler et installer plus tard.
+
+### La marche à suivre
+
+| | Étape |
+|---|---|
+| 1 | Incrémenter la version dans `My Project\AssemblyInfo.vb` (`AssemblyVersion` **et** `AssemblyFileVersion`) |
+| 2 | Reporter le même numéro dans `VersionApplication`, en tête de `Wincompense.iss` |
+| 3 | Compiler en **Release**, puis produire le setup |
+| 4 | Déposer le `setup.exe` sur le partage, dans un sous-dossier `Setup\` |
+| 5 | **Alors seulement**, mettre à jour `version.txt` |
+
+> **L'ordre des étapes 4 et 5 n'est pas indifférent.** Annoncer une version avant d'avoir déposé
+> son programme d'installation envoie les agents chercher un fichier qui n'existe pas.
+
+`version.txt` se pose à côté de `connexion.config`, au même endroit — l'application le cherche
+dans le dossier du fichier de connexion, sans réglage supplémentaire. Son modèle commenté est
+`version.txt.modele`.
+
+Tant que ce fichier n'existe pas, rien ne s'affiche et rien n'échoue : le dispositif est un
+confort, jamais une condition de démarrage.
 
 ---
 
