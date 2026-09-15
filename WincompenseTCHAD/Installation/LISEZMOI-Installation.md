@@ -134,6 +134,55 @@ Sur le deuxième poste et les suivants, le fichier partagé existe déjà : il n
 écrasé. C'est voulu — la saisie d'un technicien ne doit pas faire basculer toute la
 banque par accident.
 
+### Ce que l'assistant enchaîne, dans l'ordre
+
+| | Écran | Ce qui s'y passe |
+|---|---|---|
+| 1 | Élévation Windows | L'installation écrit dans `Program Files` : les droits administrateur sont demandés |
+| 2 | *(le cas échéant)* | Si .NET Framework 4.8 manque, un avertissement s'affiche **avant tout** |
+| 3 | Bienvenue | — |
+| 4 | Dossier de destination | `C:\Program Files\Wincompense TCHAD` par défaut |
+| 5 | Dossier du menu Démarrer | `Wincompense TCHAD` |
+| 6 | Tâches supplémentaires | Raccourci sur le Bureau, à cocher |
+| 7 | **Connexion à la base** | Serveur **ou** chaîne de connexion, et chemin du fichier partagé |
+| 8 | Prêt à installer | Récapitulatif |
+| 9 | Installation | Quelques secondes |
+| 10 | Terminé | Case « Lancer Wincompense TCHAD » |
+
+### Ce qui est posé sur le poste
+
+| Emplacement | Contenu |
+|---|---|
+| `C:\Program Files\Wincompense TCHAD\` | L'application, plus `Scripts\` (les dix scripts SQL) et `Installation\` |
+| `C:\ProgramData\Wincompense\wincompense.config` | La configuration, **modifiable par les utilisateurs** |
+| Menu Démarrer, Bureau | Les raccourcis |
+| Panneau de configuration | L'entrée de désinstallation |
+| Le partage réseau | `connexion.config`, **uniquement s'il n'existe pas déjà** |
+
+Les fichiers de débogage (`*.pdb`, `*.xml`, `*.vshost.*`) ne partent pas en production.
+
+### Déploiement en masse — installation silencieuse
+
+Pour vingt postes, on n'installe pas à la main. L'assistant accepte la configuration en ligne
+de commande, ce qui permet de le lancer par stratégie de groupe ou par SCCM :
+
+```
+WincompenseTCHAD_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES ^
+    /SERVEUR="SRV-SQL01\SQLEXPRESS" ^
+    /PARTAGE="\\SRV-FICHIERS\Wincompense\connexion.config"
+```
+
+`/SERVEUR` accepte indifféremment un nom de serveur ou une **chaîne de connexion complète**,
+comme le champ de l'assistant.
+
+> **Sans ces paramètres, une installation silencieuse ne configure rien** : la page ne s'affiche
+> pas, personne ne saisit rien, et le poste repart sur `.\SQLEXPRESS` — c'est-à-dire sur aucun
+> serveur. Les contrôles de saisie ne s'appliquent pas non plus en mode silencieux : c'est
+> l'informatique qui répond de ce qu'elle passe en paramètre.
+
+Pour éprouver la commande avant de la diffuser, remplacer `/VERYSILENT` par `/SILENT` : la barre
+de progression s'affiche, et les messages d'erreur éventuels restent visibles.
+
 ### Prérequis des postes
 
 | Prérequis | Remarque |

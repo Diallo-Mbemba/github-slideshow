@@ -171,8 +171,18 @@ begin
   PageConnexion.Add('Serveur SQL Server, OU chaine de connexion complete fournie par la banque :', False);
   PageConnexion.Add('Fichier partage de connexion (exemple : \\SRV-FICHIERS\Wincompense\connexion.config) :', False);
 
-  PageConnexion.Values[0] := '.\SQLEXPRESS';
-  PageConnexion.Values[1] := '';
+  // Les deux valeurs peuvent venir de la ligne de commande. C'est indispensable au
+  // deploiement de masse : en installation silencieuse, la page ne s'affiche pas et
+  // personne ne saisit rien, et sans cela, tous les postes repartiraient sur la valeur
+  // par defaut, c'est-a-dire sur aucun serveur.
+  //
+  //   WincompenseTCHAD_Setup.exe /VERYSILENT ^
+  //       /SERVEUR="SRV-SQL01\SQLEXPRESS" ^
+  //       /PARTAGE="\\SRV-FICHIERS\Wincompense\connexion.config"
+  //
+  // /SERVEUR accepte aussi bien un nom de serveur qu'une chaine de connexion complete.
+  PageConnexion.Values[0] := ExpandConstant('{param:SERVEUR|.\SQLEXPRESS}');
+  PageConnexion.Values[1] := ExpandConstant('{param:PARTAGE|}');
 end;
 
 // Une chaine de connexion porte toujours au moins un "mot-cle=valeur" ; un nom de

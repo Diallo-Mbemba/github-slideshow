@@ -85,6 +85,7 @@ C'est la phase la plus longue du déploiement, et la plus souvent sous-estimée.
 | ☐ | Compiler la solution en **Release** | PROJET |
 | ☐ | Produire `WincompenseTCHAD_Setup.exe` avec Inno Setup **6.4.x** | PROJET |
 | ☐ | Installer sur **un seul poste**, celui de l'agent de compense principal | INFO |
+| ☐ | Éprouver la commande d'installation silencieuse sur un second poste, avec `/SILENT` avant `/VERYSILENT` | INFO |
 | ☐ | Vérifier que la barre d'état affiche le bon serveur et la bonne base | COMPTA |
 
 > Qui peut écrire dans `connexion.config` commande la connexion de **tous** les postes.
