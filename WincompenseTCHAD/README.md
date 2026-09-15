@@ -139,7 +139,8 @@ WincompenseTCHAD/
     │   ├── DemandeRepository.vb            ' File des demandes : dépôt, autorisation, rejet
     │   ├── CoreBankingService.vb           ' Fichier d'interface : construction, numéro de lot
     │   ├── CalendrierWU.vb                 ' Jours ouvrés : week-ends et jours fériés
-    │   └── ConfigurationWU.vb              ' Où est le serveur : partage réseau, copie locale, secours
+    │   ├── ConfigurationWU.vb              ' Où est le serveur : partage réseau, copie locale, secours
+    │   └── MiseAJourWU.vb                  ' Annonce aux postes qu'une version plus récente est publiée
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -176,6 +177,7 @@ Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit WincompenseTCHAD_Setup.exe
 ├── connexion.config.modele                ' Modèle du fichier à poser sur le partage réseau
 ├── Configurer-Connexion.ps1               ' Changement de serveur en ligne de commande
+├── version.txt.modele                     ' Modèle du fichier annonçant la version publiée
 ├── LISEZMOI-Installation.md               ' Déploiement, changement de serveur, dépannage
 └── PLAN-DEPLOIEMENT.md                    ' Les huit phases du déploiement, à cocher
 ```
@@ -262,8 +264,28 @@ La désinstallation laisse `%PROGRAMDATA%\Wincompense` en place, pour qu'une ré
 retrouve le serveur sans ressaisie, et ne touche jamais au fichier partagé, qui appartient à la
 banque et non au poste.
 
-Le détail — prérequis, droits à poser sur le partage, dépannage — est dans
-`Installation\LISEZMOI-Installation.md`.
+### Aucun poste n'ignore qu'une version plus récente existe
+
+Les postes ne se mettent pas à jour seuls : l'informatique garde la main sur le moment, et
+pendant la marche en parallèle deux versions différentes fausseraient la comparaison avec la
+pièce manuelle. Mais rien n'avertissait un agent qu'il travaillait sur une version dépassée —
+une correction livrée un lundi pouvait rester ignorée d'un poste pendant des semaines, et deux
+agents produire des pièces différentes à partir des mêmes rapports.
+
+L'application lit donc `version.txt` sur le partage au démarrage — à côté de `connexion.config`,
+donc sans réglage supplémentaire — et se compare à lui. En retard, elle l'inscrit **dans sa barre
+d'état**, où un clic ouvre le dossier du programme d'installation, et le dit **une seule fois par
+version** : répété chaque matin, le message serait fermé sans être lu, et le suivant le serait
+aussi.
+
+La comparaison porte sur les nombres et non sur le texte — `1.10.0.0` est postérieure à
+`1.9.0.0`, alors qu'elle la précède alphabétiquement.
+
+Tant que ce fichier n'existe pas, rien ne s'affiche et rien n'échoue. Le dispositif est un
+confort, jamais une condition de démarrage — comme la copie locale de la connexion.
+
+Le détail — prérequis, droits à poser sur le partage, publication d'une version, dépannage — est
+dans `Installation\LISEZMOI-Installation.md`.
 
 ## Hypothèses métier retenues (à valider)
 
