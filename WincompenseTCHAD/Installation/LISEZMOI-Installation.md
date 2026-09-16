@@ -264,10 +264,11 @@ descriptions du même serveur, dont une seule compte.
 
 Changer de serveur ne déplace pas les données. Sur le nouveau serveur, il faut :
 
-1. restaurer ou recréer la base `GWC_WINCOMPENSE_ETD` — les scripts sont dans
-   `Scripts\`, exécutés dans l'ordre `01_` à `10_` ;
-2. rejouer `Scripts\08_RolesSQLServer.sql` pour redonner leurs droits aux
-   utilisateurs Windows.
+1. restaurer la base `GWC_WINCOMPENSE_ETD`, ou la recréer avec
+   **`Scripts\00_InstallationComplete.sql`** — un seul script, rejouable, qui monte les dix
+   tables, les trois rôles et leurs droits, puis rend compte de ce qu'il a fait ;
+2. compléter la **PARTIE 5** de ce script avec vos groupes Active Directory, pour redonner
+   leurs droits aux utilisateurs Windows sur le nouveau serveur.
 
 ---
 

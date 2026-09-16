@@ -37,19 +37,23 @@ paramétrés ne sont pas comptabilisés.
 
 | | Étape | Qui |
 |---|---|---|
-| ☐ | Créer la base `GWC_WINCOMPENSE_ETD` sur le serveur de production | INFO |
-| ☐ | Exécuter les scripts **dans l'ordre `01_` à `10_`** | INFO |
-| ☐ | Vérifier qu'aucun script n'a produit d'erreur, et que les dix tables existent | INFO |
-| ☐ | `08_RolesSQLServer.sql` : créer les rôles, puis y placer les groupes AD (partie laissée en commentaire) | INFO |
+| ☐ | Exécuter **`Scripts\00_InstallationComplete.sql`** sur le serveur de production | INFO |
+| ☐ | Lire le **compte rendu** en fin de script : tables créées, rôles, et ce qui reste à faire | INFO |
+| ☐ | Compléter la **PARTIE 5** du script avec vos groupes Active Directory, puis réexécuter cette partie | INFO |
 | ☐ | Vérifier le **mode de récupération** de la base | INFO |
 | ☐ | Si le mode est `FULL` : mettre en place une sauvegarde régulière du **journal de transactions** | INFO |
 | ☐ | Mettre en place la **sauvegarde complète quotidienne** | INFO |
 | ☐ | Alimenter `SystemeWU` : les neuf comptes comptables, validés un par un | COMPTA |
 | ☐ | Alimenter `T_JourFerieWU` : fêtes musulmanes de l'année en cours et de la suivante | COMPTA |
 
-> **L'ordre des scripts n'est pas indifférent.** `09_Demandes.sql` ajoute la colonne `Fonction`
-> à `T_UtilisateurWU` ; sans elle, la gestion des utilisateurs échoue sur
-> « Nom de colonne non valide : 'Fonction' ».
+> **Un seul script suffit.** `00_InstallationComplete.sql` crée la base, les dix tables, les
+> trois rôles et leurs droits, puis rend compte de ce qu'il a fait. Il est rejouable : le
+> relancer ne détruit rien et ne crée que ce qui manque.
+>
+> Il ne remplace pas les scripts `01_` à `10_`, qui restent disponibles pour une intervention
+> ciblée — mais il évite l'ordre d'exécution, qui n'était pas indifférent : `09_Demandes.sql`
+> ajoute la colonne `Fonction` sans laquelle la gestion des utilisateurs échoue, et les droits
+> doivent être accordés en dernier, une fois toutes les tables créées.
 
 > **Les neuf comptes de `SystemeWU` déterminent toute la pièce comptable.** Une erreur ici ne
 > se voit pas à l'écran : elle se voit sur les comptes, après chargement.

@@ -162,6 +162,7 @@ WincompenseTCHAD/
         └── FrmParametresConnexion.vb       ' Changement de serveur, pour ce poste ou pour toute la banque
 
 Scripts/
+├── 00_InstallationComplete.sql            ' LES DIX SCRIPTS EN UN SEUL, à donner à l'informatique
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
 ├── 02_DonneesExemple.sql
 ├── 03_SystemeWU.sql                       ' Comptes comptables paramétrés

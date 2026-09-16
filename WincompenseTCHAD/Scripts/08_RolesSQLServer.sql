@@ -133,6 +133,50 @@ END
 GO
 
 -- =========================================================================
+-- 4 bis. Tables créées par les scripts 09 et 10
+--
+--    Elles n'existent pas encore lorsque ce script est exécuté dans l'ordre numérique :
+--    les GRANT sont donc protégés par IF EXISTS et ne s'appliquent qu'au second passage,
+--    ou lorsque ce script est exécuté en dernier (voir 00_InstallationComplete.sql).
+--
+--    SANS CES DROITS, l'application échoue là où on ne l'attend pas : le calendrier des
+--    jours fériés devient illisible au moment de dater le fichier core banking, et la file
+--    du double regard reste vide alors qu'elle contient des demandes.
+--
+--    RELANCEZ CE SCRIPT APRÈS 09 ET 10 si vous exécutez les scripts un par un.
+-- =========================================================================
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_JourFerieWU')
+BEGIN
+    -- Lecture pour tous : dater une écriture suppose de connaître les jours chômés,
+    -- quel que soit le rôle. L'écriture reste réservée à l'administrateur.
+    EXEC('GRANT SELECT ON dbo.T_JourFerieWU TO wu_compense');
+    EXEC('GRANT SELECT ON dbo.T_JourFerieWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.T_JourFerieWU TO wu_admin');
+    PRINT 'Droits accordés sur T_JourFerieWU.';
+END
+ELSE
+BEGIN
+    PRINT 'T_JourFerieWU absente : relancez ce script après 10_JoursFeries.sql.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_DemandeWU')
+BEGIN
+    -- La file du double regard appartient au paramétrage : l'agent de compense n'y a
+    -- aucun accès, pas même en lecture. Aucun rôle ne reçoit DELETE — une demande rejetée
+    -- se conserve, c'est elle qui prouve qu'un contrôle a eu lieu.
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_admin');
+    PRINT 'Droits accordés sur T_DemandeWU.';
+END
+ELSE
+BEGIN
+    PRINT 'T_DemandeWU absente : relancez ce script après 09_Demandes.sql.';
+END
+GO
+
+-- =========================================================================
 -- 5. Rattachement des utilisateurs SQL Server
 --
 --    À adapter : remplacez les noms ci-dessous par vos comptes réels, puis décommentez.
