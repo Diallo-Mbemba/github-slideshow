@@ -35,6 +35,8 @@ Partial Class FrmParametresConnexion
         Me.lblAideChaine = New System.Windows.Forms.Label()
         Me.txtChaine = New System.Windows.Forms.TextBox()
         Me.grpPartage = New System.Windows.Forms.GroupBox()
+        Me.chkConserver = New System.Windows.Forms.CheckBox()
+        Me.lblAideConserver = New System.Windows.Forms.Label()
         Me.lblPartage = New System.Windows.Forms.Label()
         Me.txtPartage = New System.Windows.Forms.TextBox()
         Me.chkPropager = New System.Windows.Forms.CheckBox()
@@ -185,55 +187,76 @@ Partial Class FrmParametresConnexion
         '
         'grpPartage
         '
+        Me.grpPartage.Controls.Add(Me.chkConserver)
+        Me.grpPartage.Controls.Add(Me.lblAideConserver)
         Me.grpPartage.Controls.Add(Me.lblPartage)
         Me.grpPartage.Controls.Add(Me.txtPartage)
         Me.grpPartage.Controls.Add(Me.chkPropager)
         Me.grpPartage.Controls.Add(Me.lblAidePartage)
         Me.grpPartage.Location = New System.Drawing.Point(12, 318)
         Me.grpPartage.Name = "grpPartage"
-        Me.grpPartage.Size = New System.Drawing.Size(560, 122)
+        Me.grpPartage.Size = New System.Drawing.Size(560, 166)
         Me.grpPartage.TabIndex = 4
         Me.grpPartage.TabStop = False
-        Me.grpPartage.Text = "Fichier partagé"
+        Me.grpPartage.Text = "Portée du réglage"
+        '
+        'chkConserver
+        '
+        Me.chkConserver.Location = New System.Drawing.Point(14, 24)
+        Me.chkConserver.Name = "chkConserver"
+        Me.chkConserver.Size = New System.Drawing.Size(530, 20)
+        Me.chkConserver.TabIndex = 0
+        Me.chkConserver.Text = "Conserver ce réglage sur ce poste"
+        Me.chkConserver.UseVisualStyleBackColor = True
+        '
+        'lblAideConserver
+        '
+        Me.lblAideConserver.ForeColor = System.Drawing.SystemColors.ControlDarkDark
+        Me.lblAideConserver.Location = New System.Drawing.Point(32, 46)
+        Me.lblAideConserver.Name = "lblAideConserver"
+        Me.lblAideConserver.Size = New System.Drawing.Size(512, 32)
+        Me.lblAideConserver.TabIndex = 1
+        Me.lblAideConserver.Text = "Sans cette case, le réglage ne vaut que pour cette session : rien n'est écrit sur" &
+            " le poste, qui continue de suivre la chaîne publiée avec l'application."
         '
         'lblPartage
         '
-        Me.lblPartage.Location = New System.Drawing.Point(14, 28)
+        Me.lblPartage.Location = New System.Drawing.Point(14, 86)
         Me.lblPartage.Name = "lblPartage"
         Me.lblPartage.Size = New System.Drawing.Size(120, 20)
-        Me.lblPartage.TabIndex = 0
+        Me.lblPartage.TabIndex = 2
         Me.lblPartage.Text = "Chemin du fichier"
         '
         'txtPartage
         '
-        Me.txtPartage.Location = New System.Drawing.Point(140, 25)
+        Me.txtPartage.Location = New System.Drawing.Point(140, 83)
         Me.txtPartage.MaxLength = 400
         Me.txtPartage.Name = "txtPartage"
         Me.txtPartage.Size = New System.Drawing.Size(400, 20)
-        Me.txtPartage.TabIndex = 1
+        Me.txtPartage.TabIndex = 3
         '
         'chkPropager
         '
-        Me.chkPropager.Location = New System.Drawing.Point(140, 52)
+        Me.chkPropager.Location = New System.Drawing.Point(140, 110)
         Me.chkPropager.Name = "chkPropager"
         Me.chkPropager.Size = New System.Drawing.Size(400, 20)
-        Me.chkPropager.TabIndex = 2
+        Me.chkPropager.TabIndex = 4
         Me.chkPropager.Text = "Appliquer ce réglage à TOUS les postes de la banque"
         Me.chkPropager.UseVisualStyleBackColor = True
         '
         'lblAidePartage
         '
         Me.lblAidePartage.ForeColor = System.Drawing.SystemColors.ControlDarkDark
-        Me.lblAidePartage.Location = New System.Drawing.Point(140, 74)
+        Me.lblAidePartage.Location = New System.Drawing.Point(140, 132)
         Me.lblAidePartage.Name = "lblAidePartage"
-        Me.lblAidePartage.Size = New System.Drawing.Size(400, 40)
-        Me.lblAidePartage.TabIndex = 3
+        Me.lblAidePartage.Size = New System.Drawing.Size(400, 28)
+        Me.lblAidePartage.TabIndex = 5
         Me.lblAidePartage.Text = "Sans cette case, le réglage ne vaut que pour ce poste. Les autres continueront de" &
             " lire l'ancien serveur."
         '
         'btnTester
         '
-        Me.btnTester.Location = New System.Drawing.Point(12, 454)
+        Me.btnTester.Location = New System.Drawing.Point(12, 498)
         Me.btnTester.Name = "btnTester"
         Me.btnTester.Size = New System.Drawing.Size(150, 32)
         Me.btnTester.TabIndex = 5
@@ -242,14 +265,14 @@ Partial Class FrmParametresConnexion
         '
         'lblResultat
         '
-        Me.lblResultat.Location = New System.Drawing.Point(174, 450)
+        Me.lblResultat.Location = New System.Drawing.Point(174, 494)
         Me.lblResultat.Name = "lblResultat"
         Me.lblResultat.Size = New System.Drawing.Size(398, 40)
         Me.lblResultat.TabIndex = 6
         '
         'btnEnregistrer
         '
-        Me.btnEnregistrer.Location = New System.Drawing.Point(352, 502)
+        Me.btnEnregistrer.Location = New System.Drawing.Point(352, 546)
         Me.btnEnregistrer.Name = "btnEnregistrer"
         Me.btnEnregistrer.Size = New System.Drawing.Size(120, 32)
         Me.btnEnregistrer.TabIndex = 7
@@ -259,7 +282,7 @@ Partial Class FrmParametresConnexion
         'btnFermer
         '
         Me.btnFermer.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.btnFermer.Location = New System.Drawing.Point(478, 502)
+        Me.btnFermer.Location = New System.Drawing.Point(478, 546)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(94, 32)
         Me.btnFermer.TabIndex = 8
@@ -271,7 +294,7 @@ Partial Class FrmParametresConnexion
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(584, 546)
+        Me.ClientSize = New System.Drawing.Size(584, 590)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.lblResultat)
@@ -313,6 +336,8 @@ Partial Class FrmParametresConnexion
     Friend WithEvents lblAideChaine As System.Windows.Forms.Label
     Friend WithEvents txtChaine As System.Windows.Forms.TextBox
     Friend WithEvents grpPartage As System.Windows.Forms.GroupBox
+    Friend WithEvents chkConserver As System.Windows.Forms.CheckBox
+    Friend WithEvents lblAideConserver As System.Windows.Forms.Label
     Friend WithEvents lblPartage As System.Windows.Forms.Label
     Friend WithEvents txtPartage As System.Windows.Forms.TextBox
     Friend WithEvents chkPropager As System.Windows.Forms.CheckBox

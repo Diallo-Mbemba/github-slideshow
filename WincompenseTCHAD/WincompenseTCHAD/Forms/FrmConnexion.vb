@@ -57,6 +57,43 @@ Public Class FrmConnexion
     End Sub
 
     ''' <summary>
+    ''' Demande s'il faut créer le premier administrateur — en nommant la base visée.
+    '''
+    ''' Un compte administrateur créé dans la mauvaise base est une faute silencieuse : tout
+    ''' semble avoir fonctionné, et personne ne revient jamais voir cette base. Le serveur, la
+    ''' base et la provenance de la chaîne sont donc affichés avant le geste, et une troisième
+    ''' réponse permet d'aller corriger la connexion plutôt que de renoncer.
+    ''' </summary>
+    ''' <returns>Yes pour créer, No pour régler le serveur d'abord, Cancel pour renoncer.</returns>
+    Private Function DemanderLaCreationDuPremierAdministrateur() As DialogResult
+
+        Dim constructeur As System.Data.SqlClient.SqlConnectionStringBuilder = Nothing
+
+        Try
+            constructeur = New System.Data.SqlClient.SqlConnectionStringBuilder(
+                WURepository.ObtenirChaineConnexion())
+        Catch
+            ' Chaîne illisible : l'écran affiche alors ce qu'il peut, sans échouer ici.
+        End Try
+
+        Dim serveur As String = If(constructeur Is Nothing, "(inconnu)", constructeur.DataSource)
+        Dim base As String = If(constructeur Is Nothing, "(inconnue)", constructeur.InitialCatalog)
+
+        Return MessageBox.Show(
+            "Aucun administrateur n'est encore défini dans cette base." & Environment.NewLine & Environment.NewLine &
+            "Le compte va être créé ici :" & Environment.NewLine &
+            $"        serveur : {serveur}" & Environment.NewLine &
+            $"        base    : {base}" & Environment.NewLine &
+            $"        origine : {ConfigurationWU.Origine()}" & Environment.NewLine & Environment.NewLine &
+            "Est-ce bien la base de production ?" & Environment.NewLine & Environment.NewLine &
+            "    Oui     — créer le premier administrateur ici" & Environment.NewLine &
+            "    Non     — régler d'abord le serveur" & Environment.NewLine &
+            "    Annuler — ne rien faire",
+            "Premier démarrage", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button3)
+    End Function
+
+    ''' <summary>
     ''' Fait apparaître le bouton de réglage du serveur, et invite à s'en servir.
     '''
     ''' Il reste masqué tant que la base répond : régler le serveur n'est pas un geste
@@ -82,14 +119,7 @@ Public Class FrmConnexion
     ''' </summary>
     Private Sub btnParametres_Click(sender As Object, e As EventArgs) Handles btnParametres.Click
 
-        Using parametres As New FrmParametresConnexion()
-            parametres.ShowDialog(Me)
-        End Using
-
-        lblMessage.Text = String.Empty
-        btnParametres.Visible = False
-
-        AfficherBase()
+        ReglerLeServeur()
         VerifierPremierDemarrage()
     End Sub
 
@@ -101,29 +131,69 @@ Public Class FrmConnexion
     ''' La proposition n'apparaît que si la lecture a réellement abouti : une table absente ou
     ''' une base injoignable ne doit pas être confondue avec « aucun administrateur », sous
     ''' peine de proposer une création vouée à l'échec.
+    '''
+    ''' La boucle permet de corriger le serveur autant de fois qu'il le faut sans empiler les
+    ''' appels : un technicien qui se trompe deux fois de serveur ne doit pas creuser la pile
+    ''' d'exécution à chaque essai.
     ''' </summary>
     Private Sub VerifierPremierDemarrage()
 
-        Dim messageErreur As String = String.Empty
+        Do
+            Dim messageErreur As String = String.Empty
 
-        If UtilisateurRepository.ExisteAdministrateurUtilisable(messageErreur) Then Return
+            If UtilisateurRepository.ExisteAdministrateurUtilisable(messageErreur) Then Return
 
-        If Not String.IsNullOrEmpty(messageErreur) Then
-            lblMessage.Text = messageErreur
-            OffrirDeReglerLeServeur()
-            Return
+            If Not String.IsNullOrEmpty(messageErreur) Then
+                lblMessage.Text = messageErreur
+                OffrirDeReglerLeServeur()
+                Return
+            End If
+
+            Select Case DemanderLaCreationDuPremierAdministrateur()
+
+                Case DialogResult.Yes
+                    CreerLePremierAdministrateur()
+                    Return
+
+                Case DialogResult.No
+                    ' Ce n'est pas la bonne base : on règle le serveur, puis on recommence.
+                    ' Créer un administrateur ailleurs que dans la base de production donnerait
+                    ' un compte que personne ne retrouverait jamais.
+                    If Not ReglerLeServeur() Then Return
+
+                Case Else
+                    lblMessage.Text = "Aucun administrateur défini : la connexion est impossible tant qu'un compte n'a pas été créé."
+                    Return
+            End Select
+        Loop
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre l'écran de réglage du serveur. Retourne False si la chaîne en service n'a pas
+    ''' changé — inutile alors de reposer la même question sur la même base.
+    ''' </summary>
+    Private Function ReglerLeServeur() As Boolean
+
+        Dim avant As String = WURepository.ObtenirChaineConnexion()
+
+        Using parametres As New FrmParametresConnexion()
+            parametres.ShowDialog(Me)
+        End Using
+
+        lblMessage.Text = String.Empty
+        btnParametres.Visible = False
+        AfficherBase()
+
+        If String.Equals(avant, WURepository.ObtenirChaineConnexion(), StringComparison.OrdinalIgnoreCase) Then
+            lblMessage.Text = "La connexion n'a pas été modifiée."
+            Return False
         End If
 
-        Dim reponse As DialogResult = MessageBox.Show(
-            "Aucun administrateur n'est encore défini dans la base." & Environment.NewLine & Environment.NewLine &
-            "Souhaitez-vous créer maintenant le premier compte administrateur ?" & Environment.NewLine &
-            "Sans lui, aucun utilisateur ne pourra être créé et l'application restera inaccessible.",
-            "Premier démarrage", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+        Return True
+    End Function
 
-        If reponse <> DialogResult.Yes Then
-            lblMessage.Text = "Aucun administrateur défini : la connexion est impossible tant qu'un compte n'a pas été créé."
-            Return
-        End If
+    ''' <summary>Ouvre la création du premier administrateur et prépare la saisie qui suit.</summary>
+    Private Sub CreerLePremierAdministrateur()
 
         Using edition As New FrmUtilisateurEdition(Nothing, True)
 

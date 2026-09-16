@@ -45,7 +45,13 @@ Public Class FrmParametresConnexion
         nudDelai.Value = BornerLeDelai(constructeur.ConnectTimeout)
 
         txtPartage.Text = ConfigurationWU.CheminDuPartage
-        chkPropager.Checked = txtPartage.Text.Length > 0
+
+        ' Décochée par défaut, à dessein : le geste ordinaire est un dépannage, et la chaîne
+        ' publiée avec l'application doit rester la référence. Une case déjà cochée ferait de
+        ' l'exception la règle.
+        chkConserver.Checked = False
+        chkPropager.Checked = False
+        AppliquerLaPortee()
 
         ' Une chaîne complète déjà posée doit se voir : sans cela, l'écran afficherait un
         ' serveur et une base décomposés, et les enregistrer écraserait la chaîne — avec les
@@ -82,6 +88,89 @@ Public Class FrmParametresConnexion
         If valeur > nudDelai.Maximum Then Return nudDelai.Maximum
 
         Return valeur
+    End Function
+
+    Private Sub chkConserver_CheckedChanged(sender As Object, e As EventArgs) Handles chkConserver.CheckedChanged
+        AppliquerLaPortee()
+    End Sub
+
+    ''' <summary>
+    ''' Rend actifs ou inactifs les réglages qui n'ont de sens que si l'on conserve.
+    '''
+    ''' Propager à tous les postes suppose d'écrire quelque part : sans conservation, le
+    ''' fichier partagé n'a pas lieu d'être touché, et laisser la case accessible ferait
+    ''' croire qu'un réglage temporaire peut engager la banque entière.
+    ''' </summary>
+    Private Sub AppliquerLaPortee()
+
+        Dim conserve As Boolean = chkConserver.Checked
+
+        txtPartage.Enabled = conserve
+        chkPropager.Enabled = conserve
+
+        If Not conserve Then chkPropager.Checked = False
+    End Sub
+
+    ''' <summary>
+    ''' Enregistre pour cette session seulement : rien n'est écrit, et le poste reprendra sa
+    ''' chaîne habituelle au prochain démarrage.
+    ''' </summary>
+    Private Function RetenirPourLaSession() As Boolean
+
+        Dim chaine As String
+
+        If chkChaineComplete.Checked Then
+            chaine = txtChaine.Text.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+            If chaine.Length = 0 Then
+                MessageBox.Show("Collez d'abord la chaîne de connexion.", "Réglage incomplet",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return False
+            End If
+        Else
+            If txtServeur.Text.Trim().Length = 0 Then
+                MessageBox.Show("Indiquez d'abord le serveur.", "Réglage incomplet",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return False
+            End If
+            chaine = ConfigurationWU.ChaineDepuis(txtServeur.Text, txtBase.Text, CInt(nudDelai.Value))
+        End If
+
+        ConfigurationWU.ForcerPourCetteSession(chaine)
+        CalendrierWU.Oublier()
+
+        MessageBox.Show(
+            "Le réglage vaut pour cette session seulement." & Environment.NewLine & Environment.NewLine &
+            "Rien n'a été écrit sur ce poste : au prochain démarrage, l'application reprendra la" &
+            Environment.NewLine &
+            "chaîne publiée avec elle. Pour un changement durable, c'est cette chaîne qu'il faut" &
+            Environment.NewLine &
+            "corriger, puis republier l'application.",
+            "Réglage temporaire", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        Return True
+    End Function
+
+    ''' <summary>
+    ''' Fait confirmer un réglage conservé sur le poste.
+    '''
+    ''' Un réglage écrit ici l'emporte sur la chaîne publiée avec l'application — et pour
+    ''' toujours. Le poste cesse alors de suivre les republications, sans que rien ne le
+    ''' signale ailleurs que sur cet écran. Cela peut être voulu ; cela ne doit pas être subi.
+    ''' </summary>
+    Private Function ConfirmerLaConservation() As Boolean
+
+        Return MessageBox.Show(
+            "Ce réglage sera CONSERVÉ sur ce poste." & Environment.NewLine & Environment.NewLine &
+            "Il l'emportera désormais sur la chaîne publiée avec l'application : ce poste ne" &
+            Environment.NewLine &
+            "suivra plus les republications, jusqu'à ce que quelqu'un revienne le défaire ici." &
+            Environment.NewLine & Environment.NewLine &
+            "Pour un simple dépannage, décochez « Conserver » : le réglage vaudra le temps de" &
+            Environment.NewLine &
+            "la session, et le poste restera aligné sur la version publiée." & Environment.NewLine & Environment.NewLine &
+            "Conserver tout de même ?",
+            "Réglage durable", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) = DialogResult.Yes
     End Function
 
     Private Sub chkChaineComplete_CheckedChanged(sender As Object, e As EventArgs) Handles chkChaineComplete.CheckedChanged
@@ -196,8 +285,14 @@ Public Class FrmParametresConnexion
 
     Private Sub btnEnregistrer_Click(sender As Object, e As EventArgs) Handles btnEnregistrer.Click
 
-        If Not ConfirmerLaPropagation() Then Return
+        ' Sans conservation, rien n'est écrit : la chaîne vaut pour cette session seulement.
+        If Not chkConserver.Checked Then
+            If RetenirPourLaSession() Then AfficherLaConfigurationEnService()
+            Return
+        End If
 
+        If Not ConfirmerLaConservation() Then Return
+        If Not ConfirmerLaPropagation() Then Return
         If Not ConfirmerLAbsenceDeMotDePasse() Then Return
 
         Dim messageErreur As String = String.Empty

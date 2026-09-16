@@ -137,6 +137,16 @@ Public NotInheritable Class ConfigurationWU
     ''' <summary>Chaîne retenue, calculée une fois puis conservée le temps de l'exécution.</summary>
     Private Shared _chaine As String = String.Empty
 
+    ''' <summary>
+    ''' Chaîne imposée pour cette exécution seulement, sans rien écrire sur le poste.
+    '''
+    ''' Elle sert au technicien qui installe : il peut désigner la bonne base le temps de créer
+    ''' le premier administrateur, sans que le poste cesse pour autant de suivre la chaîne
+    ''' publiée avec l'application. Un réglage écrit sur le poste l'emporterait en effet sur
+    ''' App.config — définitivement, et sans que rien ne le signale.
+    ''' </summary>
+    Private Shared _forcageSession As String = String.Empty
+
     ''' <summary>Provenance de la chaîne retenue, en clair, pour l'écran d'administration.</summary>
     Private Shared _origine As String = String.Empty
 
@@ -171,7 +181,34 @@ Public NotInheritable Class ConfigurationWU
         _origine = String.Empty
     End Sub
 
+    ''' <summary>
+    ''' Impose une chaîne pour cette exécution, sans rien écrire sur le poste. Au prochain
+    ''' démarrage, la résolution normale reprend — et le poste continue donc de suivre la
+    ''' chaîne publiée avec l'application.
+    ''' </summary>
+    ''' <param name="chaine">Chaîne à employer. Chaîne vide pour annuler le forçage.</param>
+    Public Shared Sub ForcerPourCetteSession(chaine As String)
+
+        _forcageSession = If(chaine, String.Empty).Trim()
+        Oublier()
+    End Sub
+
+    ''' <summary>Vrai si la chaîne en service a été saisie pour cette session seulement.</summary>
+    Public Shared ReadOnly Property EstForceePourLaSession As Boolean
+        Get
+            Return _forcageSession.Length > 0
+        End Get
+    End Property
+
     Private Shared Sub Resoudre()
+
+        ' 0. Saisie imposée pour cette session : elle prime sur tout, et ne survit pas à
+        ' la fermeture de l'application.
+        If _forcageSession.Length > 0 Then
+            _chaine = _forcageSession
+            _origine = "saisie pour cette session, non conservée sur le poste"
+            Return
+        End If
 
         ' 1. Variable d'environnement : elle passe avant tout, et n'engage que ce poste.
         Dim environnement As String = Nothing

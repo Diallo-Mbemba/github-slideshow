@@ -197,6 +197,7 @@ Elle est désormais cherchée dans un ordre où le premier trouvé l'emporte :
 
 | Rang | Emplacement | À quoi il sert |
 |---|---|---|
+| 0 | **Saisie pour cette session** | Dépannage à l'installation — **rien n'est écrit** |
 | 1 | Variable d'environnement `WINCOMPENSE_CONNEXION` | Dépannage, poste de test |
 | 2 | **Fichier partagé** désigné à l'installation | **La source de vérité** |
 | 3 | `%PROGRAMDATA%\Wincompense\wincompense.config` | Copie locale, rafraîchie à chaque lecture réussie du partage |
@@ -219,6 +220,15 @@ base restent donnés par `Scripts\08_RolesSQLServer.sql`.
 1. **Menu Sécurité → Connexion à la base de données…**, réservé à l'administrateur Wincompense.
    L'écran teste la connexion avant d'enregistrer, dit **d'où vient** la chaîne en service, et
    fait confirmer tout réglage appliqué à l'ensemble des postes.
+
+   La case **« Conserver ce réglage sur ce poste » est décochée par défaut**, et ce n'est pas
+   un détail. Le geste ordinaire est un dépannage : sans la case, le réglage vaut le temps de
+   la session, rien n'est écrit, et le poste continue de suivre la chaîne publiée avec
+   l'application. Un réglage conservé, lui, l'emporte sur cette chaîne — **définitivement** :
+   le poste cesse de suivre les republications, ce que l'écran annonce sans détour avant
+   d'écrire. Le déploiement ClickOnce rend cette distinction décisive, puisque la chaîne y est
+   publiée avec l'application et qu'un réglage local rendrait le poste sourd à toute
+   correction.
 2. **Le Bloc-notes** : le fichier partagé est une suite de lignes `CLE=VALEUR`. Ni XML, ni
    registre — l'informatique doit pouvoir agir sans outil et sans casser une balise.
 3. **`Configurer-Connexion.ps1`**, pour une migration faite hors des heures de bureau.
@@ -263,6 +273,17 @@ Deux points méritent d'être signalés :
 La désinstallation laisse `%PROGRAMDATA%\Wincompense` en place, pour qu'une réinstallation
 retrouve le serveur sans ressaisie, et ne touche jamais au fichier partagé, qui appartient à la
 banque et non au poste.
+
+### Un administrateur ne se crée jamais dans une base non désignée
+
+Au tout premier démarrage, l'application propose de créer le premier administrateur. Un compte
+créé dans la mauvaise base est une faute silencieuse : tout semble avoir fonctionné, et personne
+ne revient jamais voir cette base.
+
+La proposition nomme donc **le serveur, la base et la provenance de la chaîne**, et offre une
+troisième réponse — *régler d'abord le serveur* — plutôt que le seul choix entre créer et
+renoncer. Le technicien qui installe peut ainsi désigner la bonne base, créer le compte, et
+laisser le poste revenir à la chaîne publiée au démarrage suivant.
 
 ### Aucun poste n'ignore qu'une version plus récente existe
 
