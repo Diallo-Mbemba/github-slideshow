@@ -142,7 +142,7 @@ banque par accident.
 | 1 | Élévation Windows | L'installation écrit dans `Program Files` : les droits administrateur sont demandés |
 | 2 | *(le cas échéant)* | Si .NET Framework 4.8 manque, un avertissement s'affiche **avant tout** |
 | 3 | Bienvenue | — |
-| 4 | Dossier de destination | `C:\Program Files\Wincompense TCHAD` par défaut |
+| 4 | Dossier de destination | `C:\Program Files\Default Company Name\SetupWincompense` — **le chemin autorisé par la banque, à ne pas changer** |
 | 5 | Dossier du menu Démarrer | `Wincompense TCHAD` |
 | 6 | Tâches supplémentaires | Raccourci sur le Bureau, à cocher |
 | 7 | **Connexion à la base** | Serveur **ou** chaîne de connexion, et chemin du fichier partagé |
@@ -154,7 +154,7 @@ banque par accident.
 
 | Emplacement | Contenu |
 |---|---|
-| `C:\Program Files\Wincompense TCHAD\` | L'application, plus `Scripts\` (les dix scripts SQL) et `Installation\` |
+| `C:\Program Files\Default Company Name\SetupWincompense\` | L'application, plus `Scripts\` (les dix scripts SQL) et `Installation\` |
 | `C:\ProgramData\Wincompense\wincompense.config` | La configuration, **modifiable par les utilisateurs** |
 | Menu Démarrer, Bureau | Les raccourcis |
 | Panneau de configuration | L'entrée de désinstallation |
@@ -184,26 +184,62 @@ comme le champ de l'assistant.
 Pour éprouver la commande avant de la diffuser, remplacer `/VERYSILENT` par `/SILENT` : la barre
 de progression s'affiche, et les messages d'erreur éventuels restent visibles.
 
-### ⚠️ Le renommage de l'exécutable rompt la chaîne de mise à jour
+### Le chemin et le nom de l'exécutable sont imposés par la sécurité
 
-L'exécutable s'appelait `WincompenseTCHAD.exe` ; il s'appelle désormais **`Wincompense.exe`**.
+La sécurité de la banque n'autorise pas *une application* : elle autorise **un fichier
+à un emplacement précis**. Celui qui a été autorisé, et qui fonctionnait, est :
 
-Pour un programme d'installation classique, cela ne change rien d'autre que le nom du fichier.
-**En ClickOnce, si :** l'identité d'une application publiée est bâtie sur le nom de son
-assemblage. Une installation existante ne se mettra donc **pas** à jour vers la nouvelle — elle
-la verra comme une application différente, sans rapport avec elle.
+```
+C:\Program Files\Default Company Name\SetupWincompense\Wincompense.exe
+```
 
-Sur un poste déjà équipé de l'ancienne version :
+> L'Explorateur Windows en français l'affiche `C:\Programmes\Default Company Name\SetupWincompense`.
+> C'est le **même dossier** : Windows ne traduit que son nom à l'écran, pas sur le disque.
+> Pour lire le vrai chemin, cliquer dans la barre d'adresse de l'Explorateur : elle
+> affiche alors `C:\Program Files\...`.
 
-| | Étape |
-|---|---|
-| 1 | Désinstaller **Wincompense TCHAD** par *Programmes et fonctionnalités* |
-| 2 | Installer la nouvelle depuis le partage |
+Ce chemin vient de l'ancien déploiement, fait avec un **projet d'installation Visual
+Studio**. `Default Company Name` et `SetupWincompense` sont les valeurs que ce type de
+projet met par défaut quand on ne renseigne ni l'éditeur ni le nom du produit. Elles ne
+veulent rien dire — et c'est précisément pour cela qu'il ne faut pas y toucher : les
+rendre plus présentables obligerait la banque à refaire son autorisation.
 
-`C:\ProgramData\Wincompense` n'est pas touché par la désinstallation : le serveur n'est pas à
-ressaisir.
+> **Au passage :** ce dossier n'est pas un dossier ClickOnce. ClickOnce installe sous
+> `%LOCALAPPDATA%\Apps\2.0\`, avec des noms de dossiers illisibles. Ce qui avait été
+> autorisé était donc bien un installateur classique — ce que `Wincompense.iss` reproduit.
 
-À faire une seule fois, au moment de ce changement de nom.
+Deux règles en découlent, et elles ne se négocient pas depuis le code :
+
+| | Règle | Où c'est tenu |
+|---|---|---|
+| 1 | L'exécutable s'appelle `Wincompense.exe` | `WincompenseTCHAD.vbproj`, balise `AssemblyName` |
+| 2 | Il s'installe dans `...\Default Company Name\SetupWincompense` | `Wincompense.iss`, `DefaultDirName` |
+
+Si l'assistant d'installation propose un autre dossier, **ne pas valider** : il pose la
+question et avertit, mais c'est l'opérateur qui tranche.
+
+#### Si le dossier autorisé est celui en (x86)
+
+Un projet d'installation Visual Studio en 32 bits déposait ses fichiers dans
+`C:\Program Files (x86)\` — affiché `C:\Programmes (x86)\`. Vérifier sur un poste
+avant de diffuser : si le `(x86)` est là, ouvrir `Wincompense.iss` et remplacer
+`{autopf}` par `{autopf32}` dans la ligne `#define RacineProgrammes`, **et nulle part
+ailleurs**. Puis recompiler le setup.
+
+#### Sur un poste portant déjà la version `WincompenseTCHAD.exe`
+
+L'installation écrase l'ancienne au même endroit et **supprime** `WincompenseTCHAD.exe`,
+son `.config` et son `.pdb` : laisser dans un dossier surveillé un binaire que la sécurité
+n'autorise pas ne rendrait service à personne, et un utilisateur finirait par le lancer par
+habitude.
+
+Si l'ancienne version avait été posée par un projet d'installation Visual Studio, elle a
+aussi une entrée dans *Programmes et fonctionnalités*. **La désinstaller d'abord**, avant
+de lancer `Wincompense_Setup.exe` : sinon, le jour où quelqu'un désinstallera cette vieille
+entrée, elle emportera les fichiers de la nouvelle version au passage.
+
+`C:\ProgramData\Wincompense` n'est touché ni par l'une ni par l'autre désinstallation :
+le serveur n'est jamais à ressaisir.
 
 ### Prérequis des postes
 

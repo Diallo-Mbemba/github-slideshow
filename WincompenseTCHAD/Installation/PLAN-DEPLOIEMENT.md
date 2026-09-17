@@ -87,13 +87,24 @@ C'est la phase la plus longue du déploiement, et la plus souvent sous-estimée.
 | ☐ | Y poser `connexion.config` et renseigner la ligne `SERVEUR=` | INFO |
 | ☐ | Droits : **lecture** pour les utilisateurs, **écriture** pour l'informatique seule | INFO |
 | ☐ | Déposer le `setup.exe` dans `Setup\` sur le partage, puis y poser `version.txt` | INFO |
+| ☐ | Relever sur un poste le **chemin exact** déjà autorisé par la sécurité (barre d'adresse de l'Explorateur, pas le nom affiché) | INFO |
+| ☐ | Si ce chemin est en `Program Files (x86)`, basculer `#define RacineProgrammes` sur `{autopf32}` dans `Wincompense.iss` | PROJET |
+| ☐ | Désinstaller l'ancienne version par *Programmes et fonctionnalités* si elle y figure | INFO |
 | ☐ | Compiler la solution en **Release** | PROJET |
 | ☐ | Produire `Wincompense_Setup.exe` avec Inno Setup **6.4.x** | PROJET |
 | ☐ | Installer sur **un seul poste**, celui de l'agent de compense principal | INFO |
+| ☐ | Vérifier que l'installation a bien atterri dans `...\Default Company Name\SetupWincompense\Wincompense.exe` | INFO |
+| ☐ | Lancer l'application depuis ce poste : elle doit démarrer sans blocage de la sécurité | INFO |
 | ☐ | Éprouver la commande d'installation silencieuse sur un second poste, avec `/SILENT` avant `/VERYSILENT` | INFO |
 | ☐ | Vérifier que la barre d'état affiche le bon serveur et la bonne base | COMPTA |
 
 > Qui peut écrire dans `connexion.config` commande la connexion de **tous** les postes.
+
+> **Le chemin d'installation n'est pas un détail cosmétique.** La sécurité autorise un
+> fichier à un emplacement précis : `Default Company Name\SetupWincompense\Wincompense.exe`.
+> Installée ailleurs, ou sous un autre nom, l'application est bloquée au démarrage.
+> Voir `LISEZMOI-Installation.md`, section « Le chemin et le nom de l'exécutable sont
+> imposés par la sécurité ».
 
 Le détail de ces étapes est dans `LISEZMOI-Installation.md`.
 

@@ -6,12 +6,31 @@
 ;
 ;  CE QUE FAIT CE PROGRAMME D'INSTALLATION
 ;    1. verifie que Microsoft .NET Framework 4.8 est present ;
-;    2. copie l'application dans Program Files ;
+;    2. copie l'application DANS LE CHEMIN AUTORISE PAR LA BANQUE (voir ci-dessous) ;
 ;    3. DEMANDE le serveur SQL et le chemin du fichier partage ;
 ;    4. ecrit la configuration dans %PROGRAMDATA%\Wincompense, dossier que les
 ;       utilisateurs peuvent modifier - contrairement a Program Files ;
 ;    5. cree le fichier partage s'il n'existe pas encore ;
 ;    6. pose les raccourcis et l'entree de desinstallation.
+;
+;  POURQUOI CE DOSSIER D'INSTALLATION, ET PAS UN AUTRE
+;    La securite de la banque n'autorise pas un executable : elle autorise un
+;    CHEMIN. Celui qui a ete autorise est
+;
+;        C:\Program Files\Default Company Name\SetupWincompense\Wincompense.exe
+;
+;    (l'Explorateur Windows en francais affiche "C:\Programmes\..." : c'est le
+;    meme dossier, Windows traduit seulement son nom a l'ecran).
+;
+;    Ce chemin vient de l'ancien deploiement, fait avec un projet d'installation
+;    Visual Studio : "Default Company Name" et "SetupWincompense" sont les valeurs
+;    par defaut que ce projet donne a l'editeur et au produit. Elles n'ont aucun
+;    sens pour nous - et c'est exactement pour cela qu'il ne faut pas y toucher :
+;    les changer demanderait a la banque de refaire son autorisation.
+;
+;    DefaultDirName reproduit donc ce chemin a l'identique. Ne pas le "corriger"
+;    en un nom plus presentable sans une nouvelle autorisation ecrite de la
+;    securite : l'application cesserait de demarrer sur les postes.
 ;
 ;  POURQUOI LA CONFIGURATION N'EST PAS DANS PROGRAM FILES
 ;    La banque change souvent de serveur. Une configuration posee a cote de
@@ -31,6 +50,19 @@
 #define VersionApplication  "1.0.0"
 #define Editeur             "Ecobank Tchad"
 #define ExecutablePrincipal "Wincompense.exe"
+
+; Le chemin autorise par la securite de la banque, decoupe en ses deux dossiers.
+; A ne modifier que sur une nouvelle autorisation ecrite de la securite.
+#define EditeurHistorique   "Default Company Name"
+#define ProduitHistorique   "SetupWincompense"
+
+; Racine de Program Files.
+;   {autopf}   -> C:\Program Files        (affiche "Programmes")
+;   {autopf32} -> C:\Program Files (x86)  (affiche "Programmes (x86)")
+; Si le dossier autorise sur les postes est celui en (x86) - l'ancien projet
+; d'installation etait peut-etre en 32 bits - remplacer autopf par autopf32 ici,
+; et nulle part ailleurs.
+#define RacineProgrammes    "{autopf}"
 
 ; Dossier de compilation Release.
 ;
@@ -58,7 +90,8 @@ AppName={#NomApplication}
 AppVersion={#VersionApplication}
 AppVerName={#NomApplication} {#VersionApplication}
 AppPublisher={#Editeur}
-DefaultDirName={autopf}\{#NomApplication}
+; LE POINT DE CE FICHIER. Le chemin autorise par la banque, reproduit tel quel.
+DefaultDirName={#RacineProgrammes}\{#EditeurHistorique}\{#ProduitHistorique}
 DefaultGroupName={#NomApplication}
 OutputDir=Sortie
 OutputBaseFilename=Wincompense_Setup_{#VersionApplication}
@@ -101,6 +134,15 @@ Source: "connexion.config.modele"; DestDir: "{app}\Installation"; Flags: ignorev
 Source: "version.txt.modele"; DestDir: "{app}\Installation"; Flags: ignoreversion
 Source: "Configurer-Connexion.ps1"; DestDir: "{app}\Installation"; Flags: ignoreversion
 Source: "LISEZMOI-Installation.md"; DestDir: "{app}\Installation"; Flags: ignoreversion
+
+[InstallDelete]
+; L'ancien executable occupe le meme dossier que le nouveau : la mise a jour
+; precedente l'y a depose sous le nom WincompenseTCHAD.exe. Le laisser la
+; reviendrait a garder dans un dossier surveille par la securite un binaire qui,
+; lui, n'est pas autorise - et a laisser un utilisateur le lancer par habitude.
+Type: files; Name: "{app}\WincompenseTCHAD.exe"
+Type: files; Name: "{app}\WincompenseTCHAD.exe.config"
+Type: files; Name: "{app}\WincompenseTCHAD.pdb"
 
 [Dirs]
 ; LE POINT IMPORTANT. Sans "users-modify", l'application ne pourrait pas
@@ -201,9 +243,42 @@ begin
   Result := (Pos('password', Minuscules) > 0) or (Pos('pwd', Minuscules) > 0);
 end;
 
+// ---------------------------------------------------------------------------
+//  Le dossier autorise par la securite
+// ---------------------------------------------------------------------------
+//  L'assistant laisse changer le dossier d'installation - c'est le comportement
+//  attendu d'un installateur, et il faut pouvoir le faire sur un poste de test.
+//  Mais en sortir sur un poste de production, c'est installer une application qui
+//  ne demarrera pas : la securite de la banque autorise un chemin, pas un produit.
+//  D'ou cet avertissement, qui explique au lieu d'interdire.
+function CheminAutorise(): String;
+begin
+  Result := ExpandConstant('{#RacineProgrammes}\{#EditeurHistorique}\{#ProduitHistorique}');
+end;
+
+function EstLeCheminAutorise(Chemin: String): Boolean;
+begin
+  Result := CompareText(RemoveBackslashUnlessRoot(Trim(Chemin)),
+                        RemoveBackslashUnlessRoot(CheminAutorise())) = 0;
+end;
+
 function NextButtonClick(IdPage: Integer): Boolean;
 begin
   Result := True;
+
+  if IdPage = wpSelectDir then
+  begin
+    if not EstLeCheminAutorise(WizardDirValue) then
+      if MsgBox('Ce dossier n''est pas celui que la securite de la banque a autorise.' + #13#10#13#10 +
+                'Autorise :' + #13#10 + '    ' + CheminAutorise() + #13#10#13#10 +
+                'Choisi :' + #13#10 + '    ' + WizardDirValue + #13#10#13#10 +
+                'Installee ailleurs, l''application sera tres probablement bloquee au ' +
+                'demarrage sur les postes de la banque.' + #13#10#13#10 +
+                'Installer quand meme dans ce dossier ?',
+                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) <> IDYES then
+        Result := False;
+    Exit;
+  end;
 
   if IdPage = PageConnexion.ID then
   begin
