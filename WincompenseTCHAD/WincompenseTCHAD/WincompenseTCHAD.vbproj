@@ -7,7 +7,13 @@
     <ProjectGuid>{61A0003A-67DC-4994-A806-936F8918DFFC}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>WincompenseTCHAD</RootNamespace>
-    <AssemblyName>WincompenseTCHAD</AssemblyName>
+    <!--
+      Nom du fichier produit : Wincompense.exe.
+      RootNamespace reste WincompenseTCHAD à dessein : il nomme les TYPES, pas le fichier.
+      Le changer renommerait aussi StartupObject et les ressources incorporées des
+      formulaires, pour un résultat que la banque ne verrait jamais.
+    -->
+    <AssemblyName>Wincompense</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <MyType>Custom</MyType>

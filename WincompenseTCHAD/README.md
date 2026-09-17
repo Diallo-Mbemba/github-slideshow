@@ -5,6 +5,10 @@ en VB.NET (.NET Framework 4.8 / Visual Studio 2019 / SQL Server Express).
 
 ## Ouverture du projet
 
+> **Le projet s'appelle `WincompenseTCHAD`, l'exécutable produit s'appelle `Wincompense.exe`.**
+> Ce n'est pas une incohérence : `AssemblyName` nomme le fichier livré, `RootNamespace` nomme les
+> types à l'intérieur. La banque ne voit que le premier, et son nom devait être neutre du pays.
+
 1. Ouvrir `WincompenseTCHAD.sln` dans Visual Studio 2019.
 2. Vérifier que le Framework cible du projet est bien **.NET Framework 4.8**.
 3. Adapter la chaîne de connexion SQL Server dans `WincompenseTCHAD\App.config` si nécessaire
@@ -175,7 +179,7 @@ Scripts/
 └── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
 
 Installation/
-├── Wincompense.iss                        ' Script Inno Setup : produit WincompenseTCHAD_Setup.exe
+├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe
 ├── connexion.config.modele                ' Modèle du fichier à poser sur le partage réseau
 ├── Configurer-Connexion.ps1               ' Changement de serveur en ligne de commande
 ├── version.txt.modele                     ' Modèle du fichier annonçant la version publiée
@@ -190,7 +194,7 @@ La banque change souvent de serveur. Tout le dispositif est bâti autour de cett
 
 ### La connexion ne vit pas avec l'application
 
-La chaîne vivait dans `WincompenseTCHAD.exe.config`, à côté de l'exécutable. Trois défauts qui se
+La chaîne vivait dans `Wincompense.exe.config`, à côté de l'exécutable. Trois défauts qui se
 cumulaient : le fichier est dans `Program Files`, donc protégé ; il est propre à chaque poste ; et
 une réinstallation l'écrase.
 
@@ -255,7 +259,7 @@ connexion complète**, dans le même champ : la banque fournit généralement la
 distinction se fait sur le signe `=`, qu'une chaîne porte toujours et qu'un nom de serveur ne
 porte jamais — il n'y a donc rien à choisir, et rien à expliquer au technicien qui installe.
 
-`Installation\Wincompense.iss` produit `WincompenseTCHAD_Setup.exe` avec **Inno Setup 6.3 ou
+`Installation\Wincompense.iss` produit `Wincompense_Setup.exe` avec **Inno Setup 6.3 ou
 supérieur**. Attention au point de licence : depuis la version 7, Inno Setup n'est plus gratuit
 pour un usage commercial, et une banque l'est — la **6.4.x**, gratuite pour tout usage, reste le
 choix le plus simple, et le script compile à l'identique. Il vérifie .NET Framework 4.8, copie l'application et les scripts SQL, **demande le

@@ -2,7 +2,7 @@
 ;  Wincompense TCHAD - script d'installation Inno Setup
 ; ============================================================================
 ;
-;  Produit WincompenseTCHAD_Setup.exe, a deployer sur les postes des agents.
+;  Produit Wincompense_Setup.exe, a deployer sur les postes des agents.
 ;
 ;  CE QUE FAIT CE PROGRAMME D'INSTALLATION
 ;    1. verifie que Microsoft .NET Framework 4.8 est present ;
@@ -30,7 +30,7 @@
 #define NomApplication      "Wincompense TCHAD"
 #define VersionApplication  "1.0.0"
 #define Editeur             "Ecobank Tchad"
-#define ExecutablePrincipal "WincompenseTCHAD.exe"
+#define ExecutablePrincipal "Wincompense.exe"
 
 ; Dossier de compilation Release.
 ;
@@ -47,7 +47,7 @@
 ; Sans ce controle, un projet jamais compile en Release donne un message illisible
 ; ("No files found matching ..."), qui laisse croire a une erreur du script.
 #if !FileExists(DossierRelease + "\" + ExecutablePrincipal)
-  #error "WincompenseTCHAD.exe est introuvable dans bin\Release : la solution n'a pas ete compilee en Release. Dans Visual Studio, choisir Release au lieu de Debug dans la liste de la barre d'outils, puis Generer > Generer la solution. Recompiler ensuite ce script."
+  #error "Wincompense.exe est introuvable dans bin\Release : la solution n'a pas ete compilee en Release. Dans Visual Studio, choisir Release au lieu de Debug dans la liste de la barre d'outils, puis Generer > Generer la solution. Recompiler ensuite ce script."
 #endif
 
 [Setup]
@@ -61,7 +61,7 @@ AppPublisher={#Editeur}
 DefaultDirName={autopf}\{#NomApplication}
 DefaultGroupName={#NomApplication}
 OutputDir=Sortie
-OutputBaseFilename=WincompenseTCHAD_Setup_{#VersionApplication}
+OutputBaseFilename=Wincompense_Setup_{#VersionApplication}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -177,7 +177,7 @@ begin
   // personne ne saisit rien, et sans cela, tous les postes repartiraient sur la valeur
   // par defaut, c'est-a-dire sur aucun serveur.
   //
-  //   WincompenseTCHAD_Setup.exe /VERYSILENT ^
+  //   Wincompense_Setup.exe /VERYSILENT ^
   //       /SERVEUR="SRV-SQL01\SQLEXPRESS" ^
   //       /PARTAGE="\\SRV-FICHIERS\Wincompense\connexion.config"
   //

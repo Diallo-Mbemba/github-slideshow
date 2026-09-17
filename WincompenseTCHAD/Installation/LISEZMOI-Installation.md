@@ -5,7 +5,7 @@ et pour changer de serveur ensuite sans y revenir.
 
 | Fichier | Rôle |
 |---|---|
-| `Wincompense.iss` | Script Inno Setup produisant `WincompenseTCHAD_Setup.exe` |
+| `Wincompense.iss` | Script Inno Setup produisant `Wincompense_Setup.exe` |
 | `connexion.config.modele` | Modèle du fichier à poser sur le partage réseau |
 | `Configurer-Connexion.ps1` | Changement de serveur en ligne de commande |
 | `version.txt.modele` | Modèle du fichier annonçant la version publiée |
@@ -17,7 +17,7 @@ et pour changer de serveur ensuite sans y revenir.
 ## 1. Le principe : la connexion ne vit pas avec l'application
 
 La banque change souvent de serveur. Tant que la chaîne de connexion vivait dans
-`WincompenseTCHAD.exe.config`, en changer imposait une tournée dans les bureaux :
+`Wincompense.exe.config`, en changer imposait une tournée dans les bureaux :
 ce fichier est dans `Program Files`, donc protégé ; il est propre à chaque poste ;
 et une réinstallation l'écrase.
 
@@ -66,7 +66,7 @@ sous 6.3 et suivantes.
 1. **Compiler en Release.** C'est l'oubli le plus fréquent, et il arrête tout.
    Dans Visual Studio, la liste déroulante de la barre d'outils affiche *Debug* par
    défaut : choisir **Release**, puis *Générer* → *Générer la solution*.
-   Vérifier ensuite que `WincompenseTCHAD\WincompenseTCHAD\bin\Release\WincompenseTCHAD.exe`
+   Vérifier ensuite que `WincompenseTCHAD\WincompenseTCHAD\bin\Release\Wincompense.exe`
    existe et porte la date du jour.
 
    Sans cela, la compilation du script s'arrête sur un message explicite disant
@@ -110,7 +110,7 @@ connexion de toute la banque.
 
 ## 4. Installer un poste
 
-Lancer `WincompenseTCHAD_Setup.exe` **en tant qu'administrateur**. L'assistant demande :
+Lancer `Wincompense_Setup.exe` **en tant qu'administrateur**. L'assistant demande :
 
 - **le serveur SQL Server, ou la chaîne de connexion complète** — les deux formes sont acceptées
   dans le même champ, l'assistant les distingue seul :
@@ -168,7 +168,7 @@ Pour vingt postes, on n'installe pas à la main. L'assistant accepte la configur
 de commande, ce qui permet de le lancer par stratégie de groupe ou par SCCM :
 
 ```
-WincompenseTCHAD_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES ^
+Wincompense_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES ^
     /SERVEUR="SRV-SQL01\SQLEXPRESS" ^
     /PARTAGE="\\SRV-FICHIERS\Wincompense\connexion.config"
 ```
@@ -183,6 +183,27 @@ comme le champ de l'assistant.
 
 Pour éprouver la commande avant de la diffuser, remplacer `/VERYSILENT` par `/SILENT` : la barre
 de progression s'affiche, et les messages d'erreur éventuels restent visibles.
+
+### ⚠️ Le renommage de l'exécutable rompt la chaîne de mise à jour
+
+L'exécutable s'appelait `WincompenseTCHAD.exe` ; il s'appelle désormais **`Wincompense.exe`**.
+
+Pour un programme d'installation classique, cela ne change rien d'autre que le nom du fichier.
+**En ClickOnce, si :** l'identité d'une application publiée est bâtie sur le nom de son
+assemblage. Une installation existante ne se mettra donc **pas** à jour vers la nouvelle — elle
+la verra comme une application différente, sans rapport avec elle.
+
+Sur un poste déjà équipé de l'ancienne version :
+
+| | Étape |
+|---|---|
+| 1 | Désinstaller **Wincompense TCHAD** par *Programmes et fonctionnalités* |
+| 2 | Installer la nouvelle depuis le partage |
+
+`C:\ProgramData\Wincompense` n'est pas touché par la désinstallation : le serveur n'est pas à
+ressaisir.
+
+À faire une seule fois, au moment de ce changement de nom.
 
 ### Prérequis des postes
 

@@ -4,10 +4,10 @@ Imports System.Runtime.InteropServices
 ' Informations générales relatives à un assembly sont contrôlées par le jeu d'attributs suivant.
 ' Modifiez ces valeurs d'attribut pour changer les informations associées à un assembly.
 
-<Assembly: AssemblyTitle("WincompenseTCHAD")>
+<Assembly: AssemblyTitle("Wincompense")>
 <Assembly: AssemblyDescription("Automatisation de la comptabilisation Western Union J+1 - Tchad")>
 <Assembly: AssemblyCompany("")>
-<Assembly: AssemblyProduct("WincompenseTCHAD")>
+<Assembly: AssemblyProduct("Wincompense")>
 <Assembly: AssemblyCopyright("")>
 <Assembly: AssemblyTrademark("")>
 

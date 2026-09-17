@@ -39,7 +39,7 @@ VERSION=1.1.0.0
 # Chemin complet du programme d'installation. Un clic sur la barre d'etat
 # ouvre son dossier dans l'Explorateur, le fichier deja selectionne.
 # Facultatif : sans lui, le message renvoie l'utilisateur vers l'informatique.
-SETUP=\\SRV-FICHIERS\Wincompense\Setup\WincompenseTCHAD_Setup_1.1.0.exe
+SETUP=\\SRV-FICHIERS\Wincompense\Setup\Wincompense_Setup_1.1.0.exe
 
 # Ce que la version apporte, en une ligne. Elle s'affiche dans le message et
 # en infobulle. Facultatif, mais un agent qui sait pourquoi on lui demande
