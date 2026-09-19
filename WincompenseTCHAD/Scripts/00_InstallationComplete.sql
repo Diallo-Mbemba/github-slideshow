@@ -26,7 +26,7 @@
       Partie 2   Les onze tables et leurs index
       Partie 3   Les données de paramétrage de départ (comptes comptables, jours fériés)
       Partie 4   Les trois rôles et leurs droits
-      Partie 5   Le rattachement des comptes Windows — À COMPLÉTER PAR VOUS
+      Partie 5   L'accès du compte applicatif à la base
       Partie 6   Le compte rendu
 
     L'ORDRE DIFFÈRE VOLONTAIREMENT de la numérotation des scripts d'origine : les droits sont
@@ -46,8 +46,9 @@
       - Il ne crée AUCUN compte utilisateur : le premier administrateur se crée au premier
         démarrage de l'application, qui demande confirmation de la base visée.
 
-      - Il ne rattache AUCUN compte Windows aux rôles : voir la PARTIE 5, à compléter avec
-        les groupes de votre domaine.
+      - Il ne crée AUCUN login SQL Server : il faudrait un mot de passe, qui n'a pas sa place
+        dans un fichier qui circule. La PARTIE 5 rattache à la base un login DÉJÀ CRÉÉ par la
+        banque, et lui accorde son rôle.
 
       - Il ne règle NI le mode de récupération NI la sauvegarde. À vérifier séparément : une
         base en mode FULL sans sauvegarde du journal finit par remplir le disque.
@@ -1390,22 +1391,69 @@ END
 GO
 
 -- =========================================================================
--- 5. Rattachement des utilisateurs SQL Server
+-- 5. Accès du compte applicatif
 --
---    À adapter : remplacez les noms ci-dessous par vos comptes réels, puis décommentez.
---    Les postes étant nominatifs, le plus simple est un compte Windows par agent :
+--    C'est ici que se règle l'erreur « Cannot open database ... requested by the login »
+--    (4060), celle que l'application affiche quand le login existe sur le serveur mais que
+--    la base ne le connaît pas encore.
 --
---        CREATE LOGIN [DOMAINE\pnom] FROM WINDOWS;
---        CREATE USER  [DOMAINE\pnom] FOR LOGIN [DOMAINE\pnom];
---        ALTER ROLE wu_compense ADD MEMBER [DOMAINE\pnom];
+--    Trois niveaux, qu'on confond facilement :
+--      le LOGIN ouvre la porte du bâtiment  — créé par la banque, avec son mot de passe ;
+--      l'UTILISATEUR ouvre celle du bureau  — créé ci-dessous ;
+--      le RÔLE dit ce qu'on a le droit d'y faire — accordé ci-dessous.
 --
---    Un compte SQL Server partagé par tout le service reste possible, mais le journal des
---    connexions de l'application redevient alors la seule trace nominative disponible.
+--    Ce script ne crée PAS le login : il faudrait son mot de passe, qui n'a pas sa place
+--    dans un fichier qui circule. Si le login manque, le script le dit et s'arrête là.
 -- =========================================================================
 
--- ALTER ROLE wu_compense   ADD MEMBER [DOMAINE\agent_compense];
--- ALTER ROLE wu_commercial ADD MEMBER [DOMAINE\agent_commercial];
--- ALTER ROLE wu_admin      ADD MEMBER [DOMAINE\administrateur_wu];
+-- ---- LA SEULE LIGNE À ADAPTER -------------------------------------------
+DECLARE @compteApplicatif SYSNAME = N'etdwincompense';
+
+-- Rôle accordé. wu_admin parce qu'un compte unique, employé par tous les postes, doit porter
+-- la réunion des droits de tous les postes. Si la banque fournit un compte par agent,
+-- remplacer par wu_compense (agent de compense) ou wu_commercial (saisie des points de vente)
+-- et exécuter cette partie une fois par compte : les trois rôles retrouvent alors leur
+-- utilité, et un accès direct à la base par SSMS reste borné au métier réel de chacun.
+DECLARE @roleApplicatif SYSNAME = N'wu_admin';
+
+DECLARE @ordreAcces NVARCHAR(400);
+
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @compteApplicatif)
+BEGIN
+    PRINT N'ARRET PARTIE 5 : le login ' + @compteApplicatif + N' n''existe pas sur ce serveur.';
+    PRINT N'                Creez-le d''abord avec son mot de passe, puis reexecutez ce script :';
+    PRINT N'                    CREATE LOGIN ' + QUOTENAME(@compteApplicatif) + N' WITH PASSWORD = N''...'';';
+END
+ELSE
+BEGIN
+
+    IF DATABASE_PRINCIPAL_ID(@compteApplicatif) IS NULL
+    BEGIN
+        SET @ordreAcces = N'CREATE USER ' + QUOTENAME(@compteApplicatif) +
+                          N' FOR LOGIN ' + QUOTENAME(@compteApplicatif);
+        EXEC sp_executesql @ordreAcces;
+        PRINT N'Utilisateur cree dans la base : ' + @compteApplicatif;
+    END
+    ELSE
+    BEGIN
+        PRINT N'Deja en place : utilisateur ' + @compteApplicatif;
+    END
+
+    -- ISNULL : si la creation de l'utilisateur a echoue, IS_ROLEMEMBER rend NULL, et un
+    -- NULL = 0 vaut « inconnu », donc faux : on passerait dans la branche « deja en place »
+    -- sans que rien ne le soit.
+    IF ISNULL(IS_ROLEMEMBER(@roleApplicatif, @compteApplicatif), 0) = 0
+    BEGIN
+        SET @ordreAcces = N'ALTER ROLE ' + QUOTENAME(@roleApplicatif) +
+                          N' ADD MEMBER ' + QUOTENAME(@compteApplicatif);
+        EXEC sp_executesql @ordreAcces;
+        PRINT N'Role ' + @roleApplicatif + N' accorde a ' + @compteApplicatif;
+    END
+    ELSE
+    BEGIN
+        PRINT N'Deja en place : ' + @compteApplicatif + N' dans ' + @roleApplicatif;
+    END
+END
 GO
 
 -- =========================================================================
@@ -1511,13 +1559,13 @@ BEGIN
         [Comment] = quoi
 FROM (
     SELECT  ordre = 1,
-            sujet = N''Comptes Windows rattaches aux roles'',
+            sujet = N''Compte applicatif rattache a la base'',
             fait  = CASE WHEN EXISTS (SELECT 1 FROM sys.database_role_members m
                                       INNER JOIN sys.database_principals r
                                               ON r.principal_id = m.role_principal_id
                                       WHERE r.name IN (N''wu_compense'', N''wu_commercial'', N''wu_admin''))
                          THEN 1 ELSE 0 END,
-            quoi  = N''PARTIE 5 de ce script : remplacer DOMAINE\... par vos groupes, puis reexecuter''
+            quoi  = N''PARTIE 5 de ce script : renseigner @compteApplicatif, puis reexecuter''
     UNION ALL
     SELECT  2, N''Comptes comptables renseignes'',
             CASE WHEN EXISTS (SELECT 1 FROM dbo.SystemeWU) THEN 1 ELSE 0 END,
