@@ -92,6 +92,7 @@
     <Compile Include="Services\PdvRepository.vb" />
     <Compile Include="Services\WUCalculationService.vb" />
     <Compile Include="Services\PieceComptableService.vb" />
+    <Compile Include="Services\PieceExcelWU.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />

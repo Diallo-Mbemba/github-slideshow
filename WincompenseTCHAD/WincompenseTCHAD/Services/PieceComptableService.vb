@@ -411,6 +411,32 @@ Public NotInheritable Class PieceComptableService
     End Function
 
     ''' <summary>
+    ''' Exporte la pièce DANS LE FORMULAIRE DE LA BANQUE, avec une feuille par point de vente
+    ''' en plus de la pièce globale.
+    '''
+    ''' C'est la forme attendue par la comptabilité : le classeur à quatre colonnes que produit
+    ''' la surcharge ci-dessus reste disponible pour un contrôle rapide, mais ce n'est pas un
+    ''' document qui se vise et se signe.
+    ''' </summary>
+    ''' <param name="dtPiece">Pièce comptable de la journée.</param>
+    ''' <param name="listeCalculs">Points de vente à détailler, un onglet chacun. Nothing pour n'écrire que la première feuille.</param>
+    ''' <param name="dateActivite">Journée comptabilisée — celle que portera l'en-tête.</param>
+    ''' <param name="cheminFichier">Chemin complet du .xlsx.</param>
+    ''' <param name="nomPremiereFeuille">Onglet de la première feuille.</param>
+    ''' <param name="intitulePremiereFeuille">Ligne d'identification de la première feuille.</param>
+    ''' <returns>Le chemin du fichier produit.</returns>
+    Public Shared Function ExporterEtOuvrirPieceExcel(dtPiece As DataTable,
+                                                      listeCalculs As IEnumerable(Of CalculWU),
+                                                      dateActivite As Date,
+                                                      cheminFichier As String,
+                                                      Optional nomPremiereFeuille As String = "PIECE GLOBALE",
+                                                      Optional intitulePremiereFeuille As String = "") As String
+
+        Return PieceExcelWU.Ecrire(dtPiece, listeCalculs, dateActivite, cheminFichier,
+                                   nomPremiereFeuille, intitulePremiereFeuille)
+    End Function
+
+    ''' <summary>
     ''' Ouvre la pièce comptable dans Excel sans rien demander : le classeur est écrit dans un
     ''' fichier temporaire, puis laissé ouvert pour consultation, impression ou enregistrement
     ''' manuel immédiat.

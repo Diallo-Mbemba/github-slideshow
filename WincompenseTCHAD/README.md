@@ -147,7 +147,8 @@ WincompenseTCHAD/
     │   ├── MiseAJourWU.vb                  ' Annonce aux postes qu'une version plus récente est publiée
     │   ├── DiagnosticSqlWU.vb              ' Traduit les refus de SQL Server en consigne exécutable
     │   ├── SecretWU.vb                     ' Chiffre le mot de passe SQL pour ce poste (DPAPI)
-    │   └── PreparationBaseWU.vb            ' Constate l'accès du compte, le répare ou rédige le script
+    │   ├── PreparationBaseWU.vb            ' Constate l'accès du compte, le répare ou rédige le script
+    │   └── PieceExcelWU.vb                 ' Le formulaire de pièce de la banque, une feuille par point de vente
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -1197,6 +1198,52 @@ distinguer quoi que ce soit au niveau SQL Server : c'est l'application qui garde
 distinction entre l'agent de compense, le commercial et l'administrateur, et le verrou qui
 s'opposait à une connexion faite **hors** de l'application disparaît. Un compte SQL par agent,
 si la banque l'accepte, rend aux trois rôles leur utilité.
+
+### L'export de la pièce : le formulaire de la banque (`PieceExcelWU`)
+
+La pièce comptable ne s'exporte plus en tableau à quatre colonnes. Elle sort dans **le
+formulaire que la comptabilité vise et signe** — celui du modèle fourni par la banque
+(`classe_bis.xlsx`) — et le classeur porte **une feuille par point de vente** en plus de la
+pièce globale.
+
+**Pourquoi une feuille par point de vente.** La pièce globale équilibre la journée entière.
+Mais c'est point de vente par point de vente que la comptabilité contrôle, que le sous-agent
+conteste, et que l'inspection remonte. Extraire ces pièces à la main d'un tableau de trois
+cents lignes est un travail de recopie, et la recopie se trompe.
+
+**Pourquoi ce formulaire.** Le modèle n'est pas une présentation : c'est le document que le
+guichet accepte ou refuse. Une pièce qui ne lui ressemble pas se fait renvoyer, quelles que
+soient ses écritures.
+
+Chaque feuille reprend le modèle dans l'ordre :
+
+| Zone | Contenu |
+|---|---|
+| En-tête | `ECOBANK TCHAD`, `VERIFICATION PIECE COMPTABLE`, la case de contrôle en D6 |
+| Identification | `DATE :` (la journée comptabilisée), `DE :`, `POUR :`, `AGENCE:`, et la ligne `Agence  001: …` |
+| Tableau | `N° DE COMPTES` / `LIBELLES` / `MONTANTS`, bloc **DEBIT :** puis bloc **CREDIT :** |
+| `RAISON :` | Compensation Western Union, désignation du point de vente, journée |
+| Cartouches | `SIGNATURES REQUISES`/`FCU`, `INITIE PAR` / `CONTRÔLE PAR` / `APPROUVE PAR`, `ECRITURE`/`OPS`, `PASSEE PAR` / `AUTORISEE PAR`, date et numéro de séquence |
+
+Quatre écarts avec le modèle, tous délibérés :
+
+1. **Le tableau grandit.** Le modèle réserve vingt-cinq lignes parce qu'il est fait pour être
+   rempli à la main. Une pièce générée en a autant que la journée en produit : les blocs
+   s'étendent, et tout ce qui suit descend d'autant.
+2. **La date est celle de la journée comptabilisée**, pas `=TODAY()`. Le modèle porte la
+   date du jour parce qu'il est vierge ; une pièce rejouée trois jours plus tard doit rester
+   datée du jour qu'elle comptabilise.
+3. **La case de contrôle D6 est une formule sur les deux plages**, là où le modèle porte une
+   soustraction écrite ligne par ligne. Elle dit la même chose et reste vraie quand la pièce
+   change — c'est une case de contrôle.
+4. **`DE :` et `POUR :` sont renseignés.** Le modèle les laisse vides ; une pièce produite par
+   l'application sait toujours d'où elle vient.
+
+**Les pièces individuelles sont regénérées**, et non découpées dans la pièce globale : c'est
+`GenererPieceComptable` qui produit les deux, sur un `CalculWU` unique pour la seconde. Les
+mêmes écritures, aux mêmes comptes, par construction. Un Account non comptabilisé n'a pas
+d'onglet — il n'a pas d'écriture non plus, et un onglet vide laisserait croire à une pièce
+à zéro.
 
 ### Préparer l'accès du compte (`PreparationBaseWU`)
 

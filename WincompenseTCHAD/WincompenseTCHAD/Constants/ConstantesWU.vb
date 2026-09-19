@@ -102,6 +102,52 @@ Public NotInheritable Class ConstantesWU
 #Region "Libellés comptables"
 
     Public Const LIB_COMPTE_COURANT As String = "COMPTE COURANT WESTERN UNION ETD"
+
+    ' ------------------------------------------------------------------------------------
+    '  Libellés du formulaire de pièce comptable de la banque
+    '
+    '  Repris tels quels du modèle fourni (classe_bis.xlsx), majuscules et espacement
+    '  compris : ce document est visé et signé à la main, et une pièce qui ne ressemble pas
+    '  aux autres se fait renvoyer au guichet de la comptabilité.
+    ' ------------------------------------------------------------------------------------
+    Public Const PIECE_BANQUE As String = "ECOBANK TCHAD"
+    Public Const PIECE_TITRE As String = "VERIFICATION   PIECE  COMPTABLE"
+    Public Const PIECE_DATE As String = "DATE :"
+    Public Const PIECE_DE As String = "DE :"
+    Public Const PIECE_POUR As String = "POUR :"
+    Public Const PIECE_AGENCE As String = "AGENCE:"
+    Public Const PIECE_COMPTES As String = "N° DE COMPTES"
+    Public Const PIECE_LIBELLES As String = "LIBELLES"
+    Public Const PIECE_MONTANTS As String = "MONTANTS"
+    Public Const PIECE_DEBIT As String = "DEBIT :"
+    Public Const PIECE_CREDIT As String = "CREDIT :"
+    Public Const PIECE_RAISON As String = "RAISON :"
+    Public Const PIECE_SIGNATURES As String = "SIGNATURES REQUISES"
+    Public Const PIECE_FCU As String = "FCU"
+    Public Const PIECE_INITIE As String = "INITIE PAR :"
+    Public Const PIECE_CONTROLE As String = "CONTRÔLE PAR"
+    Public Const PIECE_APPROUVE As String = "APPROUVE PAR:"
+    Public Const PIECE_ECRITURE As String = "ECRITURE"
+    Public Const PIECE_OPS As String = "OPS"
+    Public Const PIECE_PASSEE As String = "PASSEE PAR:"
+    Public Const PIECE_AUTORISEE As String = "AUTORISEE PAR:"
+    Public Const PIECE_DATE_ENREGISTREMENT As String = "DATE D'ENREGISTREMENT COMPTABLE"
+    Public Const PIECE_NUMERO_SEQUENCE As String = "NUMERO DE SEQUENCE ENREGISTREE"
+
+    ' Service émetteur et service destinataire, portés par les lignes « DE : » et « POUR : ».
+    ' Le modèle les laisse vides — il est fait pour être rempli à la main. Une pièce produite
+    ' par l'application, elle, sait toujours d'où elle vient.
+    Public Const PIECE_SERVICE_EMETTEUR As String = "COMPENSATION WESTERN UNION"
+    Public Const PIECE_SERVICE_DESTINATAIRE As String = "COMPTABILITE"
+
+    ' Ville portée par l'en-tête, en face de « AGENCE: ». À confirmer si la filiale produit
+    ' un jour des pièces au nom d'une autre place.
+    Public Const PIECE_VILLE As String = "N'Djamena"
+
+    ' Police du formulaire. Deux polices, comme le modèle : les intitulés en Arial Black,
+    ' le contenu en Century Schoolbook.
+    Public Const PIECE_POLICE_TITRE As String = "Arial Black"
+    Public Const PIECE_POLICE_CORPS As String = "Century Schoolbook"
     Public Const LIB_COMMISSION_TRANSFERT_BANQUE As String = "Commission sur Transfert_Ecobank"
     Public Const LIB_COMMISSION_PAIEMENT_BANQUE As String = "Commission sur Paiement_Ecobank"
     Public Const LIB_COMMISSION_ENVOI_BANQUE As String = "Commission sur Envoi_Ecobank"

@@ -883,7 +883,14 @@ Public Class FrmCompensationWU
 
             If _dateActivite.HasValue Then
                 apercu.NomFichierPropose = PieceComptableService.NomDeFichier(_dateActivite.Value)
+                apercu.DateActivite = _dateActivite.Value
             End If
+
+            ' La liste complète part à l'export : le classeur portera la pièce globale, puis
+            ' une feuille par point de vente comptabilisé. Les Accounts écartés n'en ont pas —
+            ' ils n'ont pas d'écriture non plus, et un onglet vide laisserait croire à une
+            ' pièce à zéro.
+            apercu.Calculs = _listeCalculs
 
             apercu.ShowDialog(Me)
 
@@ -1047,6 +1054,12 @@ Public Class FrmCompensationWU
                 ' Le nom porte l'Account : un dossier contenant la pièce globale et plusieurs
                 ' pièces de points de vente doit rester lisible sans ouvrir les classeurs.
                 formulaire.NomFichierPropose = $"PieceWU_{calc.Account}.xlsx"
+
+                ' Un seul point de vente : une seule feuille, à son nom, et non une « pièce
+                ' globale » qui ne porterait que lui.
+                If _dateActivite.HasValue Then formulaire.DateActivite = _dateActivite.Value
+                formulaire.NomPremiereFeuille = calc.Account
+                formulaire.IntitulePiece = PieceExcelWU.IntituleDe(calc)
 
                 formulaire.ShowDialog(Me)
             End Using

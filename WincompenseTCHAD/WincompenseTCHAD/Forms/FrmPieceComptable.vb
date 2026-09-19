@@ -42,6 +42,32 @@ Public Class FrmPieceComptable
     ''' </summary>
     Public Property NomFichierPropose As String = PieceComptableService.NomDeFichier(Date.Today)
 
+    ''' <summary>
+    ''' Journée comptabilisée, portée par l'en-tête du formulaire exporté.
+    ''' 
+    ''' Ce n'est pas la date d'impression : une pièce rejouée trois jours plus tard doit rester
+    ''' datée du jour qu'elle comptabilise, sans quoi elle ne se rapproche plus de rien.
+    ''' </summary>
+    Public Property DateActivite As Date = Date.Today
+
+    ''' <summary>
+    ''' Points de vente à détailler, un onglet chacun, dans le classeur exporté.
+    ''' 
+    ''' Nothing — le cas par défaut — n'écrit que la pièce affichée, en une feuille. L'appelant
+    ''' qui dispose de la liste la renseigne : c'est ce qui donne au comptable la pièce de chaque
+    ''' sous-agent sans l'extraire à la main d'un tableau de trois cents lignes.
+    ''' </summary>
+    Public Property Calculs As IEnumerable(Of CalculWU) = Nothing
+
+    ''' <summary>
+    ''' Ligne d'identification de la première feuille, à la forme du modèle de la banque
+    ''' (« Agence  001: … »). Vide pour l'intitulé de la pièce globale.
+    ''' </summary>
+    Public Property IntitulePiece As String = String.Empty
+
+    ''' <summary>Onglet de la première feuille du classeur exporté.</summary>
+    Public Property NomPremiereFeuille As String = "PIECE GLOBALE"
+
     ''' <summary>Constructeur sans paramètre requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
@@ -147,12 +173,14 @@ Public Class FrmPieceComptable
         Try
             Cursor = Cursors.WaitCursor
 
-            PieceComptableService.ExporterEtOuvrirPieceExcel(_dtPiece, chemin)
+            PieceComptableService.ExporterEtOuvrirPieceExcel(
+                _dtPiece, Calculs, DateActivite, chemin, NomPremiereFeuille, IntitulePiece)
 
             _exportee = True
             _chemin = chemin
 
-            lblSousTitre.Text = $"Pièce exportée : {chemin} — elle s'ouvre dans Excel."
+            lblSousTitre.Text = $"Pièce exportée : {chemin} — elle s'ouvre dans Excel." &
+                                NombreDeFeuilles()
 
         Catch ex As Exception
             MessageBox.Show(
@@ -163,6 +191,24 @@ Public Class FrmPieceComptable
             Cursor = Cursors.Default
         End Try
     End Sub
+
+    ''' <summary>
+    ''' Rappelle, après coup, combien d'onglets le classeur porte. Un comptable qui attend une
+    ''' pièce par sous-agent doit pouvoir constater qu'elles y sont toutes.
+    ''' </summary>
+    Private Function NombreDeFeuilles() As String
+
+        If Calculs Is Nothing Then Return String.Empty
+
+        ' Where(...).Count() plutôt que Count(...) : le jour où cette propriété serait typée
+        ' List(Of CalculWU), Count deviendrait une propriété et Count(...) se lirait comme un
+        ' indexeur — BC32016, à la compilation, loin d'ici.
+        Dim pieces As Integer =
+            Calculs.Where(Function(calcul) calcul IsNot Nothing AndAlso calcul.EstComptabilisable).Count()
+        If pieces = 0 Then Return String.Empty
+
+        Return $" — {pieces} pièce{If(pieces > 1, "s", String.Empty)} de point de vente, en onglets séparés."
+    End Function
 
     ''' <summary>Demande où enregistrer. Chaîne vide si l'utilisateur renonce.</summary>
     Private Function DemanderLeChemin() As String
