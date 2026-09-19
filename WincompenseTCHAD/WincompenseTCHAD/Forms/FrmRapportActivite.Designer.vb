@@ -42,6 +42,8 @@ Partial Class FrmRapportActivite
         Me.dgvParGroupe = New System.Windows.Forms.DataGridView()
         Me.tabCommissions = New System.Windows.Forms.TabPage()
         Me.dgvCommissions = New System.Windows.Forms.DataGridView()
+        Me.tabTaxes = New System.Windows.Forms.TabPage()
+        Me.dgvTaxes = New System.Windows.Forms.DataGridView()
         Me.sfdExport = New System.Windows.Forms.SaveFileDialog()
         Me.tabRapport.SuspendLayout()
         Me.tabSynthese.SuspendLayout()
@@ -54,6 +56,8 @@ Partial Class FrmRapportActivite
         CType(Me.dgvParGroupe, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.tabCommissions.SuspendLayout()
         CType(Me.dgvCommissions, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.tabTaxes.SuspendLayout()
+        CType(Me.dgvTaxes, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
         'lblDu
@@ -135,6 +139,7 @@ Partial Class FrmRapportActivite
         Me.tabRapport.Controls.Add(Me.tabParPdv)
         Me.tabRapport.Controls.Add(Me.tabParGroupe)
         Me.tabRapport.Controls.Add(Me.tabCommissions)
+        Me.tabRapport.Controls.Add(Me.tabTaxes)
         Me.tabRapport.Location = New System.Drawing.Point(12, 80)
         Me.tabRapport.Name = "tabRapport"
         Me.tabRapport.SelectedIndex = 0
@@ -271,6 +276,32 @@ Partial Class FrmRapportActivite
         Me.dgvCommissions.Size = New System.Drawing.Size(1002, 480)
         Me.dgvCommissions.TabIndex = 0
         '
+        'tabTaxes
+        '
+        Me.tabTaxes.Controls.Add(Me.dgvTaxes)
+        Me.tabTaxes.Location = New System.Drawing.Point(4, 22)
+        Me.tabTaxes.Name = "tabTaxes"
+        Me.tabTaxes.Padding = New System.Windows.Forms.Padding(3)
+        Me.tabTaxes.Size = New System.Drawing.Size(1008, 486)
+        Me.tabTaxes.TabIndex = 5
+        Me.tabTaxes.Text = "Taxes perçues"
+        Me.tabTaxes.UseVisualStyleBackColor = True
+        '
+        'dgvTaxes
+        '
+        Me.dgvTaxes.AllowUserToAddRows = False
+        Me.dgvTaxes.AllowUserToDeleteRows = False
+        Me.dgvTaxes.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        Me.dgvTaxes.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.dgvTaxes.Location = New System.Drawing.Point(3, 3)
+        Me.dgvTaxes.MultiSelect = False
+        Me.dgvTaxes.Name = "dgvTaxes"
+        Me.dgvTaxes.ReadOnly = True
+        Me.dgvTaxes.RowHeadersWidth = 25
+        Me.dgvTaxes.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+        Me.dgvTaxes.Size = New System.Drawing.Size(1002, 480)
+        Me.dgvTaxes.TabIndex = 0
+        '
         'btnExporter
         '
         Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
@@ -341,6 +372,8 @@ Partial Class FrmRapportActivite
         CType(Me.dgvParGroupe, System.ComponentModel.ISupportInitialize).EndInit()
         Me.tabCommissions.ResumeLayout(False)
         CType(Me.dgvCommissions, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.tabTaxes.ResumeLayout(False)
+        CType(Me.dgvTaxes, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
     End Sub
 
@@ -366,6 +399,8 @@ Partial Class FrmRapportActivite
     Friend WithEvents dgvParGroupe As System.Windows.Forms.DataGridView
     Friend WithEvents tabCommissions As System.Windows.Forms.TabPage
     Friend WithEvents dgvCommissions As System.Windows.Forms.DataGridView
+    Friend WithEvents tabTaxes As System.Windows.Forms.TabPage
+    Friend WithEvents dgvTaxes As System.Windows.Forms.DataGridView
     Friend WithEvents sfdExport As System.Windows.Forms.SaveFileDialog
 
 End Class

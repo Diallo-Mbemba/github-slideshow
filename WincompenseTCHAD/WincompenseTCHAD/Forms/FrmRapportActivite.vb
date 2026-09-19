@@ -50,6 +50,7 @@ Public Class FrmRapportActivite
     Private _parPdv As DataTable
     Private _parGroupe As DataTable
     Private _commissions As DataTable
+    Private _taxes As DataTable
 
     ''' <summary>
     ''' Détail des transactions de la période, rattaché aux points de vente dans l'état
@@ -255,12 +256,14 @@ Public Class FrmRapportActivite
         _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees, agences, _operations)
         _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
         _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
+        _taxes = RapportActiviteService.ConstruireEvolutionTaxes(_lignesAffichees)
 
         AfficherSynthese()
         AfficherDetail(dgvParJour, _parJour, "Date", "Date")
         AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
         AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
         AfficherDetail(dgvCommissions, _commissions, "Date", "Date")
+        AfficherDetail(dgvTaxes, _taxes, "Date", "Date")
 
         ReplierToutLeDetail()
 
@@ -329,6 +332,9 @@ Public Class FrmRapportActivite
         DefinirEntete(grille, "CommissionPaiement", "Commission Paiement")
         DefinirEntete(grille, "CommissionTransfert", "Commission Transfert")
         DefinirEntete(grille, "TotalCommissions", "Total commissions")
+        DefinirEntete(grille, "TTAEnvoi", "TTA sur envoi")
+        DefinirEntete(grille, "TTAReception", "TTA sur paiement")
+        DefinirEntete(grille, "TaxeEnvoi", "Impôts et taxe sur envoi")
         DefinirEntete(grille, "Variation", "Variation / veille")
         DefinirEntete(grille, "Cumul", "Cumul période")
 
@@ -337,6 +343,7 @@ Public Class FrmRapportActivite
                                                 "TVA", "TTA", "TotalTaxes",
                                                 "CommissionEnvoi", "CommissionPaiement",
                                                 "CommissionTransfert", "TotalCommissions", "Cumul",
+                                                "TTAEnvoi", "TTAReception", "TaxeEnvoi",
                                                 "Montant"}
             If Not grille.Columns.Contains(nom) Then Continue For
             grille.Columns(nom).DefaultCellStyle.Format = "N0"
@@ -650,7 +657,24 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions}
+        Dim formatsTaxes As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+            {"TVA", "# ##0"}, {"TTAEnvoi", "# ##0"}, {"TTAReception", "# ##0"},
+            {"TaxeEnvoi", "# ##0"}, {"TotalTaxes", "# ##0"},
+            {"Cumul", "# ##0"}, {"Variation", "+0,0 %;-0,0 %;0,0 %"}
+        }
+
+        Dim taxes As New BlocExcel("6. Taxes perçues", _taxes) With {
+            .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                {"TVA", "TVA collectée"}, {"TTAEnvoi", "TTA sur envoi"},
+                {"TTAReception", "TTA sur paiement"}, {"TaxeEnvoi", "Impôts et taxe sur envoi"},
+                {"TotalTaxes", "Total taxes"},
+                {"Variation", "Variation / veille"}, {"Cumul", "Cumul période"}
+            },
+            .Formats = formatsTaxes,
+            .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
+        }
+
+        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions, taxes}
     End Function
 
     ''' <summary>

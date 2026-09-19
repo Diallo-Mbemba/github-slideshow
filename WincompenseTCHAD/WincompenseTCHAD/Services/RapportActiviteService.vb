@@ -548,6 +548,93 @@ Public NotInheritable Class RapportActiviteService
         Return table
     End Function
 
+    ''' <summary>
+    ''' Évolution des taxes jour après jour, détaillée par taxe.
+    ''' 
+    ''' Le jumeau de l'évolution des commissions, et pour la même raison : ce que la banque
+    ''' REVERSE à l'État se suit comme ce qu'elle GAGNE. Une déclaration fiscale se prépare sur
+    ''' des totaux par nature de taxe, pas sur une colonne « total taxes » dont on ne sait plus
+    ''' ce qu'elle recouvre.
+    ''' 
+    ''' Les quatre taxes n'ont ni la même assiette ni le même destinataire :
+    ''' 
+    '''   TVA collectée        19,25 % des frais d'envoi
+    '''   TTA sur envoi         0,2 % du principal envoyé
+    '''   TTA sur paiement      0,2 % du principal payé — SOUS-AGENTS SEULEMENT, une agence
+    '''                         propre n'en doit pas ; la colonne est donc structurellement plus
+    '''                         basse que celle des envois, et ce n'est pas une anomalie
+    '''   Impôts et taxe envoi  25 % du solde de taxes
+    ''' 
+    ''' La variation suit la même règle que pour les commissions : laissée vide pour la première
+    ''' journée et lorsque la veille est à zéro — une variation depuis zéro n'a pas de sens.
+    ''' </summary>
+    Public Shared Function ConstruireEvolutionTaxes(lignes As List(Of LigneHistoriqueWU)) As DataTable
+
+        Dim table As New DataTable("EvolutionTaxes")
+        table.Columns.Add("Date", GetType(String))
+        table.Columns.Add("TVA", GetType(Decimal))
+        table.Columns.Add("TTAEnvoi", GetType(Decimal))
+        table.Columns.Add("TTAReception", GetType(Decimal))
+        table.Columns.Add("TaxeEnvoi", GetType(Decimal))
+        table.Columns.Add("TotalTaxes", GetType(Decimal))
+        table.Columns.Add("Variation", GetType(Decimal))
+        table.Columns.Add("Cumul", GetType(Decimal))
+
+        Dim cumuls As New SortedDictionary(Of Date, LigneHistoriqueWU)
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            If Not cumuls.ContainsKey(ligne.DateActivite) Then
+                cumuls(ligne.DateActivite) = New LigneHistoriqueWU()
+            End If
+            cumuls(ligne.DateActivite).Cumuler(ligne)
+        Next
+
+        Dim cumulPeriode As Decimal = 0D
+        Dim veille As Decimal = -1D ' -1 : aucune journée précédente
+
+        For Each jour As Date In cumuls.Keys
+
+            Dim cumulJour As LigneHistoriqueWU = cumuls(jour)
+            Dim totalJour As Decimal = cumulJour.TotalTaxes
+            cumulPeriode += totalJour
+
+            Dim enregistrement As DataRow = table.NewRow()
+            enregistrement("Date") = jour.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture)
+            enregistrement("TVA") = cumulJour.TVA
+            enregistrement("TTAEnvoi") = cumulJour.TTAEnvoi
+            enregistrement("TTAReception") = cumulJour.TTAReception
+            enregistrement("TaxeEnvoi") = cumulJour.TaxeEnvoi
+            enregistrement("TotalTaxes") = totalJour
+            enregistrement("Cumul") = cumulPeriode
+
+            If veille > 0D Then
+                enregistrement("Variation") = (totalJour - veille) / veille
+            Else
+                enregistrement("Variation") = DBNull.Value
+            End If
+
+            table.Rows.Add(enregistrement)
+            veille = totalJour
+        Next
+
+        ' Ligne de total : la variation et le cumul n'y ont pas de sens, laissés vides.
+        If cumuls.Count > 0 Then
+            Dim total As LigneHistoriqueWU = Cumuler(lignes)
+            Dim ligneTotal As DataRow = table.NewRow()
+            ligneTotal("Date") = LIBELLE_TOTAL
+            ligneTotal("TVA") = total.TVA
+            ligneTotal("TTAEnvoi") = total.TTAEnvoi
+            ligneTotal("TTAReception") = total.TTAReception
+            ligneTotal("TaxeEnvoi") = total.TaxeEnvoi
+            ligneTotal("TotalTaxes") = total.TotalTaxes
+            ligneTotal("Variation") = DBNull.Value
+            ligneTotal("Cumul") = DBNull.Value
+            table.Rows.Add(ligneTotal)
+        End If
+
+        Return table
+    End Function
+
 #End Region
 
 #Region "Statut des transactions"
