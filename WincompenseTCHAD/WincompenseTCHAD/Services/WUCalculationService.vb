@@ -30,8 +30,31 @@ Public NotInheritable Class WUCalculationService
         ' TTA Envoi = PrincipalEnvoi * 0,2 %.
         calc.TTAEnvoi = calc.PrincipalEnvoi * ConstantesWU.TAUX_TTA
 
-        ' TTA Réception = PrincipalPaye * 0,2 %.
-        calc.TTAReception = calc.PrincipalPaye * ConstantesWU.TAUX_TTA
+        ' TTA Réception = PrincipalPaye * 0,2 % — MAIS SEULEMENT POUR UN SOUS-AGENT.
+        '
+        ' RÈGLE DE LA BANQUE : une agence propre ne supporte pas de TTA sur paiement. La taxe
+        ' n'est pas due, elle n'est donc pas calculée — et non pas calculée puis omise de la
+        ' pièce. La différence n'est pas de forme : calculée, elle apparaîtrait dans la grille
+        ' de contrôle, dans le rapport d'activité et dans l'historique comme une taxe que la
+        ' banque devrait, alors qu'elle ne la doit pas.
+        '
+        ' C'EST LE SEUL ENDROIT À MODIFIER, et c'est voulu. Tout ce qui suit part de cette
+        ' valeur : la ligne de la pièce, qu'AjouterLigneSiNonNul écarte d'elle-même à zéro ;
+        ' la contrepartie sur le compte courant WU, qui augmente d'autant ; l'écart d'arrondi ;
+        ' les totaux de contrôle ; l'historique ; le fichier destiné au core banking. Poser la
+        ' règle plus bas obligerait à la répéter, et deux copies d'une règle finissent
+        ' toujours par diverger.
+        '
+        ' INCONNU N'EST PAS TRAITÉ COMME EC ICI, contrairement à RepartirCommissions. Un
+        ' Account non paramétré n'est pas une agence propre : il n'est rien encore. Il n'entre
+        ' de toute façon pas dans la pièce ; la taxe reste donc calculée, et la grille de
+        ' contrôle montre ce qu'il faudrait payer s'il s'avérait être un sous-agent. Mettre à
+        ' zéro sur une supposition serait affirmer plus qu'on ne sait.
+        If String.Equals(calc.TypePdv, "EC", StringComparison.OrdinalIgnoreCase) Then
+            calc.TTAReception = 0D
+        Else
+            calc.TTAReception = calc.PrincipalPaye * ConstantesWU.TAUX_TTA
+        End If
 
         ' Solde de taxes = Taxes - TVA - TTAEnvoi.
         calc.SoldeTaxes = calc.Taxes - calc.TVA - calc.TTAEnvoi

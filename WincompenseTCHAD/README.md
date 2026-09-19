@@ -337,8 +337,9 @@ dans `Installation\LISEZMOI-Installation.md`.
    débit miroir individuelle (voir commentaires détaillés dans `GenererPieceComptable`). Vérifié à
    l'unité près sur l'exemple disponible ; *le cas d'une agence propre "EC" reste à valider faute
    d'exemple de référence pour ce type de PDV.*
-4. **Solde par Account** (grille de contrôle) = `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes)`.
-5. **Cohérence des dates** : la date du rapport d'activité (`txnDateLOC`) est comparée à celle du
+4. **TTA sur paiement** : due par un sous-agent, **pas par une agence propre** — voir ci-dessous.
+5. **Solde par Account** (grille de contrôle) = `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes)`.
+6. **Cohérence des dates** : la date du rapport d'activité (`txnDateLOC`) est comparée à celle du
    rapport de règlement, reconstituée depuis `SetDateLOCYear/Month/Day` (à défaut `RepDate`).
    Une divergence bloque le traitement. Si aucune date n'est exploitable d'un côté, la
    vérification est ignorée sans bloquer (avertissement affiché dans le StatusStrip).
@@ -396,6 +397,42 @@ démarrage dans la table SQL Server **`SystemeWU`** et modifiables depuis le for
 | TVA | `Tob` | 434000104 |
 | TTA sur envoi WU | `Cpte_Envoi` | 434000145 |
 | TTA sur paiement WU | `Cpte_Paiement` | 434000159 |
+
+#### La TTA sur paiement ne concerne que les sous-agents
+
+Les deux taxes sur les flux sont symétriques dans leur calcul — 0,2 % du principal — mais pas
+dans leur application :
+
+| | TTA sur envoi (`434000145`) | TTA sur paiement (`434000159`) |
+|---|---|---|
+| Sous-agent (`SA`) | oui | oui |
+| Agence propre (`EC`) | oui | **non — la taxe n'est pas due** |
+| Non paramétré (`INCONNU`) | oui | oui *(voir plus bas)* |
+
+**Elle n'est pas calculée, et non pas calculée puis omise de la pièce.** La différence n'est
+pas de forme : calculée, elle apparaîtrait dans la grille de contrôle, dans le rapport
+d'activité et dans l'historique comme une taxe que la banque devrait, alors qu'elle ne la doit
+pas.
+
+La règle tient donc en une condition, **à un seul endroit** : `WUCalculationService.AppliquerFormules`.
+Tout ce qui suit en découle sans rien répéter :
+
+| | Conséquence |
+|---|---|
+| La ligne de la pièce | Disparaît d'elle-même : `AjouterLigneSiNonNul` écarte un montant nul |
+| Le compte courant WU | Augmente d'autant — la banque garde la somme |
+| L'écart d'arrondi | Reste juste : il part de la même valeur |
+| Grille de contrôle, historique, rapport, fichier core banking | Suivent, tous construits sur cette valeur |
+
+Vérifié en simulation sur une agence propre de 45 M d'envois et 38 M de paiements : la ligne
+de 76 000 F disparaît, le compte courant WU passe de 8 372 250 à 8 448 250 F, et la pièce
+reste équilibrée à zéro. La pièce d'un sous-agent, elle, ne bouge pas d'un franc.
+
+**`INCONNU` n'est pas traité comme `EC` ici**, contrairement à `RepartirCommissions`. Un Account
+non paramétré n'est pas une agence propre : il n'est rien encore. Il n'entre de toute façon pas
+dans la pièce ; la taxe reste donc calculée, et la grille de contrôle montre ce qu'il faudrait
+payer s'il s'avérait être un sous-agent. Mettre à zéro sur une supposition serait affirmer plus
+qu'on ne sait.
 
 Les autres colonnes de la table (`Passif`, `Actif`, `Cpte_Charge_Publicitaire`,
 `Cpte_Gainde_Change`, `Cpte_Envoi_agence`, `Cpte_Paiement_agence`) ne sont **ni lues ni
