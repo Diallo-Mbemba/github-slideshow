@@ -54,10 +54,65 @@ Public NotInheritable Class PieceExcelWU
     Private Const XL_CENTRE As Integer = -4108
     Private Const XL_DROITE As Integer = -4152
     Private Const XL_MAXIMISE As Integer = -4137
-    Private Const XL_PAYSAGE As Integer = 2
+    Private Const XL_PORTRAIT As Integer = 1
 
     ''' <summary>Format des montants : séparateur de milliers, pas de décimale — le FCFA n'en a pas.</summary>
     Private Const FORMAT_MONTANT As String = "#,##0"
+
+#End Region
+
+#Region "Géométrie du formulaire"
+
+    ' POURQUOI CES TAILLES, ET NON CELLES DU MODÈLE
+    '
+    ' Le modèle fourni est dessiné pour être REMPLI À LA MAIN : colonnes de 24 à 114
+    ' caractères, corps de 20 à 28 points, lignes de 33. Il faut cela pour écrire au stylo
+    ' dans une case.
+    '
+    ' Mesuré, ce modèle fait 1 241 points de large et 997 de haut pour une pièce de six
+    ' écritures. Une page A4 en offre 487 sur 734. Imprimé « une page », il sortirait donc à
+    ' 39 % : les libellés à 4 points, illisibles ; imprimé à l'échelle, il sortirait sur deux
+    ' pages et demie, et une pièce comptable en deux morceaux ne se signe pas.
+    '
+    ' Les tailles ci-dessous gardent les PROPORTIONS du modèle — les intitulés plus gros que
+    ' le corps, Arial Black pour les uns, Century Schoolbook pour les autres — mais ramenées
+    ' à ce qui tient sur une page : 519 points de large, et 662 de haut pour six écritures.
+    ' Une pièce de point de vente sort ainsi à 94 %, et à 80 % au-delà de vingt écritures.
+    '
+    ' La structure, les libellés et l'enchaînement des cartouches, eux, ne bougent pas : c'est
+    ' cela que le guichet de la comptabilité reconnaît, pas le corps de la police.
+
+    Private Const LARGEUR_A As Double = 14.0   ' DEBIT : / CREDIT : / RAISON :
+    Private Const LARGEUR_B As Double = 18.0   ' N° de comptes
+    Private Const LARGEUR_C As Double = 48.0   ' libellés — le plus long fait 46 caractères
+    Private Const LARGEUR_D As Double = 16.0   ' montants
+
+    Private Const TAILLE_BANQUE As Integer = 14
+    Private Const TAILLE_TITRE As Integer = 16
+    Private Const TAILLE_CONTROLE As Integer = 14
+    Private Const TAILLE_ETIQUETTE As Integer = 10   ' DATE : / DE : / POUR :
+    Private Const TAILLE_VALEUR As Integer = 12      ' la date, le numéro
+    Private Const TAILLE_AGENCE As Integer = 14
+    Private Const TAILLE_INTITULE As Integer = 13
+    Private Const TAILLE_COLONNE As Integer = 11     ' en-têtes du tableau
+    Private Const TAILLE_ECRITURE As Integer = 11
+    Private Const TAILLE_BLOC As Integer = 11        ' DEBIT : / CREDIT : / RAISON :
+    Private Const TAILLE_RAISON As Integer = 12
+    Private Const TAILLE_PIED As Integer = 11
+
+    Private Const HAUTEUR_BANQUE As Double = 18.0
+    Private Const HAUTEUR_TITRE As Double = 22.0
+    Private Const HAUTEUR_DATE As Double = 18.0
+    Private Const HAUTEUR_AGENCE As Double = 22.0
+    Private Const HAUTEUR_POUR As Double = 18.0
+    Private Const HAUTEUR_INTITULE As Double = 20.0
+    Private Const HAUTEUR_COLONNES As Double = 18.0
+    Private Const HAUTEUR_ECRITURE As Double = 18.0
+    Private Const HAUTEUR_RAISON As Double = 20.0
+    Private Const HAUTEUR_PIED As Double = 14.0
+
+    ''' <summary>Marges d'impression, en pouces. 1 cm de chaque côté.</summary>
+    Private Const MARGE As Double = 0.4
 
 #End Region
 
@@ -92,6 +147,16 @@ Public NotInheritable Class PieceExcelWU
 
         ''' <summary>Texte de la ligne RAISON.</summary>
         Public Property Raison As String = String.Empty
+
+        ''' <summary>
+        ''' Vrai pour une pièce qui doit tenir sur UNE page, quitte à réduire l'échelle.
+        '''
+        ''' C'est le cas d'une pièce de point de vente : elle se signe, et un document qui se
+        ''' signe ne se signe pas en deux morceaux. La pièce globale, elle, peut compter trois
+        ''' cents écritures — l'y forcer la rendrait illisible ; elle s'imprime sur plusieurs
+        ''' pages, en-tête répété en haut de chacune.
+        ''' </summary>
+        Public Property TientSurUnePage As Boolean = True
     End Class
 
     ''' <summary>
@@ -241,6 +306,7 @@ Public NotInheritable Class PieceExcelWU
                            intitule),
             .DateActivite = dateActivite,
             .Numero = NumeroDePiece(dateActivite, 1),
+            .TientSurUnePage = False,
             .AgenceEmettrice = If(String.IsNullOrWhiteSpace(agence),
                                   ConstantesWU.PIECE_AGENCE_DEFAUT, agence),
             .Raison = $"Compensation Western Union — activité du {dateActivite:dd/MM/yyyy}"
@@ -343,34 +409,36 @@ Public NotInheritable Class PieceExcelWU
         Dim ligneRaison As Integer = derniereLigne + 1
         Raison(feuille, ligneRaison, contexte.Raison)
 
-        Cartouches(feuille, ligneRaison + 2)
-        MiseEnPageImpression(feuille)
+        Dim derniereDuPied As Integer = Cartouches(feuille, ligneRaison + 2)
+
+        MiseEnPageImpression(feuille, derniereDuPied, contexte.TientSurUnePage)
     End Sub
 
     ''' <summary>Colonnes et police du modèle. Les largeurs sont celles du classeur fourni.</summary>
     Private Shared Sub LargeursEtPolice(feuille As Object)
 
         feuille.Cells.Font.Name = ConstantesWU.PIECE_POLICE_CORPS
-        feuille.Cells.Font.Size = 12
+        feuille.Cells.Font.Size = TAILLE_ECRITURE
 
-        feuille.Columns("A").ColumnWidth = 24.86
-        feuille.Columns("B").ColumnWidth = 45.86
+        feuille.Columns("A").ColumnWidth = LARGEUR_A
+        feuille.Columns("B").ColumnWidth = LARGEUR_B
 
-        ' 114 dans le modèle : le libellé d'une écriture WU est long, et le comptable lit la
-        ' pièce sans élargir la colonne.
-        feuille.Columns("C").ColumnWidth = 114.57
-        feuille.Columns("D").ColumnWidth = 48.14
+        ' La colonne des libellés reste la plus large : « COMMISSION TRANSFERT SA
+        ' SS-AGENCE_BOLOLO SIEGE » fait quarante-six caractères, et le comptable lit la pièce
+        ' sans élargir la colonne.
+        feuille.Columns("C").ColumnWidth = LARGEUR_C
+        feuille.Columns("D").ColumnWidth = LARGEUR_D
     End Sub
 
     Private Shared Sub EnTete(feuille As Object, contexte As ContexteFeuille)
 
-        Ecrire(feuille, 4, 1, ConstantesWU.PIECE_BANQUE, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_GAUCHE)
-        feuille.Rows(4).RowHeight = 20.25
+        Ecrire(feuille, 4, 1, ConstantesWU.PIECE_BANQUE, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_BANQUE, True, XL_GAUCHE)
+        feuille.Rows(4).RowHeight = HAUTEUR_BANQUE
 
-        Ecrire(feuille, 6, 2, ConstantesWU.PIECE_TITRE, ConstantesWU.PIECE_POLICE_CORPS, 20, False, XL_GAUCHE)
-        feuille.Rows(6).RowHeight = 39.75
+        Ecrire(feuille, 6, 2, ConstantesWU.PIECE_TITRE, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_TITRE, False, XL_GAUCHE)
+        feuille.Rows(6).RowHeight = HAUTEUR_TITRE
 
-        Ecrire(feuille, 9, 1, ConstantesWU.PIECE_DATE, ConstantesWU.PIECE_POLICE_TITRE, 14, True, XL_GAUCHE)
+        Ecrire(feuille, 9, 1, ConstantesWU.PIECE_DATE, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_ETIQUETTE, True, XL_GAUCHE)
 
         ' La date est celle de la JOURNÉE COMPTABILISÉE, pas celle de l'impression. Le modèle
         ' porte =TODAY() parce qu'il est vierge ; une pièce rejouée trois jours plus tard doit
@@ -380,30 +448,30 @@ Public NotInheritable Class PieceExcelWU
             celluleDate.Value = contexte.DateActivite
             celluleDate.NumberFormat = "dd/mm/yyyy"
             celluleDate.Font.Name = ConstantesWU.PIECE_POLICE_CORPS
-            celluleDate.Font.Size = 24
+            celluleDate.Font.Size = TAILLE_VALEUR
         Finally
             Marshal.ReleaseComObject(celluleDate)
         End Try
-        feuille.Rows(9).RowHeight = 30.0
+        feuille.Rows(9).RowHeight = HAUTEUR_DATE
 
-        Ecrire(feuille, 10, 1, ConstantesWU.PIECE_DE, ConstantesWU.PIECE_POLICE_TITRE, 14, True, XL_GAUCHE)
-        Ecrire(feuille, 10, 2, Emetteur(), ConstantesWU.PIECE_POLICE_CORPS, 14, False, XL_GAUCHE)
-        Ecrire(feuille, 10, 3, ConstantesWU.PIECE_AGENCE, ConstantesWU.PIECE_POLICE_TITRE, 24, True, XL_DROITE)
-        Ecrire(feuille, 10, 4, contexte.AgenceEmettrice, ConstantesWU.PIECE_POLICE_TITRE, 28, True, XL_DROITE)
-        feuille.Rows(10).RowHeight = 42.75
+        Ecrire(feuille, 10, 1, ConstantesWU.PIECE_DE, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_ETIQUETTE, True, XL_GAUCHE)
+        Ecrire(feuille, 10, 2, Emetteur(), ConstantesWU.PIECE_POLICE_CORPS, TAILLE_VALEUR, False, XL_GAUCHE)
+        Ecrire(feuille, 10, 3, ConstantesWU.PIECE_AGENCE, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_VALEUR, True, XL_DROITE)
+        Ecrire(feuille, 10, 4, contexte.AgenceEmettrice, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_AGENCE, True, XL_DROITE)
+        feuille.Rows(10).RowHeight = HAUTEUR_AGENCE
 
-        Ecrire(feuille, 11, 1, ConstantesWU.PIECE_POUR, ConstantesWU.PIECE_POLICE_TITRE, 14, True, XL_GAUCHE)
-        Ecrire(feuille, 11, 2, ConstantesWU.PIECE_SERVICE_DESTINATAIRE, ConstantesWU.PIECE_POLICE_CORPS, 14, False, XL_GAUCHE)
-        Ecrire(feuille, 11, 4, contexte.Numero, ConstantesWU.PIECE_POLICE_CORPS, 26, True, XL_DROITE)
-        feuille.Rows(11).RowHeight = 33.0
+        Ecrire(feuille, 11, 1, ConstantesWU.PIECE_POUR, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_ETIQUETTE, True, XL_GAUCHE)
+        Ecrire(feuille, 11, 2, ConstantesWU.PIECE_SERVICE_DESTINATAIRE, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_VALEUR, False, XL_GAUCHE)
+        Ecrire(feuille, 11, 4, contexte.Numero, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_VALEUR, True, XL_DROITE)
+        feuille.Rows(11).RowHeight = HAUTEUR_POUR
 
-        Ecrire(feuille, 12, 3, contexte.Intitule, ConstantesWU.PIECE_POLICE_CORPS, 26, True, XL_CENTRE)
-        feuille.Rows(12).RowHeight = 33.75
+        Ecrire(feuille, 12, 3, contexte.Intitule, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_INTITULE, True, XL_CENTRE)
+        feuille.Rows(12).RowHeight = HAUTEUR_INTITULE
 
-        Ecrire(feuille, 13, 2, ConstantesWU.PIECE_COMPTES, ConstantesWU.PIECE_POLICE_TITRE, 16, True, XL_CENTRE)
-        Ecrire(feuille, 13, 3, ConstantesWU.PIECE_LIBELLES, ConstantesWU.PIECE_POLICE_TITRE, 16, True, XL_CENTRE)
-        Ecrire(feuille, 13, 4, ConstantesWU.PIECE_MONTANTS, ConstantesWU.PIECE_POLICE_TITRE, 16, True, XL_DROITE)
-        feuille.Rows(13).RowHeight = 31.5
+        Ecrire(feuille, 13, 2, ConstantesWU.PIECE_COMPTES, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_COLONNE, True, XL_CENTRE)
+        Ecrire(feuille, 13, 3, ConstantesWU.PIECE_LIBELLES, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_COLONNE, True, XL_CENTRE)
+        Ecrire(feuille, 13, 4, ConstantesWU.PIECE_MONTANTS, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_COLONNE, True, XL_DROITE)
+        feuille.Rows(13).RowHeight = HAUTEUR_COLONNES
 
         Dim entetes As Object = feuille.Range("B13:D13")
         Try
@@ -426,7 +494,7 @@ Public NotInheritable Class PieceExcelWU
 
         If ecritures.Count = 0 Then Return premiereLigne
 
-        Ecrire(feuille, premiereLigne, 1, intitule, ConstantesWU.PIECE_POLICE_TITRE, 20, True, XL_CENTRE)
+        Ecrire(feuille, premiereLigne, 1, intitule, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_BLOC, True, XL_CENTRE)
 
         ' Le tableau part en un seul bloc plutôt que cellule par cellule : chaque appel COM
         ' coûte un aller-retour, et une journée de trois cents écritures en ferait neuf cents.
@@ -444,8 +512,8 @@ Public NotInheritable Class PieceExcelWU
         Try
             zone.Value = valeurs
             zone.Font.Name = ConstantesWU.PIECE_POLICE_CORPS
-            zone.Font.Size = 16
-            zone.RowHeight = 33.0
+            zone.Font.Size = TAILLE_ECRITURE
+            zone.RowHeight = HAUTEUR_ECRITURE
         Finally
             Marshal.ReleaseComObject(zone)
         End Try
@@ -509,7 +577,7 @@ Public NotInheritable Class PieceExcelWU
             cellule.Formula = formule
             cellule.NumberFormat = FORMAT_MONTANT
             cellule.Font.Name = ConstantesWU.PIECE_POLICE_CORPS
-            cellule.Font.Size = 20
+            cellule.Font.Size = TAILLE_CONTROLE
             cellule.Font.Bold = True
             cellule.HorizontalAlignment = XL_DROITE
             cellule.Borders.LineStyle = XL_CONTINU
@@ -520,14 +588,14 @@ Public NotInheritable Class PieceExcelWU
 
     Private Shared Sub Raison(feuille As Object, ligne As Integer, texte As String)
 
-        Ecrire(feuille, ligne, 1, ConstantesWU.PIECE_RAISON, ConstantesWU.PIECE_POLICE_TITRE, 20, True, XL_CENTRE)
+        Ecrire(feuille, ligne, 1, ConstantesWU.PIECE_RAISON, ConstantesWU.PIECE_POLICE_TITRE, TAILLE_BLOC, True, XL_CENTRE)
 
         Dim zone As Object = feuille.Range(feuille.Cells(ligne, 2), feuille.Cells(ligne, 4))
         Try
             zone.Merge()
             zone.Value = texte
             zone.Font.Name = ConstantesWU.PIECE_POLICE_CORPS
-            zone.Font.Size = 24
+            zone.Font.Size = TAILLE_RAISON
             zone.Font.Bold = True
             zone.HorizontalAlignment = XL_CENTRE
             zone.Borders.LineStyle = XL_CONTINU
@@ -535,14 +603,14 @@ Public NotInheritable Class PieceExcelWU
             Marshal.ReleaseComObject(zone)
         End Try
 
-        feuille.Rows(ligne).RowHeight = 32.25
+        feuille.Rows(ligne).RowHeight = HAUTEUR_RAISON
     End Sub
 
     ''' <summary>
     ''' Les quatre cartouches de signature, dans l'ordre et aux écartements du modèle : quatre
     ''' lignes vides entre chacun, parce que c'est l'espace où l'on signe.
     ''' </summary>
-    Private Shared Sub Cartouches(feuille As Object, premiereLigne As Integer)
+    Private Shared Function Cartouches(feuille As Object, premiereLigne As Integer) As Integer
 
         Dim ligne As Integer = premiereLigne + 3
 
@@ -554,23 +622,25 @@ Public NotInheritable Class PieceExcelWU
         ligne += 5
         TroisIntitules(feuille, ligne, ConstantesWU.PIECE_PASSEE, String.Empty, ConstantesWU.PIECE_AUTORISEE)
         ligne += 4
-        Ecrire(feuille, ligne, 1, ConstantesWU.PIECE_DATE_ENREGISTREMENT, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_GAUCHE)
+        Ecrire(feuille, ligne, 1, ConstantesWU.PIECE_DATE_ENREGISTREMENT, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_GAUCHE)
         ligne += 4
-        Ecrire(feuille, ligne, 1, ConstantesWU.PIECE_NUMERO_SEQUENCE, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_GAUCHE)
+        Ecrire(feuille, ligne, 1, ConstantesWU.PIECE_NUMERO_SEQUENCE, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_GAUCHE)
 
         Dim pied As Object = feuille.Range(feuille.Cells(premiereLigne, 1), feuille.Cells(ligne, 4))
         Try
-            pied.RowHeight = 20.25
+            pied.RowHeight = HAUTEUR_PIED
         Finally
             Marshal.ReleaseComObject(pied)
         End Try
-    End Sub
+
+        Return ligne
+    End Function
 
     ''' <summary>Un cartouche à trait continu : intitulé à gauche, service à droite.</summary>
     Private Shared Sub Souligner(feuille As Object, ligne As Integer, gauche As String, droite As String)
 
-        Ecrire(feuille, ligne, 1, gauche, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_GAUCHE)
-        Ecrire(feuille, ligne, 4, droite, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_DROITE)
+        Ecrire(feuille, ligne, 1, gauche, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_GAUCHE)
+        Ecrire(feuille, ligne, 4, droite, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_DROITE)
 
         Dim zone As Object = feuille.Range(feuille.Cells(ligne, 1), feuille.Cells(ligne, 4))
         Try
@@ -583,27 +653,87 @@ Public NotInheritable Class PieceExcelWU
     Private Shared Sub TroisIntitules(feuille As Object, ligne As Integer,
                                       gauche As String, milieu As String, droite As String)
 
-        Ecrire(feuille, ligne, 1, gauche, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_GAUCHE)
-        If milieu.Length > 0 Then Ecrire(feuille, ligne, 2, milieu, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_DROITE)
-        Ecrire(feuille, ligne, 3, droite, ConstantesWU.PIECE_POLICE_CORPS, 16, True, XL_CENTRE)
+        Ecrire(feuille, ligne, 1, gauche, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_GAUCHE)
+        If milieu.Length > 0 Then Ecrire(feuille, ligne, 2, milieu, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_DROITE)
+        Ecrire(feuille, ligne, 3, droite, ConstantesWU.PIECE_POLICE_CORPS, TAILLE_PIED, True, XL_CENTRE)
     End Sub
 
     ''' <summary>
-    ''' Une pièce se signe sur papier : elle doit tenir en largeur, sous peine de ressortir de
-    ''' l'imprimante en deux morceaux qu'il faut ensuite raccorder à la main.
+    ''' Règle l'impression : une pièce se signe sur papier, et un document qui se signe ne se
+    ''' signe pas en deux morceaux.
+    '''
+    ''' Trois réglages font tout le travail :
+    '''
+    '''   — la ZONE D'IMPRESSION s'arrête à la dernière ligne écrite. Sans elle, Excel décide
+    '''     lui-même de ce qu'il imprime, et une cellule touchée par mégarde en colonne H
+    '''     ajoute une page blanche ;
+    '''   — une seule page EN LARGEUR, toujours. Une pièce coupée verticalement oblige à
+    '''     raccorder les montants à leur libellé au scotch ;
+    '''   — une seule page EN HAUTEUR pour une pièce de point de vente. La pièce globale, elle,
+    '''     s'étale, en-tête répété en haut de chaque page : à trois cents écritures, la forcer
+    '''     sur une page la réduirait à un timbre-poste.
     ''' </summary>
-    Private Shared Sub MiseEnPageImpression(feuille As Object)
+    ''' <param name="derniereLigne">Dernière ligne écrite, cartouches compris.</param>
+    ''' <param name="unePage">Vrai pour une pièce qui doit tenir sur une seule page.</param>
+    Private Shared Sub MiseEnPageImpression(feuille As Object, derniereLigne As Integer, unePage As Boolean)
 
         Try
-            feuille.PageSetup.Orientation = XL_PAYSAGE
-            feuille.PageSetup.Zoom = False
-            feuille.PageSetup.FitToPagesWide = 1
-            feuille.PageSetup.FitToPagesTall = False
+            Dim reglage As Object = feuille.PageSetup
+
+            Try
+                reglage.PrintArea = "$A$1:$D$" & derniereLigne.ToString()
+
+                ' Portrait : la pièce est plus haute que large, et c'est le format sous lequel
+                ' la comptabilité classe ses justificatifs.
+                reglage.Orientation = XL_PORTRAIT
+
+                reglage.LeftMargin = Pouces(feuille, MARGE)
+                reglage.RightMargin = Pouces(feuille, MARGE)
+                reglage.TopMargin = Pouces(feuille, MARGE)
+                reglage.BottomMargin = Pouces(feuille, MARGE)
+
+                reglage.CenterHorizontally = True
+
+                ' Zoom doit passer à False AVANT FitToPages : les deux réglages s'excluent, et
+                ' Excel ignore silencieusement le second tant que le premier vaut un nombre.
+                reglage.Zoom = False
+                reglage.FitToPagesWide = 1
+
+                If unePage Then
+                    reglage.FitToPagesTall = 1
+                Else
+                    reglage.FitToPagesTall = False
+
+                    ' L'en-tête se répète : sans cela, la page 2 d'une pièce globale arrive
+                    ' sans date, sans agence et sans nom de colonne — une colonne de chiffres
+                    ' dont on ne sait plus ce qu'ils sont.
+                    reglage.PrintTitleRows = "$4:$13"
+                End If
+
+            Finally
+                Marshal.ReleaseComObject(reglage)
+            End Try
+
         Catch
-            ' Aucune imprimante installée : Excel refuse alors PageSetup. La pièce est écrite,
-            ' et c'est ce qui compte — l'échec ne doit pas faire perdre le classeur.
+            ' Aucune imprimante installée : Excel refuse alors PageSetup en bloc. La pièce est
+            ' écrite, et c'est ce qui compte — l'échec ne doit pas faire perdre le classeur.
         End Try
     End Sub
+
+    ''' <summary>
+    ''' Convertit des pouces en points, unité des marges d'Excel.
+    '''
+    ''' Passe par InchesToPoints plutôt que par une multiplication par 72 : c'est Excel qui
+    ''' décide de son unité, et elle a déjà changé entre deux versions.
+    ''' </summary>
+    Private Shared Function Pouces(feuille As Object, valeur As Double) As Double
+
+        Try
+            Return CDbl(feuille.Application.InchesToPoints(valeur))
+        Catch
+            Return valeur * 72.0
+        End Try
+    End Function
 
 #End Region
 

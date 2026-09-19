@@ -1264,6 +1264,38 @@ Quatre écarts avec le modèle, tous délibérés :
 `FCU` et `OPS` sont repris tels quels : ce sont les codes de service de la banque, et ils ne
 se déduisent de rien.
 
+#### Une pièce tient sur une page, et c'est ce qui commande la géométrie
+
+Le modèle est dessiné pour être **rempli à la main** : colonnes de 24 à 114 caractères, corps
+de 20 à 28 points, lignes de 33. Il faut cela pour écrire au stylo dans une case.
+
+Mesuré, ce modèle fait **1 241 points de large et 997 de haut** pour une pièce de six
+écritures. Une page A4 en offre 487 sur 734. Il en découle deux impasses, et une seule
+sortie :
+
+| | Ce qu'on obtient |
+|---|---|
+| Imprimé à l'échelle | **Deux pages et demie** — et une pièce comptable en morceaux ne se signe pas |
+| Foré sur une page | **39 %** — les libellés à 4 points, illisibles |
+| Géométrie ramenée | **519 sur 711 points** — une page à 100 %, et 81 % au-delà de vingt écritures |
+
+Les tailles retenues gardent les **proportions** du modèle — les intitulés plus gros que le
+corps, Arial Black pour les uns et Century Schoolbook pour les autres — ramenées à ce qui
+tient sur une page. La structure, les libellés et l'enchaînement des cartouches ne bougent
+pas : c'est cela que le guichet reconnaît, pas le corps de la police. Tout est groupé dans
+la région *Géométrie du formulaire* de `PieceExcelWU`, une constante par mesure.
+
+Trois réglages d'impression font le reste :
+
+1. **La zone d'impression** s'arrête à la dernière ligne écrite. Sans elle, Excel décide
+   lui-même de ce qu'il imprime, et une cellule touchée par mégarde ajoute une page blanche.
+2. **Une seule page en largeur, toujours.** Une pièce coupée verticalement oblige à raccorder
+   les montants à leur libellé au scotch.
+3. **Une seule page en hauteur pour une pièce de point de vente.** La pièce globale, elle,
+   s'étale — à trois cents écritures, la forcer sur une page la réduirait à un timbre-poste.
+   Son en-tête se répète en haut de chaque page : sans cela, la page 2 arrive sans date, sans
+   agence et sans nom de colonne, une colonne de chiffres dont on ne sait plus ce qu'ils sont.
+
 **Les pièces individuelles sont regénérées**, et non découpées dans la pièce globale : c'est
 `GenererPieceComptable` qui produit les deux, sur un `CalculWU` unique pour la seconde. Les
 mêmes écritures, aux mêmes comptes, par construction. Un Account non comptabilisé n'a pas
