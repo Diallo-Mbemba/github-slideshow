@@ -78,12 +78,36 @@ Public NotInheritable Class PieceExcelWU
         ''' <summary>Journée comptabilisée — et non la date d'impression.</summary>
         Public Property DateActivite As Date = Date.Today
 
-        ''' <summary>Numéro d'ordre de la pièce dans le classeur.</summary>
-        Public Property Numero As Integer = 1
+        ''' <summary>
+        ''' Numéro de la pièce, engendré par l'application : numéro de lot de la journée, puis
+        ''' le rang de la pièce dans le classeur. Voir <see cref="NumeroDePiece"/>.
+        ''' </summary>
+        Public Property Numero As String = String.Empty
+
+        ''' <summary>
+        ''' Agence émettrice, portée en face de « AGENCE: ». Elle varie d'une pièce à l'autre :
+        ''' c'est l'agence de rattachement du point de vente.
+        ''' </summary>
+        Public Property AgenceEmettrice As String = ConstantesWU.PIECE_AGENCE_DEFAUT
 
         ''' <summary>Texte de la ligne RAISON.</summary>
         Public Property Raison As String = String.Empty
     End Class
+
+    ''' <summary>
+    ''' Numéro d'une pièce, engendré sans rien demander à personne :
+    ''' le numéro de lot de la journée, un tiret, le rang de la pièce dans le classeur.
+    '''
+    ''' Le numéro de lot est celui-là même que porte le fichier destiné au core banking
+    ''' (<see cref="CoreBankingService.NumeroDeLot"/>) : quatre caractères tirés de la date,
+    ''' donc identiques d'une exécution à l'autre pour une même journée, et différents d'une
+    ''' journée à la suivante. Une pièce et l'écriture qu'elle justifie se retrouvent ainsi
+    ''' l'une par l'autre, ce qu'un simple compteur repartant de 1 chaque matin ne permettrait
+    ''' pas : deux pièces de deux journées porteraient le même numéro 2.
+    ''' </summary>
+    Public Shared Function NumeroDePiece(dateActivite As Date, rang As Integer) As String
+        Return $"{CoreBankingService.NumeroDeLot(dateActivite)}-{rang:000}"
+    End Function
 
 #End Region
 
@@ -100,13 +124,16 @@ Public NotInheritable Class PieceExcelWU
     ''' <param name="nomPremiereFeuille">Onglet de la première feuille.</param>
     ''' <param name="intitulePremiereFeuille">Ligne d'identification de la première feuille.
     ''' Vide pour l'intitulé de la pièce globale.</param>
+    ''' <param name="agencePremiereFeuille">Agence émettrice de la première feuille. Vide pour
+    ''' l'agence par défaut — la pièce globale n'appartient à aucune agence.</param>
     ''' <returns>Le chemin écrit.</returns>
     Public Shared Function Ecrire(dtGlobale As DataTable,
                                   listeCalculs As IEnumerable(Of CalculWU),
                                   dateActivite As Date,
                                   cheminFichier As String,
                                   Optional nomPremiereFeuille As String = "PIECE GLOBALE",
-                                  Optional intitulePremiereFeuille As String = "") As String
+                                  Optional intitulePremiereFeuille As String = "",
+                                  Optional agencePremiereFeuille As String = "") As String
 
         If dtGlobale Is Nothing OrElse dtGlobale.Rows.Count = 0 Then
             Throw New InvalidOperationException(
@@ -137,9 +164,15 @@ Public NotInheritable Class PieceExcelWU
             classeur = excelApp.Workbooks.Add()
             NeGarderQueLaPremiereFeuille(classeur)
 
+            ' Le référentiel des agences est lu UNE FOIS pour tout le classeur : une lecture
+            ' par feuille ferait cinquante allers-retours vers SQL Server pour une information
+            ' qui ne change pas pendant l'export.
+            Dim agences As Dictionary(Of String, String) = ChargerLesAgences()
+
             EcrireLaPremiereFeuille(classeur, dtGlobale, dateActivite,
-                                    nomPremiereFeuille, intitulePremiereFeuille)
-            EcrireLesPiecesIndividuelles(classeur, listeCalculs, dateActivite)
+                                    nomPremiereFeuille, intitulePremiereFeuille,
+                                    agencePremiereFeuille)
+            EcrireLesPiecesIndividuelles(classeur, listeCalculs, dateActivite, agences)
 
             ' La première feuille est celle qu'on veut voir en ouvrant le classeur.
             classeur.Worksheets(1).Activate()
@@ -198,7 +231,8 @@ Public NotInheritable Class PieceExcelWU
 
     Private Shared Sub EcrireLaPremiereFeuille(classeur As Object, dtGlobale As DataTable,
                                                dateActivite As Date,
-                                               nomFeuille As String, intitule As String)
+                                               nomFeuille As String, intitule As String,
+                                               agence As String)
 
         Dim contexte As New ContexteFeuille() With {
             .NomFeuille = If(String.IsNullOrWhiteSpace(nomFeuille), "PIECE GLOBALE", nomFeuille),
@@ -206,7 +240,9 @@ Public NotInheritable Class PieceExcelWU
                            $"PIECE GLOBALE — journée du {dateActivite:dd/MM/yyyy}",
                            intitule),
             .DateActivite = dateActivite,
-            .Numero = 1,
+            .Numero = NumeroDePiece(dateActivite, 1),
+            .AgenceEmettrice = If(String.IsNullOrWhiteSpace(agence),
+                                  ConstantesWU.PIECE_AGENCE_DEFAUT, agence),
             .Raison = $"Compensation Western Union — activité du {dateActivite:dd/MM/yyyy}"
         }
 
@@ -225,7 +261,8 @@ Public NotInheritable Class PieceExcelWU
     ''' </summary>
     Private Shared Sub EcrireLesPiecesIndividuelles(classeur As Object,
                                                     listeCalculs As IEnumerable(Of CalculWU),
-                                                    dateActivite As Date)
+                                                    dateActivite As Date,
+                                                    agences As Dictionary(Of String, String))
 
         If listeCalculs Is Nothing Then Return
 
@@ -253,7 +290,8 @@ Public NotInheritable Class PieceExcelWU
                 .NomFeuille = NomDOnglet(calc, nomsPris),
                 .Intitule = IntituleDe(calc),
                 .DateActivite = dateActivite,
-                .Numero = numero,
+                .Numero = NumeroDePiece(dateActivite, numero),
+                .AgenceEmettrice = AgenceDe(calc, agences),
                 .Raison = $"Compensation Western Union — {calc.Designation} ({calc.Account}) — " &
                           $"activité du {dateActivite:dd/MM/yyyy}"
             }
@@ -349,9 +387,9 @@ Public NotInheritable Class PieceExcelWU
         feuille.Rows(9).RowHeight = 30.0
 
         Ecrire(feuille, 10, 1, ConstantesWU.PIECE_DE, ConstantesWU.PIECE_POLICE_TITRE, 14, True, XL_GAUCHE)
-        Ecrire(feuille, 10, 2, ConstantesWU.PIECE_SERVICE_EMETTEUR, ConstantesWU.PIECE_POLICE_CORPS, 14, False, XL_GAUCHE)
+        Ecrire(feuille, 10, 2, Emetteur(), ConstantesWU.PIECE_POLICE_CORPS, 14, False, XL_GAUCHE)
         Ecrire(feuille, 10, 3, ConstantesWU.PIECE_AGENCE, ConstantesWU.PIECE_POLICE_TITRE, 24, True, XL_DROITE)
-        Ecrire(feuille, 10, 4, ConstantesWU.PIECE_VILLE, ConstantesWU.PIECE_POLICE_TITRE, 28, True, XL_DROITE)
+        Ecrire(feuille, 10, 4, contexte.AgenceEmettrice, ConstantesWU.PIECE_POLICE_TITRE, 28, True, XL_DROITE)
         feuille.Rows(10).RowHeight = 42.75
 
         Ecrire(feuille, 11, 1, ConstantesWU.PIECE_POUR, ConstantesWU.PIECE_POLICE_TITRE, 14, True, XL_GAUCHE)
@@ -600,6 +638,102 @@ Public NotInheritable Class PieceExcelWU
         Next
 
         Return retenues
+    End Function
+
+    ''' <summary>
+    ''' Qui établit la pièce : le service, puis la personne connectée.
+    ''' 
+    ''' « DE : » dit DE LA PART DE QUI. Le service seul ne le dit qu'à moitié — trois agents se
+    ''' relaient sur la compense, et c'est le cartouche « INITIE PAR » que le comptable regarde
+    ''' ensuite pour savoir à qui la renvoyer. Autant que la pièce le porte dès son en-tête.
+    ''' </summary>
+    Private Shared Function Emetteur() As String
+
+        Dim personne As String = String.Empty
+
+        If SessionWU.Utilisateur IsNot Nothing Then
+            personne = If(SessionWU.Utilisateur.NomComplet, String.Empty).Trim()
+            If personne.Length = 0 Then personne = If(SessionWU.Utilisateur.Identifiant, String.Empty).Trim()
+        End If
+
+        If personne.Length = 0 Then Return ConstantesWU.PIECE_SERVICE_EMETTEUR
+
+        Return ConstantesWU.PIECE_SERVICE_EMETTEUR & " — " & personne
+    End Function
+
+    ''' <summary>
+    ''' Le référentiel des agences, indexé par tout ce qui peut servir à les retrouver : leur
+    ''' Account (Codesite) ET leur code agence Voyager.
+    ''' 
+    ''' Un sous-agent porte le code agence de son rattachement ; une agence propre porte le sien.
+    ''' Les deux tombent dans le même dictionnaire, et une seule recherche suffit ensuite.
+    ''' 
+    ''' Une erreur SQL rend un dictionnaire vide plutôt que de faire échouer l'export : une pièce
+    ''' qui porte un code d'agence au lieu de son nom reste une pièce juste. Une pièce qu'on n'a
+    ''' pas pu produire, non.
+    ''' </summary>
+    Private Shared Function ChargerLesAgences() As Dictionary(Of String, String)
+
+        Dim repertoire As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+
+        Try
+            Dim messageErreur As String = String.Empty
+            Dim liste As List(Of PointDeVenteEC) = PdvRepository.ListerAgences(String.Empty, messageErreur)
+
+            If liste Is Nothing Then Return repertoire
+
+            For Each agence As PointDeVenteEC In liste
+
+                Dim nom As String = If(agence.Designation, String.Empty).Trim()
+                If nom.Length = 0 Then Continue For
+
+                Dim codeSite As String = If(agence.CodeSite, String.Empty).Trim()
+                If codeSite.Length > 0 Then repertoire(codeSite) = nom
+
+                Dim codeVoyager As String = If(agence.CodeAgenceVoyager, String.Empty).Trim()
+                If codeVoyager.Length > 0 Then repertoire(codeVoyager) = nom
+            Next
+
+        Catch ex As Exception
+            ' Base injoignable ou droits manquants : voir la remarque ci-dessus.
+        End Try
+
+        Return repertoire
+    End Function
+
+    ''' <summary>Agence émettrice d'un point de vente, référentiel lu à la volée.</summary>
+    Public Shared Function AgenceDe(calc As CalculWU) As String
+        Return AgenceDe(calc, ChargerLesAgences())
+    End Function
+
+    ''' <summary>
+    ''' Agence émettrice d'une pièce de point de vente, du plus précis au plus vague : le nom de
+    ''' l'agence de rattachement, sinon son code, sinon l'agence par défaut.
+    ''' 
+    ''' Une agence propre est sa propre agence émettrice ; un sous-agent relève de celle qui le
+    ''' porte dans ses livres — la même que la colonne ACBRN du fichier core banking.
+    ''' </summary>
+    Private Shared Function AgenceDe(calc As CalculWU, agences As Dictionary(Of String, String)) As String
+
+        Dim nom As String = String.Empty
+
+        If agences IsNot Nothing Then
+
+            Dim code As String = If(calc.CodeAgence, String.Empty).Trim()
+            If code.Length > 0 Then agences.TryGetValue(code, nom)
+
+            ' Une agence propre se retrouve aussi par son Account, quand son code agence
+            ' Voyager n'est pas renseigné dans le référentiel.
+            If String.IsNullOrEmpty(nom) Then
+                Dim account As String = If(calc.Account, String.Empty).Trim()
+                If account.Length > 0 Then agences.TryGetValue(account, nom)
+            End If
+        End If
+
+        If Not String.IsNullOrEmpty(nom) Then Return nom
+        If Not String.IsNullOrWhiteSpace(calc.CodeAgence) Then Return calc.CodeAgence.Trim()
+
+        Return ConstantesWU.PIECE_AGENCE_DEFAUT
     End Function
 
     ''' <summary>

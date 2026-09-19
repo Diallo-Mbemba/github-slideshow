@@ -1225,6 +1225,28 @@ Chaque feuille reprend le modèle dans l'ordre :
 | `RAISON :` | Compensation Western Union, désignation du point de vente, journée |
 | Cartouches | `SIGNATURES REQUISES`/`FCU`, `INITIE PAR` / `CONTRÔLE PAR` / `APPROUVE PAR`, `ECRITURE`/`OPS`, `PASSEE PAR` / `AUTORISEE PAR`, date et numéro de séquence |
 
+L'en-tête porte quatre valeurs que l'application établit seule :
+
+| Champ | Ce qu'il porte |
+|---|---|
+| `DATE :` | La **journée comptabilisée** |
+| `DE :` | Le service, puis **la personne connectée** — trois agents se relaient sur la compense, et c'est à l'un d'eux que le comptable renverra la pièce |
+| `AGENCE:` | **L'agence de rattachement du point de vente**, retrouvée par son code dans le référentiel des agences ; à défaut son code, à défaut l'agence par défaut |
+| Numéro (D11) | **Le numéro de lot de la journée**, un tiret, le rang de la pièce : `07q3-002` |
+
+Le numéro de lot est celui-là même que porte le fichier destiné au core banking : quatre
+caractères tirés de la date, donc identiques d'une exécution à l'autre pour une même journée,
+et différents d'une journée à la suivante. Une pièce et l'écriture qu'elle justifie se
+retrouvent ainsi l'une par l'autre — ce qu'un compteur repartant de 1 chaque matin ne
+permettrait pas : deux pièces de deux journées porteraient le même numéro 2.
+
+Le référentiel des agences est lu **une fois pour tout le classeur**, et indexé à la fois sur
+l'Account et sur le code agence Voyager : une lecture par feuille ferait cinquante
+allers-retours vers SQL Server pour une information qui ne bouge pas pendant l'export. Une
+erreur SQL rend un référentiel vide plutôt que de faire échouer l'export — une pièce qui
+porte un code d'agence au lieu de son nom reste une pièce juste ; une pièce qu'on n'a pas pu
+produire, non.
+
 Quatre écarts avec le modèle, tous délibérés :
 
 1. **Le tableau grandit.** Le modèle réserve vingt-cinq lignes parce qu'il est fait pour être
@@ -1237,7 +1259,10 @@ Quatre écarts avec le modèle, tous délibérés :
    soustraction écrite ligne par ligne. Elle dit la même chose et reste vraie quand la pièce
    change — c'est une case de contrôle.
 4. **`DE :` et `POUR :` sont renseignés.** Le modèle les laisse vides ; une pièce produite par
-   l'application sait toujours d'où elle vient.
+   l'application sait toujours d'où elle vient, et de la part de qui.
+
+`FCU` et `OPS` sont repris tels quels : ce sont les codes de service de la banque, et ils ne
+se déduisent de rien.
 
 **Les pièces individuelles sont regénérées**, et non découpées dans la pièce globale : c'est
 `GenererPieceComptable` qui produit les deux, sur un `CalculWU` unique pour la seconde. Les

@@ -68,6 +68,12 @@ Public Class FrmPieceComptable
     ''' <summary>Onglet de la première feuille du classeur exporté.</summary>
     Public Property NomPremiereFeuille As String = "PIECE GLOBALE"
 
+    ''' <summary>
+    ''' Agence émettrice de la première feuille. Vide pour l'agence par défaut — la pièce
+    ''' globale n'appartient à aucune agence en particulier.
+    ''' </summary>
+    Public Property AgencePiece As String = String.Empty
+
     ''' <summary>Constructeur sans paramètre requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
@@ -174,7 +180,8 @@ Public Class FrmPieceComptable
             Cursor = Cursors.WaitCursor
 
             PieceComptableService.ExporterEtOuvrirPieceExcel(
-                _dtPiece, Calculs, DateActivite, chemin, NomPremiereFeuille, IntitulePiece)
+                _dtPiece, Calculs, DateActivite, chemin,
+                NomPremiereFeuille, IntitulePiece, AgencePiece)
 
             _exportee = True
             _chemin = chemin

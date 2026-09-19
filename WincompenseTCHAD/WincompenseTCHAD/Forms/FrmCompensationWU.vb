@@ -1060,6 +1060,7 @@ Public Class FrmCompensationWU
                 If _dateActivite.HasValue Then formulaire.DateActivite = _dateActivite.Value
                 formulaire.NomPremiereFeuille = calc.Account
                 formulaire.IntitulePiece = PieceExcelWU.IntituleDe(calc)
+                formulaire.AgencePiece = PieceExcelWU.AgenceDe(calc)
 
                 formulaire.ShowDialog(Me)
             End Using

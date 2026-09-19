@@ -134,15 +134,21 @@ Public NotInheritable Class ConstantesWU
     Public Const PIECE_DATE_ENREGISTREMENT As String = "DATE D'ENREGISTREMENT COMPTABLE"
     Public Const PIECE_NUMERO_SEQUENCE As String = "NUMERO DE SEQUENCE ENREGISTREE"
 
-    ' Service émetteur et service destinataire, portés par les lignes « DE : » et « POUR : ».
+    ' « DE : » et « POUR : » disent DE LA PART DE QUI et POUR QUI la pièce est établie.
+    '
     ' Le modèle les laisse vides — il est fait pour être rempli à la main. Une pièce produite
-    ' par l'application, elle, sait toujours d'où elle vient.
+    ' par l'application, elle, sait d'où elle vient : le service émetteur est complété du nom
+    ' de l'utilisateur connecté, celui-là même qui a lancé la compense.
     Public Const PIECE_SERVICE_EMETTEUR As String = "COMPENSATION WESTERN UNION"
     Public Const PIECE_SERVICE_DESTINATAIRE As String = "COMPTABILITE"
 
-    ' Ville portée par l'en-tête, en face de « AGENCE: ». À confirmer si la filiale produit
-    ' un jour des pièces au nom d'une autre place.
-    Public Const PIECE_VILLE As String = "N'Djamena"
+    ' Agence émettrice portée par l'en-tête, en face de « AGENCE: ».
+    '
+    ' Elle VARIE d'une pièce à l'autre : chaque pièce de point de vente porte l'agence de
+    ' rattachement de ce point de vente. Cette constante n'est que le dernier recours — la
+    ' pièce globale, qui n'appartient à aucune agence, et le point de vente dont l'agence
+    ' n'est pas retrouvée dans le référentiel.
+    Public Const PIECE_AGENCE_DEFAUT As String = "N'Djamena"
 
     ' Police du formulaire. Deux polices, comme le modèle : les intitulés en Arial Black,
     ' le contenu en Century Schoolbook.
