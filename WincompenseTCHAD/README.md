@@ -145,7 +145,8 @@ WincompenseTCHAD/
     │   ├── CalendrierWU.vb                 ' Jours ouvrés : week-ends et jours fériés
     │   ├── ConfigurationWU.vb              ' Où est le serveur : partage réseau, copie locale, secours
     │   ├── MiseAJourWU.vb                  ' Annonce aux postes qu'une version plus récente est publiée
-    │   └── DiagnosticSqlWU.vb              ' Traduit les refus de SQL Server en consigne exécutable
+    │   ├── DiagnosticSqlWU.vb              ' Traduit les refus de SQL Server en consigne exécutable
+    │   └── SecretWU.vb                     ' Chiffre le mot de passe SQL pour ce poste (DPAPI)
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -1141,6 +1142,59 @@ compense, puisque rejouer une journée suppose d'effacer la version précédente
 Le rattachement des comptes Windows aux rôles ne peut pas être écrit d'avance : il dépend de
 votre domaine. C'est l'objet de `11_AccesUtilisateurs.sql`, le seul script dont une section doit
 être modifiée avant exécution.
+
+### Authentification SQL Server : où vit le mot de passe
+
+La banque peut fournir un **compte SQL Server et son mot de passe** plutôt qu'une
+authentification Windows. La chaîne de connexion porte alors un secret, et un secret ne
+s'écrit pas n'importe où : le fichier partagé est lisible par tous les utilisateurs de
+l'application — c'est ce qui lui permet de valoir pour tout le monde.
+
+La chaîne est donc **coupée en deux**, et les deux moitiés ne voyagent pas ensemble :
+
+| Ce qui est dit | Où c'est écrit | Portée |
+|---|---|---|
+| **Où** est le serveur — serveur, base, nom du compte | `CHAINE=` sur le partage | Toute la banque |
+| **Comment** s'y annoncer — le mot de passe | `MOTDEPASSE=` dans le fichier local, chiffré | Ce poste seulement |
+
+Les mêler rendrait impossible de changer de serveur pour tout le monde sans diffuser un
+secret à tout le monde. Séparées, la banque change de serveur dans un fichier, et chaque
+poste continue de s'annoncer avec ce qu'il tient de lui-même.
+
+Le chiffrement est celui de Windows (**DPAPI**, portée machine, `SecretWU`). Ce qu'il apporte,
+et ce qu'il n'apporte pas, mérite d'être dit dans les deux sens :
+
+- **protection réelle** — le mot de passe n'apparaît plus en clair dans `wincompense.config`,
+  et le fichier copié sur une autre machine ne donne rien ;
+- **ce que ça ne fait pas** — sur ce poste, un programme lancé par un utilisateur local peut
+  redemander le déchiffrement à Windows. La portée machine est imposée par le fait que le
+  fichier est commun à tous les comptes du poste.
+
+Autrement dit : cela ferme la lecture accidentelle et le vol de fichier, pas l'accès
+administrateur à la machine. **L'authentification Windows reste préférable quand la banque
+l'accepte**, puisqu'aucun secret n'est alors conservé nulle part.
+
+Trois détails qui se paient cher s'ils sont oubliés :
+
+1. Un poste qui n'a **jamais reçu** le mot de passe lit bien le partage, mais ne se connecte
+   pas. La propagation déplace le serveur, pas le secret — l'écran le dit avant d'enregistrer.
+2. Le programme d'installation, lui, ne sait pas chiffrer pour Windows. Il écrit
+   `MOTDEPASSE_CLAIR=` dans `%PROGRAMDATA%`, que l'application reprend, chiffre et **efface**
+   au premier démarrage (`NettoyerLeFichierLocal`). La fenêtre d'exposition se limite à
+   l'intervalle entre l'installation et le premier lancement.
+3. L'écran de réglage n'affiche plus le mot de passe — il n'est plus dans `CHAINE`. Le bouton
+   **Tester** le remet néanmoins (`ChaineEssayable`) : un test qui échouerait là où
+   l'application réussit serait le pire des verdicts, celui qui envoie chercher une panne
+   ailleurs.
+
+#### Un compte unique partagé supprime le second verrou
+
+Si la banque fournit **un seul** compte SQL pour tout le service, ce compte doit porter la
+réunion des droits de tous les postes — donc `wu_admin`. Les trois rôles cessent alors de
+distinguer quoi que ce soit au niveau SQL Server : c'est l'application qui garde seule la
+distinction entre l'agent de compense, le commercial et l'administrateur, et le verrou qui
+s'opposait à une connexion faite **hors** de l'application disparaît. Un compte SQL par agent,
+si la banque l'accepte, rend aux trois rôles leur utilité.
 
 ### Quand SQL Server refuse le compte (`DiagnosticSqlWU`)
 

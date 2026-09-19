@@ -35,8 +35,14 @@ Le rang 3 n'est pas un doublon. C'est lui qui fait travailler le poste le matin 
 le partage est injoignable — sans quoi une coupure réseau arrêterait la compense de
 toute la banque.
 
-**L'authentification est celle de Windows.** Aucun mot de passe ne circule, et c'est
+**Si l'authentification est celle de Windows**, aucun mot de passe ne circule, et c'est
 précisément ce qui permet de poser la configuration sur un partage lisible par tous.
+
+**Si la banque fournit un compte SQL Server et son mot de passe**, la chaîne est coupée en
+deux : le partage reçoit le serveur, la base et le **nom** du compte ; le mot de passe reste
+sur le poste, chiffré par Windows. Changer de serveur vaut toujours pour toute la banque —
+mais **chaque poste doit recevoir le mot de passe une fois**, à son installation. Sans quoi il
+affichera « Login failed for user ».
 Les droits d'accès à la base sont donnés par `Scripts\08_RolesSQLServer.sql` (les rôles) et
 `Scripts\11_AccesUtilisateurs.sql` (les comptes).
 

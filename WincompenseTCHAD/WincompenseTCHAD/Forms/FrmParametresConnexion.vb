@@ -240,6 +240,11 @@ Public Class FrmParametresConnexion
             ' Sur une ligne, comme elle sera écrite : tester autre chose que ce qu'on
             ' enregistre n'aurait aucune valeur.
             chaine = txtChaine.Text.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+
+            ' Une chaîne déjà enregistrée n'affiche plus son mot de passe : il est chiffré à
+            ' part. On le remet pour l'essai, sinon le test échouerait là où l'application
+            ' réussit — le pire des verdicts, celui qui envoie chercher une panne ailleurs.
+            chaine = ConfigurationWU.ChaineEssayable(chaine)
         Else
 
             If txtServeur.Text.Trim().Length = 0 Then
@@ -316,7 +321,7 @@ Public Class FrmParametresConnexion
 
         If Not ConfirmerLaConservation() Then Return
         If Not ConfirmerLaPropagation() Then Return
-        If Not ConfirmerLAbsenceDeMotDePasse() Then Return
+        If Not ConfirmerLeMotDePasse() Then Return
 
         Dim messageErreur As String = String.Empty
 
@@ -358,45 +363,41 @@ Public Class FrmParametresConnexion
     End Sub
 
     ''' <summary>
-    ''' Refuse de poser un mot de passe SQL sur le partage, et le fait confirmer ailleurs.
+    ''' Explique ce qu'il advient d'un mot de passe SQL Server, et le fait confirmer.
     '''
-    ''' Le fichier partagé est lisible par tous les utilisateurs de l'application : c'est ce qui
-    ''' permet à un changement de serveur de valoir pour tout le monde. Un mot de passe écrit là
-    ''' serait donc lisible par tous, en clair. La banque est en authentification Windows, où la
-    ''' question ne se pose pas ; une chaîne fournie par un tiers peut néanmoins en contenir un.
+    ''' Il n'est plus refusé — la banque en fournit un — mais il ne s'écrit pas n'importe où.
+    ''' Retiré de la chaîne avant toute écriture, il est chiffré par Windows pour CE poste
+    ''' seulement (voir SecretWU), et le fichier partagé ne reçoit que le serveur, la base et
+    ''' le nom du compte.
+    '''
+    ''' D'où l'avertissement sur la propagation : le serveur changera bien pour toute la
+    ''' banque, mais un poste qui n'a jamais reçu le mot de passe ne se connectera pas pour
+    ''' autant. Le taire ferait croire à un déploiement terminé qui ne l'est pas.
     ''' </summary>
-    Private Function ConfirmerLAbsenceDeMotDePasse() As Boolean
+    Private Function ConfirmerLeMotDePasse() As Boolean
 
         If Not chkChaineComplete.Checked Then Return True
+        If Not ConfigurationWU.PorteUnMotDePasse(txtChaine.Text) Then Return True
 
-        Dim chaine As String = txtChaine.Text
-        Dim porteUnMotDePasse As Boolean =
-            chaine.IndexOf("Password", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
-            chaine.IndexOf("Pwd", StringComparison.OrdinalIgnoreCase) >= 0
-
-        If Not porteUnMotDePasse Then Return True
+        Dim texte As String =
+            "Cette chaîne contient un mot de passe." & Environment.NewLine & Environment.NewLine &
+            "Il sera retiré de la chaîne, puis chiffré par Windows pour ce poste : il" & Environment.NewLine &
+            "n'apparaîtra en clair dans aucun fichier, et ne partira jamais sur le partage." & Environment.NewLine & Environment.NewLine &
+            "Le chiffrement est lié à cette machine. Un fichier recopié ailleurs ne donne" & Environment.NewLine &
+            "rien — mais il ne protège pas d'un programme lancé sur ce poste même."
 
         If chkPropager.Checked Then
-            MessageBox.Show(
-                "Cette chaîne contient un mot de passe, et le fichier partagé est lisible par tous" &
-                Environment.NewLine &
-                "les utilisateurs de l'application : il y serait en clair." & Environment.NewLine & Environment.NewLine &
-                "Demandez à la banque une chaîne en authentification Windows " &
-                "(Integrated Security=True)," & Environment.NewLine &
-                "ou décochez la propagation pour ne régler que ce poste.",
-                "Mot de passe sur le partage", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            texte &= Environment.NewLine & Environment.NewLine &
+                     "PROPAGATION : le partage recevra le serveur, la base et le nom du compte," & Environment.NewLine &
+                     "jamais le mot de passe. Chaque autre poste devra le saisir une fois, ici." & Environment.NewLine &
+                     "Sans quoi il verra « Login failed for user »."
         End If
 
-        Return MessageBox.Show(
-            "Cette chaîne contient un mot de passe. Il sera écrit en clair dans le fichier de" &
-            Environment.NewLine &
-            "configuration de ce poste." & Environment.NewLine & Environment.NewLine &
-            "L'authentification Windows évite ce risque, et c'est le mode retenu par la banque." &
-            Environment.NewLine & Environment.NewLine &
-            "Enregistrer tout de même sur ce poste ?",
-            "Mot de passe en clair", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-            MessageBoxDefaultButton.Button2) = DialogResult.Yes
+        texte &= Environment.NewLine & Environment.NewLine & "Enregistrer ?"
+
+        Return MessageBox.Show(texte, "Mot de passe du compte SQL Server",
+                               MessageBoxButtons.YesNo, MessageBoxIcon.Information,
+                               MessageBoxDefaultButton.Button1) = DialogResult.Yes
     End Function
 
     ''' <summary>

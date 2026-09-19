@@ -235,6 +235,49 @@ begin
   Result := Pos('=', Valeur) > 0;
 end;
 
+// La meme chaine, son mot de passe retire. Sert au fichier partage : il est lisible par
+// tous les utilisateurs de l'application, un secret n'y a pas sa place.
+//
+// Le decoupage est litteral, segment par segment. L'application, elle, relit la chaine avec
+// SqlConnectionStringBuilder ; ici on n'a que du texte, et c'est suffisant : il s'agit de
+// retirer un mot-cle, pas de comprendre la chaine.
+//
+// Le decoupage est ecrit a la main plutot qu'avec StringSplitEx : cette fonction demande
+// Inno Setup 6.3, et un script qui refuse de compiler sur la version installee a la banque
+// couterait plus cher que les six lignes ci-dessous.
+function SansMotDePasse(Valeur: String): String;
+var
+  Reste, Segment, Minuscule: String;
+  Separateur: Integer;
+begin
+  Result := '';
+  Reste := Valeur;
+
+  while Reste <> '' do
+  begin
+    Separateur := Pos(';', Reste);
+
+    if Separateur = 0 then
+    begin
+      Segment := Trim(Reste);
+      Reste := '';
+    end
+    else
+    begin
+      Segment := Trim(Copy(Reste, 1, Separateur - 1));
+      Reste := Copy(Reste, Separateur + 1, Length(Reste) - Separateur);
+    end;
+
+    Minuscule := Lowercase(Segment);
+
+    if (Segment <> '') and (Pos('password', Minuscule) <> 1) and (Pos('pwd', Minuscule) <> 1) then
+    begin
+      if Result <> '' then Result := Result + ';';
+      Result := Result + Segment;
+    end;
+  end;
+end;
+
 function PorteUnMotDePasse(Valeur: String): Boolean;
 var
   Minuscules: String;
@@ -304,18 +347,25 @@ begin
 
       // Le fichier partage est lisible par TOUS les utilisateurs de l'application : c'est
       // ce qui permet a un changement de serveur de valoir pour tout le monde. Un mot de
-      // passe ecrit la y serait donc lisible en clair par tous.
+      // passe n'y est donc jamais ecrit - il est retire avant, et ne reste que sur ce poste.
+      //
+      // Ce n'est pas une erreur, c'est une consequence a annoncer : le partage suffira a
+      // changer de serveur pour toute la banque, mais pas a donner le mot de passe aux
+      // autres postes. Le taire ferait croire a un deploiement termine qui ne l'est pas.
       if PorteUnMotDePasse(PageConnexion.Values[0]) then
         if Trim(PageConnexion.Values[1]) <> '' then
-        begin
-          MsgBox('Cette chaine contient un mot de passe, et le fichier partage est lisible ' +
-                 'par tous les utilisateurs de l''application : il y serait en clair.' + #13#10#13#10 +
-                 'Demandez a la banque une chaine en authentification Windows ' +
-                 '(Integrated Security=True), ou laissez le fichier partage vide pour ne ' +
-                 'regler que ce poste.', mbError, MB_OK);
-          Result := False;
-          Exit;
-        end;
+          if MsgBox('Cette chaine contient un mot de passe.' + #13#10#13#10 +
+                    'Il restera sur CE poste, chiffre par Windows au premier demarrage. Le ' +
+                    'fichier partage ne recevra que le serveur, la base et le nom du compte : ' +
+                    'il est lisible par tous les utilisateurs de l''application.' + #13#10#13#10 +
+                    'Chaque autre poste devra donc recevoir ce mot de passe une fois, a son ' +
+                    'installation. Sans quoi il affichera « Login failed for user ».' + #13#10#13#10 +
+                    'Continuer ?',
+                    mbConfirmation, MB_YESNO or MB_DEFBUTTON1) <> IDYES then
+          begin
+            Result := False;
+            Exit;
+          end;
     end;
 
     // Un partage vide n'est pas une erreur - le poste travaillera sur sa seule
@@ -350,6 +400,13 @@ begin
 
   // CHAINE prime sur SERVEUR et BASE : ecrire les deux ferait coexister deux
   // descriptions du meme serveur, dont une seule compte.
+  //
+  // Le mot de passe, lui, est ecrit ICI tel quel - contrairement au fichier partage. C'est
+  // volontaire : l'installateur ne sait pas chiffrer pour Windows, l'application si. Elle
+  // le reprend au premier demarrage, le chiffre, et l'efface de sa forme lisible (voir
+  // ConfigurationWU.NettoyerLeFichierLocal). La fenetre d'exposition se limite donc a
+  // l'intervalle entre l'installation et le premier lancement, sur un fichier de
+  // %PROGRAMDATA% et non sur un partage reseau.
   if EstUneChaineDeConnexion(PageConnexion.Values[0]) then
   begin
     SetArrayLength(Lignes, 5);
@@ -389,7 +446,7 @@ begin
   if EstUneChaineDeConnexion(PageConnexion.Values[0]) then
   begin
     SetArrayLength(Lignes, 5);
-    Lignes[4] := 'CHAINE=' + Trim(PageConnexion.Values[0]);
+    Lignes[4] := 'CHAINE=' + SansMotDePasse(Trim(PageConnexion.Values[0]));
   end
   else
   begin

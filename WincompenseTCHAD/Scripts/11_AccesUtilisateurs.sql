@@ -6,6 +6,7 @@
     CE SCRIPT RÉPOND À UNE ERREUR PRÉCISE
 
         « Login failed for user 'DOMAINE\utilisateur' »   (erreur 18456)
+    « Login failed for user 'wincompense' »            (erreur 18456, compte SQL Server)
         « Cannot open database ... requested by the login »  (erreur 4060)
 
     Ces deux messages ne disent pas que le serveur est injoignable — au contraire,
@@ -73,6 +74,18 @@ INSERT INTO @comptes (compte, role_wu, windows) VALUES
 -- Un groupe Active Directory se rattache exactement comme un compte, et évite de
 -- revenir sur le serveur à chaque arrivée ou départ :
 --  (N'DOMAINE\GRP_WINCOMPENSE_COMPENSE', N'wu_compense', 1);
+
+-- COMPTE SQL SERVER FOURNI PAR LA BANQUE : windows à 0, et le login existe déjà.
+-- Ce script ne le crée pas - il faudrait son mot de passe, qui n'a pas sa place dans un
+-- fichier - il lui ouvre la base et lui donne son rôle :
+--  (N'wincompense', N'wu_admin', 0);
+--
+-- ATTENTION AU RÔLE dans ce cas. Un compte unique partagé par tout le service doit porter
+-- la RÉUNION des droits de tous les postes, donc wu_admin. Les trois rôles cessent alors
+-- de distinguer quoi que ce soit au niveau SQL Server : c'est l'application qui garde seule
+-- la distinction entre l'agent de compense, le commercial et l'administrateur. Le second
+-- verrou disparaît, celui qui s'opposait à une connexion faite hors de l'application.
+-- Un compte SQL par agent, si la banque l'accepte, rend aux trois rôles leur utilité.
 
 -- =========================================================================
 -- 2. Rattachement

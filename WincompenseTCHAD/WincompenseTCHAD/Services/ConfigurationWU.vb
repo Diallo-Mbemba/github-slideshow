@@ -55,6 +55,26 @@ Public NotInheritable Class ConfigurationWU
     ''' <summary>Chaîne complète, pour les cas exceptionnels : elle prime sur SERVEUR/BASE/DELAI.</summary>
     Public Const CLE_CHAINE As String = "CHAINE"
 
+    ''' <summary>
+    ''' Mot de passe du compte SQL Server, chiffré pour ce poste par <see cref="SecretWU"/>.
+    '''
+    ''' Il ne vit QUE dans le fichier local, jamais sur le partage : le partage est lisible par
+    ''' tous les utilisateurs de l'application, et c'est précisément ce qui lui permet de valoir
+    ''' pour tout le monde. Un secret n'y a donc pas sa place, chiffré ou non — chiffré pour un
+    ''' poste, il serait de toute façon illisible sur les autres.
+    ''' </summary>
+    Public Const CLE_MOTDEPASSE As String = "MOTDEPASSE"
+
+    ''' <summary>
+    ''' Mot de passe encore en clair, écrit par le programme d'installation.
+    '''
+    ''' L'installateur ne sait pas chiffrer pour Windows ; l'application, si. Cette clé est donc
+    ''' un passage : à la première lecture, elle est chiffrée sous MOTDEPASSE puis EFFACÉE. La
+    ''' fenêtre pendant laquelle le mot de passe est en clair se réduit à l'intervalle entre
+    ''' l'installation et le premier démarrage.
+    ''' </summary>
+    Public Const CLE_MOTDEPASSE_CLAIR As String = "MOTDEPASSE_CLAIR"
+
     Public Const BASE_PAR_DEFAUT As String = "GWC_WINCOMPENSE_ETD"
     Public Const DELAI_PAR_DEFAUT As Integer = 10
 
@@ -200,7 +220,22 @@ Public NotInheritable Class ConfigurationWU
         End Get
     End Property
 
+    ''' <summary>
+    ''' Trouve la chaîne, puis y remet le mot de passe conservé sur ce poste.
+    '''
+    ''' Les deux étapes sont distinctes à dessein : la première dit OÙ est le serveur, et peut
+    ''' venir du partage donc de la banque entière ; la seconde dit COMMENT s'y annoncer, et
+    ''' n'appartient qu'à cette machine. Les mêler rendrait impossible de changer de serveur
+    ''' pour tout le monde sans diffuser un secret à tout le monde.
+    ''' </summary>
     Private Shared Sub Resoudre()
+
+        NettoyerLeFichierLocal()
+        ResoudreLaSource()
+        _chaine = AppliquerLeMotDePasse(_chaine)
+    End Sub
+
+    Private Shared Sub ResoudreLaSource()
 
         ' 0. Saisie imposée pour cette session : elle prime sur tout, et ne survit pas à
         ' la fermeture de l'application.
@@ -286,15 +321,141 @@ Public NotInheritable Class ConfigurationWU
         _origine = "valeur par défaut (aucune configuration trouvée)"
     End Sub
 
+    ''' <summary>
+    ''' Remet dans la chaîne le mot de passe gardé sur ce poste, quand elle nomme un compte
+    ''' SQL Server sans le porter.
+    '''
+    ''' Rien n'est touché en authentification Windows — aucun compte n'y est nommé — ni quand
+    ''' la chaîne porte déjà son mot de passe : ce qui a été saisi explicitement prime toujours
+    ''' sur ce que le poste a retenu.
+    ''' </summary>
+    Private Shared Function AppliquerLeMotDePasse(chaine As String) As String
+
+        If String.IsNullOrWhiteSpace(chaine) Then Return chaine
+
+        Dim constructeur As System.Data.SqlClient.SqlConnectionStringBuilder
+
+        Try
+            constructeur = New System.Data.SqlClient.SqlConnectionStringBuilder(chaine)
+        Catch ex As ArgumentException
+            ' Chaîne inexploitable : l'ouverture de la connexion le dira mieux que nous.
+            Return chaine
+        End Try
+
+        ' Aucun compte nommé : la chaîne est en authentification Windows, il n'y a pas de mot
+        ' de passe à y mettre.
+        If constructeur.UserID.Trim().Length = 0 Then Return chaine
+
+        ' Mot de passe déjà présent : on ne le remplace pas.
+        If constructeur.Password.Length > 0 Then Return chaine
+
+        Dim motDePasse As String = MotDePasseDuPoste()
+        If motDePasse.Length = 0 Then Return chaine
+
+        constructeur.Password = motDePasse
+        constructeur.IntegratedSecurity = False
+
+        Return constructeur.ConnectionString
+    End Function
+
+    ''' <summary>Mot de passe conservé sur ce poste, déchiffré.</summary>
+    Private Shared Function MotDePasseDuPoste() As String
+        Return SecretWU.Lire(LireCle(LireFichier(CheminLocal), CLE_MOTDEPASSE))
+    End Function
+
+    ''' <summary>
+    ''' Met à l'abri tout mot de passe qui traînerait en clair dans le fichier local, puis
+    ''' l'en efface. Appelé avant chaque résolution.
+    '''
+    ''' Deux chemins y déposent du clair, et aucun n'est une faute :
+    '''
+    '''   — le programme d'installation, qui ne sait pas chiffrer pour Windows et écrit donc
+    '''     MOTDEPASSE_CLAIR, à charge pour nous de le reprendre ;
+    '''   — une chaîne CHAINE recopiée à la main dans le fichier, mot de passe compris, par
+    '''     une informatique qui suit sa propre procédure.
+    '''
+    ''' Dans les deux cas le mot de passe passe sous MOTDEPASSE, chiffré, et disparaît de sa
+    ''' forme lisible. La fenêtre d'exposition se referme au premier démarrage.
+    ''' </summary>
+    Private Shared Sub NettoyerLeFichierLocal()
+
+        Try
+            Dim local As Dictionary(Of String, String) = LireFichier(CheminLocal)
+            If local.Count = 0 Then Return
+
+            Dim aEcrire As Boolean = False
+            Dim trouve As String = LireCle(local, CLE_MOTDEPASSE_CLAIR)
+
+            If trouve.Length > 0 Then
+                local.Remove(CLE_MOTDEPASSE_CLAIR)
+                aEcrire = True
+            End If
+
+            ' Un mot de passe dans CHAINE prime sur celui déjà rangé : il vient d'être posé là
+            ' par quelqu'un, donc il est le plus récent des deux.
+            Dim chaine As String = LireCle(local, CLE_CHAINE)
+
+            If chaine.Length > 0 Then
+                Dim dansLaChaine As String = ExtraireLeMotDePasse(chaine)
+
+                If dansLaChaine.Length > 0 Then
+                    trouve = dansLaChaine
+                    local(CLE_CHAINE) = ChaineSansMotDePasse(chaine)
+                    aEcrire = True
+                End If
+            End If
+
+            If Not aEcrire Then Return
+
+            If trouve.Length > 0 Then
+                Dim protege As String = SecretWU.Proteger(trouve)
+                If protege.Length > 0 Then local(CLE_MOTDEPASSE) = protege
+            End If
+
+            EcrireFichier(CheminLocal, local, "Configuration de ce poste")
+
+        Catch ex As Exception
+            ' Fichier verrouillé ou droit refusé : la connexion se fera quand même, avec ce que
+            ' le fichier contient. Rien ici ne doit empêcher l'application de démarrer.
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' La même chaîne, complétée du mot de passe gardé sur ce poste s'il lui en manque un.
+    '''
+    ''' Indispensable à l'écran de test : la chaîne affichée ne porte plus son mot de passe —
+    ''' il a été mis à l'abri — et l'essayer telle quelle échouerait sur « Login failed », en
+    ''' faisant croire à un réglage cassé alors que l'application, elle, se connecte.
+    ''' </summary>
+    Public Shared Function ChaineEssayable(chaine As String) As String
+        Return AppliquerLeMotDePasse(chaine)
+    End Function
+
+    ''' <summary>Vrai si une chaîne de connexion porte un mot de passe.</summary>
+    Public Shared Function PorteUnMotDePasse(chaine As String) As Boolean
+
+        If String.IsNullOrWhiteSpace(chaine) Then Return False
+
+        Try
+            Return New System.Data.SqlClient.SqlConnectionStringBuilder(chaine).Password.Length > 0
+        Catch ex As ArgumentException
+            ' Chaîne illisible : on s'en tient à la recherche littérale, qui suffit à avertir.
+            Return chaine.IndexOf("Password", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+                   chaine.IndexOf("Pwd", StringComparison.OrdinalIgnoreCase) >= 0
+        End Try
+    End Function
+
 #End Region
 
 #Region "Construction de la chaîne"
 
     ''' <summary>
     ''' Chaîne de connexion formée à partir d'un serveur et d'une base, en authentification
-    ''' Windows intégrée — la banque n'emploie pas d'identifiant SQL. Aucun mot de passe ne
-    ''' circule donc, ce qui est précisément ce qui permet de poser la configuration sur un
-    ''' partage lisible par tous.
+    ''' Windows intégrée. Aucun mot de passe n'y figure, ce qui est précisément ce qui permet
+    ''' de poser la configuration sur un partage lisible par tous.
+    '''
+    ''' Un compte SQL Server ne passe pas par ici : il s'exprime dans une chaîne complète, et
+    ''' son mot de passe est mis à part sur le poste (voir CLE_MOTDEPASSE).
     ''' </summary>
     Public Shared Function ChaineDepuis(serveur As String, base As String, delai As Integer) As String
 
@@ -397,6 +558,12 @@ Public NotInheritable Class ConfigurationWU
             ' lui-même, sans quoi on ne saurait plus où chercher le jour où il change.
             fusion(CLE_PARTAGE) = LireCle(local, CLE_PARTAGE)
 
+            ' Le mot de passe non plus n'appartient qu'au poste, et le partage n'en porte
+            ' jamais : l'écraser avec ce qui vient du réseau le ferait disparaître à chaque
+            ' lecture réussie du partage, et le poste cesserait de se connecter sans que
+            ' rien n'ait changé de visible.
+            Conserver(local, fusion, CLE_MOTDEPASSE)
+
             EcrireFichier(CheminLocal, fusion, "Copie locale de secours - regeneree automatiquement")
 
         Catch
@@ -429,6 +596,20 @@ Public NotInheritable Class ConfigurationWU
         Next
 
         File.WriteAllText(chemin, contenu.ToString(), Encoding.UTF8)
+    End Sub
+
+    ''' <summary>
+    ''' Reporte une clé de l'ancien jeu de valeurs vers le nouveau, sauf si le nouveau la
+    ''' renseigne déjà. Sert aux clés qui n'appartiennent qu'au poste et qu'une réécriture
+    ''' venue d'ailleurs ne doit pas emporter.
+    ''' </summary>
+    Private Shared Sub Conserver(ancien As Dictionary(Of String, String),
+                                 nouveau As Dictionary(Of String, String), cle As String)
+
+        If LireCle(nouveau, cle).Length > 0 Then Return
+
+        Dim valeur As String = LireCle(ancien, cle)
+        If valeur.Length > 0 Then nouveau(cle) = valeur
     End Sub
 
 #End Region
@@ -540,11 +721,98 @@ Public NotInheritable Class ConfigurationWU
             Return False
         End Try
 
+        ' Le mot de passe est retiré de la chaîne AVANT toute écriture, et conservé chiffré
+        ' pour ce poste. C'est ce qui permet de propager le serveur à toute la banque sans
+        ' propager le secret : le fichier partagé ne portera qu'un compte nommé, et chaque
+        ' poste tiendra son mot de passe de lui-même.
+        Dim aPart As String = ExtraireLeMotDePasse(surUneLigne)
+
         Dim valeurs As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
-            {CLE_CHAINE, surUneLigne}
+            {CLE_CHAINE, If(aPart.Length > 0, ChaineSansMotDePasse(surUneLigne), surUneLigne)}
         }
 
-        Return EcrireLaConfiguration(valeurs, cheminPartage, ecrireSurLePartage, messageErreur)
+        If aPart.Length > 0 Then
+            Dim protege As String = SecretWU.Proteger(aPart)
+
+            If protege.Length = 0 Then
+                messageErreur = "Windows a refusé de chiffrer le mot de passe sur ce poste." &
+                                Environment.NewLine &
+                                "Rien n'a été enregistré : l'écrire en clair n'est pas une option."
+                Return False
+            End If
+
+            valeurs(CLE_MOTDEPASSE) = protege
+        End If
+
+        If Not EcrireLaConfiguration(valeurs, cheminPartage, ecrireSurLePartage, messageErreur) Then
+            Return False
+        End If
+
+        ' Retour à l'authentification Windows : le mot de passe gardé n'a plus d'objet. Le
+        ' laisser dormir dans le fichier serait un secret conservé pour rien.
+        If aPart.Length = 0 AndAlso Not NommeUnCompte(surUneLigne) Then OublierLeMotDePasse()
+
+        Return True
+    End Function
+
+    ''' <summary>Vrai si la chaîne nomme un compte SQL Server (User ID).</summary>
+    Private Shared Function NommeUnCompte(chaine As String) As Boolean
+
+        Try
+            Return New System.Data.SqlClient.SqlConnectionStringBuilder(chaine).UserID.Trim().Length > 0
+        Catch ex As ArgumentException
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>Efface le mot de passe conservé sur ce poste.</summary>
+    Public Shared Sub OublierLeMotDePasse()
+
+        Try
+            Dim local As Dictionary(Of String, String) = LireFichier(CheminLocal)
+
+            ' Les deux retraits sont faits, puis seulement on décide d'écrire : un OrElse
+            ' placé ici sauterait le second dès que le premier a trouvé quelque chose.
+            Dim protegeRetire As Boolean = local.Remove(CLE_MOTDEPASSE)
+            Dim clairRetire As Boolean = local.Remove(CLE_MOTDEPASSE_CLAIR)
+
+            If Not protegeRetire AndAlso Not clairRetire Then Return
+
+            EcrireFichier(CheminLocal, local, "Configuration de ce poste")
+            Oublier()
+
+        Catch ex As Exception
+            ' Sans conséquence : un mot de passe inutilisé n'empêche pas de travailler.
+        End Try
+    End Sub
+
+    ''' <summary>Mot de passe porté par une chaîne, ou chaîne vide.</summary>
+    Private Shared Function ExtraireLeMotDePasse(chaine As String) As String
+
+        Try
+            Return New System.Data.SqlClient.SqlConnectionStringBuilder(chaine).Password
+        Catch ex As ArgumentException
+            Return String.Empty
+        End Try
+    End Function
+
+    ''' <summary>La même chaîne, son mot de passe retiré. Le compte, lui, reste : il n'est
+    ''' pas un secret, et c'est lui qui dira au poste quel mot de passe appliquer.</summary>
+    Private Shared Function ChaineSansMotDePasse(chaine As String) As String
+
+        Try
+            Dim constructeur As New System.Data.SqlClient.SqlConnectionStringBuilder(chaine)
+
+            ' Remove et non Password = "" : affecter une chaîne vide laisserait un
+            ' « Password= » sans valeur dans le fichier, qui se lit comme un mot de passe vide
+            ' et non comme une absence de mot de passe.
+            constructeur.Remove("Password")
+
+            Return constructeur.ConnectionString
+
+        Catch ex As ArgumentException
+            Return chaine
+        End Try
     End Function
 
     ''' <summary>
@@ -565,8 +833,19 @@ Public NotInheritable Class ConfigurationWU
                 Return False
             End If
 
+            ' Le mot de passe, même chiffré, ne part pas sur le partage. Chiffré pour un
+            ' poste, il serait de toute façon illisible sur les autres ; l'y écrire ne
+            ' servirait donc à rien, sinon à laisser croire qu'il est diffusé.
+            Dim pourLePartage As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+
+            For Each paire As KeyValuePair(Of String, String) In valeurs
+                If String.Equals(paire.Key, CLE_MOTDEPASSE, StringComparison.OrdinalIgnoreCase) Then Continue For
+                If String.Equals(paire.Key, CLE_MOTDEPASSE_CLAIR, StringComparison.OrdinalIgnoreCase) Then Continue For
+                pourLePartage(paire.Key) = paire.Value
+            Next
+
             Try
-                EcrireFichier(cheminPartage, valeurs, "Connexion commune a tous les postes")
+                EcrireFichier(cheminPartage, pourLePartage, "Connexion commune a tous les postes")
             Catch ex As Exception
                 messageErreur = $"Écriture impossible sur {cheminPartage} : {ex.Message}" & Environment.NewLine &
                                 "Vérifiez que vous avez le droit d'écrire sur ce partage. Rien n'a été modifié."
@@ -582,6 +861,11 @@ Public NotInheritable Class ConfigurationWU
             Next
 
             local(CLE_PARTAGE) = If(cheminPartage, String.Empty).Trim()
+
+            ' Même raison qu'au rafraîchissement : changer de serveur ne doit pas effacer le
+            ' mot de passe du poste. S'il vient d'être ressaisi, il est déjà dans « valeurs »
+            ' et Conserver ne le remplace pas.
+            Conserver(LireFichier(CheminLocal), local, CLE_MOTDEPASSE)
 
             EcrireFichier(CheminLocal, local, "Configuration de ce poste")
 
