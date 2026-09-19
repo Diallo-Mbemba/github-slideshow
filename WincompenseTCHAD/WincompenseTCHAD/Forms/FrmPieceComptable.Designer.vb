@@ -26,6 +26,8 @@ Partial Class FrmPieceComptable
         Me.lblTotaux = New System.Windows.Forms.Label()
         Me.lblEcart = New System.Windows.Forms.Label()
         Me.btnExporter = New System.Windows.Forms.Button()
+        Me.lblPortee = New System.Windows.Forms.Label()
+        Me.cboPortee = New System.Windows.Forms.ComboBox()
         Me.btnFermer = New System.Windows.Forms.Button()
         CType(Me.dgvPiece, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
@@ -88,6 +90,24 @@ Partial Class FrmPieceComptable
         Me.lblEcart.Size = New System.Drawing.Size(600, 32)
         Me.lblEcart.TabIndex = 4
         '
+        'lblPortee
+        '
+        Me.lblPortee.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.lblPortee.Location = New System.Drawing.Point(12, 493)
+        Me.lblPortee.Name = "lblPortee"
+        Me.lblPortee.Size = New System.Drawing.Size(130, 20)
+        Me.lblPortee.TabIndex = 3
+        Me.lblPortee.Text = "Pièces individuelles :"
+        '
+        'cboPortee
+        '
+        Me.cboPortee.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
+        Me.cboPortee.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
+        Me.cboPortee.Location = New System.Drawing.Point(148, 490)
+        Me.cboPortee.Name = "cboPortee"
+        Me.cboPortee.Size = New System.Drawing.Size(280, 21)
+        Me.cboPortee.TabIndex = 4
+        '
         'btnExporter
         '
         Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
@@ -118,6 +138,8 @@ Partial Class FrmPieceComptable
         Me.ClientSize = New System.Drawing.Size(900, 534)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.btnExporter)
+        Me.Controls.Add(Me.cboPortee)
+        Me.Controls.Add(Me.lblPortee)
         Me.Controls.Add(Me.lblEcart)
         Me.Controls.Add(Me.lblTotaux)
         Me.Controls.Add(Me.dgvPiece)
@@ -135,6 +157,8 @@ Partial Class FrmPieceComptable
     End Sub
 
     Friend WithEvents lblTitre As System.Windows.Forms.Label
+    Friend WithEvents lblPortee As System.Windows.Forms.Label
+    Friend WithEvents cboPortee As System.Windows.Forms.ComboBox
     Friend WithEvents lblSousTitre As System.Windows.Forms.Label
     Friend WithEvents dgvPiece As System.Windows.Forms.DataGridView
     Friend WithEvents lblTotaux As System.Windows.Forms.Label

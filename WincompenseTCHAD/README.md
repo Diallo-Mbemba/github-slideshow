@@ -1333,6 +1333,33 @@ Trois réglages d'impression font le reste :
    Son en-tête se répète en haut de chaque page : sans cela, la page 2 arrive sans date, sans
    agence et sans nom de colonne, une colonne de chiffres dont on ne sait plus ce qu'ils sont.
 
+#### Filtrer : sous-agents seulement, ou agences propres seulement
+
+La fenêtre d'aperçu porte une liste **« Pièces individuelles »** à trois choix, chacun suivi
+du nombre d'onglets qu'il produira :
+
+| Choix | Ce qu'on obtient |
+|---|---|
+| Tous les points de vente | La pièce globale, puis tous les onglets |
+| Sous-agents seulement | La pièce globale, puis les onglets des `SA` |
+| Agences propres seulement | La pièce globale, puis les onglets des `EC` |
+
+Le nom de fichier proposé suit : `PieceWU_20260530_SA.xlsx` à côté de `PieceWU_20260530.xlsx`.
+Un dossier d'exports reste ainsi lisible sans ouvrir les classeurs.
+
+**Le filtre ne touche QUE les onglets individuels. La première feuille reste la pièce
+globale**, entière. Ce n'est pas un oubli :
+
+1. C'est **le** document comptable de la journée. La scinder en deux donnerait deux pièces
+   dont aucune ne serait celle que la comptabilité attend.
+2. L'écart d'arrondi de la journée est absorbé par le compte inter bancaire, **sur la pièce
+   globale et sur elle seule** — la règle de la banque interdit d'appliquer le compte
+   d'attente point de vente par point de vente. Une pièce globale filtrée sortirait donc
+   déséquilibrée de quelques francs, sans rien pour les porter.
+
+La liste ne s'affiche pas quand la fenêtre présente la pièce d'un seul point de vente : un
+filtre y serait un choix entre une chose et elle-même.
+
 **Les pièces individuelles sont regénérées**, et non découpées dans la pièce globale : c'est
 `GenererPieceComptable` qui produit les deux, sur un `CalculWU` unique pour la seconde. Les
 mêmes écritures, aux mêmes comptes, par construction. Un Account non comptabilisé n'a pas

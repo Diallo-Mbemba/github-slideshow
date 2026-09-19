@@ -100,6 +100,15 @@ Public Class FrmPieceComptable
 
 #Region "Affichage"
 
+    ''' <summary>
+    ''' La liste des portées se remplit ICI, et non dans le constructeur : l'appelant pose la
+    ''' propriété Calculs APRÈS avoir construit la fenêtre, et un filtre bâti trop tôt serait
+    ''' vide sans que rien ne le dise.
+    ''' </summary>
+    Private Sub FrmPieceComptable_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        PreparerLaPortee()
+    End Sub
+
     Private Sub AfficherPiece()
 
         dgvPiece.DataSource = _dtPiece
@@ -165,6 +174,101 @@ Public Class FrmPieceComptable
 
 #End Region
 
+#Region "Portée de l'export"
+
+    ''' <summary>
+    ''' Un choix de la liste : son libellé, et le type de point de vente qu'il retient.
+    ''' </summary>
+    Private NotInheritable Class ChoixPortee
+
+        Public Sub New(libelle As String, typePdv As String, nombre As Integer)
+            _libelle = libelle
+            TypePdv = typePdv
+            Nombre = nombre
+        End Sub
+
+        Private ReadOnly _libelle As String
+
+        ''' <summary>Type retenu : "SA", "EC", ou chaîne vide pour tout prendre.</summary>
+        Public ReadOnly Property TypePdv As String
+
+        ''' <summary>Nombre de pièces que ce choix produira.</summary>
+        Public ReadOnly Property Nombre As Integer
+
+        ''' <summary>Ce que la liste affiche. Le nombre y figure : on choisit mieux en sachant combien.</summary>
+        Public Overrides Function ToString() As String
+            Return $"{_libelle} ({Nombre})"
+        End Function
+    End Class
+
+    ''' <summary>
+    ''' Remplit la liste des portées, ou la masque s'il n'y a pas de pièces individuelles à
+    ''' produire — la fenêtre sert aussi à présenter la pièce d'un seul point de vente, et un
+    ''' filtre y serait un choix entre une chose et elle-même.
+    ''' </summary>
+    Private Sub PreparerLaPortee()
+
+        Dim pieces As List(Of CalculWU) = Comptabilisables()
+
+        lblPortee.Visible = pieces.Count > 0
+        cboPortee.Visible = pieces.Count > 0
+        If pieces.Count = 0 Then Return
+
+        Dim sousAgents As Integer = pieces.Where(Function(calcul) EstDuType(calcul, "SA")).Count()
+        Dim agences As Integer = pieces.Count - sousAgents
+
+        cboPortee.Items.Clear()
+        cboPortee.Items.Add(New ChoixPortee("Tous les points de vente", String.Empty, pieces.Count))
+        cboPortee.Items.Add(New ChoixPortee("Sous-agents seulement", "SA", sousAgents))
+        cboPortee.Items.Add(New ChoixPortee("Agences propres seulement", "EC", agences))
+        cboPortee.SelectedIndex = 0
+    End Sub
+
+    ''' <summary>Les points de vente qui produiront une pièce : les autres n'ont pas d'écriture.</summary>
+    Private Function Comptabilisables() As List(Of CalculWU)
+
+        If Calculs Is Nothing Then Return New List(Of CalculWU)()
+
+        Return Calculs.Where(Function(calcul) calcul IsNot Nothing AndAlso calcul.EstComptabilisable).ToList()
+    End Function
+
+    Private Shared Function EstDuType(calcul As CalculWU, typePdv As String) As Boolean
+        Return String.Equals(calcul.TypePdv, typePdv, StringComparison.OrdinalIgnoreCase)
+    End Function
+
+    ''' <summary>La portée retenue, ou « tout » tant que rien n'a été choisi.</summary>
+    Private Function PorteeChoisie() As ChoixPortee
+
+        Dim choix As ChoixPortee = TryCast(cboPortee.SelectedItem, ChoixPortee)
+        If choix IsNot Nothing Then Return choix
+
+        Return New ChoixPortee("Tous les points de vente", String.Empty, Comptabilisables().Count)
+    End Function
+
+    ''' <summary>Les points de vente dont le classeur portera une feuille.</summary>
+    Private Function CalculsAExporter() As IEnumerable(Of CalculWU)
+
+        Dim choix As ChoixPortee = PorteeChoisie()
+        If choix.TypePdv.Length = 0 Then Return Calculs
+
+        Return Comptabilisables().Where(Function(calcul) EstDuType(calcul, choix.TypePdv)).ToList()
+    End Function
+
+    ''' <summary>
+    ''' Suffixe porté par le nom du fichier proposé, pour qu'un dossier reste lisible sans ouvrir
+    ''' les classeurs : PieceWU_20260530_SA.xlsx à côté de PieceWU_20260530.xlsx.
+    ''' </summary>
+    Private Function NomFichierSelonLaPortee() As String
+
+        Dim choix As ChoixPortee = PorteeChoisie()
+        If choix.TypePdv.Length = 0 Then Return NomFichierPropose
+
+        Dim sansExtension As String = IO.Path.GetFileNameWithoutExtension(NomFichierPropose)
+        Return $"{sansExtension}_{choix.TypePdv}{IO.Path.GetExtension(NomFichierPropose)}"
+    End Function
+
+#End Region
+
 #Region "Export"
 
     ''' <summary>
@@ -180,7 +284,7 @@ Public Class FrmPieceComptable
             Cursor = Cursors.WaitCursor
 
             PieceComptableService.ExporterEtOuvrirPieceExcel(
-                _dtPiece, Calculs, DateActivite, chemin,
+                _dtPiece, CalculsAExporter(), DateActivite, chemin,
                 NomPremiereFeuille, IntitulePiece, AgencePiece)
 
             _exportee = True
@@ -207,11 +311,11 @@ Public Class FrmPieceComptable
 
         If Calculs Is Nothing Then Return String.Empty
 
-        ' Where(...).Count() plutôt que Count(...) : le jour où cette propriété serait typée
+        ' Where(...).Count() plutôt que Count(...) : le jour où cette liste serait typée
         ' List(Of CalculWU), Count deviendrait une propriété et Count(...) se lirait comme un
         ' indexeur — BC32016, à la compilation, loin d'ici.
         Dim pieces As Integer =
-            Calculs.Where(Function(calcul) calcul IsNot Nothing AndAlso calcul.EstComptabilisable).Count()
+            CalculsAExporter().Where(Function(calcul) calcul IsNot Nothing AndAlso calcul.EstComptabilisable).Count()
         If pieces = 0 Then Return String.Empty
 
         Return $" — {pieces} pièce{If(pieces > 1, "s", String.Empty)} de point de vente, en onglets séparés."
@@ -224,7 +328,7 @@ Public Class FrmPieceComptable
 
             dialogue.Title = "Enregistrer la pièce comptable"
             dialogue.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
-            dialogue.FileName = NomFichierPropose
+            dialogue.FileName = NomFichierSelonLaPortee()
             dialogue.OverwritePrompt = True
 
             If dialogue.ShowDialog(Me) <> DialogResult.OK Then Return String.Empty
