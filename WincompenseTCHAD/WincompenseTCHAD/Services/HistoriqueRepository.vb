@@ -57,8 +57,15 @@ Public NotInheritable Class HistoriqueRepository
     ''' Détail des transactions de la journée, écrit dans T_HistoriqueMTCN au sein de la MÊME
     ''' transaction : les deux tables ne peuvent pas diverger. Peut être Nothing.
     ''' </param>
+    ''' <param name="dtPiece">
+    ''' Pièce comptable produite pour cette journée, conservée dans T_PieceWU au sein de la MÊME
+    ''' transaction — pour la même raison, et pour une de plus : la pièce est un justificatif,
+    ''' et un justificatif qui ne correspondrait pas à l'historique de sa propre journée serait
+    ''' pire que pas de justificatif du tout. Peut être Nothing.
+    ''' </param>
     Public Shared Function EnregistrerJournee(jour As Date, calculs As IEnumerable(Of CalculWU),
                                               transactions As IEnumerable(Of TransactionWU),
+                                              dtPiece As DataTable,
                                               ByRef nombreEnregistrees As Integer,
                                               ByRef nombreTransactions As Integer,
                                               ByRef messageErreur As String) As Boolean
@@ -123,6 +130,10 @@ Public NotInheritable Class HistoriqueRepository
                         nombreTransactions = EcrireTransactions(connexion, transaction, jour,
                                                                 transactions, identification)
 
+                        ' La pièce est conservée ici, et non dans un appel séparé : l'historique
+                        ' et le justificatif d'une même journée ne doivent jamais diverger.
+                        PieceRepository.Enregistrer(jour, dtPiece, connexion, transaction)
+
                         transaction.Commit()
 
                     Catch
@@ -142,7 +153,8 @@ Public NotInheritable Class HistoriqueRepository
             messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
                                MESSAGE_TABLE_ABSENTE & vbCrLf & vbCrLf &
                                "Si seule T_HistoriqueMTCN manque, exécutez aussi " &
-                               "Scripts\06_HistoriqueMTCN.sql.",
+                               "Scripts\06_HistoriqueMTCN.sql ; si c'est T_PieceWU, " &
+                               "Scripts\13_PiecesComptables.sql.",
                                $"Historisation de la journée du {jour:dd/MM/yyyy} impossible : {ex.Message}")
             Return False
 

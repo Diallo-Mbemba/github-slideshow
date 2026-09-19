@@ -107,6 +107,7 @@ Public Class FrmCompensationWU
         Dim messageErreur As String = String.Empty
 
         If HistoriqueRepository.EnregistrerJournee(_dateActivite.Value, _listeCalculs, _transactions,
+                                                   _dtPieceGeneree,
                                                    nombreEnregistrees, nombreTransactions, messageErreur) Then
             tsslStatut.Text &= $"  |  Journée du {_dateActivite.Value:dd/MM/yyyy} historisée " &
                                $"({nombreEnregistrees} point(s) de vente, {nombreTransactions} transaction(s))."

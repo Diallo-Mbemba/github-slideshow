@@ -93,6 +93,7 @@
     <Compile Include="Services\WUCalculationService.vb" />
     <Compile Include="Services\PieceComptableService.vb" />
     <Compile Include="Services\PieceExcelWU.vb" />
+    <Compile Include="Services\PieceRepository.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
@@ -173,6 +174,12 @@
     <Compile Include="Forms\FrmConnexion.Designer.vb">
       <DependentUpon>FrmConnexion.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmPiecesArchivees.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmPiecesArchivees.Designer.vb">
+      <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmDiagnostic.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -245,6 +252,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmConnexion.resx">
       <DependentUpon>FrmConnexion.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
+      <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmDiagnostic.resx">
       <DependentUpon>FrmDiagnostic.vb</DependentUpon>

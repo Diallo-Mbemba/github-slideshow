@@ -148,7 +148,8 @@ WincompenseTCHAD/
     │   ├── DiagnosticSqlWU.vb              ' Traduit les refus de SQL Server en consigne exécutable
     │   ├── SecretWU.vb                     ' Chiffre le mot de passe SQL pour ce poste (DPAPI)
     │   ├── PreparationBaseWU.vb            ' Constate l'accès du compte, le répare ou rédige le script
-    │   └── PieceExcelWU.vb                 ' Le formulaire de pièce de la banque, une feuille par point de vente
+    │   ├── PieceExcelWU.vb                 ' Le formulaire de pièce de la banque, une feuille par point de vente
+    │   └── PieceRepository.vb              ' Conserve et relit les pièces produites (T_PieceWU)
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -164,6 +165,7 @@ WincompenseTCHAD/
         ├── FrmConnexion.vb                 ' Écran de connexion, amorçage du premier administrateur
         ├── FrmChangerMotDePasse.vb         ' Changement de mot de passe (imposé ou volontaire)
         ├── FrmDiagnostic.vb                ' Affiche un diagnostic long, avec bouton Copier
+        ├── FrmPiecesArchivees.vb           ' Consultation des pièces déjà produites
         ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
         ├── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
         ├── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
@@ -183,7 +185,8 @@ Scripts/
 ├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
 ├── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
 ├── 11_AccesUtilisateurs.sql               ' Rattachement des comptes Windows aux rôles
-└── 12_AccesCompteApplicatif.sql           ' LE SCRIPT À REMETTRE À LA BANQUE : un compte, un rôle
+├── 12_AccesCompteApplicatif.sql           ' LE SCRIPT À REMETTRE À LA BANQUE : un compte, un rôle
+└── 13_PiecesComptables.sql                ' Table T_PieceWU : les pièces conservées
 
 Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe
@@ -1235,6 +1238,51 @@ distinguer quoi que ce soit au niveau SQL Server : c'est l'application qui garde
 distinction entre l'agent de compense, le commercial et l'administrateur, et le verrou qui
 s'opposait à une connexion faite **hors** de l'application disparaît. Un compte SQL par agent,
 si la banque l'accepte, rend aux trois rôles leur utilité.
+
+### Consulter une pièce déjà produite (`PieceRepository`, `FrmPiecesArchivees`)
+
+La pièce de chaque journée est **conservée ligne à ligne** dans `T_PieceWU`, et la consulter
+c'est **relire ce qui a été écrit** — rien n'est recalculé.
+
+**Pourquoi conserver plutôt que recalculer.** L'historique garde les volumes, les montants et
+les totaux de commissions. Il ne garde pas le taux du sous-agent ce jour-là, ni ses comptes de
+compensation et de commission, ni la ligne d'écart posée sur le compte inter bancaire.
+Reconstituer une pièce ancienne avec le paramétrage d'aujourd'hui réécrirait le passé : un
+sous-agent passé de 70 % à 60 % ferait apparaître une pièce qui n'a jamais été visée ni
+signée. Une pièce comptable est un justificatif ; « à peu près la même » n'a pas de sens
+devant un inspecteur.
+
+**Écrite dans la MÊME transaction que l'historique.** Deux documents d'une même journée ne
+doivent jamais diverger : si l'un échoue, aucun des deux n'est écrit.
+
+**Une journée à la fois, jamais une plage.** Les rapports d'activité se consultent sur une
+période parce qu'ils cumulent. Une pièce, non : c'est un justificatif daté, rattaché aux deux
+rapports Western Union d'UNE journée. Les additionner sur une plage produirait un document qui
+ne correspond à aucun téléchargement de la plateforme — donc à rien de vérifiable.
+
+L'écran ne fait qu'aiguiller, et c'est délibéré :
+
+| Bouton | Ce qui s'ouvre |
+|---|---|
+| **Ouvrir la pièce…** | `FrmPieceComptable`, d'où elle s'exporte au formulaire de la banque |
+| **Fichier core banking…** | `FrmFichierCoreBanking`, après confirmation de la date de valeur |
+
+Ce sont les mêmes écrans que le jour de la compense : l'agent y retrouve ses repères, et il
+n'y a qu'une façon d'afficher une pièce dans toute l'application.
+
+**Le fichier core banking n'est pas stocké**, et n'a pas à l'être : il dérive entièrement de la
+pièce, par les mêmes règles. Le conserver serait garder deux fois la même chose, avec le
+risque que les deux copies divergent. La **date de valeur**, elle, se redemande : c'est le jour
+où les écritures sont réellement passées, donc aujourd'hui — un fichier rejoué aujourd'hui
+porte la date d'aujourd'hui, comme le montrera le relevé de compte.
+
+Deux limites, dites franchement :
+
+1. **Les journées comptabilisées avant la mise en service** de cette conservation n'ont pas de
+   pièce. L'écran le dit au lieu d'en inventer une.
+2. **Le classeur exporté depuis l'archive porte la pièce globale seule**, sans les onglets par
+   point de vente : la liste des `CalculWU` n'est pas conservée. Mieux vaut une pièce fidèle
+   sans ses détails qu'un détail reconstitué au paramétrage d'aujourd'hui.
 
 ### L'export de la pièce : le formulaire de la banque (`PieceExcelWU`)
 

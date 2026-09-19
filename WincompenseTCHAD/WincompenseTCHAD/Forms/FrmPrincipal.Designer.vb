@@ -25,6 +25,7 @@ Partial Class FrmPrincipal
         Me.mnuTraitement = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP1 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuRapport = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuPiecesArchivees = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuSousAgents = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuAgences = New System.Windows.Forms.ToolStripMenuItem()
@@ -65,7 +66,7 @@ Partial Class FrmPrincipal
         '
         'mnuCompensation
         '
-        Me.mnuCompensation.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuTraitement, Me.SEP1, Me.mnuRapport})
+        Me.mnuCompensation.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuTraitement, Me.SEP1, Me.mnuRapport, Me.mnuPiecesArchivees})
         Me.mnuCompensation.Name = "mnuCompensation"
         Me.mnuCompensation.Size = New System.Drawing.Size(100, 20)
         Me.mnuCompensation.Text = "&Compensation"
@@ -86,6 +87,12 @@ Partial Class FrmPrincipal
         Me.mnuRapport.Name = "mnuRapport"
         Me.mnuRapport.Size = New System.Drawing.Size(240, 22)
         Me.mnuRapport.Text = "&Rapport d'activité"
+        '
+        'mnuPiecesArchivees
+        '
+        Me.mnuPiecesArchivees.Name = "mnuPiecesArchivees"
+        Me.mnuPiecesArchivees.Size = New System.Drawing.Size(240, 22)
+        Me.mnuPiecesArchivees.Text = "&Pièces comptables conservées"
         '
         'mnuParametrage
         '
@@ -271,6 +278,7 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuTraitement As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP1 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuRapport As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuPiecesArchivees As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuSousAgents As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuAgences As System.Windows.Forms.ToolStripMenuItem

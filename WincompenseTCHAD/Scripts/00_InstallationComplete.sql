@@ -23,7 +23,7 @@
     ------------------------------------------------------------------------------------------
 
       Partie 1   La base GWC_WINCOMPENSE_ETD
-      Partie 2   Les onze tables et leurs index
+      Partie 2   Les douze tables et leurs index
       Partie 3   Les données de paramétrage de départ (comptes comptables, jours fériés)
       Partie 4   Les trois rôles et leurs droits
       Partie 5   L'accès du compte applicatif à la base
@@ -1126,6 +1126,53 @@ END
 GO
 
 -- =========================================================================
+-- T_PieceWU — les pièces comptables produites, conservées ligne à ligne
+--
+-- L'historique garde les montants ; il ne garde pas le taux du sous-agent ce jour-là, ni
+-- ses comptes, ni la ligne d'écart posée sur le compte inter bancaire. Reconstituer une
+-- pièce ancienne avec le paramétrage d'aujourd'hui réécrirait le passé : un sous-agent
+-- passé de 70 % à 60 % ferait apparaître une pièce qui n'a jamais été visée ni signée.
+--
+-- Une pièce comptable est un justificatif. Elle est donc conservée telle quelle.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_PieceWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_PieceWU
+    (
+        DateActivite        DATE            NOT NULL,
+        Ligne               INT             NOT NULL,
+
+        Compte              NVARCHAR(50)    NOT NULL,
+        Libelle             NVARCHAR(255)   NULL,
+
+        -- En FCFA, donc entier : la monnaie n'a pas de décimale, et la pièce est déjà
+        -- arrondie à l'unité.
+        Debit               BIGINT          NOT NULL DEFAULT (0),
+        Credit              BIGINT          NOT NULL DEFAULT (0),
+
+        -- Alimente la colonne ACBRN du fichier destiné au core banking.
+        CodeAgence          NVARCHAR(50)    NULL,
+
+        DateEnregistrement  DATETIME        NOT NULL DEFAULT (GETDATE()),
+        EnregistrePar       NVARCHAR(100)   NULL,
+
+        CONSTRAINT PK_T_PieceWU PRIMARY KEY (DateActivite, Ligne),
+
+        CONSTRAINT CK_T_PieceWU_UnSeulSens CHECK
+            ((Debit <> 0 AND Credit = 0) OR (Credit <> 0 AND Debit = 0))
+    );
+
+    CREATE INDEX IX_T_PieceWU_DateActivite ON dbo.T_PieceWU (DateActivite);
+
+    PRINT 'Table T_PieceWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_PieceWU déjà présente : création ignorée.';
+END
+GO
+
+-- =========================================================================
 -- Fêtes à date fixe et lundis de Pâques, 2026 à 2030
 --
 -- Rejouable : seules les dates absentes sont ajoutées, celles que la banque aurait corrigées
@@ -1375,6 +1422,22 @@ BEGIN
 END
 GO
 
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceWU')
+BEGIN
+    -- DELETE pour le rôle de compense, comme sur l'historique : rejouer une journée suppose
+    -- d'effacer la version précédente, ce que fait EnregistrerJournee dans une transaction.
+    -- Le commercial lit, il ne comptabilise rien.
+    EXEC('GRANT SELECT, INSERT, DELETE ON dbo.T_PieceWU TO wu_compense');
+    EXEC('GRANT SELECT ON dbo.T_PieceWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.T_PieceWU TO wu_admin');
+    PRINT 'Droits accordés sur T_PieceWU.';
+END
+ELSE
+BEGIN
+    PRINT 'T_PieceWU absente : relancez ce script après 13_PiecesComptables.sql.';
+END
+GO
+
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_DemandeWU')
 BEGIN
     -- La file du double regard appartient au paramétrage : l'agent de compense n'y a
@@ -1501,7 +1564,8 @@ GO
     SELECT N'T_UtilisateurWU',           N'Comptes utilisateurs'                  UNION ALL
     SELECT N'T_ConnexionWU',             N'Journal des connexions'                UNION ALL
     SELECT N'T_DemandeWU',               N'Double regard : file des demandes'     UNION ALL
-    SELECT N'T_JourFerieWU',             N'Jours feries'
+    SELECT N'T_JourFerieWU',             N'Jours feries'                          UNION ALL
+    SELECT N'T_PieceWU',                 N'Pieces comptables conservees'
 )
 SELECT  [Table]   = a.nom,
         [Role]    = a.libelle,

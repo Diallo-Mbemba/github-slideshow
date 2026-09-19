@@ -109,6 +109,15 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmRapportActivite)()
     End Sub
 
+    ''' <summary>
+    ''' Consultation des pièces déjà produites. Rangée avec le rapport d'activité, et sous le
+    ''' même droit : ce sont deux façons de regarder ce qui a été comptabilisé, l'une qui cumule
+    ''' sur une période, l'autre qui restitue un justificatif daté.
+    ''' </summary>
+    Private Sub mnuPiecesArchivees_Click(sender As Object, e As EventArgs) Handles mnuPiecesArchivees.Click
+        AfficherEnfant(Of FrmPiecesArchivees)()
+    End Sub
+
     Private Sub mnuSousAgents_Click(sender As Object, e As EventArgs) Handles mnuSousAgents.Click
         AfficherEnfant(Of FrmSousAgents)()
     End Sub
@@ -260,6 +269,7 @@ Public Class FrmPrincipal
 
         mnuTraitement.Available = traite
         mnuRapport.Available = rapports
+        mnuPiecesArchivees.Available = rapports
         SEP1.Available = traite AndAlso rapports
         mnuCompensation.Available = traite OrElse rapports
 
