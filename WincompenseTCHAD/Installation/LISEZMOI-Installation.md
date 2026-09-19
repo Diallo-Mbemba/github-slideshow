@@ -37,7 +37,8 @@ toute la banque.
 
 **L'authentification est celle de Windows.** Aucun mot de passe ne circule, et c'est
 précisément ce qui permet de poser la configuration sur un partage lisible par tous.
-Les droits d'accès à la base sont donnés par `Scripts\08_RolesSQLServer.sql`.
+Les droits d'accès à la base sont donnés par `Scripts\08_RolesSQLServer.sql` (les rôles) et
+`Scripts\11_AccesUtilisateurs.sql` (les comptes).
 
 ---
 
@@ -154,7 +155,7 @@ banque par accident.
 
 | Emplacement | Contenu |
 |---|---|
-| `C:\Program Files\Default Company Name\SetupWincompense\` | L'application, plus `Scripts\` (les dix scripts SQL) et `Installation\` |
+| `C:\Program Files\Default Company Name\SetupWincompense\` | L'application, plus `Scripts\` (les onze scripts SQL) et `Installation\` |
 | `C:\ProgramData\Wincompense\wincompense.config` | La configuration, **modifiable par les utilisateurs** |
 | Menu Démarrer, Bureau | Les raccourcis |
 | Panneau de configuration | L'entrée de désinstallation |
@@ -324,8 +325,10 @@ Changer de serveur ne déplace pas les données. Sur le nouveau serveur, il faut
 1. restaurer la base `GWC_WINCOMPENSE_ETD`, ou la recréer avec
    **`Scripts\00_InstallationComplete.sql`** — un seul script, rejouable, qui monte les dix
    tables, les trois rôles et leurs droits, puis rend compte de ce qu'il a fait ;
-2. compléter la **PARTIE 5** de ce script avec vos groupes Active Directory, pour redonner
-   leurs droits aux utilisateurs Windows sur le nouveau serveur.
+2. exécuter **`Scripts\11_AccesUtilisateurs.sql`**, après y avoir mis vos comptes ou groupes
+   Active Directory, pour redonner leurs droits aux utilisateurs Windows sur le nouveau
+   serveur. **Un serveur restauré garde ses utilisateurs de base mais perd ses logins :**
+   c'est la cause la plus fréquente du message « Login failed for user » après une migration.
 
 ---
 

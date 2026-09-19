@@ -144,7 +144,8 @@ WincompenseTCHAD/
     │   ├── CoreBankingService.vb           ' Fichier d'interface : construction, numéro de lot
     │   ├── CalendrierWU.vb                 ' Jours ouvrés : week-ends et jours fériés
     │   ├── ConfigurationWU.vb              ' Où est le serveur : partage réseau, copie locale, secours
-    │   └── MiseAJourWU.vb                  ' Annonce aux postes qu'une version plus récente est publiée
+    │   ├── MiseAJourWU.vb                  ' Annonce aux postes qu'une version plus récente est publiée
+    │   └── DiagnosticSqlWU.vb              ' Traduit les refus de SQL Server en consigne exécutable
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -159,6 +160,7 @@ WincompenseTCHAD/
         ├── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
         ├── FrmConnexion.vb                 ' Écran de connexion, amorçage du premier administrateur
         ├── FrmChangerMotDePasse.vb         ' Changement de mot de passe (imposé ou volontaire)
+        ├── FrmDiagnostic.vb                ' Affiche un diagnostic long, avec bouton Copier
         ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
         ├── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
         ├── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
@@ -176,7 +178,8 @@ Scripts/
 ├── 07_Utilisateurs.sql                    ' Utilisateurs, journal des connexions, traçabilité
 ├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
 ├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
-└── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
+├── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
+└── 11_AccesUtilisateurs.sql               ' Rattachement des comptes Windows aux rôles
 
 Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe
@@ -1135,8 +1138,43 @@ Studio. Le script est rejouable et se termine par un état des droits réellemen
 utilisateurs peuvent effacer ne prouve rien. L'historique, lui, accepte `DELETE` pour le rôle de
 compense, puisque rejouer une journée suppose d'effacer la version précédente.
 
-Le rattachement des comptes Windows aux rôles est laissé en commentaire à la fin du script : il
-dépend de votre domaine.
+Le rattachement des comptes Windows aux rôles ne peut pas être écrit d'avance : il dépend de
+votre domaine. C'est l'objet de `11_AccesUtilisateurs.sql`, le seul script dont une section doit
+être modifiée avant exécution.
+
+### Quand SQL Server refuse le compte (`DiagnosticSqlWU`)
+
+« Login failed for user 'ETD\wincompense' » est exact, et inexploitable : c'est de l'anglais, ça
+ne dit pas si le tort est au serveur, à la base ou au compte, et surtout ça ne dit pas quoi
+demander à l'informatique. L'agent devant son écran ne peut rien en faire.
+
+`DiagnosticSqlWU` traduit ces refus en une consigne exécutable. Il ne décide de rien et n'écrit
+nulle part : il rédige.
+
+| Erreur | Ce qui manque | Ce que le diagnostic propose |
+|---|---|---|
+| 18456 | Le *login*, au niveau du serveur | `CREATE LOGIN … FROM WINDOWS`, puis l'utilisateur et le rôle |
+| 4060, 916 | L'*utilisateur*, au niveau de la base | `CREATE USER … FOR LOGIN …` |
+| 229, 230, 262, 297 | Le *rôle* | `ALTER ROLE wu_compense ADD MEMBER …` |
+| 4064 | Une base par défaut valable | `ALTER LOGIN … WITH DEFAULT_DATABASE = …` |
+| 18452 | Le domaine du poste n'est pas approuvé | Poste et serveur dans des domaines différents |
+| −1, 2, 40, 53, 1231, 10060, 10061, 11001 | Le serveur n'a pas répondu | Nom, instance, port 1433, service arrêté |
+
+Trois niveaux, qu'on confond facilement : le **login** ouvre la porte du bâtiment, l'**utilisateur**
+celle du bureau, le **rôle** dit ce qu'on a le droit d'y faire. Il faut les trois. Un login sans
+utilisateur donne 4060 ; un utilisateur sans rôle donne « SELECT permission was denied » à la
+première lecture.
+
+Le nom du compte est lu dans la chaîne de connexion et dans l'identité Windows du poste — **pas**
+dans le message d'erreur, qui est traduit dans la langue du serveur et dont le découpage
+varierait avec elle.
+
+Le diagnostic s'affiche dans `FrmDiagnostic`, avec un bouton **Copier** : le texte porte le T-SQL
+à exécuter, et c'est l'agent qui le transmettra. Le lui faire recopier à la main reviendrait à
+lui faire inventer un nom de compte.
+
+Quand `Expliquer` ne reconnaît pas l'erreur, elle rend une chaîne vide et l'appelant garde son
+propre message : mieux vaut un message technique qu'un message vague.
 
 ## Contrôles de sécurité sur les fichiers chargés
 
@@ -1257,8 +1295,9 @@ charges pour un gain nul.
 ## Points restant à confirmer
 
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré), et
-  rattachement des comptes aux rôles `wu_compense` / `wu_commercial` / `wu_admin`, laissé en
-  commentaire à la fin de `Scripts\08_RolesSQLServer.sql` faute de connaître votre domaine.
+  rattachement des comptes aux rôles `wu_compense` / `wu_commercial` / `wu_admin`. Les noms de
+  domaine de la banque n'étant pas connus d'ici, `Scripts\11_AccesUtilisateurs.sql` porte la
+  liste à compléter — c'est le seul script à modifier avant exécution.
 - Durée de vie d'un mot de passe : aucune expiration périodique n'est imposée aujourd'hui.
   Faut-il en ajouter une, et à quelle échéance ?
 - Les comptes comptables (`SystemeWU`) restent hors du double regard, sur décision de la banque.

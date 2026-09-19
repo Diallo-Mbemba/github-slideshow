@@ -29,6 +29,24 @@ Public NotInheritable Class UtilisateurRepository
     ''' <summary>Nombre d'échecs consécutifs au-delà duquel le compte est verrouillé.</summary>
     Public Const ECHECS_AVANT_VERROUILLAGE As Integer = 5
 
+    ''' <summary>
+    ''' Le message à afficher pour une erreur SQL Server, du plus précis au plus général.
+    '''
+    ''' Les refus de connexion et de droits passent par DiagnosticSqlWU : ils ne se règlent
+    ''' pas dans l'application mais sur le serveur, et l'agent a besoin de savoir quoi
+    ''' demander. Le reste garde le message du serveur, précédé de ce qu'on tentait de faire.
+    ''' </summary>
+    Private Shared Function MessageSql(ex As SqlException, contexte As String) As String
+
+        If ex.Number = ERREUR_TABLE_ABSENTE Then Return MESSAGE_TABLE_ABSENTE
+        If ex.Number = ERREUR_COLONNE_ABSENTE Then Return MESSAGE_COLONNE_ABSENTE
+
+        Dim diagnostic As String = DiagnosticSqlWU.Expliquer(ex, ConfigurationWU.ChaineDeConnexion())
+        If diagnostic.Length > 0 Then Return diagnostic
+
+        Return contexte & " : " & ex.Message
+    End Function
+
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_UtilisateurWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
         "Exécutez le script Scripts\07_Utilisateurs.sql : il crée les tables des utilisateurs " &
@@ -156,11 +174,7 @@ Public NotInheritable Class UtilisateurRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                            If(ex.Number = ERREUR_COLONNE_ABSENTE,
-                               MESSAGE_COLONNE_ABSENTE,
-                               $"Lecture des utilisateurs impossible : {ex.Message}"))
+            messageErreur = MessageSql(ex, "Lecture des utilisateurs impossible")
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -197,11 +211,7 @@ Public NotInheritable Class UtilisateurRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                            If(ex.Number = ERREUR_COLONNE_ABSENTE,
-                               MESSAGE_COLONNE_ABSENTE,
-                               $"Lecture de l'utilisateur impossible : {ex.Message}"))
+            messageErreur = MessageSql(ex, "Lecture de l'utilisateur impossible")
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
@@ -235,11 +245,7 @@ Public NotInheritable Class UtilisateurRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                            If(ex.Number = ERREUR_COLONNE_ABSENTE,
-                               MESSAGE_COLONNE_ABSENTE,
-                               $"Lecture des utilisateurs impossible : {ex.Message}"))
+            messageErreur = MessageSql(ex, "Lecture des utilisateurs impossible")
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
@@ -321,9 +327,7 @@ Public NotInheritable Class UtilisateurRepository
         Catch ex As SqlException
             messageErreur = If(ex.Number = ERREUR_CLE_DUPLIQUEE OrElse ex.Number = ERREUR_INDEX_UNIQUE,
                                $"L'identifiant « {utilisateur.Identifiant} » est déjà utilisé.",
-                            If(ex.Number = ERREUR_TABLE_ABSENTE, MESSAGE_TABLE_ABSENTE,
-                            If(ex.Number = ERREUR_COLONNE_ABSENTE, MESSAGE_COLONNE_ABSENTE,
-                               $"Création de l'utilisateur impossible : {ex.Message}")))
+                               MessageSql(ex, "Création de l'utilisateur impossible"))
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -542,11 +546,7 @@ Public NotInheritable Class UtilisateurRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                            If(ex.Number = ERREUR_COLONNE_ABSENTE,
-                               MESSAGE_COLONNE_ABSENTE,
-                               $"Lecture du journal impossible : {ex.Message}"))
+            messageErreur = MessageSql(ex, "Lecture du journal impossible")
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
@@ -600,11 +600,7 @@ Public NotInheritable Class UtilisateurRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                            If(ex.Number = ERREUR_COLONNE_ABSENTE,
-                               MESSAGE_COLONNE_ABSENTE,
-                               $"Écriture impossible : {ex.Message}"))
+            messageErreur = MessageSql(ex, "Écriture impossible")
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"

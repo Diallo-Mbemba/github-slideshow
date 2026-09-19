@@ -270,13 +270,36 @@ Public Class FrmParametresConnexion
             End Using
 
         Catch ex As SqlException
-            message = "Connexion refusée : " & ex.Message
+
+            ' Un message brut de SQL Server est exact mais inexploitable : en anglais, et
+            ' muet sur ce qu'il reste à faire. Quand le diagnostic sait répondre, c'est lui
+            ' qui parle, et le libellé de l'écran ne garde que la première ligne.
+            Dim diagnostic As String = DiagnosticSqlWU.Expliquer(ex, chaine)
+
+            If diagnostic.Length = 0 Then
+                message = "Connexion refusée : " & ex.Message
+                Return False
+            End If
+
+            message = PremiereLigne(diagnostic)
+            FrmDiagnostic.Afficher(Me, "Connexion refusée par le serveur", diagnostic)
             Return False
 
         Catch ex As Exception
             message = "Connexion impossible : " & ex.Message
             Return False
         End Try
+    End Function
+
+    ''' <summary>
+    ''' La première ligne d'un diagnostic, pour le libellé de l'écran : il fait deux lignes,
+    ''' et le détail s'affiche dans sa propre fenêtre.
+    ''' </summary>
+    Private Shared Function PremiereLigne(texte As String) As String
+
+        Dim fin As Integer = texte.IndexOfAny(New Char() {ControlChars.Cr, ControlChars.Lf})
+        If fin < 0 Then Return texte
+        Return texte.Substring(0, fin)
     End Function
 
 #End Region

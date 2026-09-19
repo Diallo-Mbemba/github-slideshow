@@ -124,6 +124,30 @@ Public Class FrmConnexion
     End Sub
 
     ''' <summary>
+    ''' Affiche un message d'erreur. Les diagnostics de DiagnosticSqlWU tiennent une
+    ''' quinzaine de lignes et portent du T-SQL à transmettre à l'informatique : le libellé
+    ''' de l'écran, haut de quatre lignes, en avalerait la moitié sans que personne ne le
+    ''' sache. Il garde donc la première ligne, et le détail s'ouvre dans sa fenêtre.
+    ''' </summary>
+    Private Sub AfficherLeMessage(texte As String)
+
+        If String.IsNullOrEmpty(texte) Then
+            lblMessage.Text = String.Empty
+            Return
+        End If
+
+        Dim fin As Integer = texte.IndexOfAny(New Char() {ControlChars.Cr, ControlChars.Lf})
+
+        If fin < 0 Then
+            lblMessage.Text = texte
+            Return
+        End If
+
+        lblMessage.Text = texte.Substring(0, fin)
+        FrmDiagnostic.Afficher(Me, "Connexion à la base impossible", texte)
+    End Sub
+
+    ''' <summary>
     ''' Au tout premier démarrage, la base ne contient aucun administrateur utilisable : sans
     ''' lui, personne ne pourrait créer de compte et l'application resterait inaccessible. On
     ''' propose alors de créer ce premier administrateur.
@@ -144,7 +168,7 @@ Public Class FrmConnexion
             If UtilisateurRepository.ExisteAdministrateurUtilisable(messageErreur) Then Return
 
             If Not String.IsNullOrEmpty(messageErreur) Then
-                lblMessage.Text = messageErreur
+                AfficherLeMessage(messageErreur)
                 OffrirDeReglerLeServeur()
                 Return
             End If
@@ -224,7 +248,7 @@ Public Class FrmConnexion
                 UtilisateurRepository.Authentifier(txtIdentifiant.Text, txtMotDePasse.Text)
 
             If Not resultat.Reussi Then
-                lblMessage.Text = resultat.Message
+                AfficherLeMessage(resultat.Message)
                 txtMotDePasse.Clear()
                 txtMotDePasse.Focus()
                 Return
