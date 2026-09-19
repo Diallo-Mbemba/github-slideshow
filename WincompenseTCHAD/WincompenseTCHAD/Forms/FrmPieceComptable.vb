@@ -181,19 +181,37 @@ Public Class FrmPieceComptable
     ''' </summary>
     Private NotInheritable Class ChoixPortee
 
-        Public Sub New(libelle As String, typePdv As String, nombre As Integer)
-            _libelle = libelle
-            TypePdv = typePdv
-            Nombre = nombre
+        ''' <summary>
+        ''' Les trois valeurs passent par des champs, et les paramètres portent des noms qui
+        ''' ne ressemblent à aucune propriété. VB NE DISTINGUE PAS LA CASSE : un paramètre
+        ''' « typePdv » et une propriété « TypePdv » sont le MÊME identifiant, et
+        ''' « TypePdv = typePdv » dans le constructeur n'assigne alors rien — le paramètre se
+        ''' recopie sur lui-même, la propriété reste à Nothing, et la faute ne se voit qu'à
+        ''' l'exécution, sur un NullReferenceException loin de sa cause.
+        ''' </summary>
+        Public Sub New(valeurLibelle As String, valeurType As String, valeurNombre As Integer)
+            _libelle = If(valeurLibelle, String.Empty)
+            _typePdv = If(valeurType, String.Empty)
+            _nombre = valeurNombre
         End Sub
 
         Private ReadOnly _libelle As String
+        Private ReadOnly _typePdv As String
+        Private ReadOnly _nombre As Integer
 
         ''' <summary>Type retenu : "SA", "EC", ou chaîne vide pour tout prendre.</summary>
         Public ReadOnly Property TypePdv As String
+            Get
+                Return _typePdv
+            End Get
+        End Property
 
         ''' <summary>Nombre de pièces que ce choix produira.</summary>
         Public ReadOnly Property Nombre As Integer
+            Get
+                Return _nombre
+            End Get
+        End Property
 
         ''' <summary>Ce que la liste affiche. Le nombre y figure : on choisit mieux en sachant combien.</summary>
         Public Overrides Function ToString() As String
