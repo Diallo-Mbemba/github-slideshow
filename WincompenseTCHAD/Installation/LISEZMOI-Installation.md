@@ -161,7 +161,7 @@ banque par accident.
 
 | Emplacement | Contenu |
 |---|---|
-| `C:\Program Files\Default Company Name\SetupWincompense\` | L'application, plus `Scripts\` (les onze scripts SQL) et `Installation\` |
+| `C:\Program Files\Default Company Name\SetupWincompense\` | L'application, plus `Scripts\` (les douze scripts SQL) et `Installation\` |
 | `C:\ProgramData\Wincompense\wincompense.config` | La configuration, **modifiable par les utilisateurs** |
 | Menu Démarrer, Bureau | Les raccourcis |
 | Panneau de configuration | L'entrée de désinstallation |

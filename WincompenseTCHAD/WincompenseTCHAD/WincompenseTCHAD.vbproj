@@ -105,6 +105,7 @@
     <Compile Include="Services\MiseAJourWU.vb" />
     <Compile Include="Services\DiagnosticSqlWU.vb" />
     <Compile Include="Services\SecretWU.vb" />
+    <Compile Include="Services\PreparationBaseWU.vb" />
     <Compile Include="Forms\FrmPrincipal.vb">
       <SubType>Form</SubType>
     </Compile>

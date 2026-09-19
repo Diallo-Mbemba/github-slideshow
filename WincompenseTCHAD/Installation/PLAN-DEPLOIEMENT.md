@@ -38,7 +38,8 @@ paramétrés ne sont pas comptabilisés.
 | | Étape | Qui |
 |---|---|---|
 | ☐ | Exécuter **`Scripts\00_InstallationComplete.sql`** sur le serveur de production | INFO |
-| ☐ | Compléter la section 1 de **`Scripts\11_AccesUtilisateurs.sql`** avec les comptes ou groupes Windows réels, puis l'exécuter | INFO |
+| ☐ | **Authentification Windows** : compléter la section 1 de **`Scripts\11_AccesUtilisateurs.sql`** avec les comptes ou groupes réels, puis l'exécuter | INFO |
+| ☐ | **Compte SQL Server fourni par la banque** : renseigner `@compte` dans **`Scripts\12_AccesCompteApplicatif.sql`**, puis l'exécuter | INFO |
 | ☐ | Lire le **compte rendu** en fin de script : tables créées, rôles, et ce qui reste à faire | INFO |
 | ☐ | Compléter la **PARTIE 5** du script avec vos groupes Active Directory, puis réexécuter cette partie | INFO |
 | ☐ | Vérifier le **mode de récupération** de la base | INFO |

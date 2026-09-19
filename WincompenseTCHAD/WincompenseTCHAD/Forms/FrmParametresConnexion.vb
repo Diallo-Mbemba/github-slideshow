@@ -226,34 +226,44 @@ Public Class FrmParametresConnexion
     ''' que la base n'existe pas, et un serveur joignable avec une mauvaise base passerait pour
     ''' un succès.
     ''' </summary>
-    Private Function Tester(ByRef message As String) As Boolean
-
-        Dim chaine As String
+    ''' <summary>
+    ''' La chaîne décrite par l'écran en ce moment, prête à être essayée.
+    '''
+    ''' Le test et la préparation de la base doivent porter sur EXACTEMENT la même chaîne :
+    ''' éprouver l'une et agir sur l'autre reviendrait à ne rien avoir éprouvé.
+    ''' </summary>
+    ''' <returns>Chaîne vide si l'écran n'est pas en état d'en décrire une.</returns>
+    Private Function ChaineDeLEcran(ByRef message As String) As String
 
         If chkChaineComplete.Checked Then
 
             If txtChaine.Text.Trim().Length = 0 Then
                 message = "Collez d'abord la chaîne de connexion fournie."
-                Return False
+                Return String.Empty
             End If
 
             ' Sur une ligne, comme elle sera écrite : tester autre chose que ce qu'on
             ' enregistre n'aurait aucune valeur.
-            chaine = txtChaine.Text.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
+            Dim surUneLigne As String = txtChaine.Text.Replace(vbCr, " ").Replace(vbLf, " ").Trim()
 
             ' Une chaîne déjà enregistrée n'affiche plus son mot de passe : il est chiffré à
             ' part. On le remet pour l'essai, sinon le test échouerait là où l'application
             ' réussit — le pire des verdicts, celui qui envoie chercher une panne ailleurs.
-            chaine = ConfigurationWU.ChaineEssayable(chaine)
-        Else
-
-            If txtServeur.Text.Trim().Length = 0 Then
-                message = "Indiquez d'abord le serveur."
-                Return False
-            End If
-
-            chaine = ConfigurationWU.ChaineDepuis(txtServeur.Text, txtBase.Text, CInt(nudDelai.Value))
+            Return ConfigurationWU.ChaineEssayable(surUneLigne)
         End If
+
+        If txtServeur.Text.Trim().Length = 0 Then
+            message = "Indiquez d'abord le serveur."
+            Return String.Empty
+        End If
+
+        Return ConfigurationWU.ChaineDepuis(txtServeur.Text, txtBase.Text, CInt(nudDelai.Value))
+    End Function
+
+    Private Function Tester(ByRef message As String) As Boolean
+
+        Dim chaine As String = ChaineDeLEcran(message)
+        If chaine.Length = 0 Then Return False
 
         Try
             Using connexion As New SqlConnection(chaine)
@@ -305,6 +315,162 @@ Public Class FrmParametresConnexion
         Dim fin As Integer = texte.IndexOfAny(New Char() {ControlChars.Cr, ControlChars.Lf})
         If fin < 0 Then Return texte
         Return texte.Substring(0, fin)
+    End Function
+
+#End Region
+
+#Region "Préparation de la base"
+
+    ''' <summary>
+    ''' Constate l'état du compte sur le serveur, répare ce qui peut l'être, et rédige le reste.
+    ''' 
+    ''' Ce bouton répond à une demande simple : coller la chaîne de la banque et que tout suive.
+    ''' Il y suit ce qu'il peut, et dit clairement ce qu'il ne peut pas — créer un accès à
+    ''' SQL Server demande des droits d'administration du serveur, que le compte applicatif n'a
+    ''' presque jamais. Le script produit alors n'est pas un pis-aller : c'est le livrable.
+    ''' </summary>
+    Private Sub btnPreparer_Click(sender As Object, e As EventArgs) Handles btnPreparer.Click
+
+        Dim message As String = String.Empty
+        Dim chaine As String = ChaineDeLEcran(message)
+
+        If chaine.Length = 0 Then
+            MessageBox.Show(Me, message, "Préparation de la base",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Cursor = Cursors.WaitCursor
+        lblResultat.ForeColor = Drawing.SystemColors.ControlText
+        lblResultat.Text = "Examen du serveur…"
+        lblResultat.Refresh()
+
+        Dim rapport As PreparationBaseWU.Rapport = PreparationBaseWU.Analyser(chaine)
+
+        Cursor = Cursors.Default
+
+        If rapport.RienAFaire Then
+            lblResultat.ForeColor = Drawing.Color.DarkGreen
+            lblResultat.Text = "Rien à préparer : ce compte a déjà accès à la base."
+            MessageBox.Show(Me, Constat(rapport), "Préparation de la base",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        If rapport.PeutAgir AndAlso ConfirmerLaPreparation(rapport) Then
+            AppliquerLaPreparation(chaine, rapport)
+            Return
+        End If
+
+        RemettreLeScript(rapport)
+    End Sub
+
+    ''' <summary>Exécute ce qui manque, puis rend compte de chaque ordre.</summary>
+    Private Sub AppliquerLaPreparation(chaine As String, rapport As PreparationBaseWU.Rapport)
+
+        Dim journal As String = String.Empty
+
+        Cursor = Cursors.WaitCursor
+        Dim tout As Boolean = PreparationBaseWU.Appliquer(chaine, rapport, journal)
+        Cursor = Cursors.Default
+
+        lblResultat.ForeColor = If(tout, Drawing.Color.DarkGreen, Drawing.Color.Firebrick)
+        lblResultat.Text = If(tout, "Base préparée.", "Préparation incomplète — voir le détail.")
+
+        Dim texte As String = Constat(rapport) & Environment.NewLine & Environment.NewLine &
+                              "--- Ce qui a été exécuté ---" & Environment.NewLine & Environment.NewLine &
+                              journal
+
+        ' Ce qui n'a pas pu être fait reste à faire par quelqu'un : le script accompagne donc
+        ' le journal, plutôt que d'obliger à rouvrir l'écran pour l'obtenir.
+        If Not tout Then
+            texte &= Environment.NewLine & Environment.NewLine &
+                     "--- À remettre à la banque pour le reste ---" & Environment.NewLine & Environment.NewLine &
+                     PreparationBaseWU.ScriptPourLaBanque(rapport)
+        End If
+
+        FrmDiagnostic.Afficher(Me, "Préparation de la base", texte)
+    End Sub
+
+    ''' <summary>Affiche le script, précédé de ce qui l'explique.</summary>
+    Private Sub RemettreLeScript(rapport As PreparationBaseWU.Rapport)
+
+        lblResultat.ForeColor = Drawing.Color.Firebrick
+        lblResultat.Text = "Droits insuffisants : script à remettre à la banque."
+
+        Dim texte As String =
+            Constat(rapport) & Environment.NewLine & Environment.NewLine &
+            "Ce compte n'a pas les droits d'ouvrir lui-même la base — et c'est normal :" & Environment.NewLine &
+            "une application comptable qui pourrait se donner des droits à elle-même n'aurait" & Environment.NewLine &
+            "plus de contrôle d'accès du tout." & Environment.NewLine & Environment.NewLine &
+            "Le script ci-dessous fait exactement ce qui manque. « Copier », puis courriel à" & Environment.NewLine &
+            "l'informatique de la banque." & Environment.NewLine & Environment.NewLine &
+            PreparationBaseWU.ScriptPourLaBanque(rapport)
+
+        FrmDiagnostic.Afficher(Me, "Script à remettre à la banque", texte)
+    End Sub
+
+    ''' <summary>Ce que le serveur a répondu, en clair.</summary>
+    Private Shared Function Constat(rapport As PreparationBaseWU.Rapport) As String
+
+        If Not rapport.Joignable Then
+            Return "Le serveur a refusé la connexion." & Environment.NewLine & Environment.NewLine &
+                   rapport.MessageDeRefus
+        End If
+
+        Dim lignes As New System.Text.StringBuilder()
+
+        lignes.AppendLine("Constat sur le serveur :")
+        lignes.AppendLine()
+        lignes.AppendLine("    compte          : " & rapport.Compte)
+        lignes.AppendLine("    base visée      : " & rapport.Base)
+        lignes.AppendLine("    base existe     : " & OuiNon(rapport.BaseExiste))
+        lignes.AppendLine("    accès à la base : " & OuiNon(rapport.AccesALaBase))
+        lignes.AppendLine("    tables en place : " & OuiNon(rapport.TablesPresentes))
+        lignes.AppendLine("    rôles présents  : " & rapport.RolesPresents.ToString() & " sur 3")
+        lignes.AppendLine("    rôle du compte  : " &
+                          If(rapport.RoleDejaAccorde.Length > 0, rapport.RoleDejaAccorde, "aucun"))
+
+        If rapport.EstAdministrateurDuServeur Then
+            lignes.AppendLine()
+            lignes.AppendLine("Ce compte administre le serveur : l'application peut tout faire elle-même.")
+        End If
+
+        Return lignes.ToString().TrimEnd()
+    End Function
+
+    Private Shared Function OuiNon(valeur As Boolean) As String
+        Return If(valeur, "oui", "non")
+    End Function
+
+    ''' <summary>
+    ''' Fait confirmer une modification des droits sur le serveur de la banque.
+    ''' 
+    ''' Ce n'est pas un réglage d'application : cela change qui a accès à quoi sur une base de
+    ''' production. On ne le fait pas sans l'avoir demandé.
+    ''' </summary>
+    Private Function ConfirmerLaPreparation(rapport As PreparationBaseWU.Rapport) As Boolean
+
+        Dim aFaire As New System.Text.StringBuilder()
+
+        If Not rapport.AccesALaBase Then
+            aFaire.AppendLine("    - ouvrir la base " & rapport.Base & " au compte " & rapport.Compte)
+        End If
+
+        If rapport.RoleDejaAccorde.Length = 0 Then
+            aFaire.AppendLine("    - lui accorder le rôle " & PreparationBaseWU.ROLE_PROPOSE)
+        End If
+
+        If aFaire.Length = 0 Then Return False
+
+        Return MessageBox.Show(Me,
+            "L'application va modifier les droits sur le serveur :" & Environment.NewLine & Environment.NewLine &
+            aFaire.ToString() & Environment.NewLine &
+            "Cela engage la base de production. Si vous préférez que l'informatique de la" & Environment.NewLine &
+            "banque le fasse, répondez Non : le script exact vous sera remis." & Environment.NewLine & Environment.NewLine &
+            "Exécuter maintenant ?",
+            "Préparation de la base", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) = DialogResult.Yes
     End Function
 
 #End Region

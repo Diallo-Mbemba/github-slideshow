@@ -42,6 +42,7 @@ Partial Class FrmParametresConnexion
         Me.chkPropager = New System.Windows.Forms.CheckBox()
         Me.lblAidePartage = New System.Windows.Forms.Label()
         Me.btnTester = New System.Windows.Forms.Button()
+        Me.btnPreparer = New System.Windows.Forms.Button()
         Me.lblResultat = New System.Windows.Forms.Label()
         Me.btnEnregistrer = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
@@ -270,12 +271,21 @@ Partial Class FrmParametresConnexion
         Me.lblResultat.Size = New System.Drawing.Size(398, 40)
         Me.lblResultat.TabIndex = 6
         '
+        'btnPreparer
+        '
+        Me.btnPreparer.Location = New System.Drawing.Point(12, 546)
+        Me.btnPreparer.Name = "btnPreparer"
+        Me.btnPreparer.Size = New System.Drawing.Size(190, 32)
+        Me.btnPreparer.TabIndex = 7
+        Me.btnPreparer.Text = "Préparer la base…"
+        Me.btnPreparer.UseVisualStyleBackColor = True
+        '
         'btnEnregistrer
         '
         Me.btnEnregistrer.Location = New System.Drawing.Point(352, 546)
         Me.btnEnregistrer.Name = "btnEnregistrer"
         Me.btnEnregistrer.Size = New System.Drawing.Size(120, 32)
-        Me.btnEnregistrer.TabIndex = 7
+        Me.btnEnregistrer.TabIndex = 8
         Me.btnEnregistrer.Text = "Enregistrer"
         Me.btnEnregistrer.UseVisualStyleBackColor = True
         '
@@ -285,7 +295,7 @@ Partial Class FrmParametresConnexion
         Me.btnFermer.Location = New System.Drawing.Point(478, 546)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(94, 32)
-        Me.btnFermer.TabIndex = 8
+        Me.btnFermer.TabIndex = 9
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -298,6 +308,7 @@ Partial Class FrmParametresConnexion
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.lblResultat)
+        Me.Controls.Add(Me.btnPreparer)
         Me.Controls.Add(Me.btnTester)
         Me.Controls.Add(Me.grpPartage)
         Me.Controls.Add(Me.grpChaine)
@@ -343,6 +354,7 @@ Partial Class FrmParametresConnexion
     Friend WithEvents chkPropager As System.Windows.Forms.CheckBox
     Friend WithEvents lblAidePartage As System.Windows.Forms.Label
     Friend WithEvents btnTester As System.Windows.Forms.Button
+    Friend WithEvents btnPreparer As System.Windows.Forms.Button
     Friend WithEvents lblResultat As System.Windows.Forms.Label
     Friend WithEvents btnEnregistrer As System.Windows.Forms.Button
     Friend WithEvents btnFermer As System.Windows.Forms.Button

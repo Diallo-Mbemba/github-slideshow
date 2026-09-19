@@ -146,7 +146,8 @@ WincompenseTCHAD/
     │   ├── ConfigurationWU.vb              ' Où est le serveur : partage réseau, copie locale, secours
     │   ├── MiseAJourWU.vb                  ' Annonce aux postes qu'une version plus récente est publiée
     │   ├── DiagnosticSqlWU.vb              ' Traduit les refus de SQL Server en consigne exécutable
-    │   └── SecretWU.vb                     ' Chiffre le mot de passe SQL pour ce poste (DPAPI)
+    │   ├── SecretWU.vb                     ' Chiffre le mot de passe SQL pour ce poste (DPAPI)
+    │   └── PreparationBaseWU.vb            ' Constate l'accès du compte, le répare ou rédige le script
     └── Forms/
         ├── FrmPrincipal.vb                 ' Fenêtre MDI : menus et ouverture des écrans
         ├── FrmCompensationWU.vb            ' Orchestration des événements uniquement
@@ -180,7 +181,8 @@ Scripts/
 ├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
 ├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
 ├── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
-└── 11_AccesUtilisateurs.sql               ' Rattachement des comptes Windows aux rôles
+├── 11_AccesUtilisateurs.sql               ' Rattachement des comptes Windows aux rôles
+└── 12_AccesCompteApplicatif.sql           ' LE SCRIPT À REMETTRE À LA BANQUE : un compte, un rôle
 
 Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe
@@ -1195,6 +1197,32 @@ distinguer quoi que ce soit au niveau SQL Server : c'est l'application qui garde
 distinction entre l'agent de compense, le commercial et l'administrateur, et le verrou qui
 s'opposait à une connexion faite **hors** de l'application disparaît. Un compte SQL par agent,
 si la banque l'accepte, rend aux trois rôles leur utilité.
+
+### Préparer l'accès du compte (`PreparationBaseWU`)
+
+L'agent colle la chaîne de la banque et voudrait que tout suive. Le bouton **« Préparer la
+base… »** de l'écran de connexion fait ce qu'il est possible de faire, et dit le reste.
+
+Il procède en trois temps, et aucun n'est supposé — tout est lu sur le serveur :
+
+| | Temps | Ce qui se passe |
+|---|---|---|
+| 1 | **Constater** | Le compte entre-t-il ? La base existe-t-elle ? Les tables ? Les trois rôles ? Le compte est-il membre de l'un d'eux ? |
+| 2 | **Agir** | Si le compte a les droits — `CREATE USER`, `ALTER ROLE`, après confirmation explicite |
+| 3 | **Rédiger** | Sinon, le T-SQL exact, noms réels substitués, avec un bouton **Copier** |
+
+L'interrogation se fait sur `master`, jamais sur la base visée : une base qui refuse le
+compte refuse aussi la connexion, et l'on ne saurait alors rien dire du tout.
+
+**Le temps 3 n'est pas un pis-aller, c'est le cas normal.** Créer un accès à SQL Server
+demande des droits d'administration du serveur, que le compte applicatif n'a presque jamais
+— et c'est heureux : une application comptable qui pourrait se donner des droits à
+elle-même n'aurait plus de contrôle d'accès du tout. Il y a là un cercle que rien ne rompt :
+pour créer l'accès, il faut déjà l'avoir. Mieux vaut donc un script juste et prêt à
+exécuter qu'une tentative qui échoue en laissant l'agent deviner.
+
+Le même script existe en fichier, pour qui préfère l'envoyer sans ouvrir l'application :
+`Scripts\12_AccesCompteApplicatif.sql`, une seule ligne à modifier.
 
 ### Quand SQL Server refuse le compte (`DiagnosticSqlWU`)
 
