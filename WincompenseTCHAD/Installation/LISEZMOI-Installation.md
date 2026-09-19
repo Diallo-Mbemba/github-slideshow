@@ -11,6 +11,7 @@ et pour changer de serveur ensuite sans y revenir.
 | `version.txt.modele` | Modèle du fichier annonçant la version publiée |
 | `LISEZMOI-Installation.md` | Ce document — installation technique et changement de serveur |
 | `PLAN-DEPLOIEMENT.md` | Les huit phases du déploiement à la banque, à cocher point par point |
+| `PROCEDURE-SSMS-Acces.md` | À remettre à la banque : donner accès au compte, clic par clic dans SSMS |
 
 ---
 

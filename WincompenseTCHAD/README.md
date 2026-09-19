@@ -1224,6 +1224,10 @@ exécuter qu'une tentative qui échoue en laissant l'agent deviner.
 Le même script existe en fichier, pour qui préfère l'envoyer sans ouvrir l'application :
 `Scripts\12_AccesCompteApplicatif.sql`, une seule ligne à modifier.
 
+Et pour une informatique qui préfère l'interface au T-SQL, la même chose clic par clic :
+`Installation\PROCEDURE-SSMS-Acces.md`. Tout y tient dans une seule fenêtre de SSMS — la page
+*User Mapping* des propriétés du login crée l'utilisateur de base **et** lui donne son rôle.
+
 ### Quand SQL Server refuse le compte (`DiagnosticSqlWU`)
 
 « Login failed for user 'ETD\wincompense' » est exact, et inexploitable : c'est de l'anglais, ça
