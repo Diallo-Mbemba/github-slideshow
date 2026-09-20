@@ -44,6 +44,8 @@ Partial Class FrmRapportActivite
         Me.dgvCommissions = New System.Windows.Forms.DataGridView()
         Me.tabTaxes = New System.Windows.Forms.TabPage()
         Me.dgvTaxes = New System.Windows.Forms.DataGridView()
+        Me.tabPerformance = New System.Windows.Forms.TabPage()
+        Me.dgvPerformance = New System.Windows.Forms.DataGridView()
         Me.sfdExport = New System.Windows.Forms.SaveFileDialog()
         Me.tabRapport.SuspendLayout()
         Me.tabSynthese.SuspendLayout()
@@ -58,6 +60,8 @@ Partial Class FrmRapportActivite
         CType(Me.dgvCommissions, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.tabTaxes.SuspendLayout()
         CType(Me.dgvTaxes, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.tabPerformance.SuspendLayout()
+        CType(Me.dgvPerformance, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
         'lblDu
@@ -138,6 +142,7 @@ Partial Class FrmRapportActivite
         Me.tabRapport.Controls.Add(Me.tabParJour)
         Me.tabRapport.Controls.Add(Me.tabParPdv)
         Me.tabRapport.Controls.Add(Me.tabParGroupe)
+        Me.tabRapport.Controls.Add(Me.tabPerformance)
         Me.tabRapport.Controls.Add(Me.tabCommissions)
         Me.tabRapport.Controls.Add(Me.tabTaxes)
         Me.tabRapport.Location = New System.Drawing.Point(12, 80)
@@ -302,6 +307,32 @@ Partial Class FrmRapportActivite
         Me.dgvTaxes.Size = New System.Drawing.Size(1002, 480)
         Me.dgvTaxes.TabIndex = 0
         '
+        'tabPerformance
+        '
+        Me.tabPerformance.Controls.Add(Me.dgvPerformance)
+        Me.tabPerformance.Location = New System.Drawing.Point(4, 22)
+        Me.tabPerformance.Name = "tabPerformance"
+        Me.tabPerformance.Padding = New System.Windows.Forms.Padding(3)
+        Me.tabPerformance.Size = New System.Drawing.Size(1008, 486)
+        Me.tabPerformance.TabIndex = 6
+        Me.tabPerformance.Text = "Performance des agences"
+        Me.tabPerformance.UseVisualStyleBackColor = True
+        '
+        'dgvPerformance
+        '
+        Me.dgvPerformance.AllowUserToAddRows = False
+        Me.dgvPerformance.AllowUserToDeleteRows = False
+        Me.dgvPerformance.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        Me.dgvPerformance.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.dgvPerformance.Location = New System.Drawing.Point(3, 3)
+        Me.dgvPerformance.MultiSelect = False
+        Me.dgvPerformance.Name = "dgvPerformance"
+        Me.dgvPerformance.ReadOnly = True
+        Me.dgvPerformance.RowHeadersWidth = 25
+        Me.dgvPerformance.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+        Me.dgvPerformance.Size = New System.Drawing.Size(1002, 480)
+        Me.dgvPerformance.TabIndex = 0
+        '
         'btnExporter
         '
         Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
@@ -374,6 +405,8 @@ Partial Class FrmRapportActivite
         CType(Me.dgvCommissions, System.ComponentModel.ISupportInitialize).EndInit()
         Me.tabTaxes.ResumeLayout(False)
         CType(Me.dgvTaxes, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.tabPerformance.ResumeLayout(False)
+        CType(Me.dgvPerformance, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
     End Sub
 
@@ -401,6 +434,8 @@ Partial Class FrmRapportActivite
     Friend WithEvents dgvCommissions As System.Windows.Forms.DataGridView
     Friend WithEvents tabTaxes As System.Windows.Forms.TabPage
     Friend WithEvents dgvTaxes As System.Windows.Forms.DataGridView
+    Friend WithEvents tabPerformance As System.Windows.Forms.TabPage
+    Friend WithEvents dgvPerformance As System.Windows.Forms.DataGridView
     Friend WithEvents sfdExport As System.Windows.Forms.SaveFileDialog
 
 End Class

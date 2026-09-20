@@ -19,6 +19,9 @@ Public Class FrmRapportActivite
     ''' <summary>Entrée du filtre affichant l'ensemble des groupes.</summary>
     Private Const TOUS_LES_GROUPES As String = "(tous les groupes)"
 
+    ''' <summary>Entrée du filtre affichant l'ensemble des agences.</summary>
+    Private Const TOUTES_LES_AGENCES As String = "(toutes les agences)"
+
     ''' <summary>
     ''' Nombre de transactions au-delà duquel l'inclusion du détail dans le PDF est soumise à
     ''' confirmation : une vingtaine de pages, soit environ une semaine d'activité.
@@ -35,8 +38,18 @@ Public Class FrmRapportActivite
     ''' </summary>
     Private _lignesAffichees As New List(Of LigneHistoriqueWU)
 
-    ''' <summary>Groupe statistique retenu, ou chaîne vide pour tous les groupes.</summary>
-    Private _groupeChoisi As String = String.Empty
+    ''' <summary>
+    ''' Valeur retenue dans le filtre : un groupe statistique pour les sous-agents, une agence
+    ''' pour le réseau propre. Chaîne vide : tout le périmètre.
+    ''' </summary>
+    Private _filtreChoisi As String = String.Empty
+
+    ''' <summary>
+    ''' Population restituée. Elle se pose AVANT l'ouverture, et ne change plus : une fenêtre
+    ''' qui basculerait de l'une à l'autre redonnerait à l'utilisateur l'occasion de citer les
+    ''' chiffres des sous-agents en croyant parler des agences.
+    ''' </summary>
+    Public Property Portee As PorteeRapportWU = PorteeRapportWU.SousAgents
 
     ''' <summary>
     ''' Agences propres du paramétrage, lues une fois à l'ouverture : elles complètent l'état
@@ -49,6 +62,7 @@ Public Class FrmRapportActivite
     Private _parJour As DataTable
     Private _parPdv As DataTable
     Private _parGroupe As DataTable
+    Private _performance As DataTable
     Private _commissions As DataTable
     Private _taxes As DataTable
 
@@ -76,6 +90,8 @@ Public Class FrmRapportActivite
     ''' </summary>
     Private Sub FrmRapportActivite_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        AppliquerLaPortee()
+
         Dim premiere As Date = Date.Today
         Dim derniere As Date = Date.Today
         Dim messageErreur As String = String.Empty
@@ -101,6 +117,37 @@ Public Class FrmRapportActivite
         AfficherRapport()
     End Sub
 
+    ''' <summary>
+    ''' Adapte la fenêtre à sa population : titre, libellé du filtre, et jeu d’onglets affiché.
+    ''' 
+    ''' L'onglet « par groupe statistique » et celui de performance NE COEXISTENT JAMAIS. Un
+    ''' groupe est une notion de sous-agent — T_Pdv_EC n'a pas la colonne — et une agence n'a de
+    ''' sens que pour le réseau propre. Laisser l'un des deux vide au lieu de le retirer ferait
+    ''' chercher une information qui n'existe pas.
+    ''' 
+    ''' Les onglets se RETIRENT et non se masquent : Visible n'a aucun effet sur un TabPage.
+    ''' </summary>
+    Private Sub AppliquerLaPortee()
+
+        If Portee = PorteeRapportWU.AgencesPropres Then
+
+            Text = "Rapport d'activité — Agences propres"
+            lblGroupe.Text = "Agence"
+            tabParPdv.Text = "Par Account"
+            tabRapport.TabPages.Remove(tabParGroupe)
+        Else
+            Text = "Rapport d'activité — Sous-agents"
+            lblGroupe.Text = "Groupe statistique"
+            tabParPdv.Text = "Par sous-agent"
+            tabRapport.TabPages.Remove(tabPerformance)
+        End If
+    End Sub
+
+    ''' <summary>Entrée « tout le périmètre » du filtre, selon la population.</summary>
+    Private Function LibelleToutLePerimetre() As String
+        Return If(Portee = PorteeRapportWU.AgencesPropres, TOUTES_LES_AGENCES, TOUS_LES_GROUPES)
+    End Function
+
 #End Region
 
 #Region "Affichage"
@@ -123,7 +170,11 @@ Public Class FrmRapportActivite
         Cursor = Cursors.WaitCursor
         Try
             Dim messageErreur As String = String.Empty
-            _lignes = HistoriqueRepository.ListerPeriode(dtpDebut.Value.Date, dtpFin.Value.Date, messageErreur)
+            ' La population est retenue DÈS LA LECTURE : tout ce qui suit — états, filtre,
+            ' export — porte ainsi sur le même périmètre, sans qu'aucun d'eux n'ait à y penser.
+            _lignes = RapportActiviteService.FiltrerParPortee(
+                HistoriqueRepository.ListerPeriode(dtpDebut.Value.Date, dtpFin.Value.Date, messageErreur),
+                Portee)
 
             ' Le paramétrage des agences propres est relu avec la période : une agence créée
             ' entre-temps doit apparaître, même sans activité.
@@ -201,39 +252,59 @@ Public Class FrmRapportActivite
     ''' </summary>
     Private Sub RemplirListeGroupes()
 
-        Dim selectionPrecedente As String = _groupeChoisi
+        Dim selectionPrecedente As String = _filtreChoisi
 
         _chargementEnCours = True
         Try
             cboGroupe.Items.Clear()
-            cboGroupe.Items.Add(TOUS_LES_GROUPES)
+            cboGroupe.Items.Add(LibelleToutLePerimetre())
 
-            For Each groupe As String In RapportActiviteService.ListerGroupesPresents(_lignes)
-                cboGroupe.Items.Add(groupe)
+            For Each valeur As String In ValeursDuFiltre()
+                cboGroupe.Items.Add(valeur)
             Next
 
-            ' La sélection est conservée d'une période à l'autre lorsque le groupe y figure encore.
+            ' La sélection est conservée d'une période à l'autre lorsqu'elle y figure encore.
             Dim index As Integer = If(String.IsNullOrEmpty(selectionPrecedente), 0, cboGroupe.Items.IndexOf(selectionPrecedente))
             cboGroupe.SelectedIndex = If(index >= 0, index, 0)
-            _groupeChoisi = If(cboGroupe.SelectedIndex = 0, String.Empty, Convert.ToString(cboGroupe.SelectedItem))
+            _filtreChoisi = If(cboGroupe.SelectedIndex = 0, String.Empty, Convert.ToString(cboGroupe.SelectedItem))
 
         Finally
             _chargementEnCours = False
         End Try
     End Sub
 
+    ''' <summary>Les valeurs proposées par le filtre : groupes pour les sous-agents, agences sinon.</summary>
+    Private Function ValeursDuFiltre() As List(Of String)
+
+        If Portee = PorteeRapportWU.AgencesPropres Then
+            Return RapportActiviteService.ListerAgencesPresentes(_lignes, _agences)
+        End If
+
+        Return RapportActiviteService.ListerGroupesPresents(_lignes)
+    End Function
+
+    ''' <summary>Applique le filtre retenu aux lignes de la période.</summary>
+    Private Function AppliquerLeFiltre() As List(Of LigneHistoriqueWU)
+
+        If Portee = PorteeRapportWU.AgencesPropres Then
+            Return RapportActiviteService.FiltrerParAgence(_lignes, _filtreChoisi, _agences)
+        End If
+
+        Return RapportActiviteService.Filtrer(_lignes, _filtreChoisi)
+    End Function
+
     Private Sub cboGroupe_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboGroupe.SelectedIndexChanged
 
         If _chargementEnCours Then Return
 
-        _groupeChoisi = If(cboGroupe.SelectedIndex <= 0, String.Empty, Convert.ToString(cboGroupe.SelectedItem))
+        _filtreChoisi = If(cboGroupe.SelectedIndex <= 0, String.Empty, Convert.ToString(cboGroupe.SelectedItem))
         ConstruireEtats()
     End Sub
 
     ''' <summary>Construit et affiche les cinq états sur le périmètre retenu.</summary>
     Private Sub ConstruireEtats()
 
-        _lignesAffichees = RapportActiviteService.Filtrer(_lignes, _groupeChoisi)
+        _lignesAffichees = AppliquerLeFiltre()
 
         _synthese = RapportActiviteService.ConstruireSynthese(_lignesAffichees)
         _parJour = RapportActiviteService.ConstruireParJour(_lignesAffichees)
@@ -241,13 +312,13 @@ Public Class FrmRapportActivite
         ' paramétrage, l'historique ne pouvant évidemment pas contenir ce qui n'a pas eu lieu.
         ' Un filtre par groupe ne les concerne pas : une agence propre n'appartient à aucun
         ' groupe statistique, ceux-ci ne s'appliquant qu'aux sous-agents.
-        Dim agences As List(Of PointDeVenteEC) = If(String.IsNullOrEmpty(_groupeChoisi), _agences, Nothing)
+        Dim agences As List(Of PointDeVenteEC) = If(String.IsNullOrEmpty(_filtreChoisi), _agences, Nothing)
 
         ' Détail des transactions : il ne se déduit pas de l'agrégat, et le filtre par groupe
         ' est appliqué par la base plutôt que de rapatrier toute la période pour la trier.
         Dim erreurDetail As String = String.Empty
         _operations = HistoriqueRepository.ListerTransactions(dtpDebut.Value.Date, dtpFin.Value.Date,
-                                                             _groupeChoisi, erreurDetail)
+                                                             _filtreChoisi, erreurDetail)
 
         If Not String.IsNullOrEmpty(erreurDetail) Then
             _operations = New List(Of TransactionWU)
@@ -255,13 +326,19 @@ Public Class FrmRapportActivite
 
         _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees, agences, _operations)
         _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
+        _performance = RapportActiviteService.ConstruirePerformanceAgences(_lignesAffichees, agences)
         _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
         _taxes = RapportActiviteService.ConstruireEvolutionTaxes(_lignesAffichees)
 
         AfficherSynthese()
         AfficherDetail(dgvParJour, _parJour, "Date", "Date")
         AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
-        AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
+        If Portee = PorteeRapportWU.AgencesPropres Then
+            AfficherDetail(dgvPerformance, _performance, "Rang", "Rang")
+            AfficherLaPerformance()
+        Else
+            AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
+        End If
         AfficherDetail(dgvCommissions, _commissions, "Date", "Date")
         AfficherDetail(dgvTaxes, _taxes, "Date", "Date")
 
@@ -270,19 +347,73 @@ Public Class FrmRapportActivite
         btnExporter.Enabled = _lignesAffichees.Count > 0
 
         If _lignesAffichees.Count = 0 Then
-            lblStatut.Text = If(String.IsNullOrEmpty(_groupeChoisi),
-                                "Aucune journée comptabilisée sur cette période.",
-                                $"Aucune activité du groupe « {_groupeChoisi} » sur cette période.")
+            lblStatut.Text = If(String.IsNullOrEmpty(_filtreChoisi),
+                                $"Aucune journée comptabilisée sur cette période pour {LibellePopulation()}.",
+                                $"Aucune activité de « {_filtreChoisi} » sur cette période.")
             Return
         End If
 
         lblStatut.Text = $"{RapportActiviteService.CompterJours(_lignesAffichees)} journée(s), " &
                          $"{RapportActiviteService.CompterPointsDeVente(_lignesAffichees)} point(s) de vente" &
-                         If(String.IsNullOrEmpty(_groupeChoisi), String.Empty, $" — groupe « {_groupeChoisi} »") &
+                         If(String.IsNullOrEmpty(_filtreChoisi), String.Empty, $" — « {_filtreChoisi} »") &
                          $", {_operations.Count} transaction(s) détaillée(s)."
 
         SignalerDetailIndisponible(erreurDetail)
     End Sub
+
+    ''' <summary>
+    ''' Habille la liste de performance : en-têtes, part en pourcentage, et les lignes d'agence
+    ''' détachées de leurs Accounts.
+    ''' 
+    ''' Sans cette distinction, un œil pressé additionnerait la ligne d'une agence et celles de
+    ''' ses Accounts, et compterait tout deux fois.
+    ''' </summary>
+    Private Sub AfficherLaPerformance()
+
+        DefinirEntete(dgvPerformance, "Agence", "Agence")
+        DefinirEntete(dgvPerformance, "Account", "Account")
+        DefinirEntete(dgvPerformance, "Part", "Part du réseau")
+
+        If dgvPerformance.Columns.Contains("Part") Then
+            dgvPerformance.Columns("Part").DefaultCellStyle.Format = "0.0 %"
+            dgvPerformance.Columns("Part").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+        End If
+
+        If dgvPerformance.Columns.Contains("Rang") Then dgvPerformance.Columns("Rang").Width = 45
+        If dgvPerformance.Columns.Contains("Niveau") Then dgvPerformance.Columns("Niveau").Visible = False
+
+        For Each ligne As DataGridViewRow In dgvPerformance.Rows
+
+            Dim valeur As Object = ligne.Cells("Niveau").Value
+            If valeur Is Nothing OrElse valeur Is DBNull.Value Then Continue For
+
+            Select Case Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture)
+
+                Case RapportActiviteService.NIVEAU_CATEGORIE
+                    ligne.DefaultCellStyle.Font = New Drawing.Font(dgvPerformance.Font, Drawing.FontStyle.Bold)
+                    ligne.DefaultCellStyle.BackColor = Drawing.Color.LightSteelBlue
+
+                Case RapportActiviteService.NIVEAU_TOTAL
+                    ligne.DefaultCellStyle.Font = New Drawing.Font(dgvPerformance.Font, Drawing.FontStyle.Bold)
+                    ligne.DefaultCellStyle.BackColor = Drawing.Color.Gainsboro
+            End Select
+        Next
+    End Sub
+
+    ''' <summary>Nom de la population, pour les messages.</summary>
+    Private Function LibellePopulation() As String
+        Return If(Portee = PorteeRapportWU.AgencesPropres, "les agences propres", "les sous-agents")
+    End Function
+
+    ''' <summary>Nom de la population, en titre de document.</summary>
+    Private Function TitreDeLaPopulation() As String
+        Return If(Portee = PorteeRapportWU.AgencesPropres, "AGENCES PROPRES", "SOUS-AGENTS")
+    End Function
+
+    ''' <summary>Nature du filtre, pour les libellés.</summary>
+    Private Function LibelleDuFiltre() As String
+        Return If(Portee = PorteeRapportWU.AgencesPropres, "Agence", "Groupe statistique")
+    End Function
 
     ''' <summary>Synthèse : deux colonnes, les intitulés de section en gras et sans valeur.</summary>
     Private Sub AfficherSynthese()
@@ -562,17 +693,17 @@ Public Class FrmRapportActivite
             ' restreint le périmètre — c'est ce qui caractérise l'extraction.
             Dim sousTitres As New List(Of SousTitreExcel) From {
                 New SousTitreExcel($"Période du {dtpDebut.Value:dd/MM/yyyy} au {dtpFin.Value:dd/MM/yyyy}", True),
-                New SousTitreExcel(If(String.IsNullOrEmpty(_groupeChoisi),
-                                      "Tous les groupes statistiques",
-                                      $"Groupe statistique : {_groupeChoisi}"),
-                                   Not String.IsNullOrEmpty(_groupeChoisi)),
+                New SousTitreExcel(If(String.IsNullOrEmpty(_filtreChoisi),
+                                      LibelleToutLePerimetre(),
+                                      $"{LibelleDuFiltre()} : {_filtreChoisi}"),
+                                   Not String.IsNullOrEmpty(_filtreChoisi)),
                 New SousTitreExcel($"{RapportActiviteService.CompterJours(_lignesAffichees)} journée(s) comptabilisée(s) — " &
                                    $"{RapportActiviteService.CompterPointsDeVente(_lignesAffichees)} point(s) de vente"),
                 New SousTitreExcel($"Édité le {Date.Now:dd/MM/yyyy à HH:mm}")
             }
 
             ExcelExportService.ExporterEnPdf(
-                "ECOBANK TCHAD — RAPPORT D'ACTIVITÉ WESTERN UNION",
+                "ECOBANK TCHAD — RAPPORT D'ACTIVITÉ WESTERN UNION — " & TitreDeLaPopulation(),
                 sousTitres,
                 ConstruireBlocs(inclureDetail),
                 "Rapport activité",
@@ -636,10 +767,35 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Account", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Dim parGroupe As New BlocExcel("4. Par groupe statistique", _parGroupe) With {
-            .Entetes = entetes, .Formats = formatsChiffres,
-            .ExergueColonne = "Groupe", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
-        }
+        ' Le quatrième bloc change avec la population : les sous-agents s'analysent par groupe
+        ' statistique, le réseau propre par agence. Les deux ne coexistent pas plus dans le PDF
+        ' qu'à l'écran.
+        Dim quatrieme As BlocExcel
+
+        If Portee = PorteeRapportWU.AgencesPropres Then
+
+            ' Les formats chiffrés sont repris tels quels, la part en plus : c'est la seule
+            ' colonne de ce bloc qui ne soit pas un montant.
+            Dim formatsPerformance As New Dictionary(Of String, String)(formatsChiffres, StringComparer.OrdinalIgnoreCase)
+            formatsPerformance("Part") = "0,0 %"
+
+            quatrieme = New BlocExcel("4. Performance des agences", _performance) With {
+                .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+                    {"Rang", "Rang"}, {"Agence", "Agence"}, {"Account", "Account"},
+                    {"Designation", "Désignation"}, {"Part", "Part du réseau"},
+                    {"NbEnvois", "Envois"}, {"PrincipalEnvoi", "Principal envoyé"},
+                    {"NbPaiements", "Paiements"}, {"PrincipalPaye", "Principal payé"},
+                    {"NbAnnulations", "Annulations"}, {"TotalTaxes", "Total taxes"}
+                },
+                .Formats = formatsPerformance,
+                .ExergueColonne = "Agence", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
+            }
+        Else
+            quatrieme = New BlocExcel("4. Par groupe statistique", _parGroupe) With {
+                .Entetes = entetes, .Formats = formatsChiffres,
+                .ExergueColonne = "Groupe", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
+            }
+        End If
 
         Dim formatsCommissions As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
             {"CommissionEnvoi", "# ##0"}, {"CommissionPaiement", "# ##0"},
@@ -674,7 +830,7 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, parGroupe, commissions, taxes}
+        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, quatrieme, commissions, taxes}
     End Function
 
     ''' <summary>
@@ -714,8 +870,8 @@ Public Class FrmRapportActivite
 
         Dim partieGroupe As String = String.Empty
 
-        If Not String.IsNullOrEmpty(_groupeChoisi) Then
-            partieGroupe = _groupeChoisi
+        If Not String.IsNullOrEmpty(_filtreChoisi) Then
+            partieGroupe = _filtreChoisi
             ' Un libellé de groupe peut contenir des caractères interdits dans un nom de fichier.
             For Each interdit As Char In IO.Path.GetInvalidFileNameChars()
                 partieGroupe = partieGroupe.Replace(interdit, "_"c)
@@ -723,7 +879,11 @@ Public Class FrmRapportActivite
             partieGroupe = "_" & partieGroupe
         End If
 
-        Return $"RapportActivite{partieGroupe}_{dtpDebut.Value:yyyyMMdd}_{dtpFin.Value:yyyyMMdd}.pdf"
+        ' La population figure dans le nom : deux rapports de la même période, l'un des
+        ' sous-agents et l'autre des agences, ne doivent pas se ressembler dans un dossier.
+        Dim population As String = If(Portee = PorteeRapportWU.AgencesPropres, "Agences", "SousAgents")
+
+        Return $"RapportActivite_{population}{partieGroupe}_{dtpDebut.Value:yyyyMMdd}_{dtpFin.Value:yyyyMMdd}.pdf"
     End Function
 
 #End Region

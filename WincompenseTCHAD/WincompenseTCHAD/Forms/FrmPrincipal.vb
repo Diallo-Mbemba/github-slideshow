@@ -106,7 +106,16 @@ Public Class FrmPrincipal
     End Sub
 
     Private Sub mnuRapport_Click(sender As Object, e As EventArgs) Handles mnuRapport.Click
-        AfficherEnfant(Of FrmRapportActivite)()
+        AfficherEnfant(Of FrmRapportSousAgents)()
+    End Sub
+
+    ''' <summary>
+    ''' Le rapport du réseau propre. Deux entrées et non une avec un filtre : les deux
+    ''' populations n'ont pas les mêmes axes, et une fenêtre qui bascule de l'une à l'autre
+    ''' donne l'occasion de citer les chiffres des sous-agents en croyant parler des agences.
+    ''' </summary>
+    Private Sub mnuRapportAgences_Click(sender As Object, e As EventArgs) Handles mnuRapportAgences.Click
+        AfficherEnfant(Of FrmRapportAgences)()
     End Sub
 
     ''' <summary>
@@ -269,6 +278,7 @@ Public Class FrmPrincipal
 
         mnuTraitement.Available = traite
         mnuRapport.Available = rapports
+        mnuRapportAgences.Available = rapports
         mnuPiecesArchivees.Available = rapports
         SEP1.Available = traite AndAlso rapports
         mnuCompensation.Available = traite OrElse rapports

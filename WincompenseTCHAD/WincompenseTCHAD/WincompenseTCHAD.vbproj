@@ -79,6 +79,7 @@
   <ItemGroup>
     <Compile Include="Constants\ConstantesWU.vb" />
     <Compile Include="Models\CalculWU.vb" />
+    <Compile Include="Models\PorteeRapportWU.vb" />
     <Compile Include="Models\ComptesSystemeWU.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
@@ -173,6 +174,12 @@
     </Compile>
     <Compile Include="Forms\FrmConnexion.Designer.vb">
       <DependentUpon>FrmConnexion.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmRapportSousAgents.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmRapportAgences.vb">
+      <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>

@@ -42,6 +42,9 @@ Public NotInheritable Class RapportActiviteService
     ''' <summary>Libellé des points de vente sans groupe statistique.</summary>
     Public Const SANS_GROUPE As String = "(sans groupe statistique)"
 
+    ''' <summary>Agence de rattachement inconnue : l'Account n'est pas au référentiel des agences.</summary>
+    Public Const SANS_AGENCE As String = "(agence non rattachée)"
+
 #Region "Page 1 — Synthèse"
 
     ''' <summary>
@@ -633,6 +636,277 @@ Public NotInheritable Class RapportActiviteService
         End If
 
         Return table
+    End Function
+
+    ''' <summary>
+    ''' Restreint les lignes à la population visée.
+    ''' 
+    ''' Les Accounts NON PARAMÉTRÉS suivent les sous-agents, et non les agences : un Account
+    ''' inconnu n'est pas une agence propre, il n'est rien encore. C'est dans l'écran des
+    ''' sous-agents qu'on ira le créer, autant qu'il y soit visible.
+    ''' </summary>
+    Public Shared Function FiltrerParPortee(lignes As List(Of LigneHistoriqueWU),
+                                            portee As PorteeRapportWU) As List(Of LigneHistoriqueWU)
+
+        Dim retenues As New List(Of LigneHistoriqueWU)
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+
+            Dim estAgence As Boolean = String.Equals(ligne.TypePdv, "EC", StringComparison.OrdinalIgnoreCase)
+
+            If (portee = PorteeRapportWU.AgencesPropres) = estAgence Then retenues.Add(ligne)
+        Next
+
+        Return retenues
+    End Function
+
+    ''' <summary>Libellé d'une agence dans les listes et les filtres : « 001 — AGENCE SIEGE ».</summary>
+    Public Shared Function LibelleAgence(code As String, designation As String) As String
+
+        Dim codeNet As String = If(code, String.Empty).Trim()
+        Dim nomNet As String = If(designation, String.Empty).Trim()
+
+        If codeNet.Length = 0 AndAlso nomNet.Length = 0 Then Return SANS_AGENCE
+        If codeNet.Length = 0 Then Return nomNet
+        If nomNet.Length = 0 Then Return codeNet
+
+        Return codeNet & " — " & nomNet
+    End Function
+
+    ''' <summary>
+    ''' Rattache chaque Account à son agence, d'après le référentiel COURANT.
+    ''' 
+    ''' L'historique ne porte pas le code agence : il garde l'Account, sa désignation, son groupe
+    ''' et son type. Le rattachement se fait donc au paramétrage d'aujourd'hui — un Account qui
+    ''' changerait d'agence emporterait tout son passé avec lui.
+    ''' 
+    ''' C'est acceptable ICI et ne l'était pas pour la pièce comptable : un rapport de gestion
+    ''' n'est pas un justificatif, et le rattachement d'un Account à son agence ne bouge
+    ''' quasiment jamais. Le jour où cela deviendrait gênant, une colonne CodeAgence dans
+    ''' T_HistoriqueWU figerait le passé.
+    ''' </summary>
+    Private Shared Function AgenceParAccount(agencesConnues As List(Of PointDeVenteEC)) As Dictionary(Of String, String)
+
+        Dim rattachement As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+
+        If agencesConnues Is Nothing Then Return rattachement
+
+        For Each agence As PointDeVenteEC In agencesConnues
+
+            If agence Is Nothing OrElse String.IsNullOrWhiteSpace(agence.CodeSite) Then Continue For
+
+            rattachement(agence.CodeSite.Trim()) =
+                LibelleAgence(agence.CodeAgenceVoyager, agence.Designation)
+        Next
+
+        Return rattachement
+    End Function
+
+    ''' <summary>Les agences présentes sur la période, pour le filtre de l'écran.</summary>
+    Public Shared Function ListerAgencesPresentes(lignes As List(Of LigneHistoriqueWU),
+                                                  agencesConnues As List(Of PointDeVenteEC)) As List(Of String)
+
+        Dim rattachement As Dictionary(Of String, String) = AgenceParAccount(agencesConnues)
+        Dim agences As New SortedSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            agences.Add(AgenceDe(ligne.Account, rattachement))
+        Next
+
+        ' Les agences sans la moindre activité doivent tout de même pouvoir être choisies :
+        ' constater qu'une agence n'a rien fait est un résultat, pas une absence de résultat.
+        If agencesConnues IsNot Nothing Then
+            For Each agence As PointDeVenteEC In agencesConnues
+                If agence Is Nothing Then Continue For
+                agences.Add(LibelleAgence(agence.CodeAgenceVoyager, agence.Designation))
+            Next
+        End If
+
+        Return New List(Of String)(agences)
+    End Function
+
+    ''' <summary>
+    ''' Performance du réseau propre : les agences classées, et sous chacune ses Accounts.
+    ''' 
+    ''' DEUX NIVEAUX, PARCE QU'UNE AGENCE A PLUSIEURS ACCOUNTS. Dans T_Pdv_EC, l'Account est la
+    ''' clé primaire mais le code agence ne porte AUCUNE contrainte d'unicité : un même guichet
+    ''' peut tenir plusieurs points Western Union. Un classement à un seul niveau mélangerait
+    ''' donc des guichets et des comptes, et la banque comparerait des agences à des fractions
+    ''' d'agences.
+    ''' 
+    ''' LE CLASSEMENT SE FAIT SUR LES COMMISSIONS, décroissantes : c'est ce que la banque gagne,
+    ''' et c'est la seule colonne qui réponde à « quelle agence rapporte le plus ». Les volumes
+    ''' et les montants restent affichés à côté — une agence peut faire du volume sans marge, et
+    ''' c'est précisément ce qu'un classement doit laisser voir.
+    ''' 
+    ''' LA PART est celle de l'agence dans les commissions de TOUT le réseau propre. Sans elle,
+    ''' une liste de performance n'est qu'une liste : on voit qui est en tête, pas de combien.
+    ''' 
+    ''' LES AGENCES SANS ACTIVITÉ FIGURENT, à zéro. Constater qu'une agence n'a rien fait de la
+    ''' période est un résultat, pas une absence de résultat — et c'est même celui qu'on cherche.
+    ''' </summary>
+    Public Shared Function ConstruirePerformanceAgences(lignes As List(Of LigneHistoriqueWU),
+                                                        agencesConnues As List(Of PointDeVenteEC)) As DataTable
+
+        Dim table As New DataTable("PerformanceAgences")
+        table.Columns.Add("Rang", GetType(String))
+        table.Columns.Add("Agence", GetType(String))
+        table.Columns.Add("Account", GetType(String))
+        table.Columns.Add("Designation", GetType(String))
+        AjouterColonnesChiffrees(table)
+        table.Columns.Add("Part", GetType(Decimal))
+        table.Columns.Add("Niveau", GetType(Integer))
+
+        Dim rattachement As Dictionary(Of String, String) = AgenceParAccount(agencesConnues)
+
+        ' Cumul par Account, puis regroupement par agence : deux passes, parce que le
+        ' rattachement d'un Account à son agence vient du référentiel et non de l'historique.
+        Dim parAccount As New Dictionary(Of String, LigneHistoriqueWU)(StringComparer.OrdinalIgnoreCase)
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+
+            If Not parAccount.ContainsKey(ligne.Account) Then
+                parAccount(ligne.Account) = New LigneHistoriqueWU() With {.Account = ligne.Account}
+            End If
+
+            Dim cumul As LigneHistoriqueWU = parAccount(ligne.Account)
+            cumul.Designation = ligne.Designation
+            cumul.TypePdv = ligne.TypePdv
+            cumul.Cumuler(ligne)
+        Next
+
+        ' Les Accounts du référentiel restés sans activité : ils doivent figurer à zéro.
+        If agencesConnues IsNot Nothing Then
+            For Each agence As PointDeVenteEC In agencesConnues
+
+                If agence Is Nothing OrElse String.IsNullOrWhiteSpace(agence.CodeSite) Then Continue For
+                If parAccount.ContainsKey(agence.CodeSite) Then Continue For
+
+                parAccount(agence.CodeSite) = New LigneHistoriqueWU() With {
+                    .Account = agence.CodeSite,
+                    .Designation = agence.Designation,
+                    .TypePdv = "EC"
+                }
+            Next
+        End If
+
+        Dim parAgence As New Dictionary(Of String, List(Of LigneHistoriqueWU))(StringComparer.OrdinalIgnoreCase)
+
+        For Each cumul As LigneHistoriqueWU In parAccount.Values
+
+            Dim agence As String = AgenceDe(cumul.Account, rattachement)
+
+            If Not parAgence.ContainsKey(agence) Then parAgence(agence) = New List(Of LigneHistoriqueWU)()
+            parAgence(agence).Add(cumul)
+        Next
+
+        Dim totalReseau As Decimal = 0D
+        For Each cumul As LigneHistoriqueWU In parAccount.Values
+            totalReseau += cumul.TotalCommissions
+        Next
+
+        ' Le cumul de chaque agence est calculé UNE FOIS, avant le tri : le recalculer dans le
+        ' comparateur le referait autant de fois que la comparaison est appelée.
+        Dim cumulParAgence As New Dictionary(Of String, LigneHistoriqueWU)(StringComparer.OrdinalIgnoreCase)
+        For Each paire As KeyValuePair(Of String, List(Of LigneHistoriqueWU)) In parAgence
+            cumulParAgence(paire.Key) = CumulerLignes(paire.Value)
+        Next
+
+        ' Les agences qui pèsent en tête. À commissions égales — deux agences à zéro, par
+        ' exemple — le nom départage, pour que deux affichages successifs donnent le même ordre.
+        Dim classement As List(Of String) = New List(Of String)(parAgence.Keys)
+        classement.Sort(Function(gauche, droite)
+                            Dim ecart As Integer = cumulParAgence(droite).TotalCommissions.CompareTo(
+                                                   cumulParAgence(gauche).TotalCommissions)
+                            If ecart <> 0 Then Return ecart
+                            Return String.Compare(gauche, droite, StringComparison.OrdinalIgnoreCase)
+                        End Function)
+
+        Dim rang As Integer = 0
+
+        For Each agence As String In classement
+
+            rang += 1
+
+            Dim comptes As List(Of LigneHistoriqueWU) = parAgence(agence)
+            Dim cumulAgence As LigneHistoriqueWU = cumulParAgence(agence)
+
+            Dim enteteAgence As DataRow = table.NewRow()
+            enteteAgence("Rang") = rang.ToString(Globalization.CultureInfo.InvariantCulture)
+            enteteAgence("Agence") = agence
+            enteteAgence("Account") = String.Empty
+            enteteAgence("Designation") = $"{comptes.Count} Account(s)"
+            RemplirColonnesChiffrees(enteteAgence, cumulAgence)
+            enteteAgence("Part") = Part(cumulAgence.TotalCommissions, totalReseau)
+            enteteAgence("Niveau") = NIVEAU_CATEGORIE
+            table.Rows.Add(enteteAgence)
+
+            comptes.Sort(Function(gauche, droite)
+                             Dim ecart As Integer = droite.TotalCommissions.CompareTo(gauche.TotalCommissions)
+                             If ecart <> 0 Then Return ecart
+                             Return String.Compare(gauche.Account, droite.Account, StringComparison.OrdinalIgnoreCase)
+                         End Function)
+
+            For Each compte As LigneHistoriqueWU In comptes
+
+                Dim enregistrement As DataRow = table.NewRow()
+                enregistrement("Rang") = String.Empty
+                enregistrement("Agence") = String.Empty
+                enregistrement("Account") = compte.Account
+                enregistrement("Designation") = compte.Designation
+                RemplirColonnesChiffrees(enregistrement, compte)
+                enregistrement("Part") = Part(compte.TotalCommissions, totalReseau)
+                enregistrement("Niveau") = NIVEAU_POINT_DE_VENTE
+                table.Rows.Add(enregistrement)
+            Next
+        Next
+
+        If table.Rows.Count = 0 Then Return table
+
+        Dim total As DataRow = table.NewRow()
+        total("Rang") = String.Empty
+        total("Agence") = LIBELLE_TOTAL
+        total("Account") = String.Empty
+        total("Designation") = $"{classement.Count} agence(s), {parAccount.Count} Account(s)"
+        RemplirColonnesChiffrees(total, CumulerLignes(New List(Of LigneHistoriqueWU)(parAccount.Values)))
+        total("Part") = If(totalReseau = 0D, 0D, 1D)
+        total("Niveau") = NIVEAU_TOTAL
+        table.Rows.Add(total)
+
+        Return table
+    End Function
+
+    ''' <summary>Part d'un montant dans un total. Zéro si le total l'est : rien ne se compare à rien.</summary>
+    Private Shared Function Part(montant As Decimal, total As Decimal) As Decimal
+        If total = 0D Then Return 0D
+        Return montant / total
+    End Function
+
+    ''' <summary>Restreint les lignes à une agence. Chaîne vide : toutes.</summary>
+    Public Shared Function FiltrerParAgence(lignes As List(Of LigneHistoriqueWU), agence As String,
+                                            agencesConnues As List(Of PointDeVenteEC)) As List(Of LigneHistoriqueWU)
+
+        Dim toutes As List(Of LigneHistoriqueWU) = SansNothing(lignes)
+        If String.IsNullOrWhiteSpace(agence) Then Return toutes
+
+        Dim rattachement As Dictionary(Of String, String) = AgenceParAccount(agencesConnues)
+        Dim retenues As New List(Of LigneHistoriqueWU)
+
+        For Each ligne As LigneHistoriqueWU In toutes
+            If String.Equals(AgenceDe(ligne.Account, rattachement), agence, StringComparison.OrdinalIgnoreCase) Then
+                retenues.Add(ligne)
+            End If
+        Next
+
+        Return retenues
+    End Function
+
+    Private Shared Function AgenceDe(account As String, rattachement As Dictionary(Of String, String)) As String
+
+        Dim nom As String = Nothing
+        If rattachement.TryGetValue(If(account, String.Empty).Trim(), nom) Then Return nom
+
+        Return SANS_AGENCE
     End Function
 
 #End Region

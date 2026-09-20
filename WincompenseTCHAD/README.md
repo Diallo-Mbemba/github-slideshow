@@ -166,6 +166,8 @@ WincompenseTCHAD/
         ├── FrmChangerMotDePasse.vb         ' Changement de mot de passe (imposé ou volontaire)
         ├── FrmDiagnostic.vb                ' Affiche un diagnostic long, avec bouton Copier
         ├── FrmPiecesArchivees.vb           ' Consultation des pièces déjà produites
+        ├── FrmRapportSousAgents.vb         ' Rapport d'activité — sous-agents (hérite de FrmRapportActivite)
+        ├── FrmRapportAgences.vb            ' Rapport d'activité — agences propres (idem)
         ├── FrmUtilisateurEdition.vb        ' Création et modification d'un compte
         ├── FrmUtilisateurs.vb              ' Liste des comptes et journal des connexions
         ├── FrmDemandes.vb                  ' Autorisations du référentiel (inputer / authorizer)
@@ -1238,6 +1240,69 @@ distinguer quoi que ce soit au niveau SQL Server : c'est l'application qui garde
 distinction entre l'agent de compense, le commercial et l'administrateur, et le verrou qui
 s'opposait à une connexion faite **hors** de l'application disparaît. Un compte SQL par agent,
 si la banque l'accepte, rend aux trois rôles leur utilité.
+
+### Deux rapports d'activité, parce que deux populations (`PorteeRapportWU`)
+
+Le rapport est éclaté en **deux fenêtres** : une pour les sous-agents, une pour le réseau
+propre. Ce n'est pas une affaire de présentation — les deux populations n'ont pas les mêmes
+axes d'analyse :
+
+| | Sous-agents | Agences propres |
+|---|---|---|
+| Groupe statistique | Oui, c'est leur axe | **Aucun** — `T_Pdv_EC` n'a pas la colonne |
+| Taux de rétrocession | 0,60 à 0,95 | **Aucun** |
+| Partage de commission | Oui | **Aucun** — la banque garde 100 % |
+| Regroupement par agence | Non | **Oui, c'est leur axe** |
+
+Les mêler obligeait l'onglet « par groupe » à ranger toutes les agences dans une ligne vide,
+et celui des commissions à additionner une part qui se partage avec une part qui ne se partage
+pas. **Séparer n'ajoute pas une vue : cela en retire une fausse.**
+
+`FrmRapportSousAgents` et `FrmRapportAgences` **héritent** de `FrmRapportActivite` et ne font
+que poser leur population. Dupliquer huit cents lignes pour changer un filtre aurait garanti
+que les deux divergent au premier correctif.
+
+L'onglet « par groupe statistique » et celui de performance **ne coexistent jamais** : celui
+qui n'a pas d'objet est retiré, pas laissé vide. Les onglets se retirent d'ailleurs et ne se
+masquent pas — `Visible` n'a aucun effet sur un `TabPage`.
+
+#### La performance des agences, à deux niveaux
+
+**Une agence a plusieurs Accounts.** Dans `T_Pdv_EC`, l'Account est la clé primaire mais le
+code agence ne porte **aucune contrainte d'unicité** : un même guichet peut tenir plusieurs
+points Western Union. Un classement à un seul niveau comparerait donc des agences à des
+fractions d'agences.
+
+```
+Rang  Agence                 Account     Désignation     Envois    Principal   Commissions   Part
+1     001 — AGENCE SIEGE                 2 Account(s)       42   18 250 000     1 240 500  59,3 %
+                             TD0001234                      28   12 100 000       820 300  39,2 %
+                             TD0009876                      14    6 150 000       420 200  20,1 %
+2     004 — AGENCE MOUNDOU               1 Account(s)       31   11 800 000       790 100  37,8 %
+```
+
+Trois choix, et leurs raisons :
+
+1. **Le classement se fait sur les commissions**, décroissantes : c'est ce que la banque gagne,
+   et la seule colonne qui réponde à « quelle agence rapporte le plus ». Les volumes et les
+   montants restent affichés à côté — une agence peut faire du volume sans marge, et c'est
+   précisément ce qu'un classement doit laisser voir.
+2. **La part** est celle de l'agence dans les commissions de tout le réseau propre. Sans elle,
+   une liste de performance n'est qu'une liste : on voit qui est en tête, pas de combien.
+3. **Les agences sans activité figurent, à zéro.** Constater qu'une agence n'a rien fait de la
+   période est un résultat — et souvent celui qu'on cherchait.
+
+Vérifié en simulation : les parts somment à 100 % aux deux niveaux, une agence sans activité
+apparaît bien, et un Account absent du référentiel tombe dans une ligne
+« (agence non rattachée) » plutôt que d'être perdu en silence — c'est un signal de
+paramétrage, pas un déchet.
+
+**Une limite à connaître.** `T_HistoriqueWU` ne porte pas le code agence : le rattachement
+d'un Account à son agence se fait au référentiel **d'aujourd'hui**. Un Account qui changerait
+d'agence emporterait tout son passé avec lui. C'est acceptable pour un rapport de gestion — ce
+n'est pas un justificatif, et le rattachement ne bouge quasiment jamais — et ça ne l'était pas
+pour la pièce comptable, qui est conservée telle quelle. Le jour où cela deviendrait gênant,
+une colonne `CodeAgence` dans `T_HistoriqueWU` figerait le passé.
 
 ### Consulter une pièce déjà produite (`PieceRepository`, `FrmPiecesArchivees`)
 
