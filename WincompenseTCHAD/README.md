@@ -228,9 +228,20 @@ Le rang 3 n'est pas un doublon : c'est lui qui fait travailler le poste le matin
 injoignable. Sans lui, une coupure du serveur de fichiers arrêterait la compense de toute la
 banque. La copie est rafraîchie pendant que le partage répond, jamais quand il ne répond plus.
 
-L'authentification est celle de **Windows**. Aucun mot de passe ne circule — et c'est précisément
-ce qui autorise à poser la configuration sur un partage lisible par tous. Les droits d'accès à la
-base restent donnés par `Scripts\08_RolesSQLServer.sql`.
+**Ce qui se propage n'est pas ce qui authentifie.** La résolution se fait en deux temps, et
+c'est le cœur du dispositif : `ResoudreLaSource()` dit **où est le serveur** — cela peut venir du
+partage, donc valoir pour toute la banque — puis `AppliquerLeMotDePasse()` dit **comment s'y
+annoncer**, et cela n'appartient qu'à la machine. Les mêler rendrait impossible de changer de
+serveur pour tout le monde sans diffuser un secret à tout le monde.
+
+En authentification **Windows**, aucun mot de passe n'existe et tout tient dans le fichier
+partagé. Avec le **compte SQL Server** que la banque fournit — `etdwincompense` —, le mot de
+passe est retiré de la chaîne **avant toute écriture**, puis chiffré par Windows (DPAPI, portée
+`LocalMachine`, donc valable pour tous les utilisateurs du poste et pour ce poste seul) sous la
+clé `MOTDEPASSE` du fichier local. Le partage ne reçoit que le serveur, la base et le **nom** du
+compte. Il reste ainsi lisible par tous, ce qui est la condition même de son utilité.
+
+Les droits d'accès à la base restent donnés par `Scripts\08_RolesSQLServer.sql`.
 
 ### Trois façons de changer de serveur
 

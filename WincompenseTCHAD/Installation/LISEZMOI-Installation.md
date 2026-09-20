@@ -336,10 +336,46 @@ descriptions du même serveur, dont une seule compte.
 
 > **Aucun mot de passe dans le fichier partagé.** Il est lisible par tous les utilisateurs de
 > l'application — c'est ce qui permet à un changement de serveur de valoir pour tout le monde ;
-> un mot de passe y serait donc lisible en clair par tous. Si la chaîne fournie contient
-> `User ID` / `Password`, demandez la version en authentification Windows
-> (`Integrated Security=True`). L'application refuse de propager sur le partage une chaîne
-> portant un mot de passe, et fait confirmer si le réglage ne vaut que pour un poste.
+> un mot de passe y serait donc lisible en clair par tous.
+>
+> Une chaîne portant `User ID` / `Password` n'est **pas refusée** : la banque en fournit une.
+> L'application **retire le mot de passe avant toute écriture**, le chiffre par Windows pour
+> cette machine (DPAPI, portée `LocalMachine` : valable pour tous les utilisateurs du poste,
+> illisible ailleurs), et n'écrit sur le partage que le serveur, la base et le **nom** du compte.
+>
+> **Conséquence à ne pas manquer :** le serveur se propage, le mot de passe non. Un poste qui ne
+> l'a jamais reçu verra « Login failed for user » après la bascule. L'écran l'annonce avant
+> d'enregistrer. Voir *« Donner le mot de passe aux autres postes »* ci-dessous.
+
+### Donner le mot de passe aux autres postes
+
+Nécessaire **seulement** si la banque a changé le mot de passe du compte SQL, ou lors du premier
+déploiement en compte SQL. Un simple changement de serveur, à mot de passe inchangé, ne demande
+rien : chaque poste applique celui qu'il détient déjà.
+
+Trois façons, sur le poste concerné :
+
+1. **Depuis l'application** — *Sécurité → Connexion à la base de données…*, cocher « Employer une
+   chaîne de connexion complète », coller la chaîne **avec** son mot de passe, **tester**, puis
+   enregistrer **sans** cocher « Appliquer à TOUS les postes ». Le mot de passe est chiffré pour
+   ce poste ; le serveur, lui, continue de venir du partage — le poste ne devient pas sourd aux
+   changements suivants.
+
+2. **Une ligne dans le fichier local**, pour un déploiement scripté. Ajouter à
+   `%PROGRAMDATA%\Wincompense\wincompense.config` :
+
+   ```
+   MOTDEPASSE_CLAIR=le-mot-de-passe
+   ```
+
+   Au démarrage suivant, l'application le chiffre sous `MOTDEPASSE` et **efface la ligne en
+   clair**. La fenêtre d'exposition se referme au premier lancement.
+
+3. **Réinstaller le poste** : l'assistant demande la chaîne et écrit `MOTDEPASSE_CLAIR`, repris
+   par le même mécanisme.
+
+> Le chiffrement est lié à la machine : recopier `wincompense.config` d'un poste sur un autre ne
+> transporte pas le mot de passe, il n'y sera pas déchiffrable.
 
 ### Ce qui reste à faire côté base
 
@@ -351,7 +387,35 @@ Changer de serveur ne déplace pas les données. Sur le nouveau serveur, il faut
 2. exécuter **`Scripts\11_AccesUtilisateurs.sql`**, après y avoir mis vos comptes ou groupes
    Active Directory, pour redonner leurs droits aux utilisateurs Windows sur le nouveau
    serveur. **Un serveur restauré garde ses utilisateurs de base mais perd ses logins :**
-   c'est la cause la plus fréquente du message « Login failed for user » après une migration.
+   c'est la cause la plus fréquente du message « Login failed for user » après une migration ;
+3. **si l'application se connecte par un compte SQL Server** — c'est le cas avec
+   `etdwincompense` —, recréer ce login sur le nouveau serveur **et le rattacher** à
+   l'utilisateur de base, que la restauration a laissé orphelin. Aucun script du projet ne le
+   fait : les scripts livrés ne connaissent que les comptes Windows. À exécuter par
+   l'informatique, sur le nouveau serveur :
+
+   ```sql
+   -- 1. le login, au niveau du serveur
+   USE [master];
+   IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'etdwincompense')
+       CREATE LOGIN [etdwincompense] WITH PASSWORD = N'<le mot de passe>',
+                                          CHECK_POLICY = OFF;
+   GO
+   -- 2. le rattachement de l'utilisateur orphelin, au niveau de la base
+   USE [GWC_WINCOMPENSE_ETD];
+   IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'etdwincompense')
+       ALTER USER [etdwincompense] WITH LOGIN = [etdwincompense];
+   ELSE
+       CREATE USER [etdwincompense] FOR LOGIN [etdwincompense];
+   GO
+   -- 3. les rôles de l'application
+   ALTER ROLE [wu_compense] ADD MEMBER [etdwincompense];
+   GO
+   ```
+
+   Vérifier aussi que le serveur accepte le **mode mixte** (authentification Windows *et* SQL
+   Server) : une instance neuve est en Windows seul, et le login existerait alors sans pouvoir
+   servir.
 
 ---
 
