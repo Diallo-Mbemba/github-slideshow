@@ -41,8 +41,12 @@
     <WarningLevel>1</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>
-    </ApplicationIcon>
+    <!--
+      L'icône de l'exécutable. C'est elle que Windows affiche sur le bureau, dans la barre
+      des tâches et dans l'explorateur. Le même fichier est aussi incorporé en ressource
+      (voir plus bas) pour que les fenêtres la portent à l'exécution.
+    -->
+    <ApplicationIcon>Ressources\Wincompense.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -190,6 +194,7 @@
       <DependentUpon>FrmConnexion.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\GrilleWU.vb" />
+    <Compile Include="Forms\IconesWU.vb" />
     <Compile Include="Forms\VisaWU.vb" />
     <Compile Include="Forms\FrmRapportSousAgents.vb">
       <SubType>Form</SubType>
@@ -351,6 +356,12 @@
     <EmbeddedResource Include="Forms\FrmFichierCoreBanking.resx">
       <DependentUpon>FrmFichierCoreBanking.vb</DependentUpon>
     </EmbeddedResource>
+    <!--
+      L'icône de l'application, incorporée pour être lue à l'exécution par IconesWU.
+      Son nom de ressource est « WincompenseTCHAD.Ressources.Wincompense.ico » : la renommer
+      ou la déplacer oblige à corriger la constante RESSOURCE_ICONE de Forms\IconesWU.vb.
+    -->
+    <EmbeddedResource Include="Ressources\Wincompense.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

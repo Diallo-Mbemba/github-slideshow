@@ -52,11 +52,21 @@ Partial Class FrmPrincipal
         Me.SEP3 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuFermerTout = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuQuitter = New System.Windows.Forms.ToolStripMenuItem()
+        Me.barreOutils = New System.Windows.Forms.ToolStrip()
+        Me.tsbTraitement = New System.Windows.Forms.ToolStripButton()
+        Me.TSEP1 = New System.Windows.Forms.ToolStripSeparator()
+        Me.tsbRapport = New System.Windows.Forms.ToolStripButton()
+        Me.tsbRapportAgences = New System.Windows.Forms.ToolStripButton()
+        Me.tsbPiecesArchivees = New System.Windows.Forms.ToolStripButton()
+        Me.tsbCommissionsBanque = New System.Windows.Forms.ToolStripButton()
+        Me.TSEP2 = New System.Windows.Forms.ToolStripSeparator()
+        Me.tsbDemandes = New System.Windows.Forms.ToolStripButton()
         Me.barreEtat = New System.Windows.Forms.StatusStrip()
         Me.tsslUtilisateur = New System.Windows.Forms.ToolStripStatusLabel()
         Me.tsslBase = New System.Windows.Forms.ToolStripStatusLabel()
         Me.tsslMiseAJour = New System.Windows.Forms.ToolStripStatusLabel()
         Me.menuPrincipal.SuspendLayout()
+        Me.barreOutils.SuspendLayout()
         Me.barreEtat.SuspendLayout()
         Me.SuspendLayout()
         '
@@ -253,6 +263,75 @@ Partial Class FrmPrincipal
         Me.mnuQuitter.Size = New System.Drawing.Size(70, 20)
         Me.mnuQuitter.Text = "&Quitter"
         '
+        'barreOutils
+        '
+        Me.barreOutils.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden
+        Me.barreOutils.ImageScalingSize = New System.Drawing.Size(24, 24)
+        Me.barreOutils.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.tsbTraitement, Me.TSEP1, Me.tsbRapport, Me.tsbRapportAgences, Me.tsbPiecesArchivees, Me.tsbCommissionsBanque, Me.TSEP2, Me.tsbDemandes})
+        Me.barreOutils.Location = New System.Drawing.Point(0, 24)
+        Me.barreOutils.Name = "barreOutils"
+        Me.barreOutils.Padding = New System.Windows.Forms.Padding(4, 2, 4, 2)
+        Me.barreOutils.Size = New System.Drawing.Size(1200, 34)
+        Me.barreOutils.TabIndex = 2
+        '
+        'tsbTraitement
+        '
+        Me.tsbTraitement.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image
+        Me.tsbTraitement.Name = "tsbTraitement"
+        Me.tsbTraitement.Size = New System.Drawing.Size(28, 28)
+        Me.tsbTraitement.Text = "Traitement de la compense"
+        Me.tsbTraitement.ToolTipText = "Traitement de la compense"
+        '
+        'TSEP1
+        '
+        Me.TSEP1.Name = "TSEP1"
+        Me.TSEP1.Size = New System.Drawing.Size(6, 31)
+        '
+        'tsbRapport
+        '
+        Me.tsbRapport.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image
+        Me.tsbRapport.Name = "tsbRapport"
+        Me.tsbRapport.Size = New System.Drawing.Size(28, 28)
+        Me.tsbRapport.Text = "Rapport d'activité — sous-agents"
+        Me.tsbRapport.ToolTipText = "Rapport d'activité — sous-agents"
+        '
+        'tsbRapportAgences
+        '
+        Me.tsbRapportAgences.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image
+        Me.tsbRapportAgences.Name = "tsbRapportAgences"
+        Me.tsbRapportAgences.Size = New System.Drawing.Size(28, 28)
+        Me.tsbRapportAgences.Text = "Rapport d'activité — agences propres"
+        Me.tsbRapportAgences.ToolTipText = "Rapport d'activité — agences propres"
+        '
+        'tsbPiecesArchivees
+        '
+        Me.tsbPiecesArchivees.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image
+        Me.tsbPiecesArchivees.Name = "tsbPiecesArchivees"
+        Me.tsbPiecesArchivees.Size = New System.Drawing.Size(28, 28)
+        Me.tsbPiecesArchivees.Text = "Pièces comptables conservées"
+        Me.tsbPiecesArchivees.ToolTipText = "Pièces comptables conservées"
+        '
+        'tsbCommissionsBanque
+        '
+        Me.tsbCommissionsBanque.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image
+        Me.tsbCommissionsBanque.Name = "tsbCommissionsBanque"
+        Me.tsbCommissionsBanque.Size = New System.Drawing.Size(28, 28)
+        Me.tsbCommissionsBanque.Text = "Commissions encaissées par la banque"
+        Me.tsbCommissionsBanque.ToolTipText = "Commissions encaissées par la banque"
+        '
+        'TSEP2
+        '
+        Me.TSEP2.Name = "TSEP2"
+        Me.TSEP2.Size = New System.Drawing.Size(6, 31)
+        '
+        'tsbDemandes
+        '
+        Me.tsbDemandes.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image
+        Me.tsbDemandes.Name = "tsbDemandes"
+        Me.tsbDemandes.Size = New System.Drawing.Size(28, 28)
+        Me.tsbDemandes.Text = "Autorisations du référentiel"
+        Me.tsbDemandes.ToolTipText = "Autorisations du référentiel"
+        '
         'barreEtat
         '
         Me.barreEtat.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.tsslUtilisateur, Me.tsslMiseAJour, Me.tsslBase})
@@ -292,6 +371,7 @@ Partial Class FrmPrincipal
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(1200, 700)
         Me.Controls.Add(Me.barreEtat)
+        Me.Controls.Add(Me.barreOutils)
         Me.Controls.Add(Me.menuPrincipal)
         Me.IsMdiContainer = True
         Me.MainMenuStrip = Me.menuPrincipal
@@ -301,6 +381,8 @@ Partial Class FrmPrincipal
         Me.WindowState = System.Windows.Forms.FormWindowState.Maximized
         Me.menuPrincipal.ResumeLayout(False)
         Me.menuPrincipal.PerformLayout()
+        Me.barreOutils.ResumeLayout(False)
+        Me.barreOutils.PerformLayout()
         Me.barreEtat.ResumeLayout(False)
         Me.barreEtat.PerformLayout()
         Me.ResumeLayout(False)
@@ -339,6 +421,15 @@ Partial Class FrmPrincipal
     Friend WithEvents SEP3 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuFermerTout As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuQuitter As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents barreOutils As System.Windows.Forms.ToolStrip
+    Friend WithEvents tsbTraitement As System.Windows.Forms.ToolStripButton
+    Friend WithEvents TSEP1 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents tsbRapport As System.Windows.Forms.ToolStripButton
+    Friend WithEvents tsbRapportAgences As System.Windows.Forms.ToolStripButton
+    Friend WithEvents tsbPiecesArchivees As System.Windows.Forms.ToolStripButton
+    Friend WithEvents tsbCommissionsBanque As System.Windows.Forms.ToolStripButton
+    Friend WithEvents TSEP2 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents tsbDemandes As System.Windows.Forms.ToolStripButton
     Friend WithEvents barreEtat As System.Windows.Forms.StatusStrip
     Friend WithEvents tsslUtilisateur As System.Windows.Forms.ToolStripStatusLabel
     Friend WithEvents tsslBase As System.Windows.Forms.ToolStripStatusLabel

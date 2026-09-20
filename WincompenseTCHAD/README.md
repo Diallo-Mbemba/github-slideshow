@@ -2242,6 +2242,122 @@ L'état des commissions encaissées par la banque gagne deux commandes :
   mention « ÉDITION DESTINÉE À LA SIGNATURE » en exergue. Le fichier s'appelle alors
   `Commissions-banque-a-signer-202605.pdf`.
 
+## Les icônes, la barre d'outils et l'icône de l'application
+
+### Ce qui manquait
+
+Les menus n'affichaient que du texte. Sur un écran de vingt entrées, l'agent lit chaque ligne
+avant de trouver la sienne ; avec une image, il vise. L'application n'avait pas non plus
+d'icône propre : le bureau, la barre des tâches et l'explorateur montraient l'icône blanche
+par défaut de Windows, celle que portent les programmes qu'on n'a pas fini d'écrire.
+
+### Les icônes sont dessinées, non importées
+
+`Forms/IconesWU.vb` dessine les dix-neuf icônes au trait, avec GDI+. Il n'y a donc **aucun
+fichier image à transporter** : ni dossier de PNG à côté de l'exécutable — il se perd au
+premier déploiement — ni blocs binaires dans les `.resx`, qu'on ne peut ni relire ni corriger.
+Le dessin est du texte, il se lit et se modifie comme le reste du code.
+
+L'avantage décisif est ailleurs : le dessin est calculé **à la taille demandée**. Un poste en
+125 % ou 150 % — courant sous Windows 10 comme sous Windows 11 — réclame des images de 20 ou
+24 pixels ; une image de 16 pixels agrandie par Windows devient floue, celle-ci reste nette
+parce qu'elle est retracée. Chaque dessin est composé dans un carré de 16 unités, et la mise
+à l'échelle est posée une fois sur le contexte graphique.
+
+Les couleurs sont relevées sur l'icône fournie par la banque : l'or `#FFD54C`, le vert
+`#79BB00`, le bleu `#3C91BD`, avec un contour ardoise `#37474F` — et non noir, qui écrase la
+couleur qu'il entoure à 16 pixels. Les menus appartiennent ainsi visiblement à la même famille
+que l'icône du bureau.
+
+Le grisé des entrées désactivées n'est pas produit ici : Windows Forms grise lui-même l'image
+d'un élément désactivé. En fabriquer une seconde version doublerait le cache pour un résultat
+que le système fait déjà.
+
+### Toutes les entrées, ou aucune
+
+Un menu où trois entrées sur dix portent une image est plus laid qu'un menu sans images : les
+sept autres s'alignent sur une colonne vide et paraissent inachevées. **Toute entrée de menu
+déroulant reçoit donc son icône.**
+
+Les titres de la barre de menu — Compensation, Paramétrage, Sécurité, Fenêtres — n'en
+reçoivent pas : ils ouvrent un menu, ils ne déclenchent rien, et aucune application Windows
+n'y met d'image. « Quitter » fait exception : c'est une commande posée dans la barre, pas un
+titre, et elle porte la sienne.
+
+| Entrée | Icône |
+|---|---|
+| Traitement de la compense | balance à deux plateaux |
+| Rapport d'activité — sous-agents | barres d'un graphique |
+| Rapport d'activité — agences propres | immeuble |
+| Pièces comptables conservées | boîte d'archives |
+| Commissions encaissées par la banque | deux pièces de monnaie |
+| Sous-agents | une silhouette |
+| Agences propres | immeuble |
+| Groupes statistiques | trois pastilles reliées |
+| Autorisations du référentiel | coche dans une pastille |
+| Comptes systèmes | registre à tranche bleue |
+| Options de traitement | deux curseurs de réglage |
+| Paramétrage : fichier de secours | chemise |
+| Mon mot de passe | clé |
+| Utilisateurs et connexions | deux silhouettes |
+| Connexion à la base de données | cylindre à bandes |
+| Cascade, mosaïques, fermer tout | fenêtres disposées, fenêtre barrée |
+| Quitter | porte et flèche |
+
+### La barre d'outils
+
+Une barre d'outils reprend les gestes du quotidien, ceux qu'on répète chaque matin :
+
+> Traitement du jour │ Rapport sous-agents · Rapport agences · Pièces conservées ·
+> Commissions │ Autorisations
+
+Les boutons ne décident rien : chacun reprend, un par un, la disponibilité de l'entrée de menu
+qu'il double, et partage son gestionnaire — un bouton visible que le menu masque serait une
+porte dérobée, et celle-là se verrait, puisqu'elle est en haut de l'écran. La barre entière
+disparaît quand aucun bouton ne reste : une barre vide prendrait de la place sur la zone de
+travail sans rien offrir.
+
+Le bouton des autorisations porte une **pastille** avec le nombre de demandes en attente. Le
+bouton n'affiche pas de texte : sans elle, il ne dirait rien de ce qui attend. Au-delà de 99,
+la pastille affiche « 99+ », et le compte exact se lit dans le menu.
+
+### L'icône de l'application
+
+`Ressources/Wincompense.ico` porte les cubes isométriques fournis par la banque, en 16, 24,
+32, 48 et 64 pixels. Elle est déclarée deux fois dans le projet, et les deux sont nécessaires :
+
+- `<ApplicationIcon>` la grave dans `Wincompense.exe` — c'est elle que montrent le bureau, la
+  barre des tâches et l'explorateur ;
+- `<EmbeddedResource>` la rend lisible à l'exécution, pour que les fenêtres la portent. Son nom
+  de ressource est `WincompenseTCHAD.Ressources.Wincompense.ico` : **la renommer ou la déplacer
+  oblige à corriger la constante `RESSOURCE_ICONE` de `Forms/IconesWU.vb`**, faute de quoi la
+  lecture échoue en silence et l'application reprend l'icône par défaut.
+
+L'icône est posée sur l'écran de connexion et sur la fenêtre principale, puis sur chaque
+fenêtre fille au moment de son ouverture — en un seul endroit, `AfficherEnfant`, et non dans
+vingt formulaires. Une fenêtre fille réduite n'affiche que son icône et son titre.
+
+### Une réserve sur l'image fournie
+
+L'image d'origine est une **capture d'écran de 30 × 40 pixels**, bordée d'un liseré gris et
+posée sur une ombre portée. Le liseré et l'ombre ont été retirés — le fond est détouré depuis
+les bords sur ce qui est *clair et sans couleur*, ce qui épargne les reflets blancs du dessin
+— et le dessin utile, 28 × 30 pixels, a été recadré puis complété en carré.
+
+**Les tailles au-delà de 32 pixels sont donc agrandies, et restent un peu douces.** Elles
+conviennent au bureau et à la barre des tâches ; une image carrée nette de 256 × 256 pixels sur
+fond transparent donnerait un résultat franchement meilleur en grande vignette. Le jour où la
+banque la fournit, il suffit de remplacer le `.ico` : aucune ligne de code ne change.
+
+### Ce qui a été vérifié
+
+- `simul_icones.py` recalcule l'encombrement de **chaque forme tracée** et refuse tout trait
+  qui sortirait de la grille de 16 unités — un débordement ne se verrait autrement qu'à
+  l'écran, une fois livré ; il contrôle aussi que chaque valeur de l'énumération a son
+  aiguillage et son tracé, que chaque entrée de menu déroulant reçoit son icône, et que chaque
+  bouton de la barre a son image, son gestionnaire, son infobulle et son contrôle de droits ;
+- les dix-neuf dessins ont été rendus en image, à 16, 24 et 72 pixels, et **regardés**.
+
 ## Règles tranchées par la banque
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :

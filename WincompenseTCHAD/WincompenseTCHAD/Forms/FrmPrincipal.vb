@@ -19,6 +19,15 @@ Imports System.Windows.Forms
 ''' </summary>
 Public Class FrmPrincipal
 
+    ''' <summary>
+    ''' La dernière image à pastille posée sur le bouton des autorisations.
+    '''
+    ''' Elle est conservée pour être libérée quand la suivante la remplace : sans cela, chaque
+    ''' rafraîchissement du compteur abandonnerait une image, et une journée de travail en
+    ''' laisserait des centaines derrière elle.
+    ''' </summary>
+    Private _pastilleDemandes As Bitmap
+
     Public Sub New()
         InitializeComponent()
     End Sub
@@ -46,6 +55,12 @@ Public Class FrmPrincipal
 
         Dim nouveau As New T()
         nouveau.MdiParent = Me
+
+        ' L'icône est posée ici, et non dans chaque écran : une fenêtre fille réduite n'affiche
+        ' que son icône et son titre, et vingt formulaires n'ont pas à se souvenir chacun de
+        ' cette ligne. Les écrans ouverts autrement — boîtes de dialogue modales — gardent
+        ' l'icône par défaut, qu'on ne voit jamais puisqu'ils ne se réduisent pas.
+        IconesWU.Habiller(nouveau)
 
         ' CenterParent et CenterScreen ne conviennent pas à une fenêtre fille : le premier ne
         ' vaut que pour un affichage modal, le second la placerait au centre de l'écran, donc
@@ -101,11 +116,11 @@ Public Class FrmPrincipal
         Return Nothing
     End Function
 
-    Private Sub mnuTraitement_Click(sender As Object, e As EventArgs) Handles mnuTraitement.Click
+    Private Sub mnuTraitement_Click(sender As Object, e As EventArgs) Handles mnuTraitement.Click, tsbTraitement.Click
         AfficherEnfant(Of FrmCompensationWU)()
     End Sub
 
-    Private Sub mnuRapport_Click(sender As Object, e As EventArgs) Handles mnuRapport.Click
+    Private Sub mnuRapport_Click(sender As Object, e As EventArgs) Handles mnuRapport.Click, tsbRapport.Click
         AfficherEnfant(Of FrmRapportSousAgents)()
     End Sub
 
@@ -114,7 +129,7 @@ Public Class FrmPrincipal
     ''' populations n'ont pas les mêmes axes, et une fenêtre qui bascule de l'une à l'autre
     ''' donne l'occasion de citer les chiffres des sous-agents en croyant parler des agences.
     ''' </summary>
-    Private Sub mnuRapportAgences_Click(sender As Object, e As EventArgs) Handles mnuRapportAgences.Click
+    Private Sub mnuRapportAgences_Click(sender As Object, e As EventArgs) Handles mnuRapportAgences.Click, tsbRapportAgences.Click
         AfficherEnfant(Of FrmRapportAgences)()
     End Sub
 
@@ -123,7 +138,7 @@ Public Class FrmPrincipal
     ''' même droit : ce sont deux façons de regarder ce qui a été comptabilisé, l'une qui cumule
     ''' sur une période, l'autre qui restitue un justificatif daté.
     ''' </summary>
-    Private Sub mnuPiecesArchivees_Click(sender As Object, e As EventArgs) Handles mnuPiecesArchivees.Click
+    Private Sub mnuPiecesArchivees_Click(sender As Object, e As EventArgs) Handles mnuPiecesArchivees.Click, tsbPiecesArchivees.Click
         AfficherEnfant(Of FrmPiecesArchivees)()
     End Sub
 
@@ -134,7 +149,7 @@ Public Class FrmPrincipal
     ''' par population — une fenêtre pour les sous-agents, une autre pour les agences — et
     ''' un total des deux n'aurait sa place dans ni l'une ni l'autre.
     ''' </summary>
-    Private Sub mnuCommissionsBanque_Click(sender As Object, e As EventArgs) Handles mnuCommissionsBanque.Click
+    Private Sub mnuCommissionsBanque_Click(sender As Object, e As EventArgs) Handles mnuCommissionsBanque.Click, tsbCommissionsBanque.Click
         AfficherEnfant(Of FrmCommissionsBanque)()
     End Sub
 
@@ -175,9 +190,76 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmParametrageFichier)()
     End Sub
 
-    Private Sub mnuDemandes_Click(sender As Object, e As EventArgs) Handles mnuDemandes.Click
+    Private Sub mnuDemandes_Click(sender As Object, e As EventArgs) Handles mnuDemandes.Click, tsbDemandes.Click
         AfficherEnfant(Of FrmDemandes)()
         RafraichirLeCompteurDeDemandes()
+    End Sub
+
+#End Region
+
+#Region "Habillage"
+
+    ''' <summary>
+    ''' Pose une icône sur chaque entrée de menu et sur chaque bouton de la barre d'outils.
+    '''
+    ''' POURQUOI ICI ET NON DANS LE CONCEPTEUR. Une image posée dans le concepteur est rangée
+    ''' dans le fichier .resx sous forme d'un bloc binaire : on ne peut ni le relire, ni le
+    ''' corriger, ni savoir ce qu'il contient. Les icônes étant dessinées par le programme
+    ''' (IconesWU), les affecter en code garde le lien visible entre l'entrée et son dessin.
+    '''
+    ''' TOUTES LES ENTRÉES, OU AUCUNE. Un menu où trois entrées sur dix portent une image est
+    ''' plus laid qu'un menu sans images : les sept autres s'alignent alors sur une colonne vide
+    ''' et paraissent inachevées. Toute entrée de menu déroulant reçoit donc son icône.
+    '''
+    ''' LES TITRES DE LA BARRE DE MENU N'EN REÇOIVENT PAS. « Compensation », « Paramétrage »,
+    ''' « Sécurité », « Fenêtres » ouvrent un menu, ils ne déclenchent rien ; sous Windows 10
+    ''' comme sous Windows 11, aucune application n'y met d'image. « Quitter » fait exception :
+    ''' c'est une commande posée dans la barre, pas un titre, et elle porte son icône.
+    ''' </summary>
+    Private Sub PoserLesIcones()
+
+        IconesWU.Habiller(Me)
+
+        ' Menu Compensation.
+        mnuTraitement.Image = IconesWU.Obtenir(IconeWU.Balance)
+        mnuRapport.Image = IconesWU.Obtenir(IconeWU.Graphique)
+        mnuRapportAgences.Image = IconesWU.Obtenir(IconeWU.Batiment)
+        mnuPiecesArchivees.Image = IconesWU.Obtenir(IconeWU.Archive)
+        mnuCommissionsBanque.Image = IconesWU.Obtenir(IconeWU.Piece)
+
+        ' Menu Paramétrage.
+        mnuSousAgents.Image = IconesWU.Obtenir(IconeWU.Silhouette)
+        mnuAgences.Image = IconesWU.Obtenir(IconeWU.Batiment)
+        mnuGroupes.Image = IconesWU.Obtenir(IconeWU.Groupe)
+        mnuDemandes.Image = IconesWU.Obtenir(IconeWU.Coche)
+        mnuComptes.Image = IconesWU.Obtenir(IconeWU.Registre)
+        mnuOptions.Image = IconesWU.Obtenir(IconeWU.Curseurs)
+        mnuFichierParametrage.Image = IconesWU.Obtenir(IconeWU.Dossier)
+
+        ' Menu Sécurité.
+        mnuMonMotDePasse.Image = IconesWU.Obtenir(IconeWU.Cle)
+        mnuUtilisateurs.Image = IconesWU.Obtenir(IconeWU.Utilisateurs)
+        mnuConnexionBase.Image = IconesWU.Obtenir(IconeWU.BaseDeDonnees)
+
+        ' Menu Fenêtres. Il est aussi le MdiWindowListItem : Windows Forms y ajoute la liste
+        ' des fenêtres ouvertes, qui n'a pas d'icône et n'en attend pas.
+        mnuCascade.Image = IconesWU.Obtenir(IconeWU.Cascade)
+        mnuMosaiqueH.Image = IconesWU.Obtenir(IconeWU.MosaiqueH)
+        mnuMosaiqueV.Image = IconesWU.Obtenir(IconeWU.MosaiqueV)
+        mnuFermerTout.Image = IconesWU.Obtenir(IconeWU.FermerTout)
+
+        mnuQuitter.Image = IconesWU.Obtenir(IconeWU.Sortie)
+
+        ' Barre d'outils : les mêmes dessins, en plus grand. La taille suit ImageScalingSize
+        ' du ruban ; la demander ici évite que Windows agrandisse une image de 16 pixels.
+        Dim cote As Integer = barreOutils.ImageScalingSize.Width
+
+        tsbTraitement.Image = IconesWU.Obtenir(IconeWU.Balance, cote)
+        tsbRapport.Image = IconesWU.Obtenir(IconeWU.Graphique, cote)
+        tsbRapportAgences.Image = IconesWU.Obtenir(IconeWU.Batiment, cote)
+        tsbPiecesArchivees.Image = IconesWU.Obtenir(IconeWU.Archive, cote)
+        tsbCommissionsBanque.Image = IconesWU.Obtenir(IconeWU.Piece, cote)
+        tsbDemandes.Image = IconesWU.Obtenir(IconeWU.Coche, cote)
     End Sub
 
 #End Region
@@ -341,6 +423,35 @@ Public Class FrmPrincipal
         mnuConnexionBase.Available = utilisateurs
         SEP6.Available = utilisateurs
         SEP4.Available = utilisateurs
+
+        AppliquerLesDroitsALaBarre(traite, rapports, pointsDeVente)
+    End Sub
+
+    ''' <summary>
+    ''' Applique à la barre d'outils les droits déjà calculés pour les menus.
+    '''
+    ''' Les boutons ne décident rien : ils reprennent, un par un, la disponibilité de l'entrée
+    ''' de menu qu'ils doublent. Un bouton visible que le menu correspondant masque serait une
+    ''' porte dérobée — et celle-là se verrait, puisqu'elle est en haut de l'écran.
+    '''
+    ''' La barre entière disparaît quand aucun bouton ne reste : une barre vide de trente
+    ''' pixels prendrait de la place sur la zone de travail sans rien offrir.
+    ''' </summary>
+    Private Sub AppliquerLesDroitsALaBarre(traite As Boolean, rapports As Boolean,
+                                           pointsDeVente As Boolean)
+
+        tsbTraitement.Available = traite
+        tsbRapport.Available = rapports
+        tsbRapportAgences.Available = rapports
+        tsbPiecesArchivees.Available = rapports
+        tsbCommissionsBanque.Available = rapports
+        tsbDemandes.Available = pointsDeVente
+
+        ' Un séparateur n'a de sens qu'entre deux groupes réellement présents.
+        TSEP1.Available = traite AndAlso rapports
+        TSEP2.Available = pointsDeVente AndAlso (traite OrElse rapports)
+
+        barreOutils.Visible = traite OrElse rapports OrElse pointsDeVente
     End Sub
 
 #End Region
@@ -542,6 +653,7 @@ Public Class FrmPrincipal
     Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
         PoserFiligrane()
+        PoserLesIcones()
         AppliquerLesDroits()
         AfficherEtatBase()
 
@@ -570,6 +682,41 @@ Public Class FrmPrincipal
         mnuDemandes.Text = If(enAttente > 0,
                               $"&Autorisations du référentiel ({enAttente})",
                               "&Autorisations du référentiel")
+
+        MarquerLeBoutonDesDemandes(enAttente)
+    End Sub
+
+    ''' <summary>
+    ''' Inscrit le même nombre sur le bouton de la barre d'outils, sous forme de pastille.
+    '''
+    ''' Le bouton n'affiche pas de texte : sans pastille, il ne dirait rien de ce qui attend.
+    ''' L'infobulle porte le compte en toutes lettres, pour qui ne distingue pas le chiffre.
+    '''
+    ''' L'image précédente est libérée APRÈS que la nouvelle a été posée : libérer une image
+    ''' encore affichée fait tomber le premier repaint du bouton.
+    ''' </summary>
+    Private Sub MarquerLeBoutonDesDemandes(enAttente As Integer)
+
+        Dim ancienne As Bitmap = _pastilleDemandes
+
+        Dim fond As Bitmap = IconesWU.Obtenir(IconeWU.Coche, barreOutils.ImageScalingSize.Width)
+        Dim marquee As Bitmap = IconesWU.AvecPastille(fond, enAttente)
+
+        tsbDemandes.Image = marquee
+
+        ' AvecPastille rend la source telle quelle quand il n'y a rien à marquer : dans ce cas
+        ' l'image appartient au cache des icônes et ne doit surtout pas être libérée.
+        If marquee Is fond Then
+            _pastilleDemandes = Nothing
+        Else
+            _pastilleDemandes = marquee
+        End If
+
+        If ancienne IsNot Nothing Then ancienne.Dispose()
+
+        tsbDemandes.ToolTipText = If(enAttente > 0,
+                                     $"Autorisations du référentiel — {enAttente} en attente",
+                                     "Autorisations du référentiel")
     End Sub
 
     ''' <summary>
