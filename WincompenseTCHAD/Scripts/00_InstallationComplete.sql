@@ -1360,6 +1360,52 @@ END
 GO
 
 -- =========================================================================
+-- T_ParametreWU — les options de traitement de la banque
+--
+-- Elles decrivent la FACON DE TRAVAILLER de la banque, et non la configuration d'un poste :
+-- si le visa est obligatoire avant le fichier core banking, il l'est pour tout le monde.
+-- Une table cle / valeur, pour qu'une option de plus ne demande pas une colonne de plus.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_ParametreWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_ParametreWU
+    (
+        Cle                 NVARCHAR(50)    NOT NULL,
+        Valeur              NVARCHAR(255)   NOT NULL,
+        Libelle             NVARCHAR(255)   NULL,
+        DateModification    DATETIME        NULL,
+        ModifiePar          NVARCHAR(50)    NULL,
+
+        CONSTRAINT PK_T_ParametreWU PRIMARY KEY (Cle)
+    );
+
+    PRINT 'Table T_ParametreWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_ParametreWU déjà présente : création ignorée.';
+END
+GO
+
+-- NON par defaut : imposer une regle bloquante que la banque n'a pas demandee arreterait la
+-- compense au premier matin ou le chef de service est absent. La valeur existante n'est
+-- jamais ecrasee.
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'VISA_AVANT_CORE_BANKING')
+BEGIN
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'VISA_AVANT_CORE_BANKING', N'NON',
+            N'OUI : le fichier core banking ne peut pas être produit tant que la journée n''est pas visée. NON : l''application avertit seulement.',
+            GETDATE(), N'installation');
+
+    PRINT 'Option VISA_AVANT_CORE_BANKING créée à NON.';
+END
+ELSE
+BEGIN
+    PRINT 'Option VISA_AVANT_CORE_BANKING déjà présente : valeur conservée.';
+END
+GO
+
+-- =========================================================================
 -- T_TraitementWU — l'en-tête du traitement d'une journée, et son visa
 --
 -- La pièce porte déjà les quatre cartouches de la banque, et les écritures sont donc
@@ -1923,6 +1969,22 @@ END
 ELSE
 BEGIN
     PRINT 'T_TraitementWU absente : relancez ce script après 17_BordereauJournee.sql.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_ParametreWU')
+BEGIN
+    -- Tout le monde lit : l'option gouverne un controle que l'agent subit, il faut qu'il
+    -- puisse la connaitre. Seul l'administrateur ecrit. Aucun DELETE : une option effacee
+    -- redeviendrait silencieusement la valeur par defaut.
+    EXEC('GRANT SELECT ON dbo.T_ParametreWU TO wu_compense');
+    EXEC('GRANT SELECT ON dbo.T_ParametreWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_ParametreWU TO wu_admin');
+    PRINT 'Droits accordés sur T_ParametreWU.';
+END
+ELSE
+BEGIN
+    PRINT 'T_ParametreWU absente : relancez ce script après 18_OptionsTraitement.sql.';
 END
 GO
 

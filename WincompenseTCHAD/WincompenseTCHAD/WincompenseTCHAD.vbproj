@@ -108,6 +108,7 @@
     <Compile Include="Services\ParametrageImportService.vb" />
     <Compile Include="Services\TraitementRepository.vb" />
     <Compile Include="Services\BordereauService.vb" />
+    <Compile Include="Services\OptionsWU.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
@@ -189,6 +190,7 @@
       <DependentUpon>FrmConnexion.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\GrilleWU.vb" />
+    <Compile Include="Forms\VisaWU.vb" />
     <Compile Include="Forms\FrmRapportSousAgents.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -224,6 +226,12 @@
     </Compile>
     <Compile Include="Forms\FrmBordereauJournee.Designer.vb">
       <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmOptionsTraitement.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmOptionsTraitement.Designer.vb">
+      <DependentUpon>FrmOptionsTraitement.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>
@@ -318,6 +326,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmBordereauJournee.resx">
       <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmOptionsTraitement.resx">
+      <DependentUpon>FrmOptionsTraitement.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
       <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>

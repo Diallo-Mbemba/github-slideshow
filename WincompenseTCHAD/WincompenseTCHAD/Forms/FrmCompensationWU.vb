@@ -871,6 +871,14 @@ Public Class FrmCompensationWU
             Return
         End If
 
+        ' Le visa devant le fichier core banking : bloquant ou non selon l'option choisie par
+        ' la banque. La règle est écrite une seule fois, dans VisaWU — cet écran et celui des
+        ' pièces conservées produisent le même fichier et doivent l'appliquer pareil.
+        If Not VisaWU.AutoriserLeCoreBanking(Me, _dateActivite.Value) Then
+            tsslStatut.Text = "Fichier core banking abandonné : journée non visée."
+            Return
+        End If
+
         ' La date de valeur est LE JOUR DE LA COMPENSE, c'est-à-dire aujourd'hui : les écritures
         ' portent la date du jour où elles sont effectivement passées, et non une date déduite
         ' de la journée d'activité. Une journée rattrapée trois jours plus tard prend donc la

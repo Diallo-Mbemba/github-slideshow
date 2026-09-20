@@ -402,6 +402,14 @@ Public Class FrmPiecesArchivees
         Dim journee As PieceRepository.JourneeConservee = JourneeSelectionnee()
         If journee Is Nothing OrElse _piece.Rows.Count = 0 Then Return
 
+        ' Même règle que sur l'écran de la compense, et écrite au même endroit : un fichier
+        ' rejoué depuis l'archive engage les comptes autant que le premier.
+        If Not VisaWU.AutoriserLeCoreBanking(Me, journee.DateActivite) Then
+            lblStatut.ForeColor = Drawing.Color.Firebrick
+            lblStatut.Text = "Fichier core banking abandonné : journée non visée."
+            Return
+        End If
+
         Dim dateValeur As Date = Date.Today
         If Not ConfirmerLaDateDeValeur(dateValeur) Then
             lblStatut.Text = "Fichier core banking abandonné : date de valeur à vérifier."

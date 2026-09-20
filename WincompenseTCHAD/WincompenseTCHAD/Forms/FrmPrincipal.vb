@@ -155,6 +155,16 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
+    ''' Les options de traitement : la façon de travailler que la banque a choisie.
+    '''
+    ''' Rangées à côté des comptes systèmes parce qu'elles ont le même propriétaire —
+    ''' l'administrateur — et la même portée : tous les postes.
+    ''' </summary>
+    Private Sub mnuOptions_Click(sender As Object, e As EventArgs) Handles mnuOptions.Click
+        AfficherEnfant(Of FrmOptionsTraitement)()
+    End Sub
+
+    ''' <summary>
     ''' Sortie et rechargement du paramétrage par fichier.
     '''
     ''' Il est rangé sous Paramétrage, et non sous Sécurité : ce n'est pas une sauvegarde de
@@ -310,6 +320,7 @@ Public Class FrmPrincipal
         mnuAgences.Available = pointsDeVente
         mnuGroupes.Available = pointsDeVente
         mnuComptes.Available = comptes
+        mnuOptions.Available = comptes
         mnuDemandes.Available = pointsDeVente
         SEP5.Available = pointsDeVente
         SEP2.Available = pointsDeVente AndAlso comptes

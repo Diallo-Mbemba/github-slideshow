@@ -2194,6 +2194,43 @@ existent. **La comptabilisation du jour ne s'arrête pas** parce qu'un script d'
 De même, une annulation ne laisse pas une journée en place faute d'une table qu'elle n'a jamais
 eue.
 
+### Le visa bloque-t-il le fichier core banking ? La banque choisit
+
+*Menu Paramétrage › Options de traitement… — administrateur seul.*
+
+Le visa peut **constater** ou **empêcher**. Imposer l'un ou l'autre serait décider à la place
+de la banque : un contrôle bloquant arrête la compense le matin où le chef de service est
+absent, et un contrôle qui n'arrête rien ne contrôle pas grand-chose.
+
+| Option | Ce qui se passe au moment de produire le fichier |
+|---|---|
+| **NON** *(par défaut)* | L'application **avertit** que la journée n'est pas visée — et que des Accounts n'ont pas été comptabilisés, s'il y en a — puis laisse l'agent décider. « Non » est proposé par défaut. |
+| **OUI** | L'application **refuse**, et dit qui doit viser et où. |
+
+L'écran ne se contente pas de deux boutons radio : **sous chaque choix, une phrase décrit ce
+qui se passera**. Une case à cocher dont on ne voit pas la conséquence se coche au hasard. Et
+activer l'option bloquante demande une confirmation qui rappelle de prévoir **plusieurs
+authorizers** — avec un seul, une journée d'absence bloque la compense.
+
+**L'option vit en base** (`T_ParametreWU`), et non sur le poste : elle décrit la façon de
+travailler de la banque, pas la configuration d'un ordinateur. Un agent ne doit pas pouvoir
+s'en affranchir en décochant une case chez lui. Seul l'administrateur l'écrit ; tout le monde
+la lit, parce qu'elle gouverne un contrôle que l'agent subit.
+
+**Une absence n'est jamais une interdiction.** Table absente, option jamais créée, base
+injoignable : la valeur par défaut s'applique, et c'est toujours la moins bloquante. Une règle
+qui s'activerait toute seule parce qu'une lecture a échoué arrêterait la compense pour une
+raison que personne ne comprendrait.
+
+**La règle est écrite une seule fois**, dans `Forms\VisaWU.vb`. Deux écrans produisent ce
+fichier — celui de la compense, pour la journée qu'on vient de traiter, et celui des pièces
+conservées, pour une journée ancienne — et deux copies d'une règle finissent toujours par
+diverger.
+
+Enfin, une journée **antérieure au bordereau** n'est jamais bloquée : elle n'a pas d'en-tête de
+traitement, donc pas de visa possible, et refuser sa production punirait l'agent pour une
+table qui n'existait pas.
+
 ### L'édition mensuelle des commissions
 
 L'état des commissions encaissées par la banque gagne deux commandes :
@@ -2254,9 +2291,6 @@ L'état des commissions encaissées par la banque gagne deux commandes :
   annulations. Si la banque veut que le chef de service de la compense soit distinct de celui
   qui autorise le paramétrage, il faudra une seconde paire de fonctions — une colonne de plus
   sur `T_UtilisateurWU`, et rien d'autre à changer.
-- Faut-il empêcher la production du fichier core banking tant que la journée n'est pas visée ?
-  Aujourd'hui le visa constate, il ne bloque pas. Le rendre bloquant est une ligne de code, et
-  une décision d'organisation.
 - Sauvegarde de la base : qui tient le serveur SQL, à quelle périodicité les sauvegardes
   tournent-elles, et où sont-elles recopiées ? Le fichier de secours du paramétrage ne
   remplace rien de cela — il le complète.
