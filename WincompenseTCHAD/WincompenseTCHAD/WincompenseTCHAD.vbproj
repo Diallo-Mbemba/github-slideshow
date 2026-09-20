@@ -175,6 +175,7 @@
     <Compile Include="Forms\FrmConnexion.Designer.vb">
       <DependentUpon>FrmConnexion.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\GrilleWU.vb" />
     <Compile Include="Forms\FrmRapportSousAgents.vb">
       <SubType>Form</SubType>
     </Compile>

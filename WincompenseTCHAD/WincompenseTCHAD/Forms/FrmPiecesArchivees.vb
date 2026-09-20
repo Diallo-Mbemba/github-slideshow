@@ -128,7 +128,7 @@ Public Class FrmPiecesArchivees
     Private Shared Sub Entete(grille As DataGridView, colonne As String, libelle As String, largeur As Integer)
         If Not grille.Columns.Contains(colonne) Then Return
         grille.Columns(colonne).HeaderText = libelle
-        grille.Columns(colonne).Width = largeur
+        GrilleWU.LargeurFixe(grille, colonne, largeur)
     End Sub
 
 #End Region
@@ -206,10 +206,10 @@ Public Class FrmPiecesArchivees
             If Not dgvPiece.Columns.Contains(nomColonne) Then Continue For
             dgvPiece.Columns(nomColonne).DefaultCellStyle.Format = "#,##0;-#,##0;"
             dgvPiece.Columns(nomColonne).DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
-            dgvPiece.Columns(nomColonne).Width = 110
+            GrilleWU.LargeurFixe(dgvPiece, nomColonne, 110)
         Next
 
-        If dgvPiece.Columns.Contains("Compte") Then dgvPiece.Columns("Compte").Width = 120
+        GrilleWU.LargeurFixe(dgvPiece, "Compte", 120)
         If dgvPiece.Columns.Contains("Libelle") Then
             dgvPiece.Columns("Libelle").AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
             dgvPiece.Columns("Libelle").HeaderText = "Libellé"

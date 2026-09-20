@@ -379,7 +379,8 @@ Public Class FrmRapportActivite
             dgvPerformance.Columns("Part").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
         End If
 
-        If dgvPerformance.Columns.Contains("Rang") Then dgvPerformance.Columns("Rang").Width = 45
+        GrilleWU.LargeurFixe(dgvPerformance, "Rang", 45)
+
         If dgvPerformance.Columns.Contains("Niveau") Then dgvPerformance.Columns("Niveau").Visible = False
 
         For Each ligne As DataGridViewRow In dgvPerformance.Rows
