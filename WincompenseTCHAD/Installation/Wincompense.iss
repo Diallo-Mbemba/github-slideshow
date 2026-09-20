@@ -47,7 +47,6 @@
 ; ============================================================================
 
 #define NomApplication      "Wincompense TCHAD"
-#define VersionApplication  "1.0.0"
 #define Editeur             "Ecobank Tchad"
 #define ExecutablePrincipal "Wincompense.exe"
 
@@ -90,6 +89,22 @@
 ; ("No files found matching ..."), qui laisse croire a une erreur du script.
 #if !FileExists(DossierRelease + "\" + ExecutablePrincipal)
   #error "Wincompense.exe est introuvable dans bin\Release : la solution n'a pas ete compilee en Release. Dans Visual Studio, choisir Release au lieu de Debug dans la liste de la barre d'outils, puis Generer > Generer la solution. Recompiler ensuite ce script."
+#endif
+
+; Version du setup : LUE DANS L'EXECUTABLE, jamais recopiee ici.
+;
+; Elle etait ecrite a la main, et c'etait une source de derive silencieuse : le nom du
+; setup annoncait une version, l'application en portait une autre, et version.txt sur le
+; partage comparait ses nombres a celle de l'application. Trois endroits, deux verites.
+;
+; L'application compare Assembly.GetName().Version (AssemblyVersion de My Project\
+; AssemblyInfo.vb) ; GetFileVersion lit AssemblyFileVersion. Visual Studio les tient
+; egales par defaut, et elles doivent le rester.
+#define VersionApplication GetFileVersion(DossierRelease + "\" + ExecutablePrincipal)
+
+#if VersionApplication == ""
+  #define VersionApplication "1.0.0.0"
+  #pragma message "Version illisible dans l'executable : 1.0.0.0 est employe par defaut."
 #endif
 
 [Setup]
@@ -211,6 +226,68 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
+//  Le fichier de configuration du poste : le relire avant de l'ecrire
+// ---------------------------------------------------------------------------
+//  Ce fichier ne contient pas que ce que l'installateur y met. L'application y
+//  range aussi le MOT DE PASSE du compte SQL, chiffre par Windows pour cette
+//  machine, et d'autres valeurs qui lui appartiennent.
+//
+//  L'ecraser a chaque reinstallation effacerait ce mot de passe, et le poste
+//  afficherait « Login failed for user » apres une simple mise a jour - sans que
+//  rien n'explique pourquoi, puisque la mise a jour semblait n'avoir touche qu'a
+//  l'executable. Les cles que nous n'ecrivons pas sont donc CONSERVEES.
+//  NOTE DE VERSION : LoadStringsFromUTF8File demande Inno Setup 6.1 ou superieur, comme
+//  SaveStringsToUTF8File employe plus bas. Sur une version anterieure - que ce projet ne
+//  vise pas - il faudrait lire par LoadStringsFromFile, au prix des accents.
+function CheminConfigLocale(): String;
+begin
+  Result := ExpandConstant('{commonappdata}\Wincompense\wincompense.config');
+end;
+
+// Cle d'une ligne CLE=VALEUR, en majuscules. Chaine vide pour un commentaire,
+// une ligne blanche, ou une ligne sans signe egal.
+function CleDeLaLigne(Ligne: String): String;
+var
+  Nette: String;
+  Separateur: Integer;
+begin
+  Result := '';
+  Nette := Trim(Ligne);
+
+  if Nette = '' then Exit;
+  if Copy(Nette, 1, 1) = '#' then Exit;
+
+  Separateur := Pos('=', Nette);
+  if Separateur <= 1 then Exit;
+
+  Result := Uppercase(Trim(Copy(Nette, 1, Separateur - 1)));
+end;
+
+// Valeur deja posee sur ce poste pour une cle, ou chaine vide.
+function ValeurLocale(Cle: String): String;
+var
+  Lignes: TArrayOfString;
+  Index, Separateur: Integer;
+  Nette: String;
+begin
+  Result := '';
+
+  if not FileExists(CheminConfigLocale()) then Exit;
+  if not LoadStringsFromUTF8File(CheminConfigLocale(), Lignes) then Exit;
+
+  for Index := 0 to GetArrayLength(Lignes) - 1 do
+  begin
+    if CompareText(CleDeLaLigne(Lignes[Index]), Cle) = 0 then
+    begin
+      Nette := Trim(Lignes[Index]);
+      Separateur := Pos('=', Nette);
+      Result := Trim(Copy(Nette, Separateur + 1, Length(Nette) - Separateur));
+      Exit;
+    end;
+  end;
+end;
+
+// ---------------------------------------------------------------------------
 //  Page supplementaire : serveur SQL et fichier partage
 // ---------------------------------------------------------------------------
 //  Les valeurs sont demandees A L'INSTALLATION, et non ecrites en dur : c'est
@@ -239,8 +316,32 @@ begin
   //       /PARTAGE="\\SRV-FICHIERS\Wincompense\connexion.config"
   //
   // /SERVEUR accepte aussi bien un nom de serveur qu'une chaine de connexion complete.
-  PageConnexion.Values[0] := ExpandConstant('{param:SERVEUR|.\SQLEXPRESS}');
+  //
+  // SUR UNE REINSTALLATION, les champs reprennent ce que le poste porte deja. Sans cela,
+  // une mise a jour silencieuse lancee sans /SERVEUR remettrait le poste sur .\SQLEXPRESS
+  // et lui retirerait son partage : l'installateur croirait n'avoir change que
+  // l'executable, et le poste ne trouverait plus la base de la banque.
+  //
+  // L'ordre est : ce qui est passe en ligne de commande, puis ce que le poste porte, puis
+  // seulement la valeur par defaut.
+  PageConnexion.Values[0] := ExpandConstant('{param:SERVEUR|}');
+
+  if Trim(PageConnexion.Values[0]) = '' then
+  begin
+    // CHAINE prime sur SERVEUR dans le fichier, comme dans l'application.
+    PageConnexion.Values[0] := ValeurLocale('CHAINE');
+
+    if Trim(PageConnexion.Values[0]) = '' then
+      PageConnexion.Values[0] := ValeurLocale('SERVEUR');
+  end;
+
+  if Trim(PageConnexion.Values[0]) = '' then
+    PageConnexion.Values[0] := '.\SQLEXPRESS';
+
   PageConnexion.Values[1] := ExpandConstant('{param:PARTAGE|}');
+
+  if Trim(PageConnexion.Values[1]) = '' then
+    PageConnexion.Values[1] := ValeurLocale('PARTAGE');
 end;
 
 // Une chaine de connexion porte toujours au moins un "mot-cle=valeur" ; un nom de
@@ -402,16 +503,39 @@ end;
 // ---------------------------------------------------------------------------
 procedure EcrireConfigurationLocale();
 var
-  Lignes: TArrayOfString;
-  Chemin: String;
+  Anciennes, Lignes: TArrayOfString;
+  Chemin, Cle: String;
+  Index, Rang: Integer;
 begin
-  Chemin := ExpandConstant('{commonappdata}\Wincompense\wincompense.config');
+  Chemin := CheminConfigLocale();
 
-  SetArrayLength(Lignes, 6);
-  Lignes[0] := '# Wincompense TCHAD - configuration de ce poste';
-  Lignes[1] := '# Ecrit par le programme d''installation. Une ligne CLE=VALEUR.';
-  Lignes[2] := '';
-  Lignes[3] := 'PARTAGE=' + Trim(PageConnexion.Values[1]);
+  // Les cles que nous NE touchons pas sont reprises telles quelles - MOTDEPASSE en
+  // premier lieu, chiffre par Windows pour cette machine. Les commentaires, eux, ne sont
+  // pas repris : ils seraient recopies a chaque reinstallation et le fichier grossirait
+  // d'un en-tete de plus a chaque fois.
+  SetArrayLength(Lignes, 0);
+  Rang := 0;
+
+  if FileExists(Chemin) then
+    if LoadStringsFromUTF8File(Chemin, Anciennes) then
+      for Index := 0 to GetArrayLength(Anciennes) - 1 do
+      begin
+        Cle := CleDeLaLigne(Anciennes[Index]);
+
+        if (Cle <> '') and (Cle <> 'PARTAGE') and (Cle <> 'CHAINE') and
+           (Cle <> 'SERVEUR') and (Cle <> 'BASE') then
+        begin
+          SetArrayLength(Lignes, Rang + 1);
+          Lignes[Rang] := Trim(Anciennes[Index]);
+          Rang := Rang + 1;
+        end;
+      end;
+
+  SetArrayLength(Lignes, Rang + 3);
+  Lignes[Rang] := '# Wincompense TCHAD - configuration de ce poste';
+  Lignes[Rang + 1] := '# Ecrit par le programme d''installation. Une ligne CLE=VALEUR.';
+  Lignes[Rang + 2] := 'PARTAGE=' + Trim(PageConnexion.Values[1]);
+  Rang := Rang + 3;
 
   // CHAINE prime sur SERVEUR et BASE : ecrire les deux ferait coexister deux
   // descriptions du meme serveur, dont une seule compte.
@@ -424,14 +548,14 @@ begin
   // %PROGRAMDATA% et non sur un partage reseau.
   if EstUneChaineDeConnexion(PageConnexion.Values[0]) then
   begin
-    SetArrayLength(Lignes, 5);
-    Lignes[4] := 'CHAINE=' + Trim(PageConnexion.Values[0]);
+    SetArrayLength(Lignes, Rang + 1);
+    Lignes[Rang] := 'CHAINE=' + Trim(PageConnexion.Values[0]);
   end
   else
   begin
-    SetArrayLength(Lignes, 6);
-    Lignes[4] := 'SERVEUR=' + Trim(PageConnexion.Values[0]);
-    Lignes[5] := 'BASE=GWC_WINCOMPENSE_ETD';
+    SetArrayLength(Lignes, Rang + 2);
+    Lignes[Rang] := 'SERVEUR=' + Trim(PageConnexion.Values[0]);
+    Lignes[Rang + 1] := 'BASE=GWC_WINCOMPENSE_ETD';
   end;
 
   if not SaveStringsToUTF8File(Chemin, Lignes, False) then

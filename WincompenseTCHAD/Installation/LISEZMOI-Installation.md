@@ -82,20 +82,42 @@ sous 6.3 et suivantes.
 
 2. **Installer Inno Setup**, selon le choix ci-dessus.
 
-3. Ouvrir `Installation\Wincompense.iss`, puis **Build → Compile** (Ctrl+F9).
+3. **Double-cliquer `Installation\Construire-Setup.cmd`.** Il cherche `ISCC.exe` dans les
+   deux `Program Files` puis dans le `PATH`, vérifie que `bin\Release\Wincompense.exe`
+   existe, compile, et ouvre le dossier du résultat. En cas de manque — Release non
+   compilé, Inno Setup absent — il dit lequel et ce qu'il faut faire.
+
+   *Équivalent manuel :* ouvrir `Installation\Wincompense.iss` dans Inno Setup, puis
+   **Build → Compile** (Ctrl+F9).
 
 4. Le programme d'installation apparaît dans `Installation\Sortie\`.
 
 Pour compiler depuis un autre emplacement — serveur de construction, dossier
-déplacé — le chemin du dossier Release se passe en ligne de commande :
+déplacé — le chemin du dossier Release se passe en argument :
+
+```
+Construire-Setup.cmd "C:\chemin\vers\bin\Release"
+```
+
+ou directement :
 
 ```
 ISCC.exe /DDossierRelease="C:\chemin\vers\bin\Release" Wincompense.iss
 ```
 
-Pour une nouvelle version, changer `VersionApplication` en tête du script. **Ne jamais
-changer `AppId`** : c'est par lui que Windows reconnaît une mise à jour plutôt qu'un
-second produit installé côte à côte.
+### Le numéro de version n'est plus à recopier
+
+Il était écrit à la main dans le script, et c'était une dérive silencieuse : le nom du
+setup annonçait une version, l'application en portait une autre, et `version.txt` sur le
+partage comparait ses nombres à celle de l'application. Trois endroits, deux vérités.
+
+Le script **lit désormais la version dans l'exécutable compilé** (`GetFileVersion`). Pour
+publier une nouvelle version, il n'y a donc qu'un seul endroit à changer :
+`WincompenseTCHAD\My Project\AssemblyInfo.vb`, puis recompiler en Release. Le setup
+s'appelle alors `Wincompense_Setup_1.1.0.0.exe` sans qu'on ait rien dit.
+
+**Ne jamais changer `AppId`** : c'est par lui que Windows reconnaît une mise à jour plutôt
+qu'un second produit installé côte à côte.
 
 ---
 

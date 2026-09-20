@@ -192,6 +192,7 @@ Scripts/
 
 Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe
+├── Construire-Setup.cmd                   ' Fabrique le setup : trouve ISCC, compile, ouvre Sortie\
 ├── connexion.config.modele                ' Modèle du fichier à poser sur le partage réseau
 ├── Configurer-Connexion.ps1               ' Changement de serveur en ligne de commande
 ├── version.txt.modele                     ' Modèle du fichier annonçant la version publiée
