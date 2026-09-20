@@ -1721,6 +1721,137 @@ La lecture des rapports Western Union (`FrmCompensationWU`) suivait jusqu'ici de
 Les deux ont disparu : la barre d'état s'abonne maintenant à `AvancementChange`, donc à la même
 source que la fenêtre flottante, et les deux affichages ne peuvent plus diverger.
 
+## Annuler une comptabilisation
+
+Une journée peut avoir été comptabilisée à tort : rapport Western Union vide, rapport d'une
+autre journée, chargement fait deux fois. Il faut pouvoir la retirer des rapports.
+
+### Corriger et retirer ne sont pas la même chose
+
+**Corriger une journée ne demande rien de nouveau.** Recomptabiliser la même date écrase
+intégralement la précédente : `HistoriqueRepository.EnregistrerJournee` commence par un
+`DELETE` sur `T_HistoriqueWU`, `T_HistoriqueMTCN` et `T_PieceWU`, puis réinsère — le tout dans
+une seule transaction. Jamais de doublon, jamais de cumul, jamais une journée à moitié
+remplacée. Rechargez les bons rapports, relancez, c'est fini.
+
+**Retirer une journée, en revanche, n'avait pas de réponse** : pour l'effacer, il aurait fallu
+en comptabiliser une autre à sa place, ce qui est impossible quand la bonne réponse est « il ne
+s'est rien passé ce jour-là ».
+
+### Annuler n'est pas supprimer
+
+Les lignes ne sont pas effacées, elles sont **déplacées** vers `T_HistoriqueAnnuleWU`,
+`T_HistoriqueMTCNAnnuleWU` et `T_PieceAnnuleeWU`, sous un identifiant d'annulation qui porte le
+motif, le commentaire et les deux signatures (`T_AnnulationWU`). Un `DELETE` effacerait la
+preuve au moment précis où l'on en a besoin : c'est quand une journée est annulée que
+l'auditeur veut savoir qui, quand et pourquoi.
+
+**Pourquoi des tables séparées, et non une colonne `Annulee`.** `T_HistoriqueWU` a pour clé
+primaire `(DateActivite, Account)` et `T_PieceWU` `(DateActivite, Ligne)`. Une journée annulée
+qui resterait sur place entrerait en collision avec la journée recomptabilisée qui la remplace,
+et il faudrait ajouter l'annulation à chaque clé primaire — donc à chaque lecture, donc aux
+rapports d'activité, qui n'ont aucune raison de connaître ce nouveau statut. Avec des tables
+d'archive, les tables vivantes ne contiennent que des journées en vigueur : **les rapports
+cessent de compter une journée annulée sans qu'on touche à une seule de leurs requêtes.**
+
+Une même date peut être annulée plusieurs fois (comptabilisée, annulée, recomptabilisée,
+annulée de nouveau). C'est `IdAnnulation`, et non la date, qui identifie une archive.
+
+### Deux personnes, comme pour le référentiel
+
+L'annulation emprunte la file du double regard (`T_DemandeWU`), avec
+`TypeObjet = 'COMPTABILISATION'` et `Operation = 'ANNULATION'`. L'authorizer garde un seul
+écran ; la contrainte `CK_T_DemandeWU_PasSoiMeme` s'applique telle quelle ; et l'index unique
+sur `(TypeObjet, Cle)` interdit deux demandes simultanées sur la même journée.
+
+Retirer une journée de la comptabilité est plus grave que modifier un taux de sous-agent — et
+le taux exige déjà deux personnes.
+
+**Conséquence sur les droits SQL.** Le rôle `wu_compense` n'avait aucun accès à `T_DemandeWU`,
+pas même en lecture, parce que la file ne portait que du paramétrage. Elle porte maintenant
+aussi les annulations, qui appartiennent à la compense : `wu_compense` reçoit donc
+`SELECT, INSERT, UPDATE`. Ce qui protège le référentiel n'est pas l'absence de ce droit, mais
+la fonction INPUTER / AUTHORIZER et la contrainte de la base, qu'un `UPDATE` fait à la main ne
+contourne pas davantage.
+
+L'application applique le retrait **dans la transaction de la décision** : en-tête d'annulation,
+trois déplacements et décision sur la demande ne font qu'un. Une journée à moitié archivée
+serait comptée deux fois par les rapports, ou pas du tout.
+
+### Ce que l'annulation ne fait pas : extourner
+
+Si le fichier destiné au core banking a été injecté, les écritures sont dans les livres de la
+banque. **Wincompense ne peut pas les en retirer.** L'écran de demande pose la question, la
+réponse est conservée (`CoreBankingInjecte`), et elle est rappelée à l'authorizer au moment
+d'autoriser. L'extourne se demande en comptabilité, séparément.
+
+Pour que l'avertissement ne repose pas sur la seule mémoire de l'agent, **la production du
+fichier est désormais tracée** (`T_FichierCoreBankingWU` : journée, date de valeur, numéro de
+lot, nom du fichier, totaux, auteur, horodatage). Le fichier lui-même n'est toujours pas
+conservé — il dérive entièrement de la pièce, le garder serait garder deux fois la même chose.
+
+La trace ne dit pas que le fichier a été **injecté** : l'application écrit un classeur, elle ne
+voit pas ce que le core banking en fait. Et « aucune production connue » n'est pas « jamais
+produit » : les fichiers sortis avant la mise en service de la table ne sont pas enregistrés.
+Les écrans le disent dans ces termes.
+
+### Le parcours à l'écran
+
+| Étape | Où | Qui |
+|---|---|---|
+| Sélectionner la journée, bouton « Annuler cette comptabilisation… » | Pièces comptables conservées | inputer |
+| Voir ce qui sera retiré, répondre sur le core banking, choisir le motif | `FrmAnnulerComptabilisation` | inputer |
+| Relire le contenu ACTUEL de la journée, autoriser ou rejeter | Demandes en attente | authorizer |
+
+Le motif est obligatoire, pris dans une liste courte (rapport vide, rapport erroné, rapport
+d'une autre journée, double comptabilisation, autre). « Autre » exige une explication écrite :
+il n'explique rien par lui-même.
+
+Le détail affiché à l'authorizer **relit la journée au moment de la décision**, et non au moment
+du dépôt : entre les deux, elle a pu être recomptabilisée. Ce sont les chiffres affichés là qui
+partiront en archive. Si la journée n'a plus rien de comptabilisé, l'écran le dit et
+l'autorisation est refusée — une archive vide ferait croire à un traitement.
+
+### La journée annulée reste visible
+
+Elle figure dans la liste des pièces conservées, grisée et barrée, avec la colonne **État** qui
+porte « ANNULÉE » et le motif. Sa pièce s'ouvre et s'exporte comme une autre : un justificatif
+se relit, il n'engage rien.
+
+**Le fichier core banking, lui, ne se reconstruit pas depuis une journée annulée** : ce fichier
+passe des écritures, et repasser celles d'une journée retirée serait exactement l'inverse de ce
+qu'on a voulu. Le bouton s'éteint.
+
+### Avertissement avant de remplacer une journée
+
+Le remplacement d'une journée déjà comptabilisée était silencieux. Il ne l'est plus : avant de
+générer, `FrmCompensationWU` annonce les trois choses qui peuvent le rendre fâcheux —
+
+- la journée a déjà été comptabilisée, par qui et à quelle heure ;
+- son fichier core banking est peut-être déjà parti, auquel cas la nouvelle version ferait
+  double emploi avec des écritures déjà passées ;
+- une annulation de cette journée attend d'être autorisée, et l'authorizer retirerait alors la
+  **nouvelle** version en croyant retirer l'ancienne.
+
+Rien de tout cela n'interdit de continuer — corriger une journée est la façon normale de
+réparer une comptabilisation fausse. L'écran informe, il ne décide pas, mais il propose « Non »
+par défaut.
+
+### Scripts à exécuter
+
+| Script | Ce qu'il crée |
+|---|---|
+| `Scripts\14_AnnulationComptabilisation.sql` | Les quatre tables d'annulation, les deux colonnes ajoutées à `T_DemandeWU`, les contraintes rouvertes, la vue `V_JourneesAnnulees` |
+| `Scripts\15_FichierCoreBanking.sql` | `T_FichierCoreBankingWU` |
+
+`00_InstallationComplete.sql` les contient déjà pour une installation neuve. Sur une base
+existante, **le script 14 est obligatoire avant toute nouvelle demande** : il ajoute deux
+colonnes à `T_DemandeWU`, et tant qu'elles manquent, plus aucune demande — annulation comme
+référentiel — ne peut être déposée ni décidée. Les écrans le disent et nomment le script.
+
+**Aucun rôle ne reçoit `DELETE` sur les archives ni sur la trace des fichiers.** Une archive que
+ses propres utilisateurs peuvent effacer ne prouve rien.
+
 ## Règles tranchées par la banque
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
@@ -1755,6 +1886,12 @@ source que la fenêtre flottante, et les deux affichages ne peuvent plus diverge
   Tant qu'il en subsiste, la clé étrangère proposée en fin de `Scripts\04_GroupeStatistique.sql`
   ne peut pas être posée.
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.
+- Annulation d'une comptabilisation : les fonctions INPUTER / AUTHORIZER du référentiel
+  servent telles quelles. Si la banque veut que le retrait d'une journée soit décidé par
+  d'autres personnes que le paramétrage des points de vente, il faudra une seconde paire de
+  fonctions — une colonne de plus sur `T_UtilisateurWU`, et rien d'autre à changer.
+- Faut-il purger les archives d'annulation au bout d'un certain temps, et lequel ? Aucune
+  purge n'est prévue aujourd'hui, et aucun rôle n'a le droit d'effacer.
 
 ## Test de référence (section 17)
 

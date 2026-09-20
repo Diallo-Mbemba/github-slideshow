@@ -38,6 +38,93 @@ Public NotInheritable Class HistoriqueRepository
         "Exécutez le script Scripts\06_HistoriqueMTCN.sql : il la crée." & vbCrLf &
         "Tant qu'elle est absente, le détail des MTCN n'est pas conservé."
 
+#Region "Une journée déjà comptabilisée"
+
+    ''' <summary>
+    ''' Ce que l'application sait d'une journée déjà comptabilisée : de quoi avertir avant
+    ''' de la remplacer.
+    ''' </summary>
+    Public NotInheritable Class Comptabilisation
+
+        Public Property DateActivite As Date
+        Public Property NombrePdv As Integer = 0
+        Public Property DateComptabilisation As Date?
+        Public Property ComptabilisePar As String = String.Empty
+
+        ''' <summary>
+        ''' La phrase d'avertissement. Elle nomme la personne et l'heure : « déjà
+        ''' comptabilisée » ne suffit pas à décider, « comptabilisée il y a dix minutes par
+        ''' votre collègue » si.
+        ''' </summary>
+        Public ReadOnly Property Avertissement As String
+            Get
+                Dim phrase As String =
+                    $"La journée du {DateActivite:dd/MM/yyyy} a déjà été comptabilisée"
+
+                If DateComptabilisation.HasValue Then
+                    phrase &= $" le {DateComptabilisation.Value:dd/MM/yyyy à HH:mm}"
+                End If
+
+                If ComptabilisePar.Length > 0 Then phrase &= $" par {ComptabilisePar}"
+
+                Return phrase & $" ({NombrePdv} point(s) de vente)."
+            End Get
+        End Property
+    End Class
+
+    ''' <summary>
+    ''' La comptabilisation en vigueur pour une journée, ou Nothing si elle n'a jamais été
+    ''' comptabilisée — ou si elle a été annulée depuis, ce qui revient au même : il n'y a
+    ''' alors plus rien à remplacer.
+    '''
+    ''' Une table absente ou une base injoignable ne renvoient rien : mieux vaut ne pas
+    ''' avertir que bloquer une comptabilisation pour un avertissement.
+    ''' </summary>
+    Public Shared Function ComptabilisationExistante(jour As Date) As Comptabilisation
+
+        Const lecture As String =
+            "SELECT  pdv     = COUNT(*)," &
+            "        quand   = MAX(DateComptabilisation)," &
+            "        qui     = MIN(ComptabilisePar) " &
+            "FROM    " & TABLE_HISTORIQUE & " " &
+            "WHERE   DateActivite = @jour"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(lecture, connexion)
+                    commande.Parameters.Add("@jour", SqlDbType.Date).Value = jour.Date
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+
+                        If Not lecteur.Read() Then Return Nothing
+
+                        Dim nombre As Integer = Convert.ToInt32(lecteur.GetValue(0),
+                                                                Globalization.CultureInfo.InvariantCulture)
+                        If nombre = 0 Then Return Nothing
+
+                        Return New Comptabilisation() With {
+                            .DateActivite = jour.Date,
+                            .NombrePdv = nombre,
+                            .DateComptabilisation = If(lecteur.IsDBNull(1), CType(Nothing, Date?),
+                                                       CType(lecteur.GetDateTime(1), Date?)),
+                            .ComptabilisePar = If(lecteur.IsDBNull(2), String.Empty,
+                                                  lecteur.GetValue(2).ToString().Trim())
+                        }
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            Return Nothing
+        Catch ex As InvalidOperationException
+            Return Nothing
+        End Try
+    End Function
+
+#End Region
+
 #Region "Écriture"
 
     ''' <summary>

@@ -26,6 +26,16 @@ Public NotInheritable Class DemandeRepository
     Private Const ERREUR_INDEX_UNIQUE As Integer = 2601
     Private Const ERREUR_CONTRAINTE As Integer = 547
 
+    ''' <summary>« Invalid column name » : la table existe, mais pas encore ses colonnes récentes.</summary>
+    Private Const ERREUR_COLONNE_ABSENTE As Integer = 207
+
+    Public Const MESSAGE_COLONNES_ABSENTES As String =
+        "La table T_DemandeWU existe, mais il lui manque les colonnes ajoutées pour " &
+        "l'annulation des comptabilisations." & vbCrLf & vbCrLf &
+        "Exécutez le script Scripts\14_AnnulationComptabilisation.sql : il les ajoute et " &
+        "ouvre la file des demandes aux annulations." & vbCrLf &
+        "Tant qu'il n'est pas exécuté, AUCUNE demande ne peut être déposée ni décidée."
+
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_DemandeWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
         "Exécutez le script Scripts\09_Demandes.sql : il crée la file des demandes et ajoute " &
@@ -33,8 +43,8 @@ Public NotInheritable Class DemandeRepository
 
     Private Const COLONNES As String =
         "IdDemande, TypeObjet, Operation, Statut, Cle, Designation, GroupeStatistique, " &
-        "CompteActivite, CompteCommission, Taux, CodeRattachement, " &
-        "SaisiPar, DateSaisie, DecidePar, DateDecision, MotifRejet"
+        "CompteActivite, CompteCommission, Taux, CodeRattachement, Commentaire, " &
+        "CoreBankingInjecte, SaisiPar, DateSaisie, DecidePar, DateDecision, MotifRejet"
 
 #Region "Dépôt d'une demande"
 
@@ -51,8 +61,11 @@ Public NotInheritable Class DemandeRepository
         End If
 
         If Not SessionWU.PeutSaisirLesPointsDeVente Then
-            messageErreur = "Seul un utilisateur ayant la fonction « inputer » peut saisir " &
-                            "une modification du référentiel."
+            messageErreur = If(demande.TypeObjet = TypeObjetWU.Comptabilisation,
+                               "Seul un utilisateur ayant la fonction « inputer » peut demander " &
+                               "l'annulation d'une comptabilisation.",
+                               "Seul un utilisateur ayant la fonction « inputer » peut saisir " &
+                               "une modification du référentiel.")
             Return False
         End If
 
@@ -64,9 +77,9 @@ Public NotInheritable Class DemandeRepository
         Const requete As String =
             "INSERT INTO " & TABLE & " (TypeObjet, Operation, Statut, Cle, Designation, " &
             "GroupeStatistique, CompteActivite, CompteCommission, Taux, CodeRattachement, " &
-            "SaisiPar, DateSaisie) " &
+            "Commentaire, CoreBankingInjecte, SaisiPar, DateSaisie) " &
             "VALUES (@objet, @operation, @statut, @cle, @designation, @groupe, @activite, " &
-            "@commission, @taux, @rattachement, @saisiPar, GETDATE())"
+            "@commission, @taux, @rattachement, @commentaire, @coreBanking, @saisiPar, GETDATE())"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -108,6 +121,8 @@ Public NotInheritable Class DemandeRepository
         parametreTaux.Value = Decimal.Round(demande.Taux, 2)
 
         commande.Parameters.Add("@rattachement", SqlDbType.NVarChar, 255).Value = If(demande.CodeRattachement, String.Empty)
+        commande.Parameters.Add("@commentaire", SqlDbType.NVarChar, 500).Value = If(demande.Commentaire, String.Empty)
+        commande.Parameters.Add("@coreBanking", SqlDbType.Bit).Value = demande.CoreBankingInjecte
         commande.Parameters.Add("@saisiPar", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
     End Sub
 
@@ -118,11 +133,33 @@ Public NotInheritable Class DemandeRepository
     ''' presque toutes les méthodes de cette classe, la masquerait — Visual Basic ne distingue
     ''' pas la casse, et l'appel serait lu comme une indexation de la chaîne.
     ''' </summary>
+    ''' <summary>
+    ''' Traduit les deux échecs d'installation en une consigne, et laisse passer le reste.
+    ''' Une table absente et une colonne absente ne se disent pas de la même façon : la
+    ''' première veut le script 09, la seconde le script 14.
+    ''' </summary>
+    Private Shared Function MessageSelonErreur(ex As SqlException, parDefaut As String) As String
+
+        If ex.Number = ERREUR_TABLE_ABSENTE Then Return MESSAGE_TABLE_ABSENTE
+        If ex.Number = ERREUR_COLONNE_ABSENTE Then Return MESSAGE_COLONNES_ABSENTES
+        Return parDefaut
+    End Function
+
     Private Shared Function TraduireErreurDepot(ex As SqlException, demande As DemandeWU) As String
 
         If ex.Number = ERREUR_TABLE_ABSENTE Then Return MESSAGE_TABLE_ABSENTE
+        If ex.Number = ERREUR_COLONNE_ABSENTE Then Return MESSAGE_COLONNES_ABSENTES
 
         If ex.Number = ERREUR_CLE_DUPLIQUEE OrElse ex.Number = ERREUR_INDEX_UNIQUE Then
+
+            If demande.TypeObjet = TypeObjetWU.Comptabilisation Then
+                Return $"Une annulation est déjà demandée pour la journée du {demande.JourneeLisible}." &
+                       Environment.NewLine & Environment.NewLine &
+                       "Elle doit être autorisée ou rejetée avant qu'une autre puisse être " &
+                       "déposée : deux annulations de la même journée retireraient la première " &
+                       "la journée, et la seconde une archive vide."
+            End If
+
             Return $"Une demande est déjà en attente sur {demande.LibelleObjet.ToLowerInvariant()} " &
                    $"« {demande.Cle} »." & Environment.NewLine & Environment.NewLine &
                    "Elle doit être autorisée ou rejetée avant qu'une autre puisse être déposée : " &
@@ -205,9 +242,7 @@ Public NotInheritable Class DemandeRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                               $"Lecture des demandes impossible : {ex.Message}")
+            messageErreur = MessageSelonErreur(ex, $"Lecture des demandes impossible : {ex.Message}")
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
@@ -229,6 +264,8 @@ Public NotInheritable Class DemandeRepository
             .CompteCommission = LireChaine(lecteur, "CompteCommission"),
             .Taux = LireDecimal(lecteur, "Taux"),
             .CodeRattachement = LireChaine(lecteur, "CodeRattachement"),
+            .Commentaire = LireChaine(lecteur, "Commentaire"),
+            .CoreBankingInjecte = LireBooleen(lecteur, "CoreBankingInjecte"),
             .SaisiPar = LireChaine(lecteur, "SaisiPar"),
             .DateSaisie = LireDate(lecteur, "DateSaisie"),
             .DecidePar = LireChaine(lecteur, "DecidePar"),
@@ -288,9 +325,7 @@ Public NotInheritable Class DemandeRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                               $"Autorisation impossible : {ex.Message}")
+            messageErreur = MessageSelonErreur(ex, $"Autorisation impossible : {ex.Message}")
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -340,9 +375,7 @@ Public NotInheritable Class DemandeRepository
             End Using
 
         Catch ex As SqlException
-            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                               MESSAGE_TABLE_ABSENTE,
-                               $"Rejet impossible : {ex.Message}")
+            messageErreur = MessageSelonErreur(ex, $"Rejet impossible : {ex.Message}")
             Return False
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -374,6 +407,16 @@ Public NotInheritable Class DemandeRepository
 
         If demande.Statut <> StatutDemandeWU.EnAttente Then
             messageErreur = "Cette demande a déjà été décidée."
+            Return False
+        End If
+
+        ' Une demande déposée par une version plus récente de l'application porterait un
+        ' objet que celle-ci ne sait pas appliquer. Mieux vaut le dire que de l'autoriser
+        ' et de ne rien faire : la demande passerait « autorisée » sans effet.
+        If demande.TypeObjet = TypeObjetWU.Inconnu Then
+            messageErreur = "Cette demande porte sur un objet que l'application ne reconnaît " &
+                            "pas. Elle a sans doute été déposée par une version plus récente." &
+                            Environment.NewLine & "Ne la décidez pas depuis cet écran."
             Return False
         End If
 
@@ -449,6 +492,13 @@ Public NotInheritable Class DemandeRepository
             Case TypeObjetWU.Groupe
                 Return PdvRepository.AppliquerGroupe(demande, connexion, transaction, messageErreur)
 
+            ' L'annulation d'une journée ne touche pas au référentiel : elle déplace des
+            ' lignes déjà comptabilisées vers les tables d'archive. Elle passe pourtant par
+            ' la même file et la même transaction, parce que c'est la même exigence — un
+            ' seul agent ne doit pas pouvoir retirer seul une journée de la comptabilité.
+            Case TypeObjetWU.Comptabilisation
+                Return AnnulationRepository.Appliquer(demande, connexion, transaction, messageErreur)
+
             Case Else
                 messageErreur = "Type d'objet inconnu : la demande ne peut pas être appliquée."
                 Return False
@@ -475,6 +525,12 @@ Public NotInheritable Class DemandeRepository
         Dim index As Integer = lecteur.GetOrdinal(colonne)
         If lecteur.IsDBNull(index) Then Return 0D
         Return Convert.ToDecimal(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    Private Shared Function LireBooleen(lecteur As SqlDataReader, colonne As String) As Boolean
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return False
+        Return Convert.ToBoolean(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
     End Function
 
     Private Shared Function LireDate(lecteur As SqlDataReader, colonne As String) As Date?

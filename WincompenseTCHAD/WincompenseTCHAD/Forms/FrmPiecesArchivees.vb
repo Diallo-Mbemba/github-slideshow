@@ -27,7 +27,17 @@ Public Class FrmPiecesArchivees
 
     Private _journees As List(Of PieceRepository.JourneeConservee)
     Private _piece As DataTable
-    Private _jourAffiche As Date?
+    ''' <summary>
+    ''' Ce qui est actuellement affiché : la date NE SUFFIT PAS, puisqu'une même journée
+    ''' peut figurer une fois en vigueur et plusieurs fois en archive.
+    ''' </summary>
+    Private _cleAffichee As String = String.Empty
+
+    ''' <summary>
+    ''' Police barrée des journées annulées. Conservée d'une actualisation à l'autre : en
+    ''' recréer une à chaque fois laisserait autant d'objets graphiques derrière soi.
+    ''' </summary>
+    Private _policeBarree As Drawing.Font
 
     Public Sub New()
         InitializeComponent()
@@ -94,13 +104,15 @@ Public Class FrmPiecesArchivees
         table.Columns.Add("Equilibre", GetType(String))
         table.Columns.Add("Conservee", GetType(String))
         table.Columns.Add("Par", GetType(String))
+        table.Columns.Add("Etat", GetType(String))
 
         For Each journee As PieceRepository.JourneeConservee In _journees
             table.Rows.Add(journee.DateActivite.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
                            journee.NombreEcritures, journee.TotalDebit, journee.TotalCredit,
                            If(journee.Equilibree, "oui", "NON"),
                            journee.DateEnregistrement.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture),
-                           journee.EnregistrePar)
+                           journee.EnregistrePar,
+                           journee.LibelleEtat)
         Next
 
         Return table
@@ -117,11 +129,35 @@ Public Class FrmPiecesArchivees
         Entete(dgvJournees, "Equilibre", "Équil.", 45)
         Entete(dgvJournees, "Conservee", "Conservée le", 115)
         Entete(dgvJournees, "Par", "Par", 90)
+        Entete(dgvJournees, "Etat", "État", 230)
 
         For Each nom As String In New String() {"Debit", "Credit", "Ecritures"}
             If Not dgvJournees.Columns.Contains(nom) Then Continue For
             dgvJournees.Columns(nom).DefaultCellStyle.Format = "N0"
             dgvJournees.Columns(nom).DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+        Next
+
+        MarquerLesJourneesAnnulees()
+    End Sub
+
+    ''' <summary>
+    ''' Une journée annulée ne se lit pas comme une journée en vigueur : elle est grise et
+    ''' barrée. La couleur seule ne suffirait pas — la colonne État écrit ANNULÉE et le
+    ''' motif, et c'est elle qui fait foi.
+    ''' </summary>
+    Private Sub MarquerLesJourneesAnnulees()
+
+        If _policeBarree Is Nothing Then
+            _policeBarree = New Drawing.Font(dgvJournees.Font, Drawing.FontStyle.Strikeout)
+        End If
+
+        For rang As Integer = 0 To dgvJournees.Rows.Count - 1
+
+            If rang >= _journees.Count Then Exit For
+            If Not _journees(rang).Annulee Then Continue For
+
+            dgvJournees.Rows(rang).DefaultCellStyle.ForeColor = Drawing.SystemColors.GrayText
+            dgvJournees.Rows(rang).DefaultCellStyle.Font = _policeBarree
         Next
     End Sub
 
@@ -161,12 +197,18 @@ Public Class FrmPiecesArchivees
 
         ' Inutile de relire la base à chaque déplacement du curseur dans la même ligne :
         ' SelectionChanged se déclenche plus souvent que la sélection ne change vraiment.
-        If _jourAffiche.HasValue AndAlso _jourAffiche.Value = journee.DateActivite Then Return
+        Dim cle As String = CleDe(journee)
+        If String.Equals(_cleAffichee, cle, StringComparison.Ordinal) Then Return
 
         Dim messageErreur As String = String.Empty
 
         Cursor = Cursors.WaitCursor
-        Dim piece As DataTable = PieceRepository.Charger(journee.DateActivite, messageErreur)
+
+        ' Une journée annulée se charge par son identifiant d'annulation : la date ne dirait
+        ' pas laquelle, puisqu'une même journée peut avoir été annulée plusieurs fois.
+        Dim piece As DataTable = If(journee.Annulee,
+                                    PieceRepository.ChargerAnnulee(journee.IdAnnulation, messageErreur),
+                                    PieceRepository.Charger(journee.DateActivite, messageErreur))
         Cursor = Cursors.Default
 
         If messageErreur.Length > 0 Then
@@ -176,10 +218,38 @@ Public Class FrmPiecesArchivees
             Return
         End If
 
-        _jourAffiche = journee.DateActivite
+        _cleAffichee = cle
         AfficherLaPiece(piece)
+        AnnoncerLaJournee(journee)
+    End Sub
 
-        lblPiece.Text = $"Écritures de la journée du {journee.DateActivite:dd/MM/yyyy}"
+    ''' <summary>Ce qui distingue une ligne de la liste : sa date ET son annulation.</summary>
+    Private Shared Function CleDe(journee As PieceRepository.JourneeConservee) As String
+        Return journee.DateActivite.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) &
+               "|" & journee.IdAnnulation.ToString(CultureInfo.InvariantCulture)
+    End Function
+
+    ''' <summary>
+    ''' Titre de la pièce affichée. Une journée annulée le dit ici aussi, et pas seulement
+    ''' dans la liste : on consulte une pièce en la regardant, pas en regardant à côté.
+    ''' </summary>
+    Private Sub AnnoncerLaJournee(journee As PieceRepository.JourneeConservee)
+
+        If Not journee.Annulee Then
+            lblPiece.ForeColor = Drawing.SystemColors.ControlText
+            lblPiece.Text = $"Écritures de la journée du {journee.DateActivite:dd/MM/yyyy}"
+            Return
+        End If
+
+        Dim quand As String = If(journee.DateAnnulation.HasValue,
+                                 journee.DateAnnulation.Value.ToString("dd/MM/yyyy",
+                                                                       CultureInfo.InvariantCulture),
+                                 "?")
+
+        lblPiece.ForeColor = Drawing.Color.Firebrick
+        lblPiece.Text = $"Journée du {journee.DateActivite:dd/MM/yyyy} — ANNULÉE le {quand}" &
+                        If(journee.AnnuleePar.Length > 0, $" par {journee.AnnuleePar}", String.Empty) &
+                        $"     {AnnulationWU.LibelleDepuisCode(journee.MotifAnnulation)}"
     End Sub
 
     Private Sub AfficherLaPiece(piece As DataTable)
@@ -187,7 +257,8 @@ Public Class FrmPiecesArchivees
         _piece = If(piece, New DataTable())
 
         If piece Is Nothing Then
-            _jourAffiche = Nothing
+            _cleAffichee = String.Empty
+            lblPiece.ForeColor = Drawing.SystemColors.ControlText
             lblPiece.Text = "Écritures de la journée"
         End If
 
@@ -198,6 +269,33 @@ Public Class FrmPiecesArchivees
         Dim disponible As Boolean = _piece.Rows.Count > 0
         btnPiece.Enabled = disponible
         btnCoreBanking.Enabled = disponible
+
+        ReglerLeBoutonAnnuler()
+    End Sub
+
+    ''' <summary>
+    ''' Le bouton d'annulation ne s'offre que là où il a un sens : sur une journée en
+    ''' vigueur, et pour un utilisateur qui a la fonction d'inputer.
+    '''
+    ''' Une journée DÉJÀ annulée ne se réannule pas : il n'y a plus rien dans les tables
+    ''' vivantes, et l'autorisation refuserait de créer une archive vide. Mieux vaut un
+    ''' bouton éteint qu'un refus après coup.
+    ''' </summary>
+    Private Sub ReglerLeBoutonAnnuler()
+
+        Dim journee As PieceRepository.JourneeConservee = JourneeSelectionnee()
+
+        Dim annulee As Boolean = journee IsNot Nothing AndAlso journee.Annulee
+
+        btnAnnuler.Enabled = journee IsNot Nothing AndAlso
+                             Not annulee AndAlso
+                             SessionWU.PeutSaisirLesPointsDeVente
+
+        ' On ne reconstruit pas le fichier core banking d'une journée annulée : ce fichier
+        ' passe des écritures, et repasser celles d'une journée retirée serait exactement
+        ' l'inverse de ce qu'on a voulu. La pièce, elle, reste consultable et exportable :
+        ' un justificatif se relit, il n'engage rien.
+        If annulee Then btnCoreBanking.Enabled = False
     End Sub
 
     Private Sub FormaterLaPiece()
@@ -254,11 +352,21 @@ Public Class FrmPiecesArchivees
         Dim journee As PieceRepository.JourneeConservee = JourneeSelectionnee()
         If journee Is Nothing OrElse _piece.Rows.Count = 0 Then Return
 
-        Dim titre As String = $"Pièce comptable conservée — journée du {journee.DateActivite:dd/MM/yyyy}"
+        Dim titre As String = If(journee.Annulee,
+                                 $"Pièce ANNULÉE — journée du {journee.DateActivite:dd/MM/yyyy}",
+                                 $"Pièce comptable conservée — journée du {journee.DateActivite:dd/MM/yyyy}")
+
         Dim sousTitre As String =
             $"Conservée le {journee.DateEnregistrement:dd/MM/yyyy à HH:mm}" &
             If(journee.EnregistrePar.Length > 0, $" par {journee.EnregistrePar}", String.Empty) &
             "     Telle qu'elle a été produite : aucun recalcul."
+
+        If journee.Annulee Then
+            sousTitre &= Environment.NewLine &
+                         $"ANNULÉE — {AnnulationWU.LibelleDepuisCode(journee.MotifAnnulation)}" &
+                         If(journee.AnnuleePar.Length > 0, $" — par {journee.AnnuleePar}", String.Empty) &
+                         "     Cette journée ne figure plus dans les rapports d'activité."
+        End If
 
         Using apercu As New FrmPieceComptable(_piece, titre, sousTitre)
 
@@ -344,6 +452,60 @@ Public Class FrmPiecesArchivees
             "Date de valeur à vérifier", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
             MessageBoxDefaultButton.Button2) = DialogResult.Yes
     End Function
+
+#End Region
+
+#Region "Annulation d'une comptabilisation"
+
+    ''' <summary>
+    ''' Dépose une demande d'annulation sur la journée sélectionnée.
+    '''
+    ''' CE BOUTON N'ANNULE RIEN. Il ouvre l'écran de demande, qui dépose dans la file du
+    ''' double regard. La journée reste comptabilisée et continue de figurer dans les
+    ''' rapports tant qu'un authorizer — qui ne peut pas être le demandeur — ne l'a pas
+    ''' autorisée. C'est pourquoi la liste n'est pas rechargée avec un air de réussite :
+    ''' rien n'a changé dans la base, et le faire croire serait le pire des services.
+    ''' </summary>
+    Private Sub btnAnnuler_Click(sender As Object, e As EventArgs) Handles btnAnnuler.Click
+
+        Dim journee As PieceRepository.JourneeConservee = JourneeSelectionnee()
+        If journee Is Nothing OrElse journee.Annulee Then Return
+
+        Dim messageErreur As String = String.Empty
+
+        Cursor = Cursors.WaitCursor
+        Dim contenu As AnnulationRepository.ContenuJournee =
+            AnnulationRepository.Decrire(journee.DateActivite, messageErreur)
+        Cursor = Cursors.Default
+
+        If messageErreur.Length > 0 Then
+            FrmDiagnostic.Afficher(Me, "Annulation impossible", messageErreur)
+            Return
+        End If
+
+        ' Une journée sans rien à retirer ne se demande pas en annulation : l'autorisation
+        ' la refuserait, et l'agent aurait attendu pour rien.
+        If contenu.EstVide Then
+            MessageBox.Show(Me,
+                $"La journée du {journee.DateActivite:dd/MM/yyyy} n'a plus rien de comptabilisé." &
+                Environment.NewLine & Environment.NewLine &
+                "Il n'y a donc rien à retirer. Actualisez la liste : elle a peut-être été " &
+                "annulée entre-temps par quelqu'un d'autre.",
+                "Rien à annuler", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using demande As New FrmAnnulerComptabilisation(journee.DateActivite, contenu)
+
+            demande.ShowDialog(Me)
+
+            If Not demande.DemandeDeposee Then Return
+
+            lblStatut.ForeColor = Drawing.SystemColors.GrayText
+            lblStatut.Text = $"Annulation demandée pour le {journee.DateActivite:dd/MM/yyyy} — " &
+                             "en attente d'autorisation."
+        End Using
+    End Sub
 
 #End Region
 

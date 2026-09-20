@@ -184,10 +184,15 @@ Public Class FrmDemandes
                 lignes.Add({"Compte d'activité", Si(actuel, actuel?.CompteActivite), demande.CompteActivite})
                 lignes.Add({"Compte de commission", Si(actuel, actuel?.CompteCommission), demande.CompteCommission})
                 lignes.Add({"Taux", SiTaux(actuel Is Nothing, If(actuel Is Nothing, 0D, actuel.Taux)), Pourcentage(demande.Taux)})
+
+            Case TypeObjetWU.Comptabilisation
+                lignes.AddRange(ComparaisonAnnulation(demande))
         End Select
 
         ' Une suppression ne propose aucune valeur : la colonne de droite se vide, pour qu'on
         ' voie exactement ce qui disparaîtrait.
+        ' Une ANNULATION, elle, garde ses deux colonnes : elles ne comparent pas un avant
+        ' à un après, elles décrivent ce qui va être retiré et pourquoi.
         If demande.Operation = OperationWU.Suppression Then
             For Each ligne As String() In lignes
                 ligne(2) = String.Empty
@@ -195,6 +200,67 @@ Public Class FrmDemandes
         End If
 
         Return lignes
+    End Function
+
+    ''' <summary>
+    ''' Ce que l'authorizer doit lire avant d'autoriser une annulation : la journée visée,
+    ''' ce qu'elle contient AUJOURD'HUI, le motif, et la réponse sur le core banking.
+    '''
+    ''' Le contenu est relu maintenant, et non repris de la demande : entre le dépôt et la
+    ''' décision, la journée a pu être recomptabilisée. Ce sont les chiffres affichés ici
+    ''' qui partiront en archive.
+    ''' </summary>
+    Private Shared Function ComparaisonAnnulation(demande As DemandeWU) As List(Of String())
+
+        Dim lignes As New List(Of String())
+
+        lignes.Add({"Journée", demande.JourneeLisible, "retirée des rapports"})
+        lignes.Add({"Motif", AnnulationWU.LibelleDepuisCode(demande.Designation), String.Empty})
+
+        If demande.Commentaire.Length > 0 Then
+            lignes.Add({"Explication", demande.Commentaire, String.Empty})
+        End If
+
+        lignes.Add({"Fichier core banking",
+                    If(demande.CoreBankingInjecte,
+                       "DÉJÀ INJECTÉ — extourne à demander en comptabilité",
+                       "non injecté, d'après le demandeur"),
+                    String.Empty})
+
+        Dim jour As Date
+        If Not AnnulationRepository.JourDepuisCle(demande.Cle, jour) Then Return lignes
+
+        Dim messageErreur As String = String.Empty
+        Dim contenu As AnnulationRepository.ContenuJournee =
+            AnnulationRepository.Decrire(jour, messageErreur)
+
+        If messageErreur.Length > 0 Then
+            lignes.Add({"Contenu actuel", "(non lu : " & messageErreur & ")", String.Empty})
+            Return lignes
+        End If
+
+        If contenu.EstVide Then
+            lignes.Add({"Contenu actuel", "PLUS RIEN — la journée n'est plus comptabilisée",
+                        "autoriser créerait une archive vide : rejetez cette demande"})
+            Return lignes
+        End If
+
+        lignes.Add({"Points de vente", Nombre(contenu.NombrePdv), String.Empty})
+        lignes.Add({"Transactions", Nombre(contenu.NombreTransactions), String.Empty})
+        lignes.Add({"Écritures", Nombre(contenu.NombreEcritures), String.Empty})
+        lignes.Add({"Total débit", Montant(contenu.TotalDebit), String.Empty})
+
+        Return lignes
+    End Function
+
+    ''' <summary>Un nombre entier, groupé par milliers.</summary>
+    Private Shared Function Nombre(valeur As Integer) As String
+        Return valeur.ToString("N0", Globalization.CultureInfo.CurrentCulture)
+    End Function
+
+    ''' <summary>Un montant en francs CFA, sans décimale : la monnaie n'en a pas.</summary>
+    Private Shared Function Montant(valeur As Long) As String
+        Return valeur.ToString("N0", Globalization.CultureInfo.CurrentCulture) & " FCFA"
     End Function
 
     ''' <summary>Valeur actuelle, ou la mention « (inexistant) » si l'objet n'est pas en base.</summary>
@@ -271,8 +337,7 @@ Public Class FrmDemandes
             demande.Intitule & Environment.NewLine & Environment.NewLine &
             $"Saisie par {demande.SaisiPar} le {LibelleDate(demande.DateSaisie)}." &
             Environment.NewLine & Environment.NewLine &
-            "Autoriser cette demande ? Elle sera portée immédiatement dans la base, et la " &
-            "comptabilisation du jour en tiendra compte.",
+            ConsequenceDeLAutorisation(demande),
             "Autoriser", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)
 
         If reponse <> DialogResult.Yes Then Return
@@ -297,6 +362,34 @@ Public Class FrmDemandes
         ChargerHistorique()
         lblMessage.Text = $"{demande.Intitule} — autorisée et appliquée."
     End Sub
+
+    ''' <summary>
+    ''' Ce que l'autorisation va réellement produire. Une modification de référentiel et
+    ''' le retrait d'une journée comptabilisée n'engagent pas la même chose, et la phrase
+    ''' de confirmation ne doit pas les confondre.
+    ''' </summary>
+    Private Shared Function ConsequenceDeLAutorisation(demande As DemandeWU) As String
+
+        If demande.TypeObjet <> TypeObjetWU.Comptabilisation Then
+            Return "Autoriser cette demande ? Elle sera portée immédiatement dans la base, " &
+                   "et la comptabilisation du jour en tiendra compte."
+        End If
+
+        Dim texte As String =
+            "Autoriser ce retrait ? La journée quittera immédiatement les rapports " &
+            "d'activité et la liste des pièces en vigueur ; ses lignes partiront en " &
+            "archive, avec votre nom." & Environment.NewLine & Environment.NewLine &
+            "Elle pourra être recomptabilisée ensuite, à partir des bons rapports."
+
+        If demande.CoreBankingInjecte Then
+            texte &= Environment.NewLine & Environment.NewLine &
+                     "LE DEMANDEUR INDIQUE QUE LE FICHIER CORE BANKING EST DÉJÀ INJECTÉ : " &
+                     "les écritures sont dans les livres de la banque et cette annulation " &
+                     "ne les en retire pas. L'extourne est à demander en comptabilité."
+        End If
+
+        Return texte
+    End Function
 
     Private Sub btnRejeter_Click(sender As Object, e As EventArgs) Handles btnRejeter.Click
 

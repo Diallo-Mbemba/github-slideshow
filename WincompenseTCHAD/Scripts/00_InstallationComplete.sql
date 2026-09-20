@@ -1173,6 +1173,263 @@ END
 GO
 
 -- =========================================================================
+-- Annulation d'une comptabilisation — archives et traces
+--
+-- ANNULER N'EST PAS SUPPRIMER. Une journée retirée voit ses lignes DÉPLACÉES vers les
+-- tables d'archive ci-dessous, sous un identifiant qui porte le motif et les deux
+-- signatures. Un DELETE effacerait la preuve au moment précis où l'on en a besoin.
+--
+-- Les tables vivantes (T_HistoriqueWU, T_HistoriqueMTCN, T_PieceWU) ne contiennent ainsi
+-- que des journées en vigueur : les rapports d'activité cessent de compter une journée
+-- annulée sans qu'on touche à une seule de leurs requêtes.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_AnnulationWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_AnnulationWU
+    (
+        IdAnnulation        BIGINT IDENTITY(1,1) NOT NULL,
+
+        DateActivite        DATE            NOT NULL,
+        Motif               NVARCHAR(30)    NOT NULL,
+        Commentaire         NVARCHAR(500)   NULL,
+
+        -- L'application sait qu'elle a PRODUIT le fichier, pas qu'il a été chargé dans les
+        -- livres de la banque. Cette colonne garde la réponse de l'agent.
+        CoreBankingInjecte  BIT             NOT NULL DEFAULT (0),
+
+        NombrePdv           INT             NOT NULL DEFAULT (0),
+        NombreTransactions  INT             NOT NULL DEFAULT (0),
+        NombreEcritures     INT             NOT NULL DEFAULT (0),
+        TotalDebit          BIGINT          NOT NULL DEFAULT (0),
+        TotalCredit         BIGINT          NOT NULL DEFAULT (0),
+
+        IdDemande           BIGINT          NULL,
+        DemandeePar         NVARCHAR(50)    NOT NULL,
+        DateDemande         DATETIME        NOT NULL DEFAULT (GETDATE()),
+        AutoriseePar        NVARCHAR(50)    NOT NULL,
+        DateAutorisation    DATETIME        NOT NULL DEFAULT (GETDATE()),
+
+        CONSTRAINT PK_T_AnnulationWU PRIMARY KEY (IdAnnulation),
+
+        CONSTRAINT CK_T_AnnulationWU_Motif
+            CHECK (Motif IN ('RAPPORT_VIDE', 'RAPPORT_ERRONE', 'MAUVAISE_JOURNEE',
+                             'DOUBLON', 'AUTRE')),
+
+        CONSTRAINT CK_T_AnnulationWU_PasSoiMeme
+            CHECK (AutoriseePar <> DemandeePar)
+    );
+
+    CREATE INDEX IX_T_AnnulationWU_DateActivite ON dbo.T_AnnulationWU (DateActivite);
+
+    PRINT 'Table T_AnnulationWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_AnnulationWU déjà présente : création ignorée.';
+END
+GO
+
+IF OBJECT_ID(N'dbo.T_HistoriqueAnnuleWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_HistoriqueAnnuleWU
+    (
+        IdAnnulation        BIGINT          NOT NULL,
+
+        DateActivite        DATE            NOT NULL,
+        Account             NVARCHAR(255)   NOT NULL,
+        Designation         NVARCHAR(255)   NULL,
+        GroupeStatistique   NVARCHAR(255)   NULL,
+        TypePdv             NVARCHAR(20)    NULL,
+
+        NombreEnvois        INT             NOT NULL DEFAULT (0),
+        NombrePaiements     INT             NOT NULL DEFAULT (0),
+        NombreAnnulations   INT             NOT NULL DEFAULT (0),
+
+        PrincipalEnvoi      DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        ChargeEnvoi         DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        Taxes               DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        PrincipalPaye       DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+
+        CommissionEnvoi     DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        CommissionPaiement  DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        CommissionTransfert DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+
+        TVA                 DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        TTAEnvoi            DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        TTAReception        DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+        TaxeEnvoi           DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+
+        DateEnregistrement      DATETIME        NULL,
+        ComptabilisePar         NVARCHAR(50)    NULL,
+        DateComptabilisation    DATETIME        NULL
+    );
+
+    CREATE INDEX IX_T_HistoriqueAnnuleWU_Annulation ON dbo.T_HistoriqueAnnuleWU (IdAnnulation);
+
+    PRINT 'Table T_HistoriqueAnnuleWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_HistoriqueAnnuleWU déjà présente : création ignorée.';
+END
+GO
+
+IF OBJECT_ID(N'dbo.T_HistoriqueMTCNAnnuleWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_HistoriqueMTCNAnnuleWU
+    (
+        IdAnnulation        BIGINT          NOT NULL,
+
+        DateActivite        DATE            NOT NULL,
+        Account             NVARCHAR(255)   NOT NULL,
+        MTCN                NVARCHAR(50)    NOT NULL,
+
+        Sens                NVARCHAR(10)    NOT NULL,
+        Statut              NVARCHAR(10)    NULL,
+        Montant             DECIMAL(18, 2)  NOT NULL DEFAULT (0),
+
+        Designation         NVARCHAR(255)   NULL,
+        GroupeStatistique   NVARCHAR(255)   NULL,
+        TypePdv             NVARCHAR(20)    NULL,
+
+        DateEnregistrement      DATETIME        NULL,
+        ComptabilisePar         NVARCHAR(50)    NULL,
+        DateComptabilisation    DATETIME        NULL
+    );
+
+    CREATE INDEX IX_T_HistoriqueMTCNAnnuleWU_Annulation ON dbo.T_HistoriqueMTCNAnnuleWU (IdAnnulation);
+    CREATE INDEX IX_T_HistoriqueMTCNAnnuleWU_MTCN ON dbo.T_HistoriqueMTCNAnnuleWU (MTCN);
+
+    PRINT 'Table T_HistoriqueMTCNAnnuleWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_HistoriqueMTCNAnnuleWU déjà présente : création ignorée.';
+END
+GO
+
+-- La contrainte CK_T_PieceWU_UnSeulSens n'est pas reprise ici : une archive conserve ce
+-- qui a été écrit, elle ne rejuge pas. La refuser ferait échouer l'annulation et
+-- laisserait la journée en place, soit l'inverse du but.
+IF OBJECT_ID(N'dbo.T_PieceAnnuleeWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_PieceAnnuleeWU
+    (
+        IdAnnulation        BIGINT          NOT NULL,
+
+        DateActivite        DATE            NOT NULL,
+        Ligne               INT             NOT NULL,
+
+        Compte              NVARCHAR(50)    NOT NULL,
+        Libelle             NVARCHAR(255)   NULL,
+        Debit               BIGINT          NOT NULL DEFAULT (0),
+        Credit              BIGINT          NOT NULL DEFAULT (0),
+        CodeAgence          NVARCHAR(50)    NULL,
+
+        DateEnregistrement  DATETIME        NULL,
+        EnregistrePar       NVARCHAR(100)   NULL,
+
+        CONSTRAINT PK_T_PieceAnnuleeWU PRIMARY KEY (IdAnnulation, Ligne)
+    );
+
+    CREATE INDEX IX_T_PieceAnnuleeWU_DateActivite ON dbo.T_PieceAnnuleeWU (DateActivite);
+
+    PRINT 'Table T_PieceAnnuleeWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_PieceAnnuleeWU déjà présente : création ignorée.';
+END
+GO
+
+-- =========================================================================
+-- T_FichierCoreBankingWU — trace des fichiers produits pour le core banking
+--
+-- Le fichier lui-même n'est pas conservé : il dérive entièrement de la pièce. Mais le FAIT
+-- de l'avoir produit ne se déduit de rien, et c'est le seul moment où la journée quitte
+-- Wincompense pour entrer dans les livres de la banque.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_FichierCoreBankingWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_FichierCoreBankingWU
+    (
+        IdFichier           BIGINT IDENTITY(1,1) NOT NULL,
+
+        DateActivite        DATE            NOT NULL,
+        DateValeur          DATE            NOT NULL,
+        NumeroLot           NVARCHAR(10)    NULL,
+
+        NomFichier          NVARCHAR(255)   NULL,
+        CheminFichier       NVARCHAR(500)   NULL,
+
+        NombreLignes        INT             NOT NULL DEFAULT (0),
+        TotalDebit          BIGINT          NOT NULL DEFAULT (0),
+        TotalCredit         BIGINT          NOT NULL DEFAULT (0),
+
+        DateProduction      DATETIME        NOT NULL DEFAULT (GETDATE()),
+        ProduitPar          NVARCHAR(50)    NULL,
+
+        CONSTRAINT PK_T_FichierCoreBankingWU PRIMARY KEY (IdFichier)
+    );
+
+    CREATE INDEX IX_T_FichierCoreBankingWU_DateActivite
+        ON dbo.T_FichierCoreBankingWU (DateActivite, DateProduction DESC);
+
+    PRINT 'Table T_FichierCoreBankingWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_FichierCoreBankingWU déjà présente : création ignorée.';
+END
+GO
+
+-- =========================================================================
+-- La file des demandes accueille l'annulation
+--
+--   Cle         = la journée, au format AAAA-MM-JJ
+--   Designation = le motif (RAPPORT_VIDE, RAPPORT_ERRONE, …)
+--
+-- Deux colonnes manquaient : le commentaire libre et la réponse sur le core banking.
+-- =========================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns
+               WHERE object_id = OBJECT_ID(N'T_DemandeWU') AND name = N'Commentaire')
+BEGIN
+    ALTER TABLE dbo.T_DemandeWU ADD Commentaire NVARCHAR(500) NULL;
+    PRINT 'Colonne Commentaire ajoutée à T_DemandeWU.';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns
+               WHERE object_id = OBJECT_ID(N'T_DemandeWU') AND name = N'CoreBankingInjecte')
+BEGIN
+    ALTER TABLE dbo.T_DemandeWU ADD CoreBankingInjecte BIT NULL;
+    PRINT 'Colonne CoreBankingInjecte ajoutée à T_DemandeWU.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_T_DemandeWU_TypeObjet')
+    ALTER TABLE dbo.T_DemandeWU DROP CONSTRAINT CK_T_DemandeWU_TypeObjet;
+GO
+
+ALTER TABLE dbo.T_DemandeWU WITH CHECK
+    ADD CONSTRAINT CK_T_DemandeWU_TypeObjet
+    CHECK (TypeObjet IN ('SOUS_AGENT', 'AGENCE', 'GROUPE', 'COMPTABILISATION'));
+GO
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_T_DemandeWU_Operation')
+    ALTER TABLE dbo.T_DemandeWU DROP CONSTRAINT CK_T_DemandeWU_Operation;
+GO
+
+ALTER TABLE dbo.T_DemandeWU WITH CHECK
+    ADD CONSTRAINT CK_T_DemandeWU_Operation
+    CHECK (Operation IN ('CREATION', 'MODIFICATION', 'SUPPRESSION', 'SYNCHRONISATION',
+                         'ANNULATION'));
+GO
+
+PRINT 'File des demandes ouverte aux annulations de comptabilisation.';
+GO
+
+-- =========================================================================
 -- Fêtes à date fixe et lundis de Pâques, 2026 à 2030
 --
 -- Rejouable : seules les dates absentes sont ajoutées, celles que la banque aurait corrigées
@@ -1438,11 +1695,69 @@ BEGIN
 END
 GO
 
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_AnnulationWU')
+BEGIN
+    -- Les archives d'annulation : SELECT et INSERT pour les trois rôles, JAMAIS de DELETE.
+    -- L'INSERT est accordé largement parce que la fonction d'authorizer se porte
+    -- indifféremment sur un compte de compense, de commercial ou d'administration ; le
+    -- double regard, lui, est posé par la contrainte CK_T_AnnulationWU_PasSoiMeme et par
+    -- l'application, non par les droits SQL.
+    --
+    -- Une archive que ses propres utilisateurs peuvent effacer ne prouve rien : c'est
+    -- exactement quand une journée est annulée que l'auditeur veut la retrouver.
+    EXEC('GRANT SELECT, INSERT ON dbo.T_AnnulationWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_AnnulationWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_AnnulationWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueAnnuleWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueAnnuleWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueAnnuleWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueMTCNAnnuleWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueMTCNAnnuleWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueMTCNAnnuleWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_PieceAnnuleeWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_PieceAnnuleeWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_PieceAnnuleeWU TO wu_admin');
+
+    PRINT 'Droits accordés sur les tables d''annulation.';
+END
+ELSE
+BEGIN
+    PRINT 'T_AnnulationWU absente : relancez ce script après 14_AnnulationComptabilisation.sql.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_FichierCoreBankingWU')
+BEGIN
+    -- Le rôle de compense produit les fichiers : il écrit. Le commercial lit. Aucun DELETE :
+    -- une trace que l'on peut effacer ne prouve rien.
+    EXEC('GRANT SELECT, INSERT ON dbo.T_FichierCoreBankingWU TO wu_compense');
+    EXEC('GRANT SELECT ON dbo.T_FichierCoreBankingWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_FichierCoreBankingWU TO wu_admin');
+    PRINT 'Droits accordés sur T_FichierCoreBankingWU.';
+END
+ELSE
+BEGIN
+    PRINT 'T_FichierCoreBankingWU absente : relancez ce script après 15_FichierCoreBanking.sql.';
+END
+GO
+
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_DemandeWU')
 BEGIN
-    -- La file du double regard appartient au paramétrage : l'agent de compense n'y a
-    -- aucun accès, pas même en lecture. Aucun rôle ne reçoit DELETE — une demande rejetée
-    -- se conserve, c'est elle qui prouve qu'un contrôle a eu lieu.
+    -- La file du double regard portait d'abord le seul paramétrage, et l'agent de compense
+    -- n'y avait aucun accès. Elle porte maintenant AUSSI les demandes d'annulation d'une
+    -- journée comptabilisée, qui appartiennent, elles, à la compense : le rôle doit donc
+    -- pouvoir y déposer, y lire, et y décider s'il porte la fonction d'authorizer.
+    --
+    -- Ce qui protège le référentiel n'est pas l'absence de ce droit SQL, mais la fonction
+    -- INPUTER / AUTHORIZER portée par l'utilisateur et la contrainte
+    -- CK_T_DemandeWU_PasSoiMeme, qu'un UPDATE fait à la main ne contourne pas davantage.
+    --
+    -- Aucun rôle ne reçoit DELETE : une demande rejetée se conserve, c'est elle qui prouve
+    -- qu'un contrôle a eu lieu.
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_compense');
     EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_commercial');
     EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_admin');
     PRINT 'Droits accordés sur T_DemandeWU.';

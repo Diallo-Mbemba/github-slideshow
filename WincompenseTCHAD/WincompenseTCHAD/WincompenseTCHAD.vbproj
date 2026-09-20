@@ -80,6 +80,7 @@
     <Compile Include="Constants\ConstantesWU.vb" />
     <Compile Include="Models\CalculWU.vb" />
     <Compile Include="Models\PorteeRapportWU.vb" />
+    <Compile Include="Models\AnnulationWU.vb" />
     <Compile Include="Models\ComptesSystemeWU.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
@@ -96,6 +97,8 @@
     <Compile Include="Services\PieceExcelWU.vb" />
     <Compile Include="Services\PieceRepository.vb" />
     <Compile Include="Services\ProgressionWU.vb" />
+    <Compile Include="Services\AnnulationRepository.vb" />
+    <Compile Include="Services\CoreBankingRepository.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
@@ -189,6 +192,12 @@
     <Compile Include="Forms\FrmProgression.Designer.vb">
       <DependentUpon>FrmProgression.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmAnnulerComptabilisation.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmAnnulerComptabilisation.Designer.vb">
+      <DependentUpon>FrmAnnulerComptabilisation.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -270,6 +279,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmProgression.resx">
       <DependentUpon>FrmProgression.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmAnnulerComptabilisation.resx">
+      <DependentUpon>FrmAnnulerComptabilisation.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
       <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>

@@ -146,6 +146,8 @@ Public Class FrmFichierCoreBanking
             _produit = True
             _chemin = chemin
 
+            TracerLaProduction(chemin)
+
             btnExporter.Enabled = False
             lblEquilibre.ForeColor = Drawing.Color.DarkGreen
             lblEquilibre.Text = $"Fichier produit : {IO.Path.GetFileName(chemin)} — il s'ouvre dans Excel."
@@ -160,6 +162,40 @@ Public Class FrmFichierCoreBanking
             Cursor = Cursors.Default
         End Try
     End Sub
+
+    ''' <summary>
+    ''' Enregistre que ce fichier est sorti : journée, date de valeur, lot, auteur, totaux.
+    '''
+    ''' C'est le seul moment où la journée quitte Wincompense pour entrer dans les livres
+    ''' de la banque. Sans cette trace, l'application ne peut ni avertir avant de
+    ''' recomptabiliser une journée déjà partie, ni prévenir avant de l'annuler.
+    '''
+    ''' L'échec n'est JAMAIS bloquant : le fichier existe et s'ouvre dans Excel. Refuser
+    ''' la production parce que le carnet n'a pas pu s'écrire ferait perdre le travail
+    ''' pour sauver le carnet. L'agent est simplement averti, dans la barre d'état.
+    ''' </summary>
+    Private Sub TracerLaProduction(chemin As String)
+
+        Dim messageErreur As String = String.Empty
+
+        Dim trace As Boolean = CoreBankingRepository.Enregistrer(
+            _dateActivite, _dateValeur, _numeroLot, chemin, _fichier.Rows.Count,
+            TotalParSens(ConstantesWU.CB_SENS_DEBIT),
+            TotalParSens(ConstantesWU.CB_SENS_CREDIT), messageErreur)
+
+        If trace Then Return
+
+        lblRecapitulatif.Text &= Environment.NewLine &
+                                 "Production NON tracée : " & PremiereLigne(messageErreur)
+    End Sub
+
+    ''' <summary>La première ligne d'un message, pour un libellé qui n'en tient qu'une.</summary>
+    Private Shared Function PremiereLigne(texte As String) As String
+
+        Dim fin As Integer = texte.IndexOfAny(New Char() {ControlChars.Cr, ControlChars.Lf})
+        If fin < 0 Then Return texte
+        Return texte.Substring(0, fin)
+    End Function
 
     ''' <summary>Demande où enregistrer. Chaîne vide si l'utilisateur renonce.</summary>
     Private Function DemanderLeChemin() As String

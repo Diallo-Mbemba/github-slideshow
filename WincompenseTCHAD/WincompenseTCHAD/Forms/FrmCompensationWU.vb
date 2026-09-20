@@ -869,6 +869,14 @@ Public Class FrmCompensationWU
             Return
         End If
 
+        ' Une journée déjà comptabilisée serait remplacée SANS RIEN DIRE : l'historisation
+        ' efface la version précédente avant d'écrire la nouvelle. C'est le bon comportement
+        ' quand on corrige, c'est un accident quand on ne savait pas.
+        If Not ConfirmerLeRemplacement() Then
+            tsslStatut.Text = "Génération abandonnée : la journée reste dans son état actuel."
+            Return
+        End If
+
         Try
             Cursor = Cursors.WaitCursor
 
@@ -899,6 +907,71 @@ Public Class FrmCompensationWU
 
         AfficherLaPieceGlobale()
     End Sub
+
+    ''' <summary>
+    ''' Avertit avant de remplacer une journée déjà comptabilisée.
+    '''
+    ''' Trois choses peuvent rendre un remplacement fâcheux, et toutes les trois sont dites :
+    '''
+    '''   — la journée a déjà été comptabilisée, par quelqu'un, à une heure connue ;
+    '''   — son fichier core banking est peut-être déjà parti, auquel cas la nouvelle
+    '''     version fera double emploi avec des écritures déjà passées ;
+    '''   — une annulation de cette journée attend d'être autorisée, et l'authorizer
+    '''     retirerait alors la NOUVELLE version en croyant retirer l'ancienne.
+    '''
+    ''' Rien de tout cela n'interdit de continuer : corriger une journée est légitime, et
+    ''' c'est même la façon normale de réparer une comptabilisation fausse. L'écran
+    ''' informe, il ne décide pas — mais il propose « Non » par défaut.
+    ''' </summary>
+    Private Function ConfirmerLeRemplacement() As Boolean
+
+        If Not _dateActivite.HasValue Then Return True
+
+        Dim jour As Date = _dateActivite.Value
+
+        Dim existante As HistoriqueRepository.Comptabilisation =
+            HistoriqueRepository.ComptabilisationExistante(jour)
+
+        Dim production As CoreBankingRepository.Production =
+            CoreBankingRepository.DerniereProduction(jour)
+
+        Dim attente As DemandeWU = AnnulationRepository.DemandeEnAttente(jour)
+
+        If existante Is Nothing AndAlso production Is Nothing AndAlso attente Is Nothing Then
+            Return True
+        End If
+
+        Dim texte As New System.Text.StringBuilder()
+
+        If existante IsNot Nothing Then
+            texte.AppendLine(existante.Avertissement)
+            texte.AppendLine()
+        End If
+
+        If production IsNot Nothing Then
+            texte.AppendLine(production.Avertissement)
+            texte.AppendLine("Si ce fichier a été injecté, la nouvelle version fera double " &
+                             "emploi avec des écritures déjà passées.")
+            texte.AppendLine()
+        End If
+
+        If attente IsNot Nothing Then
+            texte.AppendLine($"Une annulation de cette journée attend d'être autorisée " &
+                             $"(demandée par {attente.SaisiPar}).")
+            texte.AppendLine("Si vous recomptabilisez maintenant, l'authorizer retirera la " &
+                             "NOUVELLE version, pas l'ancienne.")
+            texte.AppendLine()
+        End If
+
+        texte.AppendLine("Générer de nouveau REMPLACE intégralement la version précédente : " &
+                         "historique, détail des transactions et pièce comptable.")
+        texte.AppendLine()
+        texte.Append("Continuer ?")
+
+        Return MessageBox.Show(Me, texte.ToString(), "Journée déjà comptabilisée",
+                               MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                               MessageBoxDefaultButton.Button2) = DialogResult.Yes
+    End Function
 
     ''' <summary>
     ''' Présente la pièce globale à l'écran, avant tout export.

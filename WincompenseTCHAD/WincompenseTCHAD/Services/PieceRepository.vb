@@ -29,6 +29,8 @@ Public NotInheritable Class PieceRepository
     End Sub
 
     Private Const TABLE_PIECE As String = "T_PieceWU"
+    Private Const TABLE_PIECE_ARCHIVE As String = "T_PieceAnnuleeWU"
+    Private Const TABLE_ANNULATION As String = "T_AnnulationWU"
 
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208
@@ -53,6 +55,35 @@ Public NotInheritable Class PieceRepository
         Public Property TotalCredit As Long
         Public Property DateEnregistrement As Date
         Public Property EnregistrePar As String = String.Empty
+
+        ''' <summary>
+        ''' Identifiant de l'annulation qui a retiré cette journée, ou 0 si elle est vivante.
+        '''
+        ''' C'est lui, et non la date, qui identifie une archive : une même journée peut être
+        ''' comptabilisée, annulée, recomptabilisée et annulée de nouveau.
+        ''' </summary>
+        Public Property IdAnnulation As Long = 0L
+
+        ''' <summary>Motif de l'annulation, tel qu'enregistré (RAPPORT_VIDE, …).</summary>
+        Public Property MotifAnnulation As String = String.Empty
+
+        Public Property DateAnnulation As Date?
+        Public Property AnnuleePar As String = String.Empty
+
+        ''' <summary>Vrai si cette ligne est une archive et non la journée en vigueur.</summary>
+        Public ReadOnly Property Annulee As Boolean
+            Get
+                Return IdAnnulation > 0L
+            End Get
+        End Property
+
+        ''' <summary>« Comptabilisée » ou « ANNULÉE », pour la colonne d'état de la liste.</summary>
+        Public ReadOnly Property LibelleEtat As String
+            Get
+                If Not Annulee Then Return "Comptabilisée"
+                Return "ANNULÉE — " & AnnulationWU.LibelleDepuisCode(MotifAnnulation)
+            End Get
+        End Property
 
         ''' <summary>
         ''' Vrai si la pièce s'équilibre. Elle le fait toujours — le contrôle d'équilibre
@@ -144,47 +175,41 @@ Public NotInheritable Class PieceRepository
 #Region "Lecture"
 
     ''' <summary>
-    ''' Les journées dont une pièce est conservée, la plus récente d'abord.
+    ''' Les journées dont une pièce est conservée, la plus récente d'abord — les journées
+    ''' en vigueur ET celles qui ont été annulées.
+    '''
+    ''' POURQUOI LES DEUX DANS UNE SEULE LISTE
+    '''
+    ''' Une journée annulée ne compte plus dans les rapports, mais elle a existé : elle a
+    ''' porté des écritures, peut-être un fichier core banking, et quelqu'un l'a retirée
+    ''' pour une raison écrite. La faire disparaître de l'écran reviendrait à annuler
+    ''' l'annulation elle-même, qui est précisément ce qu'un auditeur vient chercher.
+    '''
+    ''' UNE MÊME DATE PEUT APPARAÎTRE PLUSIEURS FOIS
+    '''
+    ''' Comptabilisée, annulée, recomptabilisée : la journée en vigueur vient en tête, ses
+    ''' archives en dessous, dans l'ordre où elles se sont produites.
     '''
     ''' Une table absente n'est pas une erreur de fonctionnement mais une installation
     ''' incomplète : le message le dit, et l'écran affiche une liste vide plutôt que de se
-    ''' fermer sur une exception.
+    ''' fermer sur une exception. Si seules les tables d'annulation manquent, la liste des
+    ''' journées vivantes s'affiche quand même : l'archive est un complément, pas une
+    ''' condition.
     ''' </summary>
     Public Shared Function ListerJournees(ByRef messageErreur As String) As List(Of JourneeConservee)
 
         messageErreur = String.Empty
         Dim journees As New List(Of JourneeConservee)()
 
-        Const lecture As String =
-            "SELECT  DateActivite," &
-            "        ecritures   = COUNT(*)," &
-            "        totalDebit  = SUM(Debit)," &
-            "        totalCredit = SUM(Credit)," &
-            "        enregistree = MAX(DateEnregistrement)," &
-            "        auteur      = MIN(EnregistrePar) " &
-            "FROM    " & TABLE_PIECE & " " &
-            "GROUP BY DateActivite " &
-            "ORDER BY DateActivite DESC"
-
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
 
-                Using commande As New SqlCommand(lecture, connexion)
-                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                LireLesJourneesVivantes(connexion, journees)
 
-                        While lecteur.Read()
-                            journees.Add(New JourneeConservee() With {
-                                .DateActivite = lecteur.GetDateTime(0),
-                                .NombreEcritures = lecteur.GetInt32(1),
-                                .TotalDebit = LireEntier(lecteur, 2),
-                                .TotalCredit = LireEntier(lecteur, 3),
-                                .DateEnregistrement = lecteur.GetDateTime(4),
-                                .EnregistrePar = LireChaine(lecteur, 5)
-                            })
-                        End While
-                    End Using
-                End Using
+                If ArchivePresente(connexion) Then
+                    LireLesJourneesAnnulees(connexion, journees)
+                End If
             End Using
 
         Catch ex As SqlException
@@ -196,9 +221,113 @@ Public NotInheritable Class PieceRepository
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
 
+        ' La plus récente d'abord ; à date égale, la journée en vigueur avant ses archives.
+        journees.Sort(Function(gauche, droite)
+                          Dim ordre As Integer = droite.DateActivite.CompareTo(gauche.DateActivite)
+                          If ordre <> 0 Then Return ordre
+                          Return gauche.IdAnnulation.CompareTo(droite.IdAnnulation)
+                      End Function)
+
         Return journees
     End Function
 
+    ''' <summary>
+    ''' Vrai si les tables d'annulation sont en place. La question se pose AVANT d'écrire
+    ''' une requête qui les nomme : SQL Server refuse une requête dont une table manque,
+    ''' même si le reste est valable — la liste entière échouerait pour une installation
+    ''' incomplète.
+    ''' </summary>
+    Private Shared Function ArchivePresente(connexion As SqlConnection) As Boolean
+
+        Const question As String =
+            "SELECT CASE WHEN OBJECT_ID(N'dbo.T_AnnulationWU') IS NOT NULL " &
+            "        AND OBJECT_ID(N'dbo.T_PieceAnnuleeWU') IS NOT NULL " &
+            "       THEN 1 ELSE 0 END"
+
+        Using commande As New SqlCommand(question, connexion)
+            Dim valeur As Object = commande.ExecuteScalar()
+            If valeur Is Nothing OrElse valeur Is DBNull.Value Then Return False
+            Return Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture) = 1
+        End Using
+    End Function
+
+    Private Shared Sub LireLesJourneesVivantes(connexion As SqlConnection,
+                                               journees As List(Of JourneeConservee))
+
+        Const lecture As String =
+            "SELECT  DateActivite," &
+            "        ecritures   = COUNT(*)," &
+            "        totalDebit  = SUM(Debit)," &
+            "        totalCredit = SUM(Credit)," &
+            "        enregistree = MAX(DateEnregistrement)," &
+            "        auteur      = MIN(EnregistrePar) " &
+            "FROM    " & TABLE_PIECE & " " &
+            "GROUP BY DateActivite"
+
+        Using commande As New SqlCommand(lecture, connexion)
+            Using lecteur As SqlDataReader = commande.ExecuteReader()
+
+                While lecteur.Read()
+                    journees.Add(New JourneeConservee() With {
+                        .DateActivite = lecteur.GetDateTime(0),
+                        .NombreEcritures = lecteur.GetInt32(1),
+                        .TotalDebit = LireEntier(lecteur, 2),
+                        .TotalCredit = LireEntier(lecteur, 3),
+                        .DateEnregistrement = lecteur.GetDateTime(4),
+                        .EnregistrePar = LireChaine(lecteur, 5)
+                    })
+                End While
+            End Using
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' Les journées annulées. Les totaux viennent de l'en-tête d'annulation, qui les a
+    ''' figés au moment du retrait ; la date de conservation et son auteur viennent des
+    ''' lignes archivées, parce que ce sont ceux de la comptabilisation d'origine et non
+    ''' ceux de l'annulation.
+    ''' </summary>
+    Private Shared Sub LireLesJourneesAnnulees(connexion As SqlConnection,
+                                               journees As List(Of JourneeConservee))
+
+        Const lecture As String =
+            "SELECT  a.DateActivite," &
+            "        a.NombreEcritures," &
+            "        a.TotalDebit," &
+            "        a.TotalCredit," &
+            "        enregistree = ISNULL(p.enregistree, a.DateAutorisation)," &
+            "        auteur      = ISNULL(p.auteur, a.DemandeePar)," &
+            "        a.IdAnnulation," &
+            "        a.Motif," &
+            "        a.DateAutorisation," &
+            "        a.AutoriseePar " &
+            "FROM    " & TABLE_ANNULATION & " AS a " &
+            "LEFT JOIN (SELECT IdAnnulation," &
+            "                  enregistree = MAX(DateEnregistrement)," &
+            "                  auteur      = MIN(EnregistrePar) " &
+            "           FROM   " & TABLE_PIECE_ARCHIVE & " " &
+            "           GROUP BY IdAnnulation) AS p ON p.IdAnnulation = a.IdAnnulation"
+
+        Using commande As New SqlCommand(lecture, connexion)
+            Using lecteur As SqlDataReader = commande.ExecuteReader()
+
+                While lecteur.Read()
+                    journees.Add(New JourneeConservee() With {
+                        .DateActivite = lecteur.GetDateTime(0),
+                        .NombreEcritures = lecteur.GetInt32(1),
+                        .TotalDebit = LireEntier(lecteur, 2),
+                        .TotalCredit = LireEntier(lecteur, 3),
+                        .DateEnregistrement = lecteur.GetDateTime(4),
+                        .EnregistrePar = LireChaine(lecteur, 5),
+                        .IdAnnulation = LireEntier(lecteur, 6),
+                        .MotifAnnulation = LireChaine(lecteur, 7),
+                        .DateAnnulation = lecteur.GetDateTime(8),
+                        .AnnuleePar = LireChaine(lecteur, 9)
+                    })
+                End While
+            End Using
+        End Using
+    End Sub
     ''' <summary>
     ''' La pièce d'une journée, dans la forme EXACTE que le reste de l'application attend d'une
     ''' pièce : mêmes colonnes, même ordre, même nom de table.
@@ -211,12 +340,7 @@ Public NotInheritable Class PieceRepository
 
         messageErreur = String.Empty
 
-        Dim dt As New DataTable("dtPiece")
-        dt.Columns.Add("Compte", GetType(String))
-        dt.Columns.Add("Libelle", GetType(String))
-        dt.Columns.Add("Debit", GetType(Long))
-        dt.Columns.Add("Credit", GetType(Long))
-        dt.Columns.Add("CodeAgence", GetType(String))
+        Dim dt As DataTable = TableVide()
 
         Const lecture As String =
             "SELECT Compte, Libelle, Debit, Credit, CodeAgence " &
@@ -250,6 +374,72 @@ Public NotInheritable Class PieceRepository
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
         End Try
 
+        Return dt
+    End Function
+
+    ''' <summary>
+    ''' La pièce d'une journée ANNULÉE, dans la même forme que celle d'une journée vivante.
+    '''
+    ''' Elle se charge par identifiant d'annulation et non par date : une même journée peut
+    ''' avoir été annulée plusieurs fois, et la date ne dirait pas laquelle est demandée.
+    '''
+    ''' Les colonnes sont identiques à celles de Charger : l'écran de consultation, l'export
+    ''' Excel et le fichier core banking n'ont pas à savoir d'où vient la pièce qu'on leur
+    ''' donne. Une pièce archivée reste une pièce.
+    ''' </summary>
+    Public Shared Function ChargerAnnulee(idAnnulation As Long, ByRef messageErreur As String) As DataTable
+
+        messageErreur = String.Empty
+
+        Dim dt As DataTable = TableVide()
+
+        Const lecture As String =
+            "SELECT Compte, Libelle, Debit, Credit, CodeAgence " &
+            "FROM   " & TABLE_PIECE_ARCHIVE & " " &
+            "WHERE  IdAnnulation = @id " &
+            "ORDER BY Ligne"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(lecture, connexion)
+                    commande.Parameters.Add("@id", SqlDbType.BigInt).Value = idAnnulation
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+                            dt.Rows.Add(LireChaine(lecteur, 0), LireChaine(lecteur, 1),
+                                        LireEntier(lecteur, 2), LireEntier(lecteur, 3),
+                                        LireChaine(lecteur, 4))
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               AnnulationRepository.MESSAGE_TABLES_ABSENTES,
+                               $"Lecture de la pièce archivée impossible : {ex.Message}")
+
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return dt
+    End Function
+
+    ''' <summary>
+    ''' Une pièce vide, aux colonnes exactes qu'attend le reste de l'application. Définie
+    ''' une fois : deux listes de colonnes qui doivent rester identiques ne le restent pas.
+    ''' </summary>
+    Private Shared Function TableVide() As DataTable
+
+        Dim dt As New DataTable("dtPiece")
+        dt.Columns.Add("Compte", GetType(String))
+        dt.Columns.Add("Libelle", GetType(String))
+        dt.Columns.Add("Debit", GetType(Long))
+        dt.Columns.Add("Credit", GetType(Long))
+        dt.Columns.Add("CodeAgence", GetType(String))
         Return dt
     End Function
 

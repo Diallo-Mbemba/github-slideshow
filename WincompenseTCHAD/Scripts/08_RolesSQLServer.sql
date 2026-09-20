@@ -163,9 +163,18 @@ GO
 
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_DemandeWU')
 BEGIN
-    -- La file du double regard appartient au paramétrage : l'agent de compense n'y a
-    -- aucun accès, pas même en lecture. Aucun rôle ne reçoit DELETE — une demande rejetée
-    -- se conserve, c'est elle qui prouve qu'un contrôle a eu lieu.
+    -- La file du double regard portait d'abord le seul paramétrage, et l'agent de compense
+    -- n'y avait aucun accès. Elle porte maintenant AUSSI les demandes d'annulation d'une
+    -- journée comptabilisée, qui appartiennent, elles, à la compense : le rôle doit donc
+    -- pouvoir y déposer, y lire, et y décider s'il porte la fonction d'authorizer.
+    --
+    -- Ce qui protège le référentiel n'est pas l'absence de ce droit SQL, mais la fonction
+    -- INPUTER / AUTHORIZER portée par l'utilisateur et la contrainte
+    -- CK_T_DemandeWU_PasSoiMeme, qu'un UPDATE fait à la main ne contourne pas davantage.
+    --
+    -- Aucun rôle ne reçoit DELETE : une demande rejetée se conserve, c'est elle qui prouve
+    -- qu'un contrôle a eu lieu.
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_compense');
     EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_commercial');
     EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_DemandeWU TO wu_admin');
     PRINT 'Droits accordés sur T_DemandeWU.';
@@ -175,6 +184,56 @@ BEGIN
     PRINT 'T_DemandeWU absente : relancez ce script après 09_Demandes.sql.';
 END
 GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_AnnulationWU')
+BEGIN
+    -- Les archives d'annulation : SELECT et INSERT pour les trois rôles, JAMAIS de DELETE.
+    -- L'INSERT est accordé largement parce que la fonction d'authorizer se porte
+    -- indifféremment sur un compte de compense, de commercial ou d'administration ; le
+    -- double regard, lui, est posé par la contrainte CK_T_AnnulationWU_PasSoiMeme et par
+    -- l'application, non par les droits SQL.
+    --
+    -- Une archive que ses propres utilisateurs peuvent effacer ne prouve rien : c'est
+    -- exactement quand une journée est annulée que l'auditeur veut la retrouver.
+    EXEC('GRANT SELECT, INSERT ON dbo.T_AnnulationWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_AnnulationWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_AnnulationWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueAnnuleWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueAnnuleWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueAnnuleWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueMTCNAnnuleWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueMTCNAnnuleWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_HistoriqueMTCNAnnuleWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_PieceAnnuleeWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_PieceAnnuleeWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_PieceAnnuleeWU TO wu_admin');
+
+    PRINT 'Droits accordés sur les tables d''annulation.';
+END
+ELSE
+BEGIN
+    PRINT 'T_AnnulationWU absente : relancez ce script après 14_AnnulationComptabilisation.sql.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_FichierCoreBankingWU')
+BEGIN
+    -- Le rôle de compense produit les fichiers : il écrit. Le commercial lit. Aucun DELETE :
+    -- une trace que l'on peut effacer ne prouve rien.
+    EXEC('GRANT SELECT, INSERT ON dbo.T_FichierCoreBankingWU TO wu_compense');
+    EXEC('GRANT SELECT ON dbo.T_FichierCoreBankingWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_FichierCoreBankingWU TO wu_admin');
+    PRINT 'Droits accordés sur T_FichierCoreBankingWU.';
+END
+ELSE
+BEGIN
+    PRINT 'T_FichierCoreBankingWU absente : relancez ce script après 15_FichierCoreBanking.sql.';
+END
+GO
+
 
 -- =========================================================================
 -- 5. Rattachement des utilisateurs SQL Server

@@ -7,6 +7,8 @@ Public Enum TypeObjetWU
     SousAgent = 1
     Agence = 2
     Groupe = 3
+    ''' <summary>Une journée déjà comptabilisée, qu'il s'agit de retirer.</summary>
+    Comptabilisation = 4
 End Enum
 
 ''' <summary>Nature de l'écriture demandée.</summary>
@@ -17,6 +19,8 @@ Public Enum OperationWU
     Suppression = 3
     ''' <summary>Report des valeurs d'un groupe sur tous les sous-agents qui le portent.</summary>
     Synchronisation = 4
+    ''' <summary>Retrait d'une journée comptabilisée, ses lignes partant en archive.</summary>
+    Annulation = 5
 End Enum
 
 ''' <summary>État d'une demande.</summary>
@@ -47,11 +51,13 @@ Public Class DemandeWU
     Public Const OBJET_SOUS_AGENT As String = "SOUS_AGENT"
     Public Const OBJET_AGENCE As String = "AGENCE"
     Public Const OBJET_GROUPE As String = "GROUPE"
+    Public Const OBJET_COMPTABILISATION As String = "COMPTABILISATION"
 
     Public Const OPERATION_CREATION As String = "CREATION"
     Public Const OPERATION_MODIFICATION As String = "MODIFICATION"
     Public Const OPERATION_SUPPRESSION As String = "SUPPRESSION"
     Public Const OPERATION_SYNCHRONISATION As String = "SYNCHRONISATION"
+    Public Const OPERATION_ANNULATION As String = "ANNULATION"
 
     Public Const STATUT_EN_ATTENTE As String = "EN_ATTENTE"
     Public Const STATUT_AUTORISE As String = "AUTORISE"
@@ -77,6 +83,20 @@ Public Class DemandeWU
 
     ''' <summary>codeagence pour un sous-agent, CodeAgenc-Voyager pour une agence.</summary>
     Public Property CodeRattachement As String = String.Empty
+
+    ''' <summary>
+    ''' Explication libre. Elle n'a de sens que pour une annulation de comptabilisation :
+    ''' le référentiel se décrit par ses colonnes, une journée retirée ne se décrit que par
+    ''' une phrase.
+    ''' </summary>
+    Public Property Commentaire As String = String.Empty
+
+    ''' <summary>
+    ''' Annulation seulement : le fichier destiné au core banking a-t-il déjà été injecté ?
+    ''' Cette réponse ne change rien à ce que fait l'application — elle ne sait pas extourner
+    ''' — mais elle dit à celui qui autorise ce qui reste à faire en comptabilité.
+    ''' </summary>
+    Public Property CoreBankingInjecte As Boolean = False
 
 #End Region
 
@@ -139,6 +159,28 @@ Public Class DemandeWU
         }
     End Function
 
+    ''' <summary>
+    ''' Demande portant sur une journée comptabilisée.
+    '''
+    ''' La journée voyage dans Cle au format ISO, le motif dans Designation : la file des
+    ''' demandes n'a pas de colonnes propres à l'annulation, et n'en a pas besoin. Ce sont
+    ''' les deux seules valeurs à conserver jusqu'à la décision — le reste, ce qui sera
+    ''' réellement retiré, se relit dans la base au moment où l'on retire.
+    ''' </summary>
+    Public Shared Function DepuisAnnulation(annulation As AnnulationWU) As DemandeWU
+
+        If annulation Is Nothing Then Return Nothing
+
+        Return New DemandeWU() With {
+            .TypeObjet = TypeObjetWU.Comptabilisation,
+            .Operation = OperationWU.Annulation,
+            .Cle = AnnulationRepository.CleDepuisJour(annulation.DateActivite),
+            .Designation = AnnulationWU.CodeDepuisMotif(annulation.Motif),
+            .Commentaire = annulation.Commentaire,
+            .CoreBankingInjecte = annulation.CoreBankingInjecte
+        }
+    End Function
+
 #End Region
 
 #Region "Conversion vers les objets du référentiel"
@@ -188,6 +230,7 @@ Public Class DemandeWU
                 Case TypeObjetWU.SousAgent : Return "Sous-agent"
                 Case TypeObjetWU.Agence : Return "Agence propre"
                 Case TypeObjetWU.Groupe : Return "Groupe statistique"
+                Case TypeObjetWU.Comptabilisation : Return "Comptabilisation"
                 Case Else : Return "Objet inconnu"
             End Select
         End Get
@@ -200,6 +243,7 @@ Public Class DemandeWU
                 Case OperationWU.Modification : Return "Modification"
                 Case OperationWU.Suppression : Return "Suppression"
                 Case OperationWU.Synchronisation : Return "Synchronisation des sous-agents"
+                Case OperationWU.Annulation : Return "Annulation"
                 Case Else : Return "Opération inconnue"
             End Select
         End Get
@@ -217,11 +261,27 @@ Public Class DemandeWU
     End Property
 
     ''' <summary>
+    ''' La journée d'une demande d'annulation, au format français. La clé, elle, reste au
+    ''' format ISO : elle se trie et ne dépend d'aucune culture, mais ne se lit pas.
+    ''' </summary>
+    Public ReadOnly Property JourneeLisible As String
+        Get
+            Dim jour As Date
+            If Not AnnulationRepository.JourDepuisCle(Cle, jour) Then Return Cle
+            Return jour.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture)
+        End Get
+    End Property
+
+    ''' <summary>
     ''' Phrase résumant la demande, pour une confirmation ou un journal.
     ''' Elle ne s'appelle pas « Resume » : c'est un mot-clé de Visual Basic.
     ''' </summary>
     Public ReadOnly Property Intitule As String
         Get
+            If TypeObjet = TypeObjetWU.Comptabilisation Then
+                Return $"Annulation de la comptabilisation du {JourneeLisible}"
+            End If
+
             Return $"{LibelleOperation} — {LibelleObjet} « {Cle} »"
         End Get
     End Property
@@ -235,6 +295,7 @@ Public Class DemandeWU
             Case OBJET_SOUS_AGENT : Return TypeObjetWU.SousAgent
             Case OBJET_AGENCE : Return TypeObjetWU.Agence
             Case OBJET_GROUPE : Return TypeObjetWU.Groupe
+            Case OBJET_COMPTABILISATION : Return TypeObjetWU.Comptabilisation
             Case Else : Return TypeObjetWU.Inconnu
         End Select
     End Function
@@ -244,6 +305,7 @@ Public Class DemandeWU
             Case TypeObjetWU.SousAgent : Return OBJET_SOUS_AGENT
             Case TypeObjetWU.Agence : Return OBJET_AGENCE
             Case TypeObjetWU.Groupe : Return OBJET_GROUPE
+            Case TypeObjetWU.Comptabilisation : Return OBJET_COMPTABILISATION
             Case Else : Return String.Empty
         End Select
     End Function
@@ -254,6 +316,7 @@ Public Class DemandeWU
             Case OPERATION_MODIFICATION : Return OperationWU.Modification
             Case OPERATION_SUPPRESSION : Return OperationWU.Suppression
             Case OPERATION_SYNCHRONISATION : Return OperationWU.Synchronisation
+            Case OPERATION_ANNULATION : Return OperationWU.Annulation
             Case Else : Return OperationWU.Inconnue
         End Select
     End Function
@@ -264,6 +327,7 @@ Public Class DemandeWU
             Case OperationWU.Modification : Return OPERATION_MODIFICATION
             Case OperationWU.Suppression : Return OPERATION_SUPPRESSION
             Case OperationWU.Synchronisation : Return OPERATION_SYNCHRONISATION
+            Case OperationWU.Annulation : Return OPERATION_ANNULATION
             Case Else : Return String.Empty
         End Select
     End Function
