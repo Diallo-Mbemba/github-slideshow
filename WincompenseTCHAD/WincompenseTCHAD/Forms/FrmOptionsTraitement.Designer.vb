@@ -144,7 +144,7 @@ Partial Class FrmOptionsTraitement
         Me.Controls.Add(Me.grpVisa)
         Me.Controls.Add(Me.lblSousTitre)
         Me.Controls.Add(Me.lblTitre)
-        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "FrmOptionsTraitement"

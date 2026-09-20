@@ -44,6 +44,7 @@ Public Class FrmGroupesStatistiques
     ''' </summary>
     Public Sub New(nomAPreremplir As String)
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _nomAPreremplir = If(nomAPreremplir, String.Empty).Trim()
     End Sub
 

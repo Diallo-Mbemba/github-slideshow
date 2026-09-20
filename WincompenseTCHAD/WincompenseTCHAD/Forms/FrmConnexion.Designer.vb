@@ -168,7 +168,7 @@ Partial Class FrmConnexion
         Me.Controls.Add(Me.lblSousTitre)
         Me.Controls.Add(Me.panelTitre)
         Me.Font = New System.Drawing.Font("Segoe UI", 9.0!)
-        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "FrmConnexion"

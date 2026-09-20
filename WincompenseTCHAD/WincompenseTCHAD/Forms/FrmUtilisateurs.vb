@@ -25,6 +25,7 @@ Public Class FrmUtilisateurs
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "Ouverture"

@@ -286,7 +286,7 @@ Partial Class FrmComptesSysteme
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.lblInfo)
-        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "FrmComptesSysteme"

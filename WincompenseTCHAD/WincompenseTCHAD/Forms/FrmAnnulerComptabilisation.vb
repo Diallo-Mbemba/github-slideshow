@@ -33,6 +33,7 @@ Public Class FrmAnnulerComptabilisation
     ''' <summary>Constructeur requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _jour = Date.Today
         _contenu = New AnnulationRepository.ContenuJournee()
     End Sub
@@ -40,6 +41,7 @@ Public Class FrmAnnulerComptabilisation
     Public Sub New(journee As Date, contenuJournee As AnnulationRepository.ContenuJournee)
 
         InitializeComponent()
+        IconesWU.Habiller(Me)
 
         _jour = journee.Date
         _contenu = If(contenuJournee, New AnnulationRepository.ContenuJournee())

@@ -22,6 +22,7 @@ Public Class FrmOptionsTraitement
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "Ouverture"

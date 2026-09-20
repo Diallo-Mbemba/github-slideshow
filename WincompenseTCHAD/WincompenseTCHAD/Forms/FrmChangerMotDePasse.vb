@@ -28,6 +28,7 @@ Public Class FrmChangerMotDePasse
     ''' <summary>Changement demandé par l'utilisateur : le mot de passe actuel sera exigé.</summary>
     Public Sub New(identifiant As String)
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _identifiant = If(identifiant, String.Empty).Trim()
         _ancienConnu = Nothing
     End Sub
@@ -38,6 +39,7 @@ Public Class FrmChangerMotDePasse
     ''' </summary>
     Public Sub New(identifiant As String, ancienMotDePasseValide As String)
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _identifiant = If(identifiant, String.Empty).Trim()
         _ancienConnu = If(ancienMotDePasseValide, String.Empty)
     End Sub

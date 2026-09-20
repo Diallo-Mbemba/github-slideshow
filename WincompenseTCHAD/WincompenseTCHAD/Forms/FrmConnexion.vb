@@ -28,15 +28,12 @@ Public Class FrmConnexion
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "Ouverture"
 
     Private Sub FrmConnexion_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-        ' L'écran de connexion est la première fenêtre que la banque voit, et celle qui apparaît
-        ' dans la barre des tâches avant toute autre : elle porte l'icône de l'application.
-        IconesWU.Habiller(Me)
 
         AfficherBase()
         VerifierPremierDemarrage()

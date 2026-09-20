@@ -77,6 +77,7 @@ Public Class FrmPieceComptable
     ''' <summary>Constructeur sans paramètre requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _dtPiece = New DataTable()
     End Sub
 
@@ -89,6 +90,7 @@ Public Class FrmPieceComptable
     Public Sub New(dtPiece As DataTable, titre As String, sousTitre As String)
 
         InitializeComponent()
+        IconesWU.Habiller(Me)
 
         _dtPiece = If(dtPiece, New DataTable())
         Text = titre

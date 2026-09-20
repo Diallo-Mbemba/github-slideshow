@@ -14,6 +14,24 @@ Imports System.Windows.Forms
 Public Class FrmDiagnostic
 
     ''' <summary>
+    ''' Constructeur.
+    '''
+    ''' IL MANQUAIT, et son absence était un défaut réel : sans lui, InitializeComponent
+    ''' n'était jamais appelé, aucun contrôle n'existait, et la première ligne d'Afficher —
+    ''' « fenetre.lblTitre.Text = … » — levait une NullReferenceException. L'écran tombait
+    ''' donc exactement quand on en a besoin : pour lire le diagnostic d'un accès SQL refusé.
+    '''
+    ''' Les autres formulaires du projet en déclarent un ; celui-ci avait été oublié. C'est
+    ''' une erreur silencieuse à la compilation, et VB ne la rattrape pas : le Concepteur
+    ''' Windows Forms de VB n'ajoute l'appel implicite que sur les classes portant
+    ''' l'attribut DesignerGenerated, qu'aucun fichier .Designer.vb de ce projet ne porte.
+    ''' </summary>
+    Public Sub New()
+        InitializeComponent()
+        IconesWU.Habiller(Me)
+    End Sub
+
+    ''' <summary>
     ''' Affiche un diagnostic au-dessus de la fenêtre appelante. Ne fait rien si le texte est
     ''' vide : un écran de diagnostic sans diagnostic inquiéterait pour rien.
     ''' </summary>

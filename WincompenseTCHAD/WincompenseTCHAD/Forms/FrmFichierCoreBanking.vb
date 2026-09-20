@@ -38,6 +38,7 @@ Public Class FrmFichierCoreBanking
     ''' <summary>Constructeur requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _fichier = New DataTable()
         _numeroLot = String.Empty
     End Sub
@@ -45,6 +46,7 @@ Public Class FrmFichierCoreBanking
     Public Sub New(fichier As DataTable, dateActivite As Date, dateValeur As Date, numeroLot As String)
 
         InitializeComponent()
+        IconesWU.Habiller(Me)
 
         _fichier = If(fichier, New DataTable())
         _dateActivite = dateActivite

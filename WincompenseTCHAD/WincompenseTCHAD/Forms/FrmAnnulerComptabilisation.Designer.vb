@@ -199,7 +199,7 @@ Partial Class FrmAnnulerComptabilisation
         Me.Controls.Add(Me.lblContenu)
         Me.Controls.Add(Me.lblJournee)
         Me.Controls.Add(Me.lblTitre)
-        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "FrmAnnulerComptabilisation"

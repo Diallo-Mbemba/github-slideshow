@@ -31,6 +31,7 @@ Public Class FrmSousAgents
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "Chargement et affichage de la liste"

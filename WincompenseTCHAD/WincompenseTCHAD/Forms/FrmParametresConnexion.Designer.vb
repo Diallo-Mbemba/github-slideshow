@@ -315,7 +315,7 @@ Partial Class FrmParametresConnexion
         Me.Controls.Add(Me.grpServeur)
         Me.Controls.Add(Me.lblOrigine)
         Me.Controls.Add(Me.lblTitre)
-        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "FrmParametresConnexion"

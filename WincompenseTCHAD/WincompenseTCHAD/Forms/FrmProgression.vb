@@ -38,6 +38,7 @@ Public Class FrmProgression
     Public Sub New()
 
         InitializeComponent()
+        IconesWU.Habiller(Me)
 
         AddHandler _progression.EtapeChangee, AddressOf SurEtape
         AddHandler _progression.AvancementChange, AddressOf SurAvancement

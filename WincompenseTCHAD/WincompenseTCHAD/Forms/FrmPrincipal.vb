@@ -30,6 +30,7 @@ Public Class FrmPrincipal
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "Ouverture des écrans"
@@ -55,12 +56,6 @@ Public Class FrmPrincipal
 
         Dim nouveau As New T()
         nouveau.MdiParent = Me
-
-        ' L'icône est posée ici, et non dans chaque écran : une fenêtre fille réduite n'affiche
-        ' que son icône et son titre, et vingt formulaires n'ont pas à se souvenir chacun de
-        ' cette ligne. Les écrans ouverts autrement — boîtes de dialogue modales — gardent
-        ' l'icône par défaut, qu'on ne voit jamais puisqu'ils ne se réduisent pas.
-        IconesWU.Habiller(nouveau)
 
         ' CenterParent et CenterScreen ne conviennent pas à une fenêtre fille : le premier ne
         ' vaut que pour un affichage modal, le second la placerait au centre de l'écran, donc
@@ -217,8 +212,6 @@ Public Class FrmPrincipal
     ''' c'est une commande posée dans la barre, pas un titre, et elle porte son icône.
     ''' </summary>
     Private Sub PoserLesIcones()
-
-        IconesWU.Habiller(Me)
 
         ' Menu Compensation.
         mnuTraitement.Image = IconesWU.Obtenir(IconeWU.Balance)

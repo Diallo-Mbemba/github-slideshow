@@ -41,6 +41,7 @@ Public Class FrmPiecesArchivees
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _journees = New List(Of PieceRepository.JourneeConservee)()
         _piece = New DataTable()
     End Sub

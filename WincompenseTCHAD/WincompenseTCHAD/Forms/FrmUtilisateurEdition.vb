@@ -34,6 +34,7 @@ Public Class FrmUtilisateurEdition
     ''' <param name="premierAdministrateur">Vrai pour l'amorçage du premier compte administrateur.</param>
     Public Sub New(utilisateurAModifier As UtilisateurWU, premierAdministrateur As Boolean)
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _existant = utilisateurAModifier
         _premierAdministrateur = premierAdministrateur
     End Sub

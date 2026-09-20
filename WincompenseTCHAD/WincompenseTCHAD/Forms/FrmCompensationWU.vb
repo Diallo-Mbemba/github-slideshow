@@ -18,6 +18,7 @@ Public Class FrmCompensationWU
     ''' <summary>Constructeur requis par le Concepteur Windows Forms : initialise tous les contrôles.</summary>
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "État interne du formulaire"

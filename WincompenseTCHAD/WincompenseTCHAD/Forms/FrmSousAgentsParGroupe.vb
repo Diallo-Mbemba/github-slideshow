@@ -38,6 +38,7 @@ Public Class FrmSousAgentsParGroupe
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
     End Sub
 
 #Region "Chargement"

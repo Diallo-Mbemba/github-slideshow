@@ -42,6 +42,7 @@ Public Class FrmCommissionsBanque
 
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _lignes = New List(Of LigneHistoriqueWU)()
         _synthese = New DataTable()
         _parJour = New DataTable()

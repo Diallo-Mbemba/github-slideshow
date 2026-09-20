@@ -30,11 +30,13 @@ Public Class FrmBordereauJournee
     ''' <summary>Constructeur requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _jour = Date.Today
     End Sub
 
     Public Sub New(journee As Date)
         InitializeComponent()
+        IconesWU.Habiller(Me)
         _jour = journee.Date
     End Sub
 

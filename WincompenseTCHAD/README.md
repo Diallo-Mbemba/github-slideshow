@@ -2332,9 +2332,53 @@ la pastille affiche « 99+ », et le compte exact se lit dans le menu.
   toutes ses tailles, si bien que la barre de titre et la barre des tâches prennent chacune la
   sienne, sans agrandissement.
 
-L'icône est posée sur l'écran de connexion et sur la fenêtre principale, puis sur chaque
-fenêtre fille au moment de son ouverture — en un seul endroit, `AfficherEnfant`, et non dans
-vingt formulaires. Une fenêtre fille réduite n'affiche que son icône et son titre.
+#### Chaque fenêtre se pose l'icône elle-même
+
+La première version la posait en **un seul endroit**, `AfficherEnfant` — l'ouverture d'une
+fenêtre fille MDI. C'était trop peu : les boîtes de dialogue ne passent pas par là. Elles sont
+ouvertes par `ShowDialog`, depuis quatorze endroits différents, et n'avaient donc aucune icône.
+
+La règle est maintenant : **`IconesWU.Habiller(Me)` suit chaque `InitializeComponent()`**, dans
+le constructeur de chaque formulaire. C'est une ligne de plus dans vingt-trois fichiers, et
+c'était le prix à payer : Windows Forms n'offre aucun événement « une fenêtre vient de
+naître », et `Application.Idle` — le seul point central possible — n'est pas garanti pendant
+une boucle modale, c'est-à-dire précisément pendant l'affichage des dialogues qu'il s'agissait
+de rattraper.
+
+Une classe de base commune aurait fait la même chose en un endroit. Elle a été écartée pour une
+raison d'atelier, pas de conception : **le Concepteur Windows Forms refuse d'ouvrir un
+formulaire hérité tant que le projet ne compile pas**. Mettre les vingt-trois écrans derrière
+cette condition, dans une application maintenue à travers l'interface de Visual Studio, coûtait
+plus cher que la ligne répétée.
+
+`verif_icone_fenetres.py` tient la règle : tout `InitializeComponent()` qui n'est pas suivi de
+`IconesWU.Habiller(Me)` est signalé.
+
+#### FixedDialog masque l'icône — c'est Windows, pas l'application
+
+Huit fenêtres avaient l'icône et ne l'affichaient pas. `FormBorderStyle.FixedDialog` pose
+`WS_EX_DLGMODALFRAME` sur la fenêtre — **le même drapeau que `ShowIcon = False`** — et Windows
+ne dessine alors aucune icône dans la barre de titre.
+
+Elles sont passées en `FixedSingle` : même comportement (fenêtre non redimensionnable), aspect
+identique sous Windows 10 et Windows 11 où le cadre de dialogue ne se distingue plus, et
+l'icône s'affiche. Si la banque préfère le cadre de dialogue, c'est une ligne à remettre dans
+chaque `.Designer.vb`.
+
+`FrmProgression` garde `FixedDialog` : elle n'a pas de `ControlBox`, donc pas de barre système,
+donc pas d'icône à afficher — et une fenêtre d'avancement ne doit pas offrir de bouton de
+fermeture.
+
+#### Un défaut trouvé en chemin : `FrmDiagnostic` n'avait pas de constructeur
+
+`InitializeComponent` n'y était jamais appelé. La fenêtre n'avait donc aucun contrôle, et la
+première ligne d'`Afficher` — `fenetre.lblTitre.Text = …` — levait une
+`NullReferenceException`. L'écran tombait exactement quand on en a besoin : pour lire le
+diagnostic d'un accès SQL refusé.
+
+VB ne rattrape pas cet oubli. Il n'ajoute l'appel implicite qu'aux classes portant l'attribut
+`DesignerGenerated`, qu'aucun `.Designer.vb` de ce projet ne porte. `verif_icone_fenetres.py`
+le vérifie désormais pour les vingt-quatre fenêtres.
 
 #### Le piège du nom de ressource, et pourquoi il y a deux sources
 
