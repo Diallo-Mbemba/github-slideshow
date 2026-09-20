@@ -358,10 +358,20 @@
     </EmbeddedResource>
     <!--
       L'icône de l'application, incorporée pour être lue à l'exécution par IconesWU.
-      Son nom de ressource est « WincompenseTCHAD.Ressources.Wincompense.ico » : la renommer
-      ou la déplacer oblige à corriger la constante RESSOURCE_ICONE de Forms\IconesWU.vb.
+
+      LogicalName fixe le nom de la ressource, au lieu de laisser MSBuild le composer.
+      Ce n'est pas un détail : la règle de composition N'EST PAS LA MÊME en VB.NET et en
+      C#. En C#, le dossier entre dans le nom (« WincompenseTCHAD.Ressources.Wincompense.ico ») ;
+      en VB.NET il est ignoré (« WincompenseTCHAD.Wincompense.ico »). Un nom devine à la
+      main est donc faux une fois sur deux, et l'échec est SILENCIEUX : l'application garde
+      l'icône par défaut de Windows sans rien signaler.
+
+      IconesWU cherche de toute façon par la FIN du nom, et sait relire l'icône dans
+      l'exécutable si la ressource manque : les deux précautions se complètent.
     -->
-    <EmbeddedResource Include="Ressources\Wincompense.ico" />
+    <EmbeddedResource Include="Ressources\Wincompense.ico">
+      <LogicalName>Wincompense.ico</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

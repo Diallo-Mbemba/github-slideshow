@@ -2328,14 +2328,44 @@ la pastille affiche « 99+ », et le compte exact se lit dans le menu.
 
 - `<ApplicationIcon>` la grave dans `Wincompense.exe` — c'est elle que montrent le bureau, la
   barre des tâches et l'explorateur ;
-- `<EmbeddedResource>` la rend lisible à l'exécution, pour que les fenêtres la portent. Son nom
-  de ressource est `WincompenseTCHAD.Ressources.Wincompense.ico` : **la renommer ou la déplacer
-  oblige à corriger la constante `RESSOURCE_ICONE` de `Forms/IconesWU.vb`**, faute de quoi la
-  lecture échoue en silence et l'application reprend l'icône par défaut.
+- `<EmbeddedResource>` la rend lisible à l'exécution, pour que les fenêtres la portent — avec
+  toutes ses tailles, si bien que la barre de titre et la barre des tâches prennent chacune la
+  sienne, sans agrandissement.
 
 L'icône est posée sur l'écran de connexion et sur la fenêtre principale, puis sur chaque
 fenêtre fille au moment de son ouverture — en un seul endroit, `AfficherEnfant`, et non dans
 vingt formulaires. Une fenêtre fille réduite n'affiche que son icône et son titre.
+
+#### Le piège du nom de ressource, et pourquoi il y a deux sources
+
+La première version n'a porté **aucune** icône, et n'a rien signalé. La cause : le nom d'une
+ressource incorporée **ne se compose pas de la même façon en VB.NET et en C#**.
+
+| | Ce que MSBuild écrit pour `Ressources\Wincompense.ico` |
+|---|---|
+| C# | `WincompenseTCHAD.Ressources.Wincompense.ico` |
+| **VB.NET** | `WincompenseTCHAD.Wincompense.ico` — **le dossier est ignoré** |
+
+Le nom écrit en dur était celui de C#. `GetManifestResourceStream` a donc rendu `Nothing` —
+**sans lever d'exception** : une ressource introuvable n'est pas une erreur, elle est
+simplement absente. L'icône manquait partout, et rien ne le disait.
+
+Trois parades, posées ensemble parce qu'aucune ne suffit seule :
+
+1. `<LogicalName>Wincompense.ico</LogicalName>` dans le `.vbproj` **fixe** le nom au lieu de
+   laisser MSBuild le composer ;
+2. `IconesWU` cherche par la **fin** du nom, ce qui retrouve les trois écritures possibles —
+   celle de VB, celle de C#, et le `LogicalName` — sans dépendre d'aucune ;
+3. si la ressource manque quand même, l'icône est relue **dans l'exécutable lui-même**, où
+   `ApplicationIcon` l'a gravée (`Icon.ExtractAssociatedIcon`). Cette lecture ne rend qu'une
+   taille, que Windows redimensionne, mais elle ne dépend ni du nom de la ressource ni de la
+   façon dont MSBuild l'a composé.
+
+Les deux sources n'échouent pas pour les mêmes raisons : la première tient au nom de la
+ressource, la seconde au fichier `.exe`. C'est précisément pour cela qu'il y en a deux.
+
+`verif_pieges.py` porte désormais la règle : un nom de ressource incorporée écrit en dur
+**avec un dossier** est signalé.
 
 ### Une réserve sur l'image fournie
 

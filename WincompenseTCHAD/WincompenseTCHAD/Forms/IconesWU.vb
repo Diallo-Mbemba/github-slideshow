@@ -51,14 +51,19 @@ Public NotInheritable Class IconesWU
     Private Const COTE_DESSIN As Single = 16.0F
 
     ''' <summary>
-    ''' Nom de la ressource incorporée qui porte l'icône de l'application.
+    ''' Nom du fichier de l'icône, cherché par la FIN du nom de ressource.
     '''
-    ''' Il est composé du RootNamespace du projet et du chemin du fichier, les séparateurs
-    ''' devenant des points : c'est la règle de nommage de MSBuild pour une EmbeddedResource.
-    ''' Déplacer ou renommer le fichier .ico sans corriger cette constante ferait échouer la
-    ''' lecture — silencieusement, l'application gardant alors l'icône par défaut de Windows.
+    ''' POURQUOI PAS UN NOM COMPLET ÉCRIT EN DUR. Il l'était, et c'était un piège : le nom
+    ''' d'une ressource incorporée n'est pas composé de la même façon en VB.NET et en C#.
+    ''' En C#, MSBuild écrit « RootNamespace.Dossier.Fichier.ico » ; **en VB.NET il ignore le
+    ''' dossier** et écrit « RootNamespace.Fichier.ico ». Un nom complet écrit à la main est
+    ''' donc faux une fois sur deux, et il échoue EN SILENCE : la lecture rend Nothing, et
+    ''' l'application garde l'icône par défaut de Windows sans rien signaler.
+    '''
+    ''' Chercher par la fin du nom fait tomber les trois écritures possibles — celle de VB,
+    ''' celle de C#, et le LogicalName posé dans le .vbproj — sans dépendre d'aucune.
     ''' </summary>
-    Private Const RESSOURCE_ICONE As String = "WincompenseTCHAD.Ressources.Wincompense.ico"
+    Private Const NOM_FICHIER_ICONE As String = "Wincompense.ico"
 
     ' La palette, relevée sur l'icône fournie par la banque.
     Private Shared ReadOnly TEINTE_OR As Color = Color.FromArgb(255, 213, 76)
@@ -110,33 +115,88 @@ Public NotInheritable Class IconesWU
     End Function
 
     ''' <summary>
-    ''' Rend l'icône de l'application, lue une fois dans les ressources incorporées.
+    ''' Rend l'icône de l'application, lue une fois pour toutes.
     '''
-    ''' Renvoie Nothing si la ressource est absente : l'application garde alors l'icône par
-    ''' défaut de Windows Forms. Une icône manquante est un défaut d'habillage, jamais une
-    ''' raison d'empêcher un agent de travailler.
+    ''' DEUX SOURCES, ET C'EST VOULU. L'icône est d'abord cherchée dans les ressources
+    ''' incorporées, qui portent toutes les tailles — 16, 24, 32, 48 et 64 pixels — si bien
+    ''' que la barre de titre et la barre des tâches prennent chacune la sienne, sans
+    ''' agrandissement. Si elle n'y est pas, elle est relue DANS L'EXÉCUTABLE lui-même, où
+    ''' ApplicationIcon l'a gravée : cette seconde lecture ne rend qu'une taille, mais elle
+    ''' ne dépend ni du nom de la ressource ni de la façon dont MSBuild l'a composé.
+    '''
+    ''' Les deux échouent rarement ensemble : la première tient au nom de la ressource, la
+    ''' seconde au fichier .exe. C'est exactement pourquoi il y en a deux — la version
+    ''' précédente n'avait que la première, son nom était faux, et l'application n'a porté
+    ''' aucune icône sans que rien ne le dise.
+    '''
+    ''' Renvoie Nothing si les deux échouent : l'application garde alors l'icône par défaut
+    ''' de Windows Forms. Une icône manquante est un défaut d'habillage, jamais une raison
+    ''' d'empêcher un agent de travailler.
     ''' </summary>
     Public Shared Function IconeApplication() As Icon
 
         If _iconeCherchee Then Return _iconeApplication
         _iconeCherchee = True
 
-        Try
-            Dim assemblage As System.Reflection.Assembly = System.Reflection.Assembly.GetExecutingAssembly()
+        _iconeApplication = LireDansLesRessources()
 
-            Using flux As System.IO.Stream = assemblage.GetManifestResourceStream(RESSOURCE_ICONE)
-                If flux IsNot Nothing Then _iconeApplication = New Icon(flux)
-            End Using
-
-        Catch ex As ArgumentException
-            ' Ressource présente mais illisible : on s'en passe.
-            _iconeApplication = Nothing
-
-        Catch ex As System.IO.IOException
-            _iconeApplication = Nothing
-        End Try
+        If _iconeApplication Is Nothing Then
+            _iconeApplication = LireDansLExecutable()
+        End If
 
         Return _iconeApplication
+    End Function
+
+    ''' <summary>
+    ''' Cherche l'icône parmi les ressources incorporées, par la fin de leur nom.
+    ''' </summary>
+    Private Shared Function LireDansLesRessources() As Icon
+
+        Try
+            Dim assemblage As System.Reflection.Assembly =
+                System.Reflection.Assembly.GetExecutingAssembly()
+
+            For Each nomRessource As String In assemblage.GetManifestResourceNames()
+
+                If Not nomRessource.EndsWith(NOM_FICHIER_ICONE,
+                                             StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+
+                Using flux As System.IO.Stream = assemblage.GetManifestResourceStream(nomRessource)
+                    If flux IsNot Nothing Then Return New Icon(flux)
+                End Using
+            Next
+
+        Catch ex As ArgumentException
+            ' Ressource trouvée mais illisible : l'exécutable prendra le relais.
+            Return Nothing
+
+        Catch ex As System.IO.IOException
+            Return Nothing
+        End Try
+
+        Return Nothing
+    End Function
+
+    ''' <summary>
+    ''' Relit l'icône gravée dans l'exécutable par ApplicationIcon.
+    '''
+    ''' Elle ne rend qu'une taille, que Windows redimensionne au besoin : c'est un recours,
+    ''' pas le chemin normal. Mais c'est un recours qui ne peut pas se tromper de nom.
+    ''' </summary>
+    Private Shared Function LireDansLExecutable() As Icon
+
+        Try
+            Return Icon.ExtractAssociatedIcon(Application.ExecutablePath)
+
+        Catch ex As ArgumentException
+            ' Chemin introuvable ou exécutable sans icône : il n'y en aura pas.
+            Return Nothing
+
+        Catch ex As System.IO.IOException
+            Return Nothing
+        End Try
     End Function
 
     ''' <summary>
