@@ -143,6 +143,17 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmComptesSysteme)()
     End Sub
 
+    ''' <summary>
+    ''' Sortie et rechargement du paramétrage par fichier.
+    '''
+    ''' Il est rangé sous Paramétrage, et non sous Sécurité : ce n'est pas une sauvegarde de
+    ''' la base — celle-là se fait sur le serveur — mais le paramétrage lui-même, emporté
+    ''' dans un fichier.
+    ''' </summary>
+    Private Sub mnuFichierParametrage_Click(sender As Object, e As EventArgs) Handles mnuFichierParametrage.Click
+        AfficherEnfant(Of FrmParametrageFichier)()
+    End Sub
+
     Private Sub mnuDemandes_Click(sender As Object, e As EventArgs) Handles mnuDemandes.Click
         AfficherEnfant(Of FrmDemandes)()
         RafraichirLeCompteurDeDemandes()
@@ -290,6 +301,11 @@ Public Class FrmPrincipal
         mnuDemandes.Available = pointsDeVente
         SEP5.Available = pointsDeVente
         SEP2.Available = pointsDeVente AndAlso comptes
+
+        ' Le fichier de secours emporte le plan comptable et tout le référentiel : il suit le
+        ' même droit que les comptes systèmes, c'est-à-dire l'administrateur seul.
+        mnuFichierParametrage.Available = comptes
+        SEP7.Available = comptes
 
         ' Un menu dont toutes les entrées sont masquées resterait affiché, et s'ouvrirait sur
         ' un vide : il disparaît avec elles.

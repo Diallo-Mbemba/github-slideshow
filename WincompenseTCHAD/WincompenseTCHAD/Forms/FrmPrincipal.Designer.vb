@@ -35,6 +35,8 @@ Partial Class FrmPrincipal
         Me.mnuDemandes = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP2 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuComptes = New System.Windows.Forms.ToolStripMenuItem()
+        Me.SEP7 = New System.Windows.Forms.ToolStripSeparator()
+        Me.mnuFichierParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuSecurite = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuMonMotDePasse = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP4 = New System.Windows.Forms.ToolStripSeparator()
@@ -103,7 +105,7 @@ Partial Class FrmPrincipal
         '
         'mnuParametrage
         '
-        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes})
+        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.SEP7, Me.mnuFichierParametrage})
         Me.mnuParametrage.Name = "mnuParametrage"
         Me.mnuParametrage.Size = New System.Drawing.Size(100, 20)
         Me.mnuParametrage.Text = "&Paramétrage"
@@ -147,6 +149,17 @@ Partial Class FrmPrincipal
         Me.mnuComptes.Name = "mnuComptes"
         Me.mnuComptes.Size = New System.Drawing.Size(240, 22)
         Me.mnuComptes.Text = "&Comptes systèmes"
+        '
+        'SEP7
+        '
+        Me.SEP7.Name = "SEP7"
+        Me.SEP7.Size = New System.Drawing.Size(220, 6)
+        '
+        'mnuFichierParametrage
+        '
+        Me.mnuFichierParametrage.Name = "mnuFichierParametrage"
+        Me.mnuFichierParametrage.Size = New System.Drawing.Size(240, 22)
+        Me.mnuFichierParametrage.Text = "Paramétrage : &fichier de secours..."
         '
         'mnuSecurite
         '
@@ -295,6 +308,8 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuDemandes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP2 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuComptes As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents SEP7 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents mnuFichierParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuSecurite As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuMonMotDePasse As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP4 As System.Windows.Forms.ToolStripSeparator

@@ -1852,6 +1852,138 @@ référentiel — ne peut être déposée ni décidée. Les écrans le disent et
 **Aucun rôle ne reçoit `DELETE` sur les archives ni sur la trace des fichiers.** Une archive que
 ses propres utilisateurs peuvent effacer ne prouve rien.
 
+## Paramétrage : fichier de secours
+
+*Menu Paramétrage › Paramétrage : fichier de secours… — administrateur seul.*
+
+### Ce que ce fichier n'est pas
+
+**Une sauvegarde de la base.** L'application ne peut pas en faire une, et ce n'est pas un choix
+de conception mais quatre obstacles :
+
+- `BACKUP DATABASE` n'est pas un droit de base de données mais un rôle serveur. Le compte
+  applicatif est membre de `wu_admin` **dans la base** et n'a rien au niveau du serveur — lui
+  donner le droit de sauvegarder et de restaurer, ce serait lui donner le droit d'écraser.
+- Le fichier de sauvegarde atterrit sur le disque du **serveur**, sous le compte de service SQL
+  Server, et non sur le poste de l'agent.
+- Une sauvegarde qui ne se déclenche que si quelqu'un ouvre l'application n'est pas une
+  sauvegarde : un lundi férié, une semaine de congé, et il n'y a rien.
+- On ne restaure pas une base à laquelle on est connecté, et restaurer efface tout ce qui a été
+  fait depuis. Ce n'est pas un bouton dans une application comptable.
+
+**La vraie sauvegarde se fait sur le serveur, par l'équipe qui le tient** : complète chaque
+nuit après la compensation, journal toutes les 15 à 30 minutes si la base est en mode
+`FULL`, `RESTORE VERIFYONLY` après chaque passage, copie hors du serveur, et une restauration
+d'essai par trimestre. Une sauvegarde qu'on n'a jamais restaurée n'est pas une sauvegarde.
+
+### Ce qu'il est
+
+De quoi remonter une installation **neuve** sans resaisir à la main des centaines de
+sous-agents : les comptes comptables, les groupes statistiques, les sous-agents et les agences
+propres. C'est peu, et c'est exactement ce qu'une application de poste peut promettre sans
+mentir.
+
+### Le format : une archive de fichiers texte
+
+`Parametrage-GWC_WINCOMPENSE_ETD-20260920-1830.zip`, qui contient :
+
+| Fichier | Contenu |
+|---|---|
+| `manifeste.csv` | version du format, base, serveur, date, auteur, empreinte du contenu |
+| `LISEZ-MOI.txt` | ce que le fichier est, ce qu'il n'est pas, comment le recharger |
+| `comptes-systeme.csv` | les neuf comptes, une ligne chacun, avec leur signification |
+| `groupes-statistiques.csv` | groupe, compte d'activité, compte de commission, taux |
+| `sous-agents.csv` | les sept colonnes de `T_Pdv_SA` |
+| `agences-propres.csv` | les trois colonnes de `T_Pdv_EC` |
+| `utilisateurs-pour-information.csv` | identifiant, nom, rôle, fonction, actif |
+
+**Du CSV, et non un classeur.** Le fichier doit pouvoir être relu sur le poste d'une
+installation qui commence, donc sans qu'on puisse parier sur la présence d'Excel — Interop est
+exclu ici comme il l'est de toute la logique métier. Un CSV en point-virgule et en UTF-8 **avec
+BOM** s'ouvre néanmoins d'un double-clic dans Excel, en français, colonnes séparées : on garde
+la lisibilité sans la dépendance.
+
+Deux précautions valent d'être notées. Les valeurs qui contiennent un point-virgule, un
+guillemet ou un saut de ligne sont protégées, et le découpage à la lecture est écrit caractère
+par caractère — un `Split` couperait en deux une désignation contenant un point-virgule, et
+personne ne s'en apercevrait avant que le sous-agent correspondant soit mal créé. Les nombres,
+eux, sont écrits en **culture invariante** : un taux écrit `0,70` sur un poste français et relu
+`0.70` sur un autre vaudrait soixante-dix fois trop.
+
+**L'empreinte SHA-256** des quatre fichiers de données figure au manifeste. Elle ne protège de
+rien — qui modifie un fichier peut recalculer son empreinte — mais elle répond à une question :
+*ce fichier est-il celui qui est sorti de l'application ?* Retoucher un taux avant de recharger
+est parfois la seule façon de s'en sortir ; l'ignorer ne l'est jamais. L'écran affiche
+« CONTENU MODIFIÉ depuis l'export » en rouge, et le redit dans la confirmation.
+
+### Les utilisateurs ne se rechargent pas
+
+Leur liste est exportée — identifiant, nom, rôle, fonction — pour qu'on sache **qui** recréer.
+Aucun mot de passe n'en sort, **pas même sous forme d'empreinte** : un fichier qui circule ne
+porte pas les identifiants d'une banque. Les recharger supposerait soit d'emporter ces
+empreintes, soit d'inventer des mots de passe provisoires et de les écrire dans le même
+fichier. Ni l'un ni l'autre. L'administrateur de la nouvelle installation est créé au premier
+démarrage, comme aujourd'hui.
+
+### Le chargement ne remplace jamais
+
+**C'est la règle qui tient tout le reste.** Une clé déjà présente est laissée telle quelle et
+comptée « déjà présente ». Le chargement ne peut donc pas détruire un référentiel : au pire, il
+ne fait rien.
+
+C'est aussi ce qui le dispense du double regard. Le contrôle à deux personnes protège les
+**modifications** d'un paramétrage en service ; ici, là où quelque chose existe, l'import
+s'abstient — il n'y a rien à protéger. Toute modification ultérieure repasse par la file des
+demandes, comme aujourd'hui.
+
+**L'import n'a pas son propre SQL** : il écrit par `PdvRepository.AppliquerSousAgent`,
+`AppliquerAgence` et `AppliquerGroupe`, c'est-à-dire par le chemin qu'emprunte déjà une demande
+autorisée. Ce qui est vrai de l'un est vrai de l'autre.
+
+**La seule exception : les comptes comptables.** `SystemeWU` n'est pas une liste d'objets mais
+une ligne de réglages, que le script d'installation crée d'emblée avec des valeurs par défaut.
+S'en tenir à « ne jamais remplacer » reviendrait à ne jamais charger les comptes de la banque —
+exactement ce qu'on est venu chercher. Ils sont donc remplaçables, mais jamais en silence :
+l'écran montre l'**ancienne et la nouvelle valeur ligne à ligne**, en rouge là où elles
+diffèrent, et l'administrateur doit cocher. Le code de la ligne locale est conservé : celui du
+fichier désigne la ligne de la base d'origine, et viser une ligne inexistante ne toucherait
+rien.
+
+### Ce que l'analyse refuse, et pourquoi elle le fait avant d'écrire
+
+| Cas | Décision |
+|---|---|
+| Taux hors de `[0 ; 1]` — le classique `70` pour `0,70` | refusé |
+| Désignation ou compte obligatoire vide | refusé |
+| Compte d'activité ou de commission déjà porté par un autre groupe | refusé |
+| Account déjà enregistré de l'autre côté (sous-agent ↔ agence propre) | refusé |
+| Sous-agent sans groupe, ou dont le groupe n'existe pas | créé, avec une remarque |
+
+Les deux index uniques de `T_GroupeStatistique` et la règle « un Account n'est pas des deux
+côtés » sont vérifiés **avant** la transaction. Les heurter en plein chargement ferait échouer
+l'ensemble, là où les annoncer permet de corriger le fichier et de recommencer.
+
+L'analyse est **refaite au moment de cliquer sur Charger** : entre son affichage et ce clic,
+quelqu'un d'autre a pu créer un sous-agent.
+
+### L'ordre des écritures n'est pas indifférent
+
+Les groupes d'abord — les sous-agents s'y réfèrent —, puis les agences, puis les sous-agents, le
+tout dans **une transaction**. Un chargement à moitié fait laisserait des sous-agents rattachés
+à des groupes absents, et personne ne saurait dire où il s'est arrêté.
+
+Les comptes comptables sont écrits **en dernier, hors de cette transaction**. Si le référentiel
+échoue, les comptes n'auront pas bougé ; si les comptes échouent après, le référentiel est en
+place et les neuf comptes se retapent sur un écran, là où trois cents sous-agents ne se retapent
+pas.
+
+### Un garde-fou de plus
+
+Si le fichier vient d'une **autre base** que celle à laquelle on est connecté, l'écran le dit et
+demande confirmation. C'est normal pour une installation neuve ; ce l'est beaucoup moins si les
+deux bases appartiennent à des entités différentes — le référentiel chargé serait plausible et
+faux, et rien ne le signalerait ensuite.
+
 ## Règles tranchées par la banque
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
@@ -1892,6 +2024,15 @@ ses propres utilisateurs peuvent effacer ne prouve rien.
   fonctions — une colonne de plus sur `T_UtilisateurWU`, et rien d'autre à changer.
 - Faut-il purger les archives d'annulation au bout d'un certain temps, et lequel ? Aucune
   purge n'est prévue aujourd'hui, et aucun rôle n'a le droit d'effacer.
+- Sauvegarde de la base : qui tient le serveur SQL, à quelle périodicité les sauvegardes
+  tournent-elles, et où sont-elles recopiées ? Le fichier de secours du paramétrage ne
+  remplace rien de cela — il le complète.
+- Faut-il afficher dans l'application la date de la dernière sauvegarde réussie, lue dans
+  `msdb` ? C'est le jour où le travail de sauvegarde s'arrête en silence que cela sert.
+  Proposé, non retenu pour l'instant.
+- Le fichier de secours doit-il aussi porter les jours fériés (`T_JourFerieWU`) ? Ils sont
+  regénérés pour 2026-2030 par `Scripts\10_JoursFeries.sql` sur une installation neuve,
+  d'où leur absence ; les corrections apportées par la banque, elles, ne s'exportent pas.
 
 ## Test de référence (section 17)
 

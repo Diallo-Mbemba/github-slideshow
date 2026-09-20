@@ -81,6 +81,7 @@
     <Compile Include="Models\CalculWU.vb" />
     <Compile Include="Models\PorteeRapportWU.vb" />
     <Compile Include="Models\AnnulationWU.vb" />
+    <Compile Include="Models\LotParametrageWU.vb" />
     <Compile Include="Models\ComptesSystemeWU.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
@@ -99,6 +100,11 @@
     <Compile Include="Services\ProgressionWU.vb" />
     <Compile Include="Services\AnnulationRepository.vb" />
     <Compile Include="Services\CoreBankingRepository.vb" />
+    <Compile Include="Services\FichierCsvWU.vb" />
+    <Compile Include="Services\ParametrageColonnes.vb" />
+    <Compile Include="Services\ParametrageFichierWU.vb" />
+    <Compile Include="Services\ParametrageExportService.vb" />
+    <Compile Include="Services\ParametrageImportService.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
@@ -198,6 +204,12 @@
     <Compile Include="Forms\FrmAnnulerComptabilisation.Designer.vb">
       <DependentUpon>FrmAnnulerComptabilisation.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmParametrageFichier.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmParametrageFichier.Designer.vb">
+      <DependentUpon>FrmParametrageFichier.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -282,6 +294,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmAnnulerComptabilisation.resx">
       <DependentUpon>FrmAnnulerComptabilisation.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmParametrageFichier.resx">
+      <DependentUpon>FrmParametrageFichier.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
       <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>
