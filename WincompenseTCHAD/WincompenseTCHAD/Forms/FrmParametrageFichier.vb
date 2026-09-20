@@ -192,7 +192,7 @@ Public Class FrmParametrageFichier
     Private Shared Function NomDeLaBase() As String
 
         Try
-            Dim constructeur As New Data.SqlClient.SqlConnectionStringBuilder(
+            Dim constructeur As New System.Data.SqlClient.SqlConnectionStringBuilder(
                 WURepository.ObtenirChaineConnexion())
             Return constructeur.InitialCatalog
 

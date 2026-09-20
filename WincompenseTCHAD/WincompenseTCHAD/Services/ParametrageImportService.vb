@@ -323,16 +323,23 @@ Public NotInheritable Class ParametrageImportService
         ligne.Motif = motif
     End Sub
 
+    ''' <summary>
+    ''' Les valeurs non vides, comparables sans tenir compte de la casse.
+    '''
+    ''' La variable locale ne s'appelle pas « ensemble » : en Visual Basic, le nom d'une
+    ''' fonction EST sa variable de retour, et une locale homonyme est refusée par le
+    ''' compilateur (BC30290) — la casse n'y change rien.
+    ''' </summary>
     Private Shared Function Ensemble(valeurs As IEnumerable(Of String)) As HashSet(Of String)
 
-        Dim ensemble As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+        Dim resultat As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
 
         For Each valeur As String In valeurs
             Dim texte As String = If(valeur, String.Empty).Trim()
-            If texte.Length > 0 Then ensemble.Add(texte)
+            If texte.Length > 0 Then resultat.Add(texte)
         Next
 
-        Return ensemble
+        Return resultat
     End Function
 
 #End Region
