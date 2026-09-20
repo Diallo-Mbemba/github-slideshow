@@ -191,6 +191,10 @@ Public NotInheritable Class PieceExcelWU
     ''' Vide pour l'intitulé de la pièce globale.</param>
     ''' <param name="agencePremiereFeuille">Agence émettrice de la première feuille. Vide pour
     ''' l'agence par défaut — la pièce globale n'appartient à aucune agence.</param>
+    ''' <param name="progression">
+    ''' Rend compte de l'avancement, onglet par onglet. Nothing pour ne rien annoncer : ce
+    ''' service reste appelable sans interface.
+    ''' </param>
     ''' <returns>Le chemin écrit.</returns>
     Public Shared Function Ecrire(dtGlobale As DataTable,
                                   listeCalculs As IEnumerable(Of CalculWU),
@@ -198,7 +202,8 @@ Public NotInheritable Class PieceExcelWU
                                   cheminFichier As String,
                                   Optional nomPremiereFeuille As String = "PIECE GLOBALE",
                                   Optional intitulePremiereFeuille As String = "",
-                                  Optional agencePremiereFeuille As String = "") As String
+                                  Optional agencePremiereFeuille As String = "",
+                                  Optional progression As ProgressionWU = Nothing) As String
 
         If dtGlobale Is Nothing OrElse dtGlobale.Rows.Count = 0 Then
             Throw New InvalidOperationException(
@@ -209,10 +214,22 @@ Public NotInheritable Class PieceExcelWU
             Throw New ArgumentException("Chemin de fichier non renseigné.", NameOf(cheminFichier))
         End If
 
+        ' Les points de vente sont dénombrés AVANT d'ouvrir Excel : la barre doit connaître son
+        ' total dès la première étape, sinon elle repart en arrière quand il se précise.
+        Dim aDetailler As List(Of CalculWU) = PointsDeVenteADetailler(listeCalculs)
+
+        ' Quatre étapes fixes — ouverture d'Excel, pièce globale, enregistrement, affichage —
+        ' plus un onglet par point de vente. Le total doit être JUSTE : une barre qui s'arrête
+        ' à quatre-vingt-dix pour cent laisse croire à un blocage, et une qui sature avant la
+        ' fin laisse croire que c'est fini.
+        If progression IsNot Nothing Then progression.Commencer(4 + aDetailler.Count)
+
         Dim excelApp As Object = Nothing
         Dim classeur As Object = Nothing
 
         Try
+            Annoncer(progression, "Ouverture de Microsoft Excel…")
+
             Dim typeExcel As Type = Type.GetTypeFromProgID("Excel.Application")
             If typeExcel Is Nothing Then
                 Throw New InvalidOperationException("Microsoft Excel n'est pas installé sur ce poste.")
@@ -234,15 +251,20 @@ Public NotInheritable Class PieceExcelWU
             ' qui ne change pas pendant l'export.
             Dim agences As Dictionary(Of String, String) = ChargerLesAgences()
 
+            Annoncer(progression, $"Pièce globale — journée du {dateActivite:dd/MM/yyyy}")
+
             EcrireLaPremiereFeuille(classeur, dtGlobale, dateActivite,
                                     nomPremiereFeuille, intitulePremiereFeuille,
                                     agencePremiereFeuille)
-            EcrireLesPiecesIndividuelles(classeur, listeCalculs, dateActivite, agences)
+            EcrireLesPiecesIndividuelles(classeur, aDetailler, dateActivite, agences, progression)
 
             ' La première feuille est celle qu'on veut voir en ouvrant le classeur.
             classeur.Worksheets(1).Activate()
 
+            Annoncer(progression, "Enregistrement du classeur…")
             classeur.SaveAs(cheminFichier)
+
+            Annoncer(progression, "Ouverture du classeur à l'écran…")
 
             excelApp.ScreenUpdating = True
             excelApp.Visible = True
@@ -326,11 +348,12 @@ Public NotInheritable Class PieceExcelWU
     ''' produit les deux, donc les mêmes écritures, aux mêmes comptes, par construction.
     ''' </summary>
     Private Shared Sub EcrireLesPiecesIndividuelles(classeur As Object,
-                                                    listeCalculs As IEnumerable(Of CalculWU),
+                                                    aDetailler As List(Of CalculWU),
                                                     dateActivite As Date,
-                                                    agences As Dictionary(Of String, String))
+                                                    agences As Dictionary(Of String, String),
+                                                    progression As ProgressionWU)
 
-        If listeCalculs Is Nothing Then Return
+        If aDetailler Is Nothing Then Return
 
         ' Les onglets déjà posés, pour ne pas en produire deux du même nom — Excel refuse
         ' alors d'écrire le classeur entier, après vingt feuilles déjà remplies.
@@ -341,13 +364,15 @@ Public NotInheritable Class PieceExcelWU
         Next
         Dim numero As Integer = 1
 
-        For Each calc As CalculWU In listeCalculs
+        For Each calc As CalculWU In aDetailler
 
-            ' Un Account non comptabilisé n'a pas de pièce — il n'a pas d'écriture non plus.
-            ' Lui donner un onglet vide laisserait croire à une pièce à zéro.
-            If calc Is Nothing OrElse Not calc.EstComptabilisable Then Continue For
+            Annoncer(progression, $"{calc.Account} — {calc.Designation}")
 
             Dim dtPdv As DataTable = PieceComptableService.GenererPieceComptable(New CalculWU() {calc})
+
+            ' Un point de vente dont tous les montants s'arrondissent à zéro ne produit aucune
+            ' écriture. Son étape a déjà été annoncée : la barre avance quand même, sans quoi
+            ' elle n'atteindrait jamais son total.
             If dtPdv Is Nothing OrElse dtPdv.Rows.Count = 0 Then Continue For
 
             numero += 1
@@ -756,6 +781,32 @@ Public NotInheritable Class PieceExcelWU
         Finally
             Marshal.ReleaseComObject(cellule)
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' Les points de vente qui auront leur onglet, dénombrés une fois pour toutes.
+    ''' 
+    ''' Un Account non comptabilisé n'a pas de pièce — il n'a pas d'écriture non plus — et lui
+    ''' donner un onglet vide laisserait croire à une pièce à zéro.
+    ''' </summary>
+    Private Shared Function PointsDeVenteADetailler(listeCalculs As IEnumerable(Of CalculWU)) As List(Of CalculWU)
+
+        Dim retenus As New List(Of CalculWU)()
+
+        If listeCalculs Is Nothing Then Return retenus
+
+        For Each calc As CalculWU In listeCalculs
+            If calc IsNot Nothing AndAlso calc.EstComptabilisable Then retenus.Add(calc)
+        Next
+
+        Return retenus
+    End Function
+
+    ''' <summary>Annonce une étape, s'il y a quelqu'un pour l'entendre.</summary>
+    Private Shared Sub Annoncer(progression As ProgressionWU, libelle As String)
+
+        If progression Is Nothing Then Return
+        progression.Avancer(libelle)
     End Sub
 
     ''' <summary>Les lignes de la pièce dont la colonne indiquée porte un montant non nul.</summary>

@@ -298,12 +298,15 @@ Public Class FrmPieceComptable
         Dim chemin As String = DemanderLeChemin()
         If chemin.Length = 0 Then Return
 
+        Dim avancement As FrmProgression = Nothing
+
         Try
             Cursor = Cursors.WaitCursor
+            avancement = FrmProgression.Ouvrir(Me, "Export de la pièce comptable")
 
             PieceComptableService.ExporterEtOuvrirPieceExcel(
                 _dtPiece, CalculsAExporter(), DateActivite, chemin,
-                NomPremiereFeuille, IntitulePiece, AgencePiece)
+                NomPremiereFeuille, IntitulePiece, AgencePiece, avancement.Progression)
 
             _exportee = True
             _chemin = chemin
@@ -312,11 +315,17 @@ Public Class FrmPieceComptable
                                 NombreDeFeuilles()
 
         Catch ex As Exception
+            If avancement IsNot Nothing Then avancement.Fermer()
+            ' La fenêtre d'avancement se ferme AVANT le message : une boîte d'erreur derrière
+            ' une barre de progression est un classique désagréable.
+            If avancement IsNot Nothing Then avancement.Fermer()
+
             MessageBox.Show(
                 "Impossible d'exporter la pièce comptable : " & ex.Message & Environment.NewLine &
                 "La pièce reste consultable dans cette fenêtre.",
                 "Export Excel", MessageBoxButtons.OK, MessageBoxIcon.Warning)
         Finally
+            If avancement IsNot Nothing Then avancement.Fermer()
             Cursor = Cursors.Default
         End Try
     End Sub

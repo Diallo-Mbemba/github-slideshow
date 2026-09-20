@@ -137,7 +137,8 @@ Public NotInheritable Class ExcelExportService
                                        sousTitres As IEnumerable(Of SousTitreExcel),
                                        blocs As IEnumerable(Of BlocExcel),
                                        nomFeuille As String,
-                                       cheminFichier As String)
+                                       cheminFichier As String,
+                                       Optional progression As ProgressionWU = Nothing)
 
         Dim listeBlocs As List(Of BlocExcel) = BlocsExploitables(blocs)
 
@@ -145,11 +146,16 @@ Public NotInheritable Class ExcelExportService
             Throw New InvalidOperationException("Aucune donnée à exporter.")
         End If
 
+        ' Ouverture d'Excel, un état par bloc, mise en page, enregistrement.
+        If progression IsNot Nothing Then progression.Commencer(3 + listeBlocs.Count)
+
         Dim excelApp As Object = Nothing
         Dim classeur As Object = Nothing
         Dim feuille As Object = Nothing
 
         Try
+            Annoncer(progression, "Ouverture de Microsoft Excel…")
+
             Dim typeExcel As Type = Type.GetTypeFromProgID("Excel.Application")
             If typeExcel Is Nothing Then
                 Throw New InvalidOperationException(
@@ -165,8 +171,9 @@ Public NotInheritable Class ExcelExportService
             classeur = excelApp.Workbooks.Add()
             feuille = classeur.Worksheets(1)
 
-            RemplirFeuille(feuille, titre, sousTitres, listeBlocs, nomFeuille)
+            RemplirFeuille(feuille, titre, sousTitres, listeBlocs, nomFeuille, progression)
 
+            Annoncer(progression, "Enregistrement du classeur…")
             classeur.SaveAs(cheminFichier)
 
             ' Mise au premier plan : purement cosmétique, et protégée par un Try/Catch silencieux.
@@ -219,13 +226,17 @@ Public NotInheritable Class ExcelExportService
                                     blocs As IEnumerable(Of BlocExcel),
                                     nomFeuille As String,
                                     cheminFichier As String,
-                                    Optional ouvrirApres As Boolean = True)
+                                    Optional ouvrirApres As Boolean = True,
+                                    Optional progression As ProgressionWU = Nothing)
 
         Dim listeBlocs As List(Of BlocExcel) = BlocsExploitables(blocs)
 
         If listeBlocs.Count = 0 Then
             Throw New InvalidOperationException("Aucune donnée à exporter.")
         End If
+
+        ' Ouverture d'Excel, un état par bloc, mise en page, conversion en PDF.
+        If progression IsNot Nothing Then progression.Commencer(3 + listeBlocs.Count)
 
         Dim excelApp As Object = Nothing
         Dim classeur As Object = Nothing
@@ -240,6 +251,8 @@ Public NotInheritable Class ExcelExportService
                     "Excel sert ici à la mise en page ; le rapport reste consultable à l'écran.")
             End If
 
+            Annoncer(progression, "Ouverture de Microsoft Excel…")
+
             excelApp = Activator.CreateInstance(typeExcel)
 
             ' Classeur invisible : l'utilisateur ne doit jamais voir passer un tableur qu'il
@@ -250,7 +263,9 @@ Public NotInheritable Class ExcelExportService
             classeur = excelApp.Workbooks.Add()
             feuille = classeur.Worksheets(1)
 
-            RemplirFeuille(feuille, titre, sousTitres, listeBlocs, nomFeuille)
+            RemplirFeuille(feuille, titre, sousTitres, listeBlocs, nomFeuille, progression)
+
+            Annoncer(progression, "Conversion en PDF…")
 
             ' xlTypePDF = 0. Le classeur n'est pas enregistré : seul le PDF sort.
             classeur.ExportAsFixedFormat(XL_TYPE_PDF, cheminFichier)
@@ -314,7 +329,8 @@ Public NotInheritable Class ExcelExportService
                                          colonnesNumeriques As IEnumerable(Of String),
                                          nomFeuille As String,
                                          cheminFichier As String,
-                                         ouvrirApres As Boolean)
+                                         ouvrirApres As Boolean,
+                                         Optional progression As ProgressionWU = Nothing)
 
         If table Is Nothing OrElse table.Rows.Count = 0 Then
             Throw New InvalidOperationException("Aucune donnée à exporter.")
@@ -327,6 +343,9 @@ Public NotInheritable Class ExcelExportService
             Next
         End If
 
+        ' Ouverture d'Excel, écriture du tableau, enregistrement.
+        If progression IsNot Nothing Then progression.Commencer(3)
+
         Dim excelApp As Object = Nothing
         Dim classeur As Object = Nothing
         Dim feuille As Object = Nothing
@@ -338,6 +357,8 @@ Public NotInheritable Class ExcelExportService
                     "Microsoft Excel n'est pas installé sur ce poste : le fichier ne peut pas être produit.")
             End If
 
+            Annoncer(progression, "Ouverture de Microsoft Excel…")
+
             excelApp = Activator.CreateInstance(typeExcel)
             excelApp.Visible = False
             excelApp.DisplayAlerts = False
@@ -348,6 +369,8 @@ Public NotInheritable Class ExcelExportService
 
             Dim nbColonnes As Integer = table.Columns.Count
             Dim nbLignes As Integer = table.Rows.Count
+
+            Annoncer(progression, $"Écriture de {nbLignes:N0} ligne(s)…")
 
             ' Le format des colonnes est posé AVANT l'écriture : appliqué après, Excel aurait
             ' déjà converti les valeurs, et reformater n'aurait rien rendu.
@@ -384,6 +407,8 @@ Public NotInheritable Class ExcelExportService
             feuille.Range(feuille.Cells(1, 1), feuille.Cells(1, nbColonnes)).Font.Bold = True
             feuille.Columns.AutoFit()
             feuille.Range("A1").Select()
+
+            Annoncer(progression, "Enregistrement du classeur…")
 
             classeur.SaveAs(cheminFichier)
 
@@ -460,7 +485,8 @@ Public NotInheritable Class ExcelExportService
 
     Private Shared Sub RemplirFeuille(feuille As Object, titre As String,
                                       sousTitres As IEnumerable(Of SousTitreExcel),
-                                      blocs As List(Of BlocExcel), nomFeuille As String)
+                                      blocs As List(Of BlocExcel), nomFeuille As String,
+                                      Optional progression As ProgressionWU = Nothing)
 
         If Not String.IsNullOrWhiteSpace(nomFeuille) Then
             ' Excel limite le nom d'onglet à 31 caractères et en interdit certains.
@@ -483,9 +509,12 @@ Public NotInheritable Class ExcelExportService
         Dim filtrePose As Boolean = False
 
         For Each bloc As BlocExcel In blocs
+            Annoncer(progression, bloc.Titre)
             ligne = EcrireBloc(feuille, bloc, ligne, filtrePose)
             ligne += 1 ' ligne vide entre deux tableaux
         Next
+
+        Annoncer(progression, "Mise en page…")
 
         feuille.Columns.AutoFit()
         PreparerImpression(feuille, titre, hauteurBandeau)
@@ -701,6 +730,13 @@ Public NotInheritable Class ExcelExportService
     ''' Rend un nom d'onglet acceptable par Excel : 31 caractères au plus, sans les caractères
     ''' que le tableur interdit.
     ''' </summary>
+    ''' <summary>Annonce une étape, s'il y a quelqu'un pour l'entendre.</summary>
+    Private Shared Sub Annoncer(progression As ProgressionWU, libelle As String)
+
+        If progression Is Nothing Then Return
+        progression.Avancer(libelle)
+    End Sub
+
     Private Shared Function NettoyerNomFeuille(nom As String) As String
 
         Dim propre As String = nom.Trim()

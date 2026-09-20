@@ -431,10 +431,12 @@ Public NotInheritable Class PieceComptableService
                                                       cheminFichier As String,
                                                       Optional nomPremiereFeuille As String = "PIECE GLOBALE",
                                                       Optional intitulePremiereFeuille As String = "",
-                                                      Optional agencePremiereFeuille As String = "") As String
+                                                      Optional agencePremiereFeuille As String = "",
+                                                      Optional progression As ProgressionWU = Nothing) As String
 
         Return PieceExcelWU.Ecrire(dtPiece, listeCalculs, dateActivite, cheminFichier,
-                                   nomPremiereFeuille, intitulePremiereFeuille, agencePremiereFeuille)
+                                   nomPremiereFeuille, intitulePremiereFeuille, agencePremiereFeuille,
+                                   progression)
     End Function
 
     ''' <summary>

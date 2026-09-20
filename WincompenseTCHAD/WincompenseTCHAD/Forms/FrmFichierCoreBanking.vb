@@ -131,13 +131,17 @@ Public Class FrmFichierCoreBanking
         Dim chemin As String = DemanderLeChemin()
         If chemin.Length = 0 Then Return
 
+        Dim avancement As FrmProgression = Nothing
+
         Try
             Cursor = Cursors.WaitCursor
+            avancement = FrmProgression.Ouvrir(Me, "Production du fichier core banking")
 
             ' Seul AMOUNT est écrit en nombre : tout le reste est du texte, sans quoi Excel
             ' réinterpréterait les numéros de compte et les numéros de lot.
             ExcelExportService.ExporterTableBrute(_fichier, New String() {"AMOUNT"},
-                                                  "CoreBanking", chemin, ouvrirApres:=True)
+                                                  "CoreBanking", chemin, ouvrirApres:=True,
+                                                  progression:=avancement.Progression)
 
             _produit = True
             _chemin = chemin
@@ -147,9 +151,12 @@ Public Class FrmFichierCoreBanking
             lblEquilibre.Text = $"Fichier produit : {IO.Path.GetFileName(chemin)} — il s'ouvre dans Excel."
 
         Catch ex As Exception
+            If avancement IsNot Nothing Then avancement.Fermer()
+
             MessageBox.Show("Production du fichier impossible : " & ex.Message,
                             "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
         Finally
+            If avancement IsNot Nothing Then avancement.Fermer()
             Cursor = Cursors.Default
         End Try
     End Sub

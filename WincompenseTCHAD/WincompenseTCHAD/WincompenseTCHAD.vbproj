@@ -95,6 +95,7 @@
     <Compile Include="Services\PieceComptableService.vb" />
     <Compile Include="Services\PieceExcelWU.vb" />
     <Compile Include="Services\PieceRepository.vb" />
+    <Compile Include="Services\ProgressionWU.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
@@ -182,6 +183,12 @@
     <Compile Include="Forms\FrmRapportAgences.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Forms\FrmProgression.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmProgression.Designer.vb">
+      <DependentUpon>FrmProgression.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -260,6 +267,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmConnexion.resx">
       <DependentUpon>FrmConnexion.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmProgression.resx">
+      <DependentUpon>FrmProgression.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
       <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>

@@ -313,13 +313,25 @@ Public Class FrmCompensationWU
         btnGenererPiece.Enabled = False
         progressBarTraitement.Value = 0
 
+        ' C'est ici que l'attente est la plus longue de toute l'application : deux rapports à
+        ' décompresser et à lire, puis un aller-retour SQL Server par point de vente.
+        Dim avancement As FrmProgression = FrmProgression.Ouvrir(Me, "Lecture des rapports Western Union")
+
+        ' La barre de la barre d'état suit la MÊME source que la fenêtre : deux indicateurs qui
+        ' se contrediraient seraient pires qu'un seul.
+        AddHandler avancement.Progression.AvancementChange, AddressOf SuivreDansLaBarreDEtat
+        avancement.Progression.Commencer(8)
+
         Try
             tsslStatut.Text = "Lecture des rapports en cours..."
-            Application.DoEvents()
 
+            avancement.Progression.Avancer("Lecture du rapport d'activité…")
             Dim dtActivite As DataTable = WUReportService.LireRapportWU(_cheminActivite)
+
+            avancement.Progression.Avancer("Lecture du rapport de règlement…")
             Dim dtReglement As DataTable = WUReportService.LireRapportWU(_cheminReglement)
-            progressBarTraitement.Value = 15
+
+            avancement.Progression.Avancer("Contrôle des fichiers chargés…")
 
             ' Contrôle de sécurité : chaque fichier est-il bien le rapport qu'il prétend être ?
             ' Fondé sur les colonnes réellement présentes, ce contrôle démasque un fichier
@@ -330,7 +342,8 @@ Public Class FrmCompensationWU
             ' Vérification structurelle avant tout calcul (section 15).
             WUReportService.VerifierColonnesRapport(dtActivite, ConstantesWU.ColonnesRapportActivite, "activité")
             WUReportService.VerifierColonnesRapport(dtReglement, ConstantesWU.ColonnesRapportReglement, "règlement")
-            progressBarTraitement.Value = 30
+
+            avancement.Progression.Avancer("Extraction du détail des transactions…")
 
             ' Date de la journée traitée, retenue pour l'historisation.
             _dateActivite = WUReportService.ObtenirDateActivite(dtActivite)
@@ -340,6 +353,8 @@ Public Class FrmCompensationWU
                                WUReportService.ExtraireTransactions(dtActivite, _dateActivite.Value),
                                New List(Of TransactionWU))
 
+            avancement.Progression.Avancer("Contrôle de cohérence des dates…")
+
             ' Validation de la cohérence des dates entre les deux rapports (section 16).
             Dim messageDate As String = String.Empty
             If Not WUReportService.ValiderCoherenceDates(dtActivite, dtReglement, messageDate) Then
@@ -347,19 +362,20 @@ Public Class FrmCompensationWU
                 tsslStatut.Text = "Traitement bloqué : incohérence de date entre les deux rapports."
                 Return
             End If
-            progressBarTraitement.Value = 45
+
+            avancement.Progression.Avancer("Agrégation par Account…")
 
             ' Agrégation des deux rapports par Account.
             Dim aggActivite As Dictionary(Of String, ActiviteAgregat) = WUReportService.CalculerActivite(dtActivite)
             Dim aggReglement As Dictionary(Of String, ReglementAgregat) = WUReportService.CalculerReglement(dtReglement)
-            progressBarTraitement.Value = 60
 
             tsslStatut.Text = "Récupération des paramètres SQL Server..."
-            Application.DoEvents()
+            avancement.Progression.Avancer("Lecture du paramétrage sur SQL Server…")
 
             ' Récupération des paramètres SQL Server + application des formules métier.
             _listeCalculs = ConstruireCalculsParAccount(aggActivite, aggReglement)
-            progressBarTraitement.Value = 85
+
+            avancement.Progression.Avancer("Construction de la grille de contrôle…")
 
             ' Construction et affichage de la grille de contrôle.
             Dim dtControle As DataTable = PieceComptableService.CreerTableControle(_listeCalculs)
@@ -376,7 +392,13 @@ Public Class FrmCompensationWU
 
             btnGenererPiece.Enabled = _listeCalculs.Count > 0
             btnPieceAccount.Enabled = _listeCalculs.Count > 0
-            progressBarTraitement.Value = 100
+
+            avancement.Progression.Terminer()
+
+            ' Les messages qui suivent — base inaccessible, Accounts non paramétrés — sont des
+            ' boîtes de dialogue : la fenêtre d'avancement leur cède la place plutôt que de
+            ' laisser croire que le travail continue derrière.
+            avancement.Fermer()
 
             ' La base est facultative pour calculer, mais indispensable pour identifier les points
             ' de vente : sans elle, tous les Accounts restent INCONNU et la pièce comptable ne peut
@@ -401,18 +423,36 @@ Public Class FrmCompensationWU
             AlerterSurLesAccountsNonParametres()
 
         Catch ex As RapportInvalideException
+            avancement.Fermer()
             MessageBox.Show(ex.Message, "Anomalie de rapport", MessageBoxButtons.OK, MessageBoxIcon.Error)
             tsslStatut.Text = "Erreur : " & ex.Message
 
         Catch ex As Exception
+            avancement.Fermer()
             MessageBox.Show("Erreur inattendue lors du calcul : " & ex.Message, "Erreur",
                              MessageBoxButtons.OK, MessageBoxIcon.Error)
             tsslStatut.Text = "Erreur inattendue lors du calcul."
 
         Finally
+            RemoveHandler avancement.Progression.AvancementChange, AddressOf SuivreDansLaBarreDEtat
+            avancement.Fermer()
             Cursor = Cursors.Default
             btnAfficher.Enabled = True
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' Reporte l'avancement sur la barre de la barre d'état.
+    '''
+    ''' Elle ne fait pas double emploi avec la fenêtre : celle-ci disparaît une fois le travail
+    ''' fini, la barre d'état reste et garde la trace que quelque chose a bien été fait.
+    ''' </summary>
+    Private Sub SuivreDansLaBarreDEtat(rang As Integer, total As Integer)
+
+        If total <= 0 Then Return
+
+        progressBarTraitement.Maximum = total
+        progressBarTraitement.Value = Math.Min(Math.Max(rang, 0), total)
     End Sub
 
     ''' <summary>

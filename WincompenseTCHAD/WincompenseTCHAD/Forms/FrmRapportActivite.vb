@@ -688,8 +688,12 @@ Public Class FrmRapportActivite
         sfdExport.FileName = NomFichierPropose()
         If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
 
+        Dim avancement As FrmProgression = Nothing
+
         Cursor = Cursors.WaitCursor
         Try
+            avancement = FrmProgression.Ouvrir(Me, "Export du rapport en PDF")
+
             ' La période est toujours mise en exergue ; le groupe l'est aussi lorsqu'il en
             ' restreint le périmètre — c'est ce qui caractérise l'extraction.
             Dim sousTitres As New List(Of SousTitreExcel) From {
@@ -708,26 +712,35 @@ Public Class FrmRapportActivite
                 sousTitres,
                 ConstruireBlocs(inclureDetail),
                 "Rapport activité",
-                sfdExport.FileName)
+                sfdExport.FileName,
+                progression:=avancement.Progression)
 
             lblStatut.Text = $"Rapport exporté vers {sfdExport.FileName}."
 
         Catch ex As InvalidOperationException
+            If avancement IsNot Nothing Then avancement.Fermer()
+            ' La fenêtre d'avancement se ferme AVANT le message : une boîte d'erreur derrière
+            ' une barre de progression est un classique désagréable.
+            If avancement IsNot Nothing Then avancement.Fermer()
+
             ' Excel absent, ou refus d'Excel de produire le PDF : message déjà explicite.
             MessageBox.Show(ex.Message, "Export PDF impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Catch ex As IO.IOException
+            If avancement IsNot Nothing Then avancement.Fermer()
             MessageBox.Show(
                 $"Écriture du fichier impossible : {ex.Message}" & Environment.NewLine & Environment.NewLine &
                 "Le document est peut-être déjà ouvert dans un lecteur PDF.",
                 "Export PDF impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Catch ex As UnauthorizedAccessException
+            If avancement IsNot Nothing Then avancement.Fermer()
             MessageBox.Show(
                 $"Accès refusé au fichier : {ex.Message}",
                 "Export PDF impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Finally
+            If avancement IsNot Nothing Then avancement.Fermer()
             Cursor = Cursors.Default
         End Try
     End Sub

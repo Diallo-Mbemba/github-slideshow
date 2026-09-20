@@ -329,8 +329,12 @@ Public Class FrmSousAgentsParGroupe
         sfdExport.FileName = NomFichierPropose(groupeChoisi, tous)
         If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
 
+        Dim avancement As FrmProgression = Nothing
+
         Cursor = Cursors.WaitCursor
         Try
+            avancement = FrmProgression.Ouvrir(Me, "Export de la liste par groupe")
+
             ' Le récapitulatif se restreint au groupe retenu : l'état porte sur ce groupe, la
             ' liste des vingt autres n'y a pas sa place. En affichage « tous les groupes », il
             ' les reprend évidemment tous.
@@ -391,27 +395,33 @@ Public Class FrmSousAgentsParGroupe
                 sousTitres,
                 New BlocExcel() {recapitulatif, detail},
                 "Sous-agents par groupe",
-                sfdExport.FileName)
+                sfdExport.FileName,
+                progression:=avancement.Progression)
 
             lblStatut.Text = $"Liste exportée vers {sfdExport.FileName}."
 
         Catch ex As InvalidOperationException
+            If avancement IsNot Nothing Then avancement.Fermer()
+
             ' Excel absent du poste, ou aucune donnée : message métier déjà explicite.
             MessageBox.Show(ex.Message, "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Catch ex As IO.IOException
+            If avancement IsNot Nothing Then avancement.Fermer()
             MessageBox.Show(
                 $"Écriture du fichier impossible : {ex.Message}" & Environment.NewLine & Environment.NewLine &
                 "Le classeur est peut-être déjà ouvert dans Excel.",
                 "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Catch ex As Runtime.InteropServices.COMException
+            If avancement IsNot Nothing Then avancement.Fermer()
             ' Excel a refusé une opération (classeur verrouillé, instance en cours d'arrêt...).
             MessageBox.Show(
                 $"Microsoft Excel a signalé une erreur : {ex.Message}",
                 "Export Excel impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Finally
+            If avancement IsNot Nothing Then avancement.Fermer()
             Cursor = Cursors.Default
         End Try
     End Sub

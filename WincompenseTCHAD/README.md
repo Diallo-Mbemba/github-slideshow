@@ -1649,6 +1649,78 @@ arrondis à l'unité pratiqués par Western Union. **Aucune modification des for
 justifiée** : les remplacer par les valeurs fournies modifierait les règles du cahier des
 charges pour un gain nul.
 
+## Barre de progression des exports
+
+Un export Excel ne dit rien pendant qu'il travaille. Sur une journée chargée, écrire la pièce
+comptable d'une trentaine de points de vente prend une bonne dizaine de secondes pendant
+lesquelles la fenêtre ne se repeint plus : l'utilisateur ne sait pas si l'application calcule ou
+si elle est bloquée, et il reclique. **Tous les processus d'exportation affichent désormais une
+fenêtre de progression flottante** qui nomme l'étape en cours.
+
+### Le contrat : `Services\ProgressionWU.vb`
+
+Le compteur d'avancement ne connaît pas l'interface graphique. Il expose deux évènements et
+quatre méthodes, rien d'autre :
+
+| Membre | Rôle |
+|---|---|
+| `Commencer(total)` | Annonce le nombre d'étapes prévues. `total <= 0` = avancement inconnu |
+| `Etape(libelle)` | Change le texte affiché sans faire avancer la barre |
+| `Avancer(libelle)` | `Etape` puis `Avancer` — le cas courant |
+| `Avancer()` | Avance d'un cran, sans jamais dépasser `Total` |
+| `Terminer()` | Porte la barre à son maximum |
+| `EtapeChangee` / `AvancementChange` | Les deux évènements auxquels une fenêtre s'abonne |
+
+Les services d'export (`PieceExcelWU`, `PieceComptableService`, `ExcelExportService`) reçoivent
+ce compteur en paramètre **optionnel** :
+
+```vb
+Public Shared Sub Ecrire(..., Optional progression As ProgressionWU = Nothing)
+```
+
+`Nothing` est un cas normal, pas une erreur : appelé sans progression, un service exporte
+exactement comme avant. Aucun service n'a de dépendance vers `System.Windows.Forms` du fait de
+cette fonctionnalité, et les tests d'export restent possibles sans écran.
+
+### La fenêtre : `Forms\FrmProgression.vb`
+
+`FrmProgression.Ouvrir(proprietaire, titre)` construit la fenêtre, s'abonne au compteur et
+l'affiche **immédiatement**. Pas de temporisation « n'afficher qu'au bout d'une seconde » : le
+seul cas qui justifie la fenêtre est précisément celui d'une étape longue et unique, que
+l'affichage différé manquerait.
+
+Elle n'a ni bouton, ni `ControlBox`, ni menu système. **Il n'y a pas de bouton Annuler**, et
+c'est un choix technique et non un oubli : Excel Interop est un composant **STA**, qui ne
+supporte pas d'être piloté depuis un thread d'arrière-plan. L'export s'exécute donc sur le thread
+de l'interface, et le seul point où la fenêtre peut se repeindre est l'intérieur de la boucle
+d'export. Un bouton Annuler ne recevrait jamais son clic. Le repeint se fait par
+`Control.Refresh()` et **non** par `Application.DoEvents()`, qui rouvrirait la file de messages
+et permettrait à l'utilisateur de relancer l'export pendant qu'il tourne.
+
+`Fermer()` est idempotent : elle est appelée en première instruction de chaque `Catch` — pour que
+la fenêtre disparaisse **avant** le `MessageBox` d'erreur, et non derrière lui — puis de nouveau
+dans le `Finally`.
+
+### Ce que chaque export annonce
+
+| Opération | Étapes fixes | Étapes variables |
+|---|---|---|
+| Export de la pièce comptable | 4 | 1 par point de vente détaillé |
+| Export Excel par blocs | 3 | 1 par bloc écrit |
+| Export PDF | 3 | 1 par feuille |
+| Fichier core banking | 3 | — |
+| Lecture des rapports Western Union | 8 | — |
+
+Le budget d'étapes est vérifié : si une opération promet huit étapes et n'en annonce que six, la
+barre s'arrête aux trois quarts et ment à l'utilisateur. Un script de simulation rejoue les
+annonces de chaque opération, helpers compris, et contrôle que chaque barre atteint bien son
+total.
+
+La lecture des rapports Western Union (`FrmCompensationWU`) suivait jusqu'ici des pourcentages
+écrits en dur dans la barre de la barre d'état, entrecoupés d'appels à `Application.DoEvents()`.
+Les deux ont disparu : la barre d'état s'abonne maintenant à `AvancementChange`, donc à la même
+source que la fenêtre flottante, et les deux affichages ne peuvent plus diverger.
+
 ## Règles tranchées par la banque
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
