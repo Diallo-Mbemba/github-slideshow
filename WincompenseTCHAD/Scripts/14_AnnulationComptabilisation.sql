@@ -144,6 +144,13 @@ BEGIN
         TTAReception        DECIMAL(18, 2)  NOT NULL DEFAULT (0),
         TaxeEnvoi           DECIMAL(18, 2)  NOT NULL DEFAULT (0),
 
+        -- Part revenant a la banque, recopiee telle qu'elle etait dans l'historique.
+        -- Une archive qui perd une partie de ce qu'elle archive ne prouve plus grand-chose.
+        CommissionEnvoiBanque     DECIMAL(18, 2) NULL,
+        CommissionPaiementBanque  DECIMAL(18, 2) NULL,
+        CommissionTransfertBanque DECIMAL(18, 2) NULL,
+        TauxSA                    DECIMAL(4, 2)  NULL,
+
         DateEnregistrement      DATETIME    NULL,
         ComptabilisePar         NVARCHAR(50) NULL,
         DateComptabilisation    DATETIME    NULL

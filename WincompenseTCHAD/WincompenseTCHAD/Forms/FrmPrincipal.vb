@@ -127,6 +127,17 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmPiecesArchivees)()
     End Sub
 
+    ''' <summary>
+    ''' Ce que la banque a réellement encaissé sur les commissions.
+    '''
+    ''' Une fenêtre à part, et non un onglet des rapports d'activité : ceux-ci sont filtrés
+    ''' par population — une fenêtre pour les sous-agents, une autre pour les agences — et
+    ''' un total des deux n'aurait sa place dans ni l'une ni l'autre.
+    ''' </summary>
+    Private Sub mnuCommissionsBanque_Click(sender As Object, e As EventArgs) Handles mnuCommissionsBanque.Click
+        AfficherEnfant(Of FrmCommissionsBanque)()
+    End Sub
+
     Private Sub mnuSousAgents_Click(sender As Object, e As EventArgs) Handles mnuSousAgents.Click
         AfficherEnfant(Of FrmSousAgents)()
     End Sub
@@ -291,6 +302,7 @@ Public Class FrmPrincipal
         mnuRapport.Available = rapports
         mnuRapportAgences.Available = rapports
         mnuPiecesArchivees.Available = rapports
+        mnuCommissionsBanque.Available = rapports
         SEP1.Available = traite AndAlso rapports
         mnuCompensation.Available = traite OrElse rapports
 

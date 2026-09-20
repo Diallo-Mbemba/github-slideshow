@@ -349,6 +349,14 @@ Public NotInheritable Class AnnulationRepository
         End Using
     End Function
 
+    ''' <summary>
+    ''' Déplace l'historique de la journée.
+    '''
+    ''' Les quatre colonnes de répartition sont récentes : elles ne sont nommées que si
+    ''' les DEUX tables les portent. Les nommer sur une base où le script 16 n'a pas été
+    ''' joué ferait échouer l'annulation entière, et une journée resterait en place faute
+    ''' d'une colonne qu'elle n'a jamais eue.
+    ''' </summary>
     Private Shared Sub DeplacerHistorique(idAnnulation As Long, jour As Date,
                                           connexion As SqlConnection, transaction As SqlTransaction)
 
@@ -360,7 +368,17 @@ Public NotInheritable Class AnnulationRepository
             "TVA, TTAEnvoi, TTAReception, TaxeEnvoi, " &
             "DateEnregistrement, ComptabilisePar, DateComptabilisation"
 
-        Deplacer(HISTORIQUE, HISTORIQUE_ARCHIVE, colonnes, idAnnulation, jour, connexion, transaction)
+        Const colonnesBanque As String =
+            ", CommissionEnvoiBanque, CommissionPaiementBanque, " &
+            "CommissionTransfertBanque, TauxSA"
+
+        Dim repartition As Boolean =
+            WURepository.ColonneExiste(connexion, transaction, HISTORIQUE, "CommissionEnvoiBanque") AndAlso
+            WURepository.ColonneExiste(connexion, transaction, HISTORIQUE_ARCHIVE, "CommissionEnvoiBanque")
+
+        Deplacer(HISTORIQUE, HISTORIQUE_ARCHIVE,
+                 colonnes & If(repartition, colonnesBanque, String.Empty),
+                 idAnnulation, jour, connexion, transaction)
     End Sub
 
     Private Shared Sub DeplacerTransactions(idAnnulation As Long, jour As Date,

@@ -571,6 +571,180 @@ Public NotInheritable Class RapportActiviteService
     ''' La variation suit la même règle que pour les commissions : laissée vide pour la première
     ''' journée et lorsque la veille est à zéro — une variation depuis zéro n'a pas de sens.
     ''' </summary>
+#Region "Ce que la banque a gardé"
+
+    ''' <summary>Libellé de la population, tel qu'il apparaît en colonne.</summary>
+    Public Const POPULATION_SOUS_AGENTS As String = "Sous-agents"
+    Public Const POPULATION_AGENCES As String = "Agences propres"
+
+    ''' <summary>
+    ''' Répartition de la commission encaissée par la banque, par nature et par population.
+    '''
+    ''' La banque tire sa commission de deux sources qui n'obéissent pas à la même règle :
+    ''' sur un sous-agent elle garde ce qui n'est pas rétrocédé, sur une agence propre elle
+    ''' garde tout. Le total des deux est ce qu'elle a réellement encaissé — le chiffre que
+    ''' l'onglet « Évolution des commissions » ne donne PAS, puisqu'il montre la commission
+    ''' générée par l'activité, rétrocession comprise.
+    '''
+    ''' La dernière colonne rappelle ce qui est parti aux sous-agents : ce n'est pas un
+    ''' produit de la banque, mais l'afficher permet de vérifier d'un coup d'œil que les
+    ''' deux parts font bien la commission totale.
+    ''' </summary>
+    Public Shared Function ConstruireCommissionsBanque(lignes As List(Of LigneHistoriqueWU)) As DataTable
+
+        Dim table As New DataTable("CommissionsBanque")
+        table.Columns.Add("Nature", GetType(String))
+        table.Columns.Add("SousAgents", GetType(Decimal))
+        table.Columns.Add("AgencesPropres", GetType(Decimal))
+        table.Columns.Add("TotalBanque", GetType(Decimal))
+        table.Columns.Add("Retrocede", GetType(Decimal))
+        table.Columns.Add("CommissionTotale", GetType(Decimal))
+
+        Dim sousAgents As LigneHistoriqueWU = CumulerPopulation(lignes, True)
+        Dim agences As LigneHistoriqueWU = CumulerPopulation(lignes, False)
+
+        AjouterNature(table, "Commission sur envoi",
+                      sousAgents.CommissionEnvoiBanque, agences.CommissionEnvoiBanque,
+                      sousAgents.CommissionEnvoi + agences.CommissionEnvoi)
+
+        AjouterNature(table, "Commission sur paiement",
+                      sousAgents.CommissionPaiementBanque, agences.CommissionPaiementBanque,
+                      sousAgents.CommissionPaiement + agences.CommissionPaiement)
+
+        AjouterNature(table, "Commission sur transfert",
+                      sousAgents.CommissionTransfertBanque, agences.CommissionTransfertBanque,
+                      sousAgents.CommissionTransfert + agences.CommissionTransfert)
+
+        AjouterNature(table, "TOTAL",
+                      sousAgents.TotalPartBanque, agences.TotalPartBanque,
+                      sousAgents.TotalCommissions + agences.TotalCommissions)
+
+        Return table
+    End Function
+
+    Private Shared Sub AjouterNature(table As DataTable, nature As String,
+                                     partSousAgents As Decimal, partAgences As Decimal,
+                                     commissionTotale As Decimal)
+
+        Dim totalBanque As Decimal = partSousAgents + partAgences
+
+        table.Rows.Add(nature, partSousAgents, partAgences, totalBanque,
+                       commissionTotale - totalBanque, commissionTotale)
+    End Sub
+
+    ''' <summary>
+    ''' Cumule les lignes d'une population. Un sous-agent est reconnu à son type, conservé
+    ''' tel qu'il était le jour de la comptabilisation : un point de vente qui aurait changé
+    ''' de nature depuis ne réécrit pas le passé.
+    ''' </summary>
+    Private Shared Function CumulerPopulation(lignes As List(Of LigneHistoriqueWU),
+                                              sousAgents As Boolean) As LigneHistoriqueWU
+
+        Dim cumul As New LigneHistoriqueWU()
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            If ligne.EstSousAgent <> sousAgents Then Continue For
+            cumul.Cumuler(ligne)
+        Next
+
+        Return cumul
+    End Function
+
+    ''' <summary>
+    ''' Ce que la banque a gardé, jour par jour.
+    '''
+    ''' La colonne « Documentée » ne décore pas : une journée comptabilisée avant que la
+    ''' répartition ne soit conservée porte un zéro côté sous-agents qui n'est pas un
+    ''' chiffre mais une absence. L'écran doit pouvoir le dire.
+    ''' </summary>
+    Public Shared Function ConstruireCommissionsBanqueParJour(lignes As List(Of LigneHistoriqueWU)) As DataTable
+
+        Dim table As New DataTable("CommissionsBanqueParJour")
+        table.Columns.Add("Date", GetType(String))
+        table.Columns.Add("SousAgents", GetType(Decimal))
+        table.Columns.Add("AgencesPropres", GetType(Decimal))
+        table.Columns.Add("TotalBanque", GetType(Decimal))
+        table.Columns.Add("Retrocede", GetType(Decimal))
+        table.Columns.Add("CommissionTotale", GetType(Decimal))
+        table.Columns.Add("Documentee", GetType(String))
+
+        Dim parJour As New SortedDictionary(Of Date, LigneHistoriqueWU)()
+        Dim parJourSA As New SortedDictionary(Of Date, LigneHistoriqueWU)()
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+
+            If Not parJour.ContainsKey(ligne.DateActivite) Then
+                parJour(ligne.DateActivite) = New LigneHistoriqueWU()
+                parJourSA(ligne.DateActivite) = New LigneHistoriqueWU()
+            End If
+
+            parJour(ligne.DateActivite).Cumuler(ligne)
+            If ligne.EstSousAgent Then parJourSA(ligne.DateActivite).Cumuler(ligne)
+        Next
+
+        For Each jour As Date In parJour.Keys
+
+            Dim total As LigneHistoriqueWU = parJour(jour)
+            Dim sousAgents As LigneHistoriqueWU = parJourSA(jour)
+
+            table.Rows.Add(jour.ToString("dd/MM/yyyy", Globalization.CultureInfo.InvariantCulture),
+                           sousAgents.TotalPartBanque,
+                           total.TotalPartBanque - sousAgents.TotalPartBanque,
+                           total.TotalPartBanque,
+                           total.TotalPartSousAgent,
+                           total.TotalCommissions,
+                           If(total.RepartitionConnue, "oui", "NON"))
+        Next
+
+        Return table
+    End Function
+
+    ''' <summary>
+    ''' La première journée dont la répartition est connue, ou Nothing s'il n'y en a aucune.
+    ''' Sert à écrire « la répartition commence au … » plutôt qu'à laisser croire à un zéro.
+    ''' </summary>
+    Public Shared Function PremierJourDocumente(lignes As List(Of LigneHistoriqueWU)) As Date?
+
+        Dim premier As Date? = Nothing
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            If Not ligne.RepartitionConnue Then Continue For
+            If Not premier.HasValue OrElse ligne.DateActivite < premier.Value Then
+                premier = ligne.DateActivite
+            End If
+        Next
+
+        Return premier
+    End Function
+
+    ''' <summary>Les journées dont la répartition n'est pas connue, les plus anciennes d'abord.</summary>
+    Public Shared Function JourneesNonDocumentees(lignes As List(Of LigneHistoriqueWU)) As List(Of Date)
+
+        Dim journees As New List(Of Date)()
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            If ligne.RepartitionConnue Then Continue For
+            If Not journees.Contains(ligne.DateActivite) Then journees.Add(ligne.DateActivite)
+        Next
+
+        journees.Sort()
+        Return journees
+    End Function
+
+    ''' <summary>Ce que la banque a gardé sur toute la période.</summary>
+    Public Shared Function TotalPartBanque(lignes As List(Of LigneHistoriqueWU)) As Decimal
+
+        Dim total As Decimal = 0D
+
+        For Each ligne As LigneHistoriqueWU In SansNothing(lignes)
+            total += ligne.TotalPartBanque
+        Next
+
+        Return total
+    End Function
+
+#End Region
+
     Public Shared Function ConstruireEvolutionTaxes(lignes As List(Of LigneHistoriqueWU)) As DataTable
 
         Dim table As New DataTable("EvolutionTaxes")

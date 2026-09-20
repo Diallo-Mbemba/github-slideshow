@@ -168,20 +168,20 @@ Public NotInheritable Class HistoriqueRepository
 
         Const suppression As String = "DELETE FROM " & TABLE_HISTORIQUE & " WHERE DateActivite = @jour"
 
-        Const insertion As String =
-            "INSERT INTO " & TABLE_HISTORIQUE & " (DateActivite, Account, Designation, " &
-            "GroupeStatistique, TypePdv, NombreEnvois, NombrePaiements, NombreAnnulations, " &
-            "PrincipalEnvoi, ChargeEnvoi, Taxes, PrincipalPaye, " &
-            "CommissionEnvoi, CommissionPaiement, CommissionTransfert, " &
-            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi, DateComptabilisation, ComptabilisePar) " &
-            "VALUES (@jour, @account, @designation, @groupe, @type, @nbEnvois, @nbPaiements, " &
-            "@nbAnnulations, @principalEnvoi, @chargeEnvoi, @taxes, @principalPaye, " &
-            "@comEnvoi, @comPaiement, @comTransfert, @tva, @ttaEnvoi, @ttaReception, @taxeEnvoi, " &
-            "GETDATE(), @auteur)"
-
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
+
+                ' Les quatre colonnes de répartition sont récentes. Sur une base où le script
+                ' 16 n'a pas encore été joué, la comptabilisation du jour doit continuer de
+                ' passer : c'est l'opération quotidienne, elle ne s'arrête pas pour une
+                ' information complémentaire. L'état des commissions dira alors qu'il ne sait
+                ' pas répartir cette journée.
+                Dim repartition As Boolean = RepartitionPresente(connexion)
+                ' La variable ne s'appelle pas « insertion » : elle masquerait la fonction
+                ' Insertion() appelée sur cette ligne même, et Visual Basic ne distingue pas
+                ' la casse.
+                Dim ordreInsertion As String = Insertion(repartition)
 
                 Using transaction As SqlTransaction = connexion.BeginTransaction()
                     Try
@@ -197,8 +197,8 @@ Public NotInheritable Class HistoriqueRepository
 
                             Dim ligne As LigneHistoriqueWU = LigneHistoriqueWU.DepuisCalcul(calc, jour)
 
-                            Using commande As New SqlCommand(insertion, connexion, transaction)
-                                AjouterParametres(commande, ligne)
+                            Using commande As New SqlCommand(ordreInsertion, connexion, transaction)
+                                AjouterParametres(commande, ligne, repartition)
                                 commande.ExecuteNonQuery()
                             End Using
 
@@ -255,7 +255,42 @@ Public NotInheritable Class HistoriqueRepository
         Return True
     End Function
 
-    Private Shared Sub AjouterParametres(commande As SqlCommand, ligne As LigneHistoriqueWU)
+    ''' <summary>
+    ''' L'ordre d'insertion, avec ou sans les colonnes de répartition. Une seule liste de
+    ''' colonnes communes : deux listes à tenir identiques ne le restent pas.
+    ''' </summary>
+    Private Shared Function Insertion(avecRepartition As Boolean) As String
+
+        Const colonnes As String =
+            "DateActivite, Account, Designation, GroupeStatistique, TypePdv, " &
+            "NombreEnvois, NombrePaiements, NombreAnnulations, " &
+            "PrincipalEnvoi, ChargeEnvoi, Taxes, PrincipalPaye, " &
+            "CommissionEnvoi, CommissionPaiement, CommissionTransfert, " &
+            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi"
+
+        Const valeurs As String =
+            "@jour, @account, @designation, @groupe, @type, " &
+            "@nbEnvois, @nbPaiements, @nbAnnulations, " &
+            "@principalEnvoi, @chargeEnvoi, @taxes, @principalPaye, " &
+            "@comEnvoi, @comPaiement, @comTransfert, " &
+            "@tva, @ttaEnvoi, @ttaReception, @taxeEnvoi"
+
+        Const colonnesBanque As String =
+            ", CommissionEnvoiBanque, CommissionPaiementBanque, " &
+            "CommissionTransfertBanque, TauxSA"
+
+        Const valeursBanque As String =
+            ", @comEnvoiBanque, @comPaiementBanque, @comTransfertBanque, @tauxSA"
+
+        Return "INSERT INTO " & TABLE_HISTORIQUE & " (" & colonnes &
+               If(avecRepartition, colonnesBanque, String.Empty) &
+               ", DateComptabilisation, ComptabilisePar) VALUES (" & valeurs &
+               If(avecRepartition, valeursBanque, String.Empty) &
+               ", GETDATE(), @auteur)"
+    End Function
+
+    Private Shared Sub AjouterParametres(commande As SqlCommand, ligne As LigneHistoriqueWU,
+                                         avecRepartition As Boolean)
 
         commande.Parameters.Add("@jour", SqlDbType.Date).Value = ligne.DateActivite
         commande.Parameters.Add("@account", SqlDbType.NVarChar, 255).Value = ligne.Account
@@ -278,6 +313,22 @@ Public NotInheritable Class HistoriqueRepository
         AjouterMontant(commande, "@ttaEnvoi", ligne.TTAEnvoi)
         AjouterMontant(commande, "@ttaReception", ligne.TTAReception)
         AjouterMontant(commande, "@taxeEnvoi", ligne.TaxeEnvoi)
+
+        If avecRepartition Then
+
+            ' Ce que la banque a gardé, tel qu'il vient d'être calculé. Écrit ici et non
+            ' recalculé plus tard : le taux du sous-agent change, et un état comptable ne se
+            ' recompose pas.
+            AjouterMontant(commande, "@comEnvoiBanque", ligne.CommissionEnvoiBanque)
+            AjouterMontant(commande, "@comPaiementBanque", ligne.CommissionPaiementBanque)
+            AjouterMontant(commande, "@comTransfertBanque", ligne.CommissionTransfertBanque)
+
+            ' DECIMAL(4,2), comme dans les tables de points de vente.
+            Dim parametreTaux As SqlParameter = commande.Parameters.Add("@tauxSA", SqlDbType.Decimal)
+            parametreTaux.Precision = 4
+            parametreTaux.Scale = 2
+            parametreTaux.Value = Decimal.Round(ligne.TauxSA, 2)
+        End If
 
         commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
     End Sub
@@ -447,19 +498,32 @@ Public NotInheritable Class HistoriqueRepository
         messageErreur = String.Empty
         Dim resultat As New List(Of LigneHistoriqueWU)
 
-        Const requete As String =
-            "SELECT DateActivite, Account, Designation, GroupeStatistique, TypePdv, " &
+        Const colonnesCommunes As String =
+            "DateActivite, Account, Designation, GroupeStatistique, TypePdv, " &
             "NombreEnvois, NombrePaiements, NombreAnnulations, " &
             "PrincipalEnvoi, ChargeEnvoi, Taxes, PrincipalPaye, " &
             "CommissionEnvoi, CommissionPaiement, CommissionTransfert, " &
-            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi " &
-            "FROM " & TABLE_HISTORIQUE & " " &
-            "WHERE DateActivite >= @debut AND DateActivite <= @fin " &
-            "ORDER BY DateActivite, Account"
+            "TVA, TTAEnvoi, TTAReception, TaxeEnvoi"
+
+        Const colonnesBanque As String =
+            ", CommissionEnvoiBanque, CommissionPaiementBanque, " &
+            "CommissionTransfertBanque, TauxSA"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
+
+                ' Les quatre colonnes de répartition sont récentes. Les nommer sur une base
+                ' où le script 16 n'a pas été joué ferait échouer TOUTE la lecture, donc tous
+                ' les rapports — pour une information qui n'en est qu'une parmi d'autres.
+                Dim repartition As Boolean = RepartitionPresente(connexion)
+
+                Dim requete As String =
+                    "SELECT " & colonnesCommunes &
+                    If(repartition, colonnesBanque, String.Empty) &
+                    " FROM " & TABLE_HISTORIQUE &
+                    " WHERE DateActivite >= @debut AND DateActivite <= @fin" &
+                    " ORDER BY DateActivite, Account"
 
                 Using commande As New SqlCommand(requete, connexion)
                     commande.Parameters.Add("@debut", SqlDbType.Date).Value = debut.Date
@@ -467,7 +531,8 @@ Public NotInheritable Class HistoriqueRepository
 
                     Using lecteur As SqlDataReader = commande.ExecuteReader()
                         While lecteur.Read()
-                            resultat.Add(New LigneHistoriqueWU() With {
+
+                            Dim ligne As New LigneHistoriqueWU() With {
                                 .DateActivite = Convert.ToDateTime(lecteur("DateActivite"), Globalization.CultureInfo.InvariantCulture),
                                 .Account = LireChaine(lecteur, "Account"),
                                 .Designation = LireChaine(lecteur, "Designation"),
@@ -486,8 +551,19 @@ Public NotInheritable Class HistoriqueRepository
                                 .TVA = LireMontant(lecteur, "TVA"),
                                 .TTAEnvoi = LireMontant(lecteur, "TTAEnvoi"),
                                 .TTAReception = LireMontant(lecteur, "TTAReception"),
-                                .TaxeEnvoi = LireMontant(lecteur, "TaxeEnvoi")
-                            })
+                                .TaxeEnvoi = LireMontant(lecteur, "TaxeEnvoi"),
+                                .TauxSA = If(repartition, LireMontant(lecteur, "TauxSA"), 0D)
+                            }
+
+                            ' La part de la banque se pose, elle ne se copie pas : une colonne
+                            ' absente ne vaut pas zéro. Sur une agence propre, la totalité lui
+                            ' revient ; sur un sous-agent, la répartition est déclarée inconnue.
+                            ligne.PoserLaPartBanque(
+                                If(repartition, LireMontantFacultatif(lecteur, "CommissionEnvoiBanque"), Nothing),
+                                If(repartition, LireMontantFacultatif(lecteur, "CommissionPaiementBanque"), Nothing),
+                                If(repartition, LireMontantFacultatif(lecteur, "CommissionTransfertBanque"), Nothing))
+
+                            resultat.Add(ligne)
                         End While
                     End Using
                 End Using
@@ -568,6 +644,31 @@ Public NotInheritable Class HistoriqueRepository
         Dim index As Integer = lecteur.GetOrdinal(colonne)
         If lecteur.IsDBNull(index) Then Return 0D
         Return Convert.ToDecimal(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    ''' <summary>
+    ''' Un montant qui peut légitimement ne pas exister : NULL est rendu tel quel, et non
+    ''' converti en zéro. La différence n'est pas cosmétique — c'est elle qui distingue
+    ''' « la banque n'a rien gagné » de « on ne sait pas ce qu'elle a gagné ».
+    ''' </summary>
+    Private Shared Function LireMontantFacultatif(lecteur As SqlDataReader, colonne As String) As Decimal?
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return Nothing
+        Return Convert.ToDecimal(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    ''' <summary>
+    ''' Vrai si la table porte les colonnes de répartition (script 16).
+    '''
+    ''' La question se pose AVANT d'écrire une requête qui les nomme : SQL Server refuse
+    ''' une requête dont une colonne manque, et toute la lecture de l'historique — donc
+    ''' tous les rapports — échouerait pour une information qui n'en est qu'une parmi
+    ''' d'autres.
+    ''' </summary>
+    Private Shared Function RepartitionPresente(connexion As SqlConnection) As Boolean
+
+        Return WURepository.ColonneExiste(connexion, Nothing, TABLE_HISTORIQUE,
+                                          "CommissionEnvoiBanque")
     End Function
 
 #End Region

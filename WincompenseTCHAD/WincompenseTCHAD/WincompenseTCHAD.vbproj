@@ -210,6 +210,12 @@
     <Compile Include="Forms\FrmParametrageFichier.Designer.vb">
       <DependentUpon>FrmParametrageFichier.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmCommissionsBanque.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmCommissionsBanque.Designer.vb">
+      <DependentUpon>FrmCommissionsBanque.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -297,6 +303,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmParametrageFichier.resx">
       <DependentUpon>FrmParametrageFichier.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmCommissionsBanque.resx">
+      <DependentUpon>FrmCommissionsBanque.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
       <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>

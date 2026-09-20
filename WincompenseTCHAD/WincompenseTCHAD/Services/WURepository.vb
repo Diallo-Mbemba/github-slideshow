@@ -34,6 +34,34 @@ Public NotInheritable Class WURepository
     End Function
 
     ''' <summary>
+    ''' Vrai si une colonne existe dans une table de la base.
+    '''
+    ''' La question se pose AVANT d'écrire une requête qui nomme une colonne récente :
+    ''' SQL Server refuse la requête entière dès qu'une colonne manque. Sans ce contrôle,
+    ''' une base où un script d'évolution n'a pas été joué verrait échouer des traitements
+    ''' qui n'ont rien à voir avec la nouveauté.
+    '''
+    ''' Le nom de la table et celui de la colonne sont des constantes du programme, jamais
+    ''' une saisie : rien de ce que l'utilisateur écrit n'entre ici.
+    ''' </summary>
+    Public Shared Function ColonneExiste(connexion As SqlConnection, transaction As SqlTransaction,
+                                         table As String, colonne As String) As Boolean
+
+        Const question As String =
+            "SELECT CASE WHEN COL_LENGTH(@table, @colonne) IS NULL THEN 0 ELSE 1 END"
+
+        Using commande As New SqlCommand(question, connexion, transaction)
+
+            commande.Parameters.Add("@table", SqlDbType.NVarChar, 256).Value = "dbo." & table
+            commande.Parameters.Add("@colonne", SqlDbType.NVarChar, 128).Value = colonne
+
+            Dim valeur As Object = commande.ExecuteScalar()
+            If valeur Is Nothing OrElse valeur Is DBNull.Value Then Return False
+            Return Convert.ToInt32(valeur, Globalization.CultureInfo.InvariantCulture) = 1
+        End Using
+    End Function
+
+    ''' <summary>
     ''' Recherche les paramètres d'un Account dans SQL Server, dans l'ordre imposé :
     ''' 1) T_Pdv_SA (sous-agent) via Code_Pdv = Account
     ''' 2) T_Pdv_EC (agence propre) via Codesite = Account

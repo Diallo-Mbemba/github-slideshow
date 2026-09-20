@@ -443,6 +443,110 @@ Public NotInheritable Class PieceRepository
         Return dt
     End Function
 
+    ''' <summary>
+    ''' Ce qui a été porté sur des comptes donnés pendant une période, d'après les PIÈCES
+    ''' CONSERVÉES.
+    '''
+    ''' C'est la vérité comptable : non pas ce que l'historique dit avoir calculé, mais ce
+    ''' que la pièce a effectivement écrit. Les deux doivent coïncider ; les comparer est
+    ''' le seul moyen de s'en assurer, et l'état des commissions le fait.
+    '''
+    ''' Les journées annulées n'y figurent pas : leurs écritures sont parties en archive,
+    ''' et c'est précisément ce qu'on attend d'une journée retirée.
+    '''
+    ''' Les comptes sont DÉDOUBLONNÉS. Deux natures de commission peuvent partager le même
+    ''' compte — c'est le cas par défaut pour le transfert et l'envoi — et les compter deux
+    ''' fois doublerait le total.
+    ''' </summary>
+    Public Shared Function TotauxParCompte(debut As Date, fin As Date,
+                                           comptes As IEnumerable(Of String),
+                                           ByRef messageErreur As String) As DataTable
+
+        messageErreur = String.Empty
+
+        Dim table As New DataTable("TotauxParCompte")
+        table.Columns.Add("Compte", GetType(String))
+        table.Columns.Add("Ecritures", GetType(Integer))
+        table.Columns.Add("Debit", GetType(Long))
+        table.Columns.Add("Credit", GetType(Long))
+        table.Columns.Add("Net", GetType(Long))
+
+        Dim recherches As List(Of String) = ComptesDistincts(comptes)
+        If recherches.Count = 0 Then Return table
+
+        Dim marques As New List(Of String)()
+        For rang As Integer = 0 To recherches.Count - 1
+            marques.Add("@c" & rang.ToString(Globalization.CultureInfo.InvariantCulture))
+        Next
+
+        Dim lecture As String =
+            "SELECT  Compte," &
+            "        ecritures = COUNT(*)," &
+            "        totalDebit = ISNULL(SUM(Debit), 0)," &
+            "        totalCredit = ISNULL(SUM(Credit), 0) " &
+            "FROM    " & TABLE_PIECE & " " &
+            "WHERE   DateActivite >= @debut AND DateActivite <= @fin " &
+            "  AND   LTRIM(RTRIM(Compte)) IN (" & String.Join(", ", marques) & ") " &
+            "GROUP BY Compte " &
+            "ORDER BY Compte"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(lecture, connexion)
+
+                    commande.Parameters.Add("@debut", SqlDbType.Date).Value = debut.Date
+                    commande.Parameters.Add("@fin", SqlDbType.Date).Value = fin.Date
+
+                    For rang As Integer = 0 To recherches.Count - 1
+                        commande.Parameters.Add(marques(rang), SqlDbType.NVarChar, 50).Value = recherches(rang)
+                    Next
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+
+                            Dim debit As Long = LireEntier(lecteur, 2)
+                            Dim credit As Long = LireEntier(lecteur, 3)
+
+                            ' Un compte de produit se crédite : le net est donc crédit moins
+                            ' débit, et non l'inverse. Le signe compte autant que le montant.
+                            table.Rows.Add(LireChaine(lecteur, 0), lecteur.GetInt32(1),
+                                           debit, credit, credit - debit)
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_ABSENTE,
+                               $"Lecture des pièces conservées impossible : {ex.Message}")
+
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return table
+    End Function
+
+    ''' <summary>Les comptes non vides, sans doublon, la casse ne comptant pas.</summary>
+    Private Shared Function ComptesDistincts(comptes As IEnumerable(Of String)) As List(Of String)
+
+        Dim retenus As New List(Of String)()
+        If comptes Is Nothing Then Return retenus
+
+        Dim vus As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        For Each compte As String In comptes
+            Dim texte As String = If(compte, String.Empty).Trim()
+            If texte.Length = 0 Then Continue For
+            If vus.Add(texte) Then retenus.Add(texte)
+        Next
+
+        Return retenus
+    End Function
+
 #End Region
 
 #Region "Utilitaires de lecture"

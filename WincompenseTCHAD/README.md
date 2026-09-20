@@ -1984,6 +1984,101 @@ demande confirmation. C'est normal pour une installation neuve ; ce l'est beauco
 deux bases appartiennent à des entités différentes — le référentiel chargé serait plausible et
 faux, et rien ne le signalerait ensuite.
 
+## Commissions encaissées par la banque
+
+*Menu Compensation › Commissions encaissées par la banque.*
+
+### Pourquoi cet écran n'existait pas
+
+L'onglet « Évolution des commissions » des rapports d'activité montre la commission
+**générée par l'activité** — celle que Western Union verse. Sur un sous-agent à 70 %, les sept
+dixièmes affichés ne sont pas à la banque : ils lui sont rétrocédés. **Aucun écran ne disait
+donc ce que la banque gagne.**
+
+### Deux sources, deux règles
+
+| Population | Ce que la banque garde |
+|---|---|
+| Sous-agents | la part non rétrocédée, soit `commission × (1 − taux)` |
+| Agences propres | la totalité — leur taux vaut zéro |
+
+La somme des deux est ce qu'elle a réellement encaissé sur la période. L'état les présente
+côte à côte, par nature de commission (envoi, paiement, transfert) puis jour par jour, avec la
+part rétrocédée en regard : **part banque + part sous-agents = commission totale**, vérifiable
+d'un coup d'œil et recoupable avec l'onglet existant.
+
+### Rien n'est recalculé
+
+La part de la banque est celle qui a été **calculée le jour même**, conservée avec l'historique
+(`CommissionEnvoiBanque`, `CommissionPaiementBanque`, `CommissionTransfertBanque`), ainsi que le
+taux appliqué ce jour-là (`TauxSA`).
+
+La recalculer avec les taux d'aujourd'hui ferait varier **rétroactivement** ce que la banque a
+gagné le mois dernier : un sous-agent passé de 70 % à 60 % changerait le passé. C'est
+exactement ce que l'application refuse déjà de faire pour les pièces comptables, et pour la
+même raison.
+
+### Les comptes concernés
+
+Les trois comptes de commission de la banque (`Cpte_Produit`, `Cpte_Produit_Envoi`,
+`Cpte_Produit_Paiement`) **reçoivent les deux populations indifféremment**. La séparation
+demandée est donc **analytique** : elle se lit dans l'état, pas sur le relevé de compte. C'est
+le choix retenu par la banque ; faire apparaître la séparation en comptabilité supposerait des
+comptes distincts pour les agences et modifierait la pièce.
+
+L'état affiche ces comptes avec ce que les **pièces conservées** y ont réellement porté sur la
+période : nombre d'écritures, débit, crédit, net crédité. Les comptes sont **dédoublonnés** —
+par défaut, le transfert et l'envoi partagent le même compte, et les compter deux fois
+doublerait le total.
+
+### Le contrôle croisé
+
+Le total de l'état (issu de l'historique) est confronté au total porté sur ces comptes (issu
+des pièces). Les deux doivent coïncider ; l'écran le dit en vert quand c'est le cas, en rouge
+sinon, avec les deux explications possibles : les comptes de commission ont changé pendant la
+période, ou une journée n'a pas de pièce conservée. La tolérance est d'un franc par ligne
+d'historique — l'historique porte deux décimales, la pièce est arrondie à l'unité.
+
+Les journées **annulées** n'entrent dans aucun des deux totaux : leur historique et leur pièce
+sont partis en archive, ce qui est précisément ce qu'on attend d'une journée retirée.
+
+### Ce que l'état ne sait pas, il le dit
+
+Les journées comptabilisées **avant** l'exécution de `Scripts\16_CommissionsBanque.sql` n'ont
+pas de répartition conservée. Pour elles :
+
+- la part des **agences propres reste exacte** — leur taux vaut zéro par construction, et le
+  type du point de vente est conservé depuis toujours ;
+- la part des **sous-agents est inconnue**, et non nulle.
+
+L'écran affiche alors, en rouge, combien de journées sont concernées, de quand à quand, et à
+partir de quelle date la répartition est disponible. Les lignes correspondantes sont en rouge
+dans le tableau jour par jour, avec une colonne « Répartition » qui vaut NON. **Un zéro et une
+donnée absente ne sont pas la même chose**, et une case vide qui se lit comme un zéro est la
+pire façon de se tromper. L'avertissement suit l'état jusque dans le classeur exporté : un
+chiffre incomplet exporté sans sa réserve deviendrait un chiffre tout court.
+
+### Une fenêtre à part
+
+L'état n'est pas un onglet des rapports d'activité : ceux-ci sont filtrés par population — une
+fenêtre pour les sous-agents, une autre pour les agences propres — et un total des deux
+n'aurait sa place dans ni l'une ni l'autre.
+
+### Compatibilité avec une base non mise à jour
+
+Les quatre colonnes sont récentes. Trois traitements les nomment, et les trois vérifient
+d'abord qu'elles existent (`WURepository.ColonneExiste`) :
+
+- la **lecture** de l'historique — sans quoi tous les rapports échoueraient pour une
+  information qui n'en est qu'une parmi d'autres ;
+- l'**écriture** de la comptabilisation quotidienne — c'est l'opération du jour, elle ne
+  s'arrête pas pour une colonne manquante ;
+- le **déplacement** d'une journée annulée vers l'archive — une journée resterait en place
+  faute d'une colonne qu'elle n'a jamais eue.
+
+`Scripts\16_CommissionsBanque.sql` ajoute les colonnes à `T_HistoriqueWU` **et** à
+`T_HistoriqueAnnuleWU`, et crée la vue d'audit `V_CommissionsBanque`.
+
 ## Règles tranchées par la banque
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
@@ -2007,6 +2102,11 @@ faux, et rien ne le signalerait ensuite.
   l'administrateur y touche — seul.
 - Format de `VALDT` dans le fichier core banking : `jj/mm/aaaa` a été retenu, faute d'indication
   contraire. À confirmer auprès de l'équipe du core banking avant le premier chargement réel.
+- Comptes distincts pour les commissions des agences propres : la banque a retenu la
+  séparation ANALYTIQUE, les trois comptes de commission restant communs aux deux
+  populations. Les colonnes `Cpte_Envoi_agence` et `Cpte_Paiement_agence` de `SystemeWU`
+  restent donc inutilisées. Si la séparation doit un jour apparaître en comptabilité, c'est
+  la pièce qu'il faudra modifier, et la banque devra fournir ces comptes.
 - Les comptes 379100319 et 379200585 sont écrits dans `ConstantesWU` et non paramétrés dans
   `SystemeWU` : la banque les a donnés tels quels, et ils décrivent une règle d'aiguillage propre
   au format, non un paramétrage comptable. À basculer en paramètre si le plan comptable bouge.

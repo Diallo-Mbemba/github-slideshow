@@ -558,6 +558,18 @@ BEGIN
         TTAReception        DECIMAL(18, 2)  NOT NULL DEFAULT (0),
         TaxeEnvoi           DECIMAL(18, 2)  NOT NULL DEFAULT (0),
 
+        -- Part revenant a la banque, telle qu'elle a ete calculee CE JOUR-LA.
+        -- NULL et non 0 : un zero affirmerait que la banque n'a rien gagne, NULL dit
+        -- qu'on ne sait pas. Une case vide qui se lit comme un zero est la pire facon
+        -- de se tromper.
+        CommissionEnvoiBanque     DECIMAL(18, 2) NULL,
+        CommissionPaiementBanque  DECIMAL(18, 2) NULL,
+        CommissionTransfertBanque DECIMAL(18, 2) NULL,
+
+        -- Le taux applique ce jour-la : il permet de comprendre un chiffre sans rouvrir
+        -- le parametrage, et de retrouver la regle si elle est un jour contestee.
+        TauxSA                    DECIMAL(4, 2)  NULL,
+
         DateEnregistrement  DATETIME        NOT NULL DEFAULT (GETDATE()),
 
         CONSTRAINT PK_T_HistoriqueWU PRIMARY KEY (DateActivite, Account)
@@ -1259,6 +1271,11 @@ BEGIN
         TTAReception        DECIMAL(18, 2)  NOT NULL DEFAULT (0),
         TaxeEnvoi           DECIMAL(18, 2)  NOT NULL DEFAULT (0),
 
+        CommissionEnvoiBanque     DECIMAL(18, 2) NULL,
+        CommissionPaiementBanque  DECIMAL(18, 2) NULL,
+        CommissionTransfertBanque DECIMAL(18, 2) NULL,
+        TauxSA                    DECIMAL(4, 2)  NULL,
+
         DateEnregistrement      DATETIME        NULL,
         ComptabilisePar         NVARCHAR(50)    NULL,
         DateComptabilisation    DATETIME        NULL
@@ -1845,6 +1862,49 @@ FROM    sys.database_permissions AS pe
         INNER JOIN sys.database_principals AS dp ON dp.principal_id = pe.grantee_principal_id
 WHERE   dp.name IN (N'wu_compense', N'wu_commercial', N'wu_admin')
 ORDER BY dp.name, OBJECT_NAME(pe.major_id), pe.permission_name;
+GO
+
+
+/*----------------------------------------------------------------------------------------------
+    PARTIE 5.1 — Vue d'audit : ce que la banque a garde sur les commissions
+    (source : Scripts\16_CommissionsBanque.sql)
+----------------------------------------------------------------------------------------------*/
+
+IF OBJECT_ID(N'dbo.V_CommissionsBanque', N'V') IS NOT NULL DROP VIEW dbo.V_CommissionsBanque;
+GO
+CREATE VIEW dbo.V_CommissionsBanque
+AS
+    SELECT  h.DateActivite,
+            population = CASE WHEN h.TypePdv = 'SA' THEN N'Sous-agents'
+                              WHEN h.TypePdv = 'EC' THEN N'Agences propres'
+                              ELSE N'Non paramétrés' END,
+
+            documentee = CASE WHEN h.CommissionEnvoiBanque IS NOT NULL THEN 1
+                              WHEN h.TypePdv <> 'SA' THEN 1
+                              ELSE 0 END,
+
+            partBanque = CASE WHEN h.CommissionEnvoiBanque IS NOT NULL
+                              THEN h.CommissionEnvoiBanque + h.CommissionPaiementBanque
+                                   + h.CommissionTransfertBanque
+                              WHEN h.TypePdv <> 'SA'
+                              THEN h.CommissionEnvoi + h.CommissionPaiement + h.CommissionTransfert
+                              ELSE NULL END,
+
+            commissionTotale = h.CommissionEnvoi + h.CommissionPaiement + h.CommissionTransfert,
+            h.TauxSA,
+            h.Account,
+            h.Designation
+    FROM    dbo.T_HistoriqueWU AS h;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_compense')
+    EXEC('GRANT SELECT ON dbo.V_CommissionsBanque TO wu_compense');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_commercial')
+    EXEC('GRANT SELECT ON dbo.V_CommissionsBanque TO wu_commercial');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_admin')
+    EXEC('GRANT SELECT ON dbo.V_CommissionsBanque TO wu_admin');
 GO
 
 
