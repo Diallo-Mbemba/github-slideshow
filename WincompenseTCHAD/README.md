@@ -2368,6 +2368,15 @@ banque la fournit, il suffit de remplacer le `.ico` : aucune ligne de code ne ch
   agence propre n'a pas de compte de compensation dans les livres de la banque.
 - **Accounts non paramétrés.** Ils ne sont **pas comptabilisés** — voir plus haut.
 
+- **Chemin d'installation.** La sécurité de la banque autorise un **fichier à un emplacement**,
+  pas une application. Le chemin autorisé est
+  `C:\Program Files\Default Company Name\SetupWincompense\Wincompense.exe` — le Program Files
+  **natif**, sans `(x86)`. Les deux noms sans signification viennent de l'ancien projet
+  d'installation Visual Studio, et c'est pour cela qu'il ne faut pas les rendre présentables :
+  les changer obligerait la banque à refaire son autorisation. `Installation\Wincompense.iss`
+  le reproduit avec `{autopf}` **et** `ArchitecturesInstallIn64BitMode=x64compatible` — les deux
+  lignes tiennent ensemble, `{autopf}` seul donnant `Program Files (x86)` sur un poste 64 bits.
+
 ## Points restant à confirmer
 
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré), et

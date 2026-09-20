@@ -59,9 +59,19 @@
 ; Racine de Program Files.
 ;   {autopf}   -> C:\Program Files        (affiche "Programmes")
 ;   {autopf32} -> C:\Program Files (x86)  (affiche "Programmes (x86)")
-; Si le dossier autorise sur les postes est celui en (x86) - l'ancien projet
-; d'installation etait peut-etre en 32 bits - remplacer autopf par autopf32 ici,
-; et nulle part ailleurs.
+;
+; CONFIRME PAR LA BANQUE : le chemin autorise est
+;     C:\Program Files\Default Company Name\SetupWincompense
+; soit le Program Files NATIF, sans "(x86)". C'est donc {autopf}, et l'ancien
+; projet d'installation Visual Studio n'etait pas en 32 bits. La question est
+; tranchee : ne pas basculer sur {autopf32}.
+;
+; Attention : {autopf} seul ne suffit PAS a designer C:\Program Files. Sur un
+; Windows 64 bits, Inno Setup le resout en "Program Files (x86)" tant que
+; l'installation n'est pas en mode 64 bits. C'est ArchitecturesInstallIn64BitMode,
+; plus bas dans [Setup], qui fait tomber le chemin au bon endroit. Les deux lignes
+; tiennent ensemble : retirer l'une sans l'autre change le dossier d'installation,
+; et l'application sortirait du chemin autorise par la securite.
 #define RacineProgrammes    "{autopf}"
 
 ; Dossier de compilation Release.
@@ -105,6 +115,11 @@ PrivilegesRequired=admin
 
 ; L'application est compilee en AnyCPU : elle tourne des deux cotes, et
 ; s'installe dans le Program Files natif du poste.
+;
+; CETTE LIGNE PORTE LE CHEMIN AUTORISE. Sans elle, {autopf} ci-dessus donnerait
+; "C:\Program Files (x86)" sur les postes 64 bits, et l'executable atterrirait
+; hors du dossier autorise par la securite de la banque.
+;
 ; Sur une version d'Inno Setup anterieure a la 6.3, remplacer x64compatible par x64.
 ArchitecturesInstallIn64BitMode=x64compatible
 

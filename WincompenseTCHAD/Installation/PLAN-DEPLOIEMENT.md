@@ -90,7 +90,7 @@ C'est la phase la plus longue du déploiement, et la plus souvent sous-estimée.
 | ☐ | Droits : **lecture** pour les utilisateurs, **écriture** pour l'informatique seule | INFO |
 | ☐ | Déposer le `setup.exe` dans `Setup\` sur le partage, puis y poser `version.txt` | INFO |
 | ☐ | Relever sur un poste le **chemin exact** déjà autorisé par la sécurité (barre d'adresse de l'Explorateur, pas le nom affiché) | INFO |
-| ☐ | Si ce chemin est en `Program Files (x86)`, basculer `#define RacineProgrammes` sur `{autopf32}` dans `Wincompense.iss` | PROJET |
+| ☐ | Constater que le chemin est bien `C:\Program Files\...` et non `Program Files (x86)` — confirmé par la banque, `Wincompense.iss` est déjà réglé ainsi et n'a pas à être modifié | INFO |
 | ☐ | Désinstaller l'ancienne version par *Programmes et fonctionnalités* si elle y figure | INFO |
 | ☐ | Compiler la solution en **Release** | PROJET |
 | ☐ | Produire `Wincompense_Setup.exe` avec Inno Setup **6.4.x** | PROJET |

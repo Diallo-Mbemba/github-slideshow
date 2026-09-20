@@ -226,13 +226,29 @@ Deux règles en découlent, et elles ne se négocient pas depuis le code :
 Si l'assistant d'installation propose un autre dossier, **ne pas valider** : il pose la
 question et avertit, mais c'est l'opérateur qui tranche.
 
-#### Si le dossier autorisé est celui en (x86)
+#### Ce n'est pas le dossier en (x86) — c'est confirmé
 
-Un projet d'installation Visual Studio en 32 bits déposait ses fichiers dans
-`C:\Program Files (x86)\` — affiché `C:\Programmes (x86)\`. Vérifier sur un poste
-avant de diffuser : si le `(x86)` est là, ouvrir `Wincompense.iss` et remplacer
-`{autopf}` par `{autopf32}` dans la ligne `#define RacineProgrammes`, **et nulle part
-ailleurs**. Puis recompiler le setup.
+La question s'est posée : un projet d'installation Visual Studio en 32 bits aurait
+déposé ses fichiers dans `C:\Program Files (x86)\`, affiché `C:\Programmes (x86)\`.
+**La banque a confirmé le chemin sans `(x86)`** :
+
+```
+C:\Program Files\Default Company Name\SetupWincompense
+```
+
+`Wincompense.iss` est déjà réglé ainsi et **ne doit pas être touché** : ne pas basculer
+`#define RacineProgrammes` sur `{autopf32}`.
+
+> **Une subtilité qui se paie cher.** `{autopf}` seul ne désigne pas `C:\Program Files`.
+> Sur un Windows 64 bits, Inno Setup le résout en `Program Files (x86)` tant que
+> l'installation n'est pas en mode 64 bits. C'est la ligne
+> `ArchitecturesInstallIn64BitMode=x64compatible`, dans la section `[Setup]`, qui fait
+> tomber le chemin au bon endroit. **Les deux lignes tiennent ensemble** : retirer l'une
+> sans l'autre déplace l'installation hors du chemin autorisé, et l'application cesse de
+> démarrer sur les postes.
+
+Cela reste à vérifier une fois, sur le premier poste installé — non pour décider, mais
+pour constater : le tableau de recette du plan de déploiement porte la ligne.
 
 #### Sur un poste portant déjà la version `WincompenseTCHAD.exe`
 
