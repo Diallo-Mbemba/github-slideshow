@@ -372,11 +372,11 @@ Public Class FrmCommissionsBanque
 
 #End Region
 
-#Region "Export"
+#Region "Export en PDF"
 
     Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
 
-        sfdEtat.FileName = $"Commissions-banque-{dtpDebut.Value:yyyyMMdd}-{dtpFin.Value:yyyyMMdd}.xlsx"
+        sfdEtat.FileName = $"Commissions-banque-{dtpDebut.Value:yyyyMMdd}-{dtpFin.Value:yyyyMMdd}.pdf"
         sfdEtat.OverwritePrompt = True
 
         If sfdEtat.ShowDialog(Me) <> DialogResult.OK Then Return
@@ -385,21 +385,26 @@ Public Class FrmCommissionsBanque
 
         Try
             Cursor = Cursors.WaitCursor
-            avancement = FrmProgression.Ouvrir(Me, "Export des commissions de la banque")
+            avancement = FrmProgression.Ouvrir(Me, "Export PDF des commissions de la banque")
 
-            ExcelExportService.ExporterEtOuvrir(
-                "Commissions encaissées par la banque",
-                SousTitres(), Blocs(), "Commissions", sfdEtat.FileName, avancement.Progression)
+            ' En PDF et non en classeur : cet état se signe, se classe et se transmet. Un
+            ' tableur invite à retoucher les chiffres, et un chiffre retouché dans le fichier
+            ' qu'on présente n'est plus le chiffre de la banque.
+            ExcelExportService.ExporterEnPdf(
+                "ECOBANK TCHAD — COMMISSIONS ENCAISSÉES SUR L'ACTIVITÉ WESTERN UNION",
+                SousTitres(), Blocs(), "Commissions", sfdEtat.FileName,
+                progression:=avancement.Progression)
 
             avancement.Fermer()
 
             lblStatut.ForeColor = Drawing.SystemColors.GrayText
-            lblStatut.Text = "Exporté : " & IO.Path.GetFileName(sfdEtat.FileName)
+            lblStatut.Text = "PDF produit : " & IO.Path.GetFileName(sfdEtat.FileName) &
+                             " — il s'ouvre aussitôt."
 
         Catch ex As Exception
             If avancement IsNot Nothing Then avancement.Fermer()
 
-            MessageBox.Show(Me, "Export impossible : " & ex.Message,
+            MessageBox.Show(Me, "Export PDF impossible : " & ex.Message,
                             "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
         Finally
             If avancement IsNot Nothing Then avancement.Fermer()
@@ -427,6 +432,10 @@ Public Class FrmCommissionsBanque
         End If
 
         lignes.Add(New SousTitreExcel(SurUneLigne(lblControle.Text)))
+
+        ' Un état qui se classe doit dire quand il a été tiré : deux éditions d'une même
+        ' période peuvent différer si une journée a été annulée entre-temps.
+        lignes.Add(New SousTitreExcel($"Édité le {Date.Now:dd/MM/yyyy à HH:mm} par {SessionWU.Auteur}"))
 
         Return lignes
     End Function

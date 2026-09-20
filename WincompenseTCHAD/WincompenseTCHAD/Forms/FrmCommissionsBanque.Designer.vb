@@ -219,7 +219,7 @@ Partial Class FrmCommissionsBanque
         Me.btnExporter.Name = "btnExporter"
         Me.btnExporter.Size = New System.Drawing.Size(200, 32)
         Me.btnExporter.TabIndex = 16
-        Me.btnExporter.Text = "Exporter vers Excel…"
+        Me.btnExporter.Text = "Exporter en PDF…"
         Me.btnExporter.UseVisualStyleBackColor = True
         '
         'lblStatut
@@ -245,8 +245,8 @@ Partial Class FrmCommissionsBanque
         '
         'sfdEtat
         '
-        Me.sfdEtat.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
-        Me.sfdEtat.Title = "Exporter les commissions de la banque"
+        Me.sfdEtat.Filter = "Document PDF (*.pdf)|*.pdf"
+        Me.sfdEtat.Title = "Exporter l'état en PDF"
         '
         'FrmCommissionsBanque
         '

@@ -2055,8 +2055,23 @@ L'écran affiche alors, en rouge, combien de journées sont concernées, de quan
 partir de quelle date la répartition est disponible. Les lignes correspondantes sont en rouge
 dans le tableau jour par jour, avec une colonne « Répartition » qui vaut NON. **Un zéro et une
 donnée absente ne sont pas la même chose**, et une case vide qui se lit comme un zéro est la
-pire façon de se tromper. L'avertissement suit l'état jusque dans le classeur exporté : un
+pire façon de se tromper. L'avertissement suit l'état jusque dans le PDF exporté : un
 chiffre incomplet exporté sans sa réserve deviendrait un chiffre tout court.
+
+### L'export se fait en PDF
+
+Et non en classeur, à la différence des rapports d'activité : cet état se signe, se classe et
+se transmet. Un tableur invite à retoucher les chiffres, et un chiffre retouché dans le fichier
+qu'on présente n'est plus celui de la banque.
+
+Le PDF reprend les trois tableaux — répartition, comptes crédités, jour par jour — précédés de
+la période, de la mention que rien n'est recalculé, de l'avertissement sur les journées non
+documentées s'il y en a, du contrôle croisé, et de la date d'édition avec son auteur. Cette
+dernière n'est pas une politesse : deux éditions d'une même période peuvent différer si une
+journée a été annulée entre-temps.
+
+Mise en page en paysage, ajustée à une page de large — le tableau jour par jour porte sept
+colonnes. La conversion passe par Excel, comme tous les PDF de l'application.
 
 ### Une fenêtre à part
 
