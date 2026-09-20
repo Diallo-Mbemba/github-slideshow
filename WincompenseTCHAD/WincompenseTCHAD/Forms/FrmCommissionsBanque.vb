@@ -88,6 +88,24 @@ Public Class FrmCommissionsBanque
         Afficher()
     End Sub
 
+    ''' <summary>
+    ''' Cale la période sur le mois entier de la date de fin.
+    '''
+    ''' L'édition destinée à la signature est mensuelle : un état signé qui couvrirait
+    ''' vingt-trois jours parce que l'agent a mal cliqué serait un état faux, et rien ne le
+    ''' dirait.
+    ''' </summary>
+    Private Sub btnMois_Click(sender As Object, e As EventArgs) Handles btnMois.Click
+
+        Dim reference As Date = dtpFin.Value.Date
+        Dim premier As New Date(reference.Year, reference.Month, 1)
+
+        dtpDebut.Value = premier
+        dtpFin.Value = premier.AddMonths(1).AddDays(-1)
+
+        Afficher()
+    End Sub
+
     Private Sub btnAfficher_Click(sender As Object, e As EventArgs) Handles btnAfficher.Click
         Afficher()
     End Sub
@@ -376,7 +394,9 @@ Public Class FrmCommissionsBanque
 
     Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
 
-        sfdEtat.FileName = $"Commissions-banque-{dtpDebut.Value:yyyyMMdd}-{dtpFin.Value:yyyyMMdd}.pdf"
+        sfdEtat.FileName = If(chkASigner.Checked,
+                              $"Commissions-banque-a-signer-{dtpDebut.Value:yyyyMM}.pdf",
+                              $"Commissions-banque-{dtpDebut.Value:yyyyMMdd}-{dtpFin.Value:yyyyMMdd}.pdf")
         sfdEtat.OverwritePrompt = True
 
         If sfdEtat.ShowDialog(Me) <> DialogResult.OK Then Return
@@ -433,6 +453,10 @@ Public Class FrmCommissionsBanque
 
         lignes.Add(New SousTitreExcel(SurUneLigne(lblControle.Text)))
 
+        If chkASigner.Checked Then
+            lignes.Add(New SousTitreExcel("ÉDITION DESTINÉE À LA SIGNATURE", True))
+        End If
+
         ' Un état qui se classe doit dire quand il a été tiré : deux éditions d'une même
         ' période peuvent différer si une journée a été annulée entre-temps.
         lignes.Add(New SousTitreExcel($"Édité le {Date.Now:dd/MM/yyyy à HH:mm} par {SessionWU.Auteur}"))
@@ -455,7 +479,7 @@ Public Class FrmCommissionsBanque
             {"Ecritures", "Écritures"}, {"Net", "Net crédité"}
         }
 
-        Return New List(Of BlocExcel) From {
+        Dim liste As New List(Of BlocExcel) From {
             New BlocExcel() With {
                 .Titre = "Répartition sur la période",
                 .Donnees = _synthese, .Formats = formats, .Entetes = entetes
@@ -469,6 +493,10 @@ Public Class FrmCommissionsBanque
                 .Donnees = _parJour, .Formats = formats, .Entetes = entetes
             }
         }
+
+        If chkASigner.Checked Then liste.Add(BlocDesSignatures())
+
+        Return liste
     End Function
 
 #End Region
@@ -478,6 +506,31 @@ Public Class FrmCommissionsBanque
     Private Sub btnFermer_Click(sender As Object, e As EventArgs) Handles btnFermer.Click
         Close()
     End Sub
+
+    ''' <summary>
+    ''' Les cartouches de signature, pour l'édition mensuelle qui se classe.
+    '''
+    ''' Trois lignes hautes : une case où l'on doit écrire un nom et signer à la main a
+    ''' besoin de place, et la hauteur d'une ligne de tableau ne suffit pas.
+    ''' </summary>
+    Private Shared Function BlocDesSignatures() As BlocExcel
+
+        Dim table As New DataTable("Signatures")
+        table.Columns.Add("Fonction", GetType(String))
+        table.Columns.Add("Nom", GetType(String))
+        table.Columns.Add("Date", GetType(String))
+        table.Columns.Add("Signature", GetType(String))
+
+        table.Rows.Add("Établi par — agent de la compense", String.Empty, String.Empty, String.Empty)
+        table.Rows.Add("Vérifié par — chef de service", String.Empty, String.Empty, String.Empty)
+        table.Rows.Add("Approuvé par", String.Empty, String.Empty, String.Empty)
+
+        Return New BlocExcel() With {
+            .Titre = "Visa et signatures",
+            .Donnees = table,
+            .HauteurLignes = 42R
+        }
+    End Function
 
     ''' <summary>Un libellé de plusieurs lignes, ramené à une seule pour un sous-titre.</summary>
     Private Shared Function SurUneLigne(texte As String) As String

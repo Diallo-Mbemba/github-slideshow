@@ -80,6 +80,15 @@ Public Class BlocExcel
     ''' </summary>
     Public Property AvecFiltre As Boolean = False
 
+    ''' <summary>
+    ''' Hauteur imposée aux lignes de données, en points. Zéro laisse la hauteur normale.
+    '''
+    ''' Elle n'existe que pour une chose : les cartouches de signature. Une case où l'on
+    ''' doit écrire un nom et signer à la main a besoin de place, et la hauteur d'une ligne
+    ''' de tableau ne suffit pas.
+    ''' </summary>
+    Public Property HauteurLignes As Double = 0R
+
     Public Sub New()
     End Sub
 
@@ -649,6 +658,12 @@ Public NotInheritable Class ExcelExportService
 
             feuille.Range(feuille.Cells(premiereLigneDonnees, 1),
                           feuille.Cells(derniereLigne, nombreColonnes)).Borders.LineStyle = XL_TRAIT_CONTINU
+
+            ' Hauteur imposée, s'il y en a une : c'est l'espace où l'on signe.
+            If bloc.HauteurLignes > 0R Then
+                feuille.Range(feuille.Cells(premiereLigneDonnees, 1),
+                              feuille.Cells(derniereLigne, nombreColonnes)).RowHeight = bloc.HauteurLignes
+            End If
 
             ' --- Formats de nombre ---
             For c As Integer = 0 To nombreColonnes - 1

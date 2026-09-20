@@ -144,6 +144,10 @@ Public NotInheritable Class HistoriqueRepository
     ''' Détail des transactions de la journée, écrit dans T_HistoriqueMTCN au sein de la MÊME
     ''' transaction : les deux tables ne peuvent pas diverger. Peut être Nothing.
     ''' </param>
+    ''' <param name="traitement">
+    ''' En-tête du traitement : rapports utilisés, volumes, totaux de la pièce, écart
+    ''' d'arrondi. Écrit dans la MÊME transaction, et pour la même raison. Peut être Nothing.
+    ''' </param>
     ''' <param name="dtPiece">
     ''' Pièce comptable produite pour cette journée, conservée dans T_PieceWU au sein de la MÊME
     ''' transaction — pour la même raison, et pour une de plus : la pièce est un justificatif,
@@ -153,6 +157,7 @@ Public NotInheritable Class HistoriqueRepository
     Public Shared Function EnregistrerJournee(jour As Date, calculs As IEnumerable(Of CalculWU),
                                               transactions As IEnumerable(Of TransactionWU),
                                               dtPiece As DataTable,
+                                              traitement As TraitementJourneeWU,
                                               ByRef nombreEnregistrees As Integer,
                                               ByRef nombreTransactions As Integer,
                                               ByRef messageErreur As String) As Boolean
@@ -220,6 +225,16 @@ Public NotInheritable Class HistoriqueRepository
                         ' La pièce est conservée ici, et non dans un appel séparé : l'historique
                         ' et le justificatif d'une même journée ne doivent jamais diverger.
                         PieceRepository.Enregistrer(jour, dtPiece, connexion, transaction)
+
+                        ' L'en-tête de traitement pour la même raison, et pour une de plus :
+                        ' c'est lui qui porte les rapports Western Union utilisés et le nombre
+                        ' d'Accounts écartés. Un bordereau qui ne correspondrait pas à
+                        ' l'historique de sa propre journée ne prouverait rien.
+                        '
+                        ' Son absence n'interrompt PAS la comptabilisation : sur une base où le
+                        ' script 17 n'a pas été joué, la journée passe quand même, sans bordereau
+                        ' reproductible. C'est l'opération du jour, elle ne s'arrête pas là.
+                        TraitementRepository.Enregistrer(traitement, connexion, transaction)
 
                         transaction.Commit()
 

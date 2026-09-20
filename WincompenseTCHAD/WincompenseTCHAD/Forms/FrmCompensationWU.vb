@@ -94,6 +94,92 @@ Public Class FrmCompensationWU
     ''' générée et équilibrée, elle reste la priorité. L'utilisateur est simplement averti que
     ''' la journée ne figurera pas dans les rapports tant qu'elle n'aura pas été regénérée.
     ''' </summary>
+    ''' <summary>
+    ''' L'en-tête du traitement : ce que la pièce comptable ne dit pas.
+    '''
+    ''' Les rapports Western Union utilisés et leur empreinte, les volumes, le nombre
+    ''' d'Accounts ÉCARTÉS, les totaux de la pièce et l'écart d'arrondi isolé. C'est de là
+    ''' que se tire le bordereau de fin de journée, celui qui se signe.
+    '''
+    ''' L'empreinte des fichiers est calculée maintenant, pendant qu'ils sont encore sous la
+    ''' main : plus tard, ils auront pu être déplacés, renommés ou remplacés — et c'est
+    ''' précisément contre cela que l'empreinte existe.
+    ''' </summary>
+    Private Function ConstruireLEnTete() As TraitementJourneeWU
+
+        Dim jour As Date = _dateActivite.Value
+
+        Dim entete As New TraitementJourneeWU() With {
+            .DateActivite = jour,
+            .DateValeur = CalendrierWU.ProchainJourOuvre(jour),
+            .NumeroLot = CoreBankingService.NumeroDeLot(jour),
+            .FichierActivite = NomDuRapport(_infosActivite, _cheminActivite),
+            .EmpreinteActivite = FichierCsvWU.EmpreinteFichier(_cheminActivite),
+            .FichierReglement = NomDuRapport(_infosReglement, _cheminReglement),
+            .EmpreinteReglement = FichierCsvWU.EmpreinteFichier(_cheminReglement),
+            .NombrePdv = _listeCalculs.Count,
+            .NombreEcartes = LesAccountsEcartes().Count
+        }
+
+        For Each calc As CalculWU In _listeCalculs
+
+            entete.NombreEnvois += calc.NombreEnvois
+            entete.NombrePaiements += calc.NombrePaiements
+            entete.NombreAnnulations += calc.NombreAnnulations
+
+            If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) Then
+                entete.NombreSousAgents += 1
+            ElseIf String.Equals(calc.TypePdv, "EC", StringComparison.OrdinalIgnoreCase) Then
+                entete.NombreAgences += 1
+            End If
+        Next
+
+        RelireLaPiece(entete)
+        Return entete
+    End Function
+
+    ''' <summary>Le nom du rapport tel qu'il a été chargé, ou le nom du fichier à défaut.</summary>
+    Private Shared Function NomDuRapport(infos As InfosFichierRapport, chemin As String) As String
+
+        If infos IsNot Nothing AndAlso infos.NomFichier.Length > 0 Then Return infos.NomFichier
+        If String.IsNullOrWhiteSpace(chemin) Then Return String.Empty
+
+        Try
+            Return IO.Path.GetFileName(chemin)
+        Catch ex As ArgumentException
+            Return String.Empty
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Relit la pièce pour en tirer les trois chiffres du bordereau : les deux totaux et
+    ''' l'écart d'arrondi.
+    '''
+    ''' L'écart est repéré par son libellé et non recalculé : c'est celui qui a été POSÉ
+    ''' dans la pièce qui compte, pas celui qu'un second calcul retrouverait.
+    ''' </summary>
+    Private Sub RelireLaPiece(entete As TraitementJourneeWU)
+
+        If _dtPieceGeneree Is Nothing Then Return
+
+        For Each ligne As DataRow In _dtPieceGeneree.Rows
+
+            Dim debit As Long = Convert.ToInt64(ligne("Debit"), Globalization.CultureInfo.InvariantCulture)
+            Dim credit As Long = Convert.ToInt64(ligne("Credit"), Globalization.CultureInfo.InvariantCulture)
+
+            entete.TotalDebit += debit
+            entete.TotalCredit += credit
+
+            If Not String.Equals(Convert.ToString(ligne("Libelle")),
+                                 ConstantesWU.LIB_ECART_ATTENTE, StringComparison.Ordinal) Then Continue For
+
+            ' Signé : un écart au crédit et un écart au débit ne se compensent pas dans la
+            ' tête de celui qui relit.
+            entete.EcartArrondi += credit - debit
+            entete.CompteEcart = Convert.ToString(ligne("Compte"))
+        Next
+    End Sub
+
     Private Sub HistoriserLaJournee()
 
         If Not _dateActivite.HasValue Then
@@ -107,7 +193,7 @@ Public Class FrmCompensationWU
         Dim messageErreur As String = String.Empty
 
         If HistoriqueRepository.EnregistrerJournee(_dateActivite.Value, _listeCalculs, _transactions,
-                                                   _dtPieceGeneree,
+                                                   _dtPieceGeneree, ConstruireLEnTete(),
                                                    nombreEnregistrees, nombreTransactions, messageErreur) Then
             tsslStatut.Text &= $"  |  Journée du {_dateActivite.Value:dd/MM/yyyy} historisée " &
                                $"({nombreEnregistrees} point(s) de vente, {nombreTransactions} transaction(s))."
@@ -906,6 +992,34 @@ Public Class FrmCompensationWU
         End Try
 
         AfficherLaPieceGlobale()
+
+        ' Le bordereau vient APRÈS la pièce : l'agent regarde d'abord ce qu'il a produit,
+        ' puis ce qu'il doit faire signer. L'inverse ferait signer avant d'avoir vu.
+        AfficherLeBordereau()
+    End Sub
+
+    ''' <summary>
+    ''' Présente le bordereau de fin de journée, une fois la pièce vue.
+    '''
+    ''' Il s'ouvre de lui-même : c'est la dernière chose que fait l'agent de la compense, et
+    ''' l'oublier reviendrait à ne rien faire signer. Il reste accessible ensuite depuis
+    ''' l'écran des pièces conservées, pour le réimprimer ou pour le viser.
+    '''
+    ''' Son échec n'a aucune conséquence sur la journée : elle est comptabilisée, la pièce
+    ''' est générée, et le bordereau se rouvre quand on veut.
+    ''' </summary>
+    Private Sub AfficherLeBordereau()
+
+        If Not _dateActivite.HasValue Then Return
+
+        Try
+            Using bordereau As New FrmBordereauJournee(_dateActivite.Value)
+                bordereau.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            tsslStatut.Text &= "  |  Bordereau non affiché : " & ex.Message
+        End Try
     End Sub
 
     ''' <summary>

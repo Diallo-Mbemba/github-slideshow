@@ -82,6 +82,7 @@
     <Compile Include="Models\PorteeRapportWU.vb" />
     <Compile Include="Models\AnnulationWU.vb" />
     <Compile Include="Models\LotParametrageWU.vb" />
+    <Compile Include="Models\TraitementJourneeWU.vb" />
     <Compile Include="Models\ComptesSystemeWU.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
@@ -105,6 +106,8 @@
     <Compile Include="Services\ParametrageFichierWU.vb" />
     <Compile Include="Services\ParametrageExportService.vb" />
     <Compile Include="Services\ParametrageImportService.vb" />
+    <Compile Include="Services\TraitementRepository.vb" />
+    <Compile Include="Services\BordereauService.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />
@@ -216,6 +219,12 @@
     <Compile Include="Forms\FrmCommissionsBanque.Designer.vb">
       <DependentUpon>FrmCommissionsBanque.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmBordereauJournee.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmBordereauJournee.Designer.vb">
+      <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmPiecesArchivees.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -306,6 +315,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmCommissionsBanque.resx">
       <DependentUpon>FrmCommissionsBanque.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmBordereauJournee.resx">
+      <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmPiecesArchivees.resx">
       <DependentUpon>FrmPiecesArchivees.vb</DependentUpon>

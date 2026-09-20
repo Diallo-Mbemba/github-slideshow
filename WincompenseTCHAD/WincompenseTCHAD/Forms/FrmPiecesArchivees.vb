@@ -296,6 +296,10 @@ Public Class FrmPiecesArchivees
         ' l'inverse de ce qu'on a voulu. La pièce, elle, reste consultable et exportable :
         ' un justificatif se relit, il n'engage rien.
         If annulee Then btnCoreBanking.Enabled = False
+
+        ' Le bordereau reste accessible sur une journée annulée : comprendre pourquoi elle a
+        ' été retirée suppose de pouvoir relire comment elle avait été traitée.
+        btnBordereau.Enabled = journee IsNot Nothing
     End Sub
 
     Private Sub FormaterLaPiece()
@@ -510,6 +514,30 @@ Public Class FrmPiecesArchivees
 #End Region
 
 #Region "Fermeture"
+
+    ''' <summary>
+    ''' Le bordereau de la journée sélectionnée : ce qui se signe, là où la pièce est ce qui
+    ''' se comptabilise.
+    '''
+    ''' Il s'ouvre aussi de lui-même en fin de comptabilisation. Ce bouton existe pour les
+    ''' deux autres usages : le réimprimer, et le VISER — c'est ici que le chef de service
+    ''' vient relire une journée.
+    '''
+    ''' Disponible même sur une journée annulée : comprendre POURQUOI une journée a été
+    ''' retirée suppose de pouvoir relire comment elle avait été traitée.
+    ''' </summary>
+    Private Sub btnBordereau_Click(sender As Object, e As EventArgs) Handles btnBordereau.Click
+
+        Dim journee As PieceRepository.JourneeConservee = JourneeSelectionnee()
+        If journee Is Nothing Then Return
+
+        Using bordereau As New FrmBordereauJournee(journee.DateActivite)
+            bordereau.ShowDialog(Me)
+        End Using
+
+        ' Le visa a pu changer pendant ce temps : la liste se relit.
+        Charger()
+    End Sub
 
     Private Sub btnFermer_Click(sender As Object, e As EventArgs) Handles btnFermer.Click
         Close()

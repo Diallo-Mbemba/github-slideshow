@@ -1360,6 +1360,142 @@ END
 GO
 
 -- =========================================================================
+-- T_TraitementWU — l'en-tête du traitement d'une journée, et son visa
+--
+-- La pièce porte déjà les quatre cartouches de la banque, et les écritures sont donc
+-- couvertes par une signature. Mais qui signe la pièce signe ce qui y figure : ce qui n'a
+-- PAS été comptabilisé, les rapports Western Union utilisés, l'écart d'arrondi isolé et le
+-- fichier core banking n'y sont pas. Cette table les porte, et le bordereau s'en tire.
+--
+-- Le visa corrige un déséquilibre : modifier un taux de sous-agent exige deux personnes,
+-- comptabiliser une journée entière n'en exigeait qu'une.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_TraitementWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_TraitementWU
+    (
+        DateActivite        DATE            NOT NULL,
+        DateValeur          DATE            NULL,
+        NumeroLot           NVARCHAR(10)    NULL,
+
+        -- Les deux rapports traites, et leur empreinte SHA-256. Elle ne protege de rien,
+        -- mais elle repond a une question : le fichier que vous me montrez est-il celui
+        -- qui a ete traite ce jour-la ?
+        FichierActivite     NVARCHAR(255)   NULL,
+        EmpreinteActivite   NVARCHAR(64)    NULL,
+        FichierReglement    NVARCHAR(255)   NULL,
+        EmpreinteReglement  NVARCHAR(64)    NULL,
+
+        NombrePdv           INT             NOT NULL DEFAULT (0),
+        NombreSousAgents    INT             NOT NULL DEFAULT (0),
+        NombreAgences       INT             NOT NULL DEFAULT (0),
+        NombreEcartes       INT             NOT NULL DEFAULT (0),
+
+        NombreEnvois        INT             NOT NULL DEFAULT (0),
+        NombrePaiements     INT             NOT NULL DEFAULT (0),
+        NombreAnnulations   INT             NOT NULL DEFAULT (0),
+
+        TotalDebit          BIGINT          NOT NULL DEFAULT (0),
+        TotalCredit         BIGINT          NOT NULL DEFAULT (0),
+        EcartArrondi        BIGINT          NOT NULL DEFAULT (0),
+        CompteEcart         NVARCHAR(50)    NULL,
+
+        ComptabilisePar     NVARCHAR(50)    NULL,
+        DateComptabilisation DATETIME       NOT NULL DEFAULT (GETDATE()),
+
+        VisePar             NVARCHAR(50)    NULL,
+        DateVisa            DATETIME        NULL,
+        CommentaireVisa     NVARCHAR(500)   NULL,
+
+        CONSTRAINT PK_T_TraitementWU PRIMARY KEY (DateActivite),
+
+        -- Personne ne vise son propre traitement : la regle est dans la base, et non
+        -- seulement dans l'application.
+        CONSTRAINT CK_T_TraitementWU_PasSoiMeme
+            CHECK (VisePar IS NULL OR VisePar <> ComptabilisePar),
+
+        CONSTRAINT CK_T_TraitementWU_VisaComplet
+            CHECK ((VisePar IS NULL AND DateVisa IS NULL)
+                OR (VisePar IS NOT NULL AND DateVisa IS NOT NULL))
+    );
+
+    PRINT 'Table T_TraitementWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_TraitementWU déjà présente : création ignorée.';
+END
+GO
+
+IF OBJECT_ID(N'dbo.T_TraitementAnnuleWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_TraitementAnnuleWU
+    (
+        IdAnnulation        BIGINT          NOT NULL,
+
+        DateActivite        DATE            NOT NULL,
+        DateValeur          DATE            NULL,
+        NumeroLot           NVARCHAR(10)    NULL,
+
+        FichierActivite     NVARCHAR(255)   NULL,
+        EmpreinteActivite   NVARCHAR(64)    NULL,
+        FichierReglement    NVARCHAR(255)   NULL,
+        EmpreinteReglement  NVARCHAR(64)    NULL,
+
+        NombrePdv           INT             NULL,
+        NombreSousAgents    INT             NULL,
+        NombreAgences       INT             NULL,
+        NombreEcartes       INT             NULL,
+
+        NombreEnvois        INT             NULL,
+        NombrePaiements     INT             NULL,
+        NombreAnnulations   INT             NULL,
+
+        TotalDebit          BIGINT          NULL,
+        TotalCredit         BIGINT          NULL,
+        EcartArrondi        BIGINT          NULL,
+        CompteEcart         NVARCHAR(50)    NULL,
+
+        ComptabilisePar     NVARCHAR(50)    NULL,
+        DateComptabilisation DATETIME       NULL,
+
+        VisePar             NVARCHAR(50)    NULL,
+        DateVisa            DATETIME        NULL,
+        CommentaireVisa     NVARCHAR(500)   NULL,
+
+        CONSTRAINT PK_T_TraitementAnnuleWU PRIMARY KEY (IdAnnulation)
+    );
+
+    CREATE INDEX IX_T_TraitementAnnuleWU_DateActivite
+        ON dbo.T_TraitementAnnuleWU (DateActivite);
+
+    PRINT 'Table T_TraitementAnnuleWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_TraitementAnnuleWU déjà présente : création ignorée.';
+END
+GO
+
+IF OBJECT_ID(N'dbo.V_JourneesAViser', N'V') IS NOT NULL DROP VIEW dbo.V_JourneesAViser;
+GO
+CREATE VIEW dbo.V_JourneesAViser
+AS
+    SELECT  t.DateActivite,
+            t.NumeroLot,
+            t.ComptabilisePar,
+            t.DateComptabilisation,
+            attente     = DATEDIFF(DAY, t.DateComptabilisation, GETDATE()),
+            t.NombrePdv,
+            t.NombreEcartes,
+            equilibre   = CASE WHEN t.TotalDebit = t.TotalCredit THEN N'oui' ELSE N'NON' END,
+            t.TotalDebit,
+            t.EcartArrondi
+    FROM    dbo.T_TraitementWU AS t
+    WHERE   t.VisePar IS NULL;
+GO
+
+-- =========================================================================
 -- T_FichierCoreBankingWU — trace des fichiers produits pour le core banking
 --
 -- Le fichier lui-même n'est pas conservé : il dérive entièrement de la pièce. Mais le FAIT
@@ -1758,6 +1894,35 @@ END
 ELSE
 BEGIN
     PRINT 'T_FichierCoreBankingWU absente : relancez ce script après 15_FichierCoreBanking.sql.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_TraitementWU')
+BEGIN
+    -- Le rôle de compense produit l'en-tête en comptabilisant. Le visa est un UPDATE,
+    -- accordé aux trois rôles pour la même raison que l'annulation : la fonction
+    -- d'authorizer se porte indifféremment sur l'un d'eux. Le double regard est posé par la
+    -- contrainte CK_T_TraitementWU_PasSoiMeme, non par les droits SQL.
+    --
+    -- Aucun DELETE sur l'archive : une archive que ses utilisateurs peuvent effacer ne
+    -- prouve rien.
+    EXEC('GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.T_TraitementWU TO wu_compense');
+    EXEC('GRANT SELECT, UPDATE ON dbo.T_TraitementWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.T_TraitementWU TO wu_admin');
+
+    EXEC('GRANT SELECT, INSERT ON dbo.T_TraitementAnnuleWU TO wu_compense');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_TraitementAnnuleWU TO wu_commercial');
+    EXEC('GRANT SELECT, INSERT ON dbo.T_TraitementAnnuleWU TO wu_admin');
+
+    EXEC('GRANT SELECT ON dbo.V_JourneesAViser TO wu_compense');
+    EXEC('GRANT SELECT ON dbo.V_JourneesAViser TO wu_commercial');
+    EXEC('GRANT SELECT ON dbo.V_JourneesAViser TO wu_admin');
+
+    PRINT 'Droits accordés sur T_TraitementWU et son archive.';
+END
+ELSE
+BEGIN
+    PRINT 'T_TraitementWU absente : relancez ce script après 17_BordereauJournee.sql.';
 END
 GO
 

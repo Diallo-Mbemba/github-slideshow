@@ -2094,6 +2094,117 @@ d'abord qu'elles existent (`WURepository.ColonneExiste`) :
 `Scripts\16_CommissionsBanque.sql` ajoute les colonnes à `T_HistoriqueWU` **et** à
 `T_HistoriqueAnnuleWU`, et crée la vue d'audit `V_CommissionsBanque`.
 
+## Le bordereau de fin de journée, et son visa
+
+### Ce que la pièce comptable ne prouve pas
+
+La pièce porte déjà les quatre cartouches de la banque — *Initié, Contrôlé, Approuvé*, puis
+*Écriture passée et autorisée*. Les **écritures** sont donc couvertes par une signature.
+
+Mais qui signe la pièce signe **ce qui y figure**. Cinq choses n'y figurent pas :
+
+- **ce qui n'a PAS été comptabilisé** : les Accounts non paramétrés sont écartés, et
+  n'apparaissent donc nulle part sur la pièce, par construction. Un contrôleur qui ne voit que
+  la pièce ne peut pas savoir qu'une agence a travaillé ce jour-là sans que ses opérations
+  soient passées ;
+- **quels rapports Western Union ont servi** — si une journée est contestée dans six mois, rien
+  ne prouvait que c'est bien le rapport de ce jour-là qui avait été traité ;
+- **l'écart d'arrondi**, noyé au milieu des lignes de la pièce ;
+- **le fichier destiné au core banking**, qui est pourtant le point de non-retour ;
+- **que la journée est complète** : volumes, points de vente, concordance.
+
+Le bordereau porte ces cinq choses. Il atteste de la **façon dont la journée a été faite**, là
+où la pièce atteste de ce qui a été écrit.
+
+### Ses huit blocs
+
+| Bloc | Contenu |
+|---|---|
+| 1. Identification | journée, date de valeur, numéro de lot, qui a comptabilisé et quand, état du visa |
+| 2. Rapports traités | nom des deux fichiers Western Union et leur **empreinte SHA-256** |
+| 3. Ce qui a été traité | points de vente, dont sous-agents et agences propres, **Accounts écartés**, envois, paiements, annulations |
+| 4. Montants | principal envoyé et payé, charges, taxes, commission totale, **dont part de la banque** et part rétrocédée |
+| 5. La pièce | total débit, total crédit, **équilibre**, et **l'écart d'arrondi isolé avec son compte** |
+| 6. **Accounts non comptabilisés** | Account, désignation, volumes, principal et commission générée — ou « AUCUN », écrit en toutes lettres |
+| 7. Core banking | fichier produit, par qui, quand, sous quel lot |
+| 8. Visa et signatures | trois cartouches hauts : *Établi par*, *Vérifié par*, *Approuvé par* |
+
+Le **bloc 6 est celui qui justifie la signature**. Les sept autres décrivent ce qui a été fait ;
+celui-là décrit ce qui ne l'a pas été, et c'est la seule information qu'un supérieur ne peut
+obtenir ailleurs. Quand il est vide, il le dit — une case vide ne se lit pas, « AUCUN » se lit.
+
+**L'empreinte des rapports** ne protège de rien : qui remplace un fichier peut recalculer la
+sienne. Elle répond à une question — *le fichier que vous me montrez est-il celui qui a été
+traité ce jour-là ?* Sans elle, la question n'a pas de réponse. Elle est calculée au moment de
+la comptabilisation, pendant que les fichiers sont encore sous la main.
+
+### Le visa, et pourquoi il existe
+
+Modifier un taux de sous-agent exige **deux personnes**. Comptabiliser une journée entière n'en
+exigeait qu'**une**. C'était un déséquilibre curieux : le référentiel était mieux gardé que
+l'écriture qu'il produit.
+
+Le visa corrige cela. Un utilisateur ayant la fonction **authorizer** — la même que pour le
+référentiel et les annulations — relit la journée et la marque visée. **Celui qui l'a
+comptabilisée ne peut pas la viser**, et la contrainte `CK_T_TraitementWU_PasSoiMeme` le refuse
+aussi bien qu'un `UPDATE` fait à la main dans Management Studio.
+
+La confirmation répète les chiffres au lieu de demander « êtes-vous sûr ? » : le nombre de
+points de vente, les deux totaux, l'équilibre, et **le nombre d'Accounts non comptabilisés**
+s'il y en a. On est toujours sûr ; on ne relit pas toujours.
+
+**Recomptabiliser une journée efface son visa.** Le visa atteste d'un traitement précis ;
+refaire la journée en produit un autre, et laisser le visa en place ferait croire qu'un
+supérieur a vu des chiffres qu'il n'a jamais vus. Il faut viser de nouveau.
+
+### Quand il se produit
+
+**Automatiquement**, à la fin de la comptabilisation : il s'ouvre après la pièce — l'agent
+regarde d'abord ce qu'il a produit, puis ce qu'il doit faire signer. L'inverse ferait signer
+avant d'avoir vu.
+
+**Et à la demande**, depuis l'écran des pièces conservées, bouton « Bordereau de la journée… ».
+C'est là que le chef de service vient relire une journée et la viser. Le bouton reste actif sur
+une journée **annulée** : comprendre pourquoi elle a été retirée suppose de pouvoir relire
+comment elle avait été traitée.
+
+### Il se reconstitue
+
+Tout vient de la base : l'en-tête de traitement (`T_TraitementWU`, écrit dans la **même
+transaction** que l'historique et la pièce), l'historique, la pièce conservée et la trace du
+fichier core banking. Rien n'est recalculé avec le paramétrage d'aujourd'hui.
+
+Une journée annulée emporte son en-tête en archive (`T_TraitementAnnuleWU`), **visa compris** :
+c'est ce que l'on relira pour comprendre qui avait vu quoi.
+
+### Pour les journées antérieures
+
+Celles comptabilisées avant l'exécution de `Scripts\17_BordereauJournee.sql` n'ont pas
+d'en-tête. Leur bordereau s'affiche quand même : volumes, montants et totaux de la pièce se
+relisent. Mais le **nom des rapports Western Union** n'était conservé nulle part — l'écran écrit
+« NON CONSERVÉ pour cette journée » plutôt que de laisser des cases vides qui se liraient comme
+une absence de rapport. Et ces journées **ne peuvent pas être visées** : on ne vise pas un
+traitement dont on n'a pas la trace.
+
+### Compatibilité avec une base non mise à jour
+
+L'écriture de l'en-tête et son déplacement en archive vérifient tous deux que les tables
+existent. **La comptabilisation du jour ne s'arrête pas** parce qu'un script d'évolution n'a pas
+été joué : c'est l'opération quotidienne, elle passe quand même, sans bordereau reproductible.
+De même, une annulation ne laisse pas une journée en place faute d'une table qu'elle n'a jamais
+eue.
+
+### L'édition mensuelle des commissions
+
+L'état des commissions encaissées par la banque gagne deux commandes :
+
+- **« Mois complet »** cale la période sur le mois entier de la date de fin. Un état signé qui
+  couvrirait vingt-trois jours parce que l'agent a mal cliqué serait un état faux, et rien ne le
+  dirait ;
+- **« Édition à signer (cartouches) »** ajoute au PDF les trois cartouches de signature et la
+  mention « ÉDITION DESTINÉE À LA SIGNATURE » en exergue. Le fichier s'appelle alors
+  `Commissions-banque-a-signer-202605.pdf`.
+
 ## Règles tranchées par la banque
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
@@ -2139,6 +2250,13 @@ d'abord qu'elles existent (`WURepository.ColonneExiste`) :
   fonctions — une colonne de plus sur `T_UtilisateurWU`, et rien d'autre à changer.
 - Faut-il purger les archives d'annulation au bout d'un certain temps, et lequel ? Aucune
   purge n'est prévue aujourd'hui, et aucun rôle n'a le droit d'effacer.
+- Le visa d'une journée utilise la fonction AUTHORIZER, la même que le référentiel et les
+  annulations. Si la banque veut que le chef de service de la compense soit distinct de celui
+  qui autorise le paramétrage, il faudra une seconde paire de fonctions — une colonne de plus
+  sur `T_UtilisateurWU`, et rien d'autre à changer.
+- Faut-il empêcher la production du fichier core banking tant que la journée n'est pas visée ?
+  Aujourd'hui le visa constate, il ne bloque pas. Le rendre bloquant est une ligne de code, et
+  une décision d'organisation.
 - Sauvegarde de la base : qui tient le serveur SQL, à quelle périodicité les sauvegardes
   tournent-elles, et où sont-elles recopiées ? Le fichier de secours du paramétrage ne
   remplace rien de cela — il le complète.

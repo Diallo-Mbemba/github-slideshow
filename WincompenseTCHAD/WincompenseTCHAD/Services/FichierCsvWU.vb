@@ -232,6 +232,40 @@ Public NotInheritable Class FichierCsvWU
     ''' l'application, ou quelqu'un l'a-t-il retouché entre-temps ? ». Retoucher est parfois
     ''' légitime ; l'ignorer ne l'est pas.
     ''' </summary>
+    ''' <summary>
+    ''' Empreinte SHA-256 d'un FICHIER, en hexadécimal. Chaîne vide si le fichier est
+    ''' illisible : une empreinte manquante se dit, elle ne fait pas échouer un traitement
+    ''' qui a par ailleurs abouti.
+    '''
+    ''' Le fichier est lu par blocs et non chargé en mémoire : un rapport Western Union
+    ''' décompressé pèse plusieurs dizaines de mégaoctets.
+    ''' </summary>
+    Public Shared Function EmpreinteFichier(chemin As String) As String
+
+        If String.IsNullOrWhiteSpace(chemin) Then Return String.Empty
+
+        Try
+            Using flux As IO.FileStream = IO.File.OpenRead(chemin)
+                Using algorithme As System.Security.Cryptography.SHA256 = System.Security.Cryptography.SHA256.Create()
+
+                    Dim octets() As Byte = algorithme.ComputeHash(flux)
+                    Dim assemblage As New StringBuilder(octets.Length * 2)
+
+                    For Each octet As Byte In octets
+                        assemblage.Append(octet.ToString("x2", CultureInfo.InvariantCulture))
+                    Next
+
+                    Return assemblage.ToString()
+                End Using
+            End Using
+
+        Catch ex As IO.IOException
+            Return String.Empty
+        Catch ex As UnauthorizedAccessException
+            Return String.Empty
+        End Try
+    End Function
+
     Public Shared Function Empreinte(texte As String) As String
 
         Using algorithme As System.Security.Cryptography.SHA256 = System.Security.Cryptography.SHA256.Create()

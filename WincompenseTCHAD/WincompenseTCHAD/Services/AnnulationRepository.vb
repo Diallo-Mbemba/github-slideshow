@@ -42,6 +42,8 @@ Public NotInheritable Class AnnulationRepository
     Private Const MTCN_ARCHIVE As String = "T_HistoriqueMTCNAnnuleWU"
     Private Const PIECE As String = "T_PieceWU"
     Private Const PIECE_ARCHIVE As String = "T_PieceAnnuleeWU"
+    Private Const TRAITEMENT As String = "T_TraitementWU"
+    Private Const TRAITEMENT_ARCHIVE As String = "T_TraitementAnnuleWU"
 
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208
@@ -303,6 +305,7 @@ Public NotInheritable Class AnnulationRepository
         DeplacerHistorique(idAnnulation, jour, connexion, transaction)
         DeplacerTransactions(idAnnulation, jour, connexion, transaction)
         DeplacerPiece(idAnnulation, jour, connexion, transaction)
+        DeplacerTraitement(idAnnulation, jour, connexion, transaction)
 
         Return True
     End Function
@@ -400,6 +403,35 @@ Public NotInheritable Class AnnulationRepository
             "DateEnregistrement, EnregistrePar"
 
         Deplacer(PIECE, PIECE_ARCHIVE, colonnes, idAnnulation, jour, connexion, transaction)
+    End Sub
+
+    ''' <summary>
+    ''' Déplace l'en-tête de traitement.
+    '''
+    ''' Une journée annulée emporte son historique, ses MTCN et sa pièce ; elle doit emporter
+    ''' aussi la façon dont elle avait été traitée — rapports utilisés, Accounts écartés,
+    ''' visa éventuel. C'est ce que l'on relira pour comprendre POURQUOI elle a dû être
+    ''' retirée.
+    '''
+    ''' Les deux tables sont récentes : sans elles, l'annulation se fait quand même, et une
+    ''' journée n'est pas laissée en place faute d'une table qu'elle n'a jamais eue.
+    ''' </summary>
+    Private Shared Sub DeplacerTraitement(idAnnulation As Long, jour As Date,
+                                          connexion As SqlConnection, transaction As SqlTransaction)
+
+        Const colonnes As String =
+            "DateActivite, DateValeur, NumeroLot, " &
+            "FichierActivite, EmpreinteActivite, FichierReglement, EmpreinteReglement, " &
+            "NombrePdv, NombreSousAgents, NombreAgences, NombreEcartes, " &
+            "NombreEnvois, NombrePaiements, NombreAnnulations, " &
+            "TotalDebit, TotalCredit, EcartArrondi, CompteEcart, " &
+            "ComptabilisePar, DateComptabilisation, VisePar, DateVisa, CommentaireVisa"
+
+        If Not WURepository.ColonneExiste(connexion, transaction, TRAITEMENT, "DateActivite") Then Return
+        If Not WURepository.ColonneExiste(connexion, transaction, TRAITEMENT_ARCHIVE, "DateActivite") Then Return
+
+        Deplacer(TRAITEMENT, TRAITEMENT_ARCHIVE, colonnes, idAnnulation, jour,
+                 connexion, transaction)
     End Sub
 
     ''' <summary>

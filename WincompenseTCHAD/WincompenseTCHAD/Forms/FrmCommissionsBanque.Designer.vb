@@ -28,6 +28,8 @@ Partial Class FrmCommissionsBanque
         Me.dtpFin = New System.Windows.Forms.DateTimePicker()
         Me.btnAfficher = New System.Windows.Forms.Button()
         Me.lblDisponible = New System.Windows.Forms.Label()
+        Me.btnMois = New System.Windows.Forms.Button()
+        Me.chkASigner = New System.Windows.Forms.CheckBox()
         Me.lblAvertissement = New System.Windows.Forms.Label()
         Me.lblSynthese = New System.Windows.Forms.Label()
         Me.dgvSynthese = New System.Windows.Forms.DataGridView()
@@ -52,7 +54,7 @@ Partial Class FrmCommissionsBanque
         Me.lblTitre.ForeColor = System.Drawing.Color.Yellow
         Me.lblTitre.Location = New System.Drawing.Point(12, 12)
         Me.lblTitre.Name = "lblTitre"
-        Me.lblTitre.Size = New System.Drawing.Size(1036, 34)
+        Me.lblTitre.Size = New System.Drawing.Size(1136, 34)
         Me.lblTitre.TabIndex = 0
         Me.lblTitre.Text = "   Commissions encaissées par la banque"
         Me.lblTitre.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
@@ -62,7 +64,7 @@ Partial Class FrmCommissionsBanque
         Me.lblSousTitre.ForeColor = System.Drawing.SystemColors.GrayText
         Me.lblSousTitre.Location = New System.Drawing.Point(12, 50)
         Me.lblSousTitre.Name = "lblSousTitre"
-        Me.lblSousTitre.Size = New System.Drawing.Size(1036, 32)
+        Me.lblSousTitre.Size = New System.Drawing.Size(1136, 32)
         Me.lblSousTitre.TabIndex = 1
         Me.lblSousTitre.Text = "Ce que la banque garde réellement : sur un sous-agent, la part non rétrocédée ; su" &
             "r une agence propre, la totalité. L'onglet « Évolution des commissions » des rapp" &
@@ -114,10 +116,28 @@ Partial Class FrmCommissionsBanque
         Me.lblDisponible.Anchor = CType(((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.lblDisponible.ForeColor = System.Drawing.SystemColors.GrayText
-        Me.lblDisponible.Location = New System.Drawing.Point(480, 92)
+        Me.lblDisponible.Location = New System.Drawing.Point(848, 92)
         Me.lblDisponible.Name = "lblDisponible"
-        Me.lblDisponible.Size = New System.Drawing.Size(568, 20)
-        Me.lblDisponible.TabIndex = 7
+        Me.lblDisponible.Size = New System.Drawing.Size(300, 20)
+        Me.lblDisponible.TabIndex = 9
+        '
+        'btnMois
+        '
+        Me.btnMois.Location = New System.Drawing.Point(472, 86)
+        Me.btnMois.Name = "btnMois"
+        Me.btnMois.Size = New System.Drawing.Size(120, 26)
+        Me.btnMois.TabIndex = 7
+        Me.btnMois.Text = "Mois complet"
+        Me.btnMois.UseVisualStyleBackColor = True
+        '
+        'chkASigner
+        '
+        Me.chkASigner.Location = New System.Drawing.Point(600, 90)
+        Me.chkASigner.Name = "chkASigner"
+        Me.chkASigner.Size = New System.Drawing.Size(240, 22)
+        Me.chkASigner.TabIndex = 8
+        Me.chkASigner.Text = "Édition à signer (cartouches)"
+        Me.chkASigner.UseVisualStyleBackColor = True
         '
         'lblAvertissement
         '
@@ -126,16 +146,16 @@ Partial Class FrmCommissionsBanque
         Me.lblAvertissement.ForeColor = System.Drawing.Color.Firebrick
         Me.lblAvertissement.Location = New System.Drawing.Point(12, 118)
         Me.lblAvertissement.Name = "lblAvertissement"
-        Me.lblAvertissement.Size = New System.Drawing.Size(1036, 34)
-        Me.lblAvertissement.TabIndex = 8
+        Me.lblAvertissement.Size = New System.Drawing.Size(1136, 34)
+        Me.lblAvertissement.TabIndex = 10
         '
         'lblSynthese
         '
         Me.lblSynthese.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
         Me.lblSynthese.Location = New System.Drawing.Point(12, 156)
         Me.lblSynthese.Name = "lblSynthese"
-        Me.lblSynthese.Size = New System.Drawing.Size(520, 20)
-        Me.lblSynthese.TabIndex = 9
+        Me.lblSynthese.Size = New System.Drawing.Size(620, 20)
+        Me.lblSynthese.TabIndex = 11
         Me.lblSynthese.Text = "Répartition sur la période"
         '
         'dgvSynthese
@@ -149,17 +169,17 @@ Partial Class FrmCommissionsBanque
         Me.dgvSynthese.ReadOnly = True
         Me.dgvSynthese.RowHeadersWidth = 25
         Me.dgvSynthese.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
-        Me.dgvSynthese.Size = New System.Drawing.Size(520, 132)
-        Me.dgvSynthese.TabIndex = 10
+        Me.dgvSynthese.Size = New System.Drawing.Size(620, 132)
+        Me.dgvSynthese.TabIndex = 12
         '
         'lblComptes
         '
         Me.lblComptes.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.lblComptes.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
-        Me.lblComptes.Location = New System.Drawing.Point(544, 156)
+        Me.lblComptes.Location = New System.Drawing.Point(644, 156)
         Me.lblComptes.Name = "lblComptes"
         Me.lblComptes.Size = New System.Drawing.Size(504, 20)
-        Me.lblComptes.TabIndex = 11
+        Me.lblComptes.TabIndex = 13
         Me.lblComptes.Text = "Comptes bancaires crédités, d'après les pièces conservées"
         '
         'dgvComptes
@@ -168,22 +188,22 @@ Partial Class FrmCommissionsBanque
         Me.dgvComptes.AllowUserToDeleteRows = False
         Me.dgvComptes.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.dgvComptes.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        Me.dgvComptes.Location = New System.Drawing.Point(544, 178)
+        Me.dgvComptes.Location = New System.Drawing.Point(644, 178)
         Me.dgvComptes.MultiSelect = False
         Me.dgvComptes.Name = "dgvComptes"
         Me.dgvComptes.ReadOnly = True
         Me.dgvComptes.RowHeadersWidth = 25
         Me.dgvComptes.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
         Me.dgvComptes.Size = New System.Drawing.Size(504, 132)
-        Me.dgvComptes.TabIndex = 12
+        Me.dgvComptes.TabIndex = 14
         '
         'lblParJour
         '
         Me.lblParJour.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
         Me.lblParJour.Location = New System.Drawing.Point(12, 320)
         Me.lblParJour.Name = "lblParJour"
-        Me.lblParJour.Size = New System.Drawing.Size(1036, 20)
-        Me.lblParJour.TabIndex = 13
+        Me.lblParJour.Size = New System.Drawing.Size(1136, 20)
+        Me.lblParJour.TabIndex = 15
         Me.lblParJour.Text = "Jour par jour"
         '
         'dgvParJour
@@ -199,8 +219,8 @@ Partial Class FrmCommissionsBanque
         Me.dgvParJour.ReadOnly = True
         Me.dgvParJour.RowHeadersWidth = 25
         Me.dgvParJour.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
-        Me.dgvParJour.Size = New System.Drawing.Size(1036, 240)
-        Me.dgvParJour.TabIndex = 14
+        Me.dgvParJour.Size = New System.Drawing.Size(1136, 240)
+        Me.dgvParJour.TabIndex = 16
         '
         'lblControle
         '
@@ -209,8 +229,8 @@ Partial Class FrmCommissionsBanque
         Me.lblControle.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
         Me.lblControle.Location = New System.Drawing.Point(12, 590)
         Me.lblControle.Name = "lblControle"
-        Me.lblControle.Size = New System.Drawing.Size(1036, 40)
-        Me.lblControle.TabIndex = 15
+        Me.lblControle.Size = New System.Drawing.Size(1136, 40)
+        Me.lblControle.TabIndex = 17
         '
         'btnExporter
         '
@@ -218,7 +238,7 @@ Partial Class FrmCommissionsBanque
         Me.btnExporter.Location = New System.Drawing.Point(12, 640)
         Me.btnExporter.Name = "btnExporter"
         Me.btnExporter.Size = New System.Drawing.Size(200, 32)
-        Me.btnExporter.TabIndex = 16
+        Me.btnExporter.TabIndex = 18
         Me.btnExporter.Text = "Exporter en PDF…"
         Me.btnExporter.UseVisualStyleBackColor = True
         '
@@ -229,17 +249,17 @@ Partial Class FrmCommissionsBanque
         Me.lblStatut.ForeColor = System.Drawing.SystemColors.GrayText
         Me.lblStatut.Location = New System.Drawing.Point(222, 646)
         Me.lblStatut.Name = "lblStatut"
-        Me.lblStatut.Size = New System.Drawing.Size(722, 20)
-        Me.lblStatut.TabIndex = 17
+        Me.lblStatut.Size = New System.Drawing.Size(822, 20)
+        Me.lblStatut.TabIndex = 19
         '
         'btnFermer
         '
         Me.btnFermer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnFermer.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.btnFermer.Location = New System.Drawing.Point(956, 640)
+        Me.btnFermer.Location = New System.Drawing.Point(1056, 640)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(92, 32)
-        Me.btnFermer.TabIndex = 18
+        Me.btnFermer.TabIndex = 20
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -254,7 +274,7 @@ Partial Class FrmCommissionsBanque
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(1060, 690)
+        Me.ClientSize = New System.Drawing.Size(1160, 690)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.lblStatut)
         Me.Controls.Add(Me.btnExporter)
@@ -266,6 +286,8 @@ Partial Class FrmCommissionsBanque
         Me.Controls.Add(Me.dgvSynthese)
         Me.Controls.Add(Me.lblSynthese)
         Me.Controls.Add(Me.lblAvertissement)
+        Me.Controls.Add(Me.chkASigner)
+        Me.Controls.Add(Me.btnMois)
         Me.Controls.Add(Me.lblDisponible)
         Me.Controls.Add(Me.btnAfficher)
         Me.Controls.Add(Me.dtpFin)
@@ -274,7 +296,7 @@ Partial Class FrmCommissionsBanque
         Me.Controls.Add(Me.lblDu)
         Me.Controls.Add(Me.lblSousTitre)
         Me.Controls.Add(Me.lblTitre)
-        Me.MinimumSize = New System.Drawing.Size(940, 620)
+        Me.MinimumSize = New System.Drawing.Size(1040, 620)
         Me.Name = "FrmCommissionsBanque"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
         Me.Text = "Commissions encaissées par la banque"
@@ -293,6 +315,8 @@ Partial Class FrmCommissionsBanque
     Friend WithEvents dtpFin As System.Windows.Forms.DateTimePicker
     Friend WithEvents btnAfficher As System.Windows.Forms.Button
     Friend WithEvents lblDisponible As System.Windows.Forms.Label
+    Friend WithEvents btnMois As System.Windows.Forms.Button
+    Friend WithEvents chkASigner As System.Windows.Forms.CheckBox
     Friend WithEvents lblAvertissement As System.Windows.Forms.Label
     Friend WithEvents lblSynthese As System.Windows.Forms.Label
     Friend WithEvents dgvSynthese As System.Windows.Forms.DataGridView
