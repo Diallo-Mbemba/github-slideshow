@@ -59,6 +59,9 @@ Public NotInheritable Class PieceExcelWU
     ''' <summary>Format des montants : séparateur de milliers, pas de décimale — le FCFA n'en a pas.</summary>
     Private Const FORMAT_MONTANT As String = "#,##0"
 
+    ''' <summary>Format « texte » d'Excel : ce qui est écrit reste écrit, sans conversion.</summary>
+    Private Const FORMAT_TEXTE As String = "@"
+
 #End Region
 
 #Region "Géométrie du formulaire"
@@ -203,7 +206,8 @@ Public NotInheritable Class PieceExcelWU
                                   Optional nomPremiereFeuille As String = "PIECE GLOBALE",
                                   Optional intitulePremiereFeuille As String = "",
                                   Optional agencePremiereFeuille As String = "",
-                                  Optional progression As ProgressionWU = Nothing) As String
+                                  Optional progression As ProgressionWU = Nothing,
+                                  Optional derniereJournee As Date? = Nothing) As String
 
         If dtGlobale Is Nothing OrElse dtGlobale.Rows.Count = 0 Then
             Throw New InvalidOperationException(
@@ -253,10 +257,11 @@ Public NotInheritable Class PieceExcelWU
 
             Annoncer(progression, $"Pièce globale — journée du {dateActivite:dd/MM/yyyy}")
 
-            EcrireLaPremiereFeuille(classeur, dtGlobale, dateActivite,
+            EcrireLaPremiereFeuille(classeur, dtGlobale, dateActivite, derniereJournee,
                                     nomPremiereFeuille, intitulePremiereFeuille,
                                     agencePremiereFeuille)
-            EcrireLesPiecesIndividuelles(classeur, aDetailler, dateActivite, agences, progression)
+            EcrireLesPiecesIndividuelles(classeur, aDetailler, dateActivite, derniereJournee,
+                                         agences, progression)
 
             ' La première feuille est celle qu'on veut voir en ouvrant le classeur.
             classeur.Worksheets(1).Activate()
@@ -303,6 +308,22 @@ Public NotInheritable Class PieceExcelWU
     ''' classeur où les pièces sont noyées entre des « Feuil2 » vides — et le comptable qui
     ''' imprime tout le classeur sortirait des pages blanches au milieu de ses pièces.
     ''' </summary>
+    ''' <summary>
+    ''' Dit la période réellement couverte : une journée, ou un intervalle.
+    '''
+    ''' La pièce portait « activité du 09/09/2026 » alors qu'elle totalisait la semaine du 08
+    ''' au 14 : la date venait de la première ligne du rapport, et rien ne disait le reste.
+    ''' Une pièce qui annonce une journée pour une semaine est impossible à rapprocher.
+    ''' </summary>
+    Private Shared Function LibelleDeLaPeriode(debut As Date, fin As Date?) As String
+
+        If Not fin.HasValue OrElse fin.Value.Date <= debut.Date Then
+            Return $"activité du {debut:dd/MM/yyyy}"
+        End If
+
+        Return $"activité du {debut:dd/MM/yyyy} au {fin.Value:dd/MM/yyyy}"
+    End Function
+
     Private Shared Sub NeGarderQueLaPremiereFeuille(classeur As Object)
 
         While CInt(classeur.Worksheets.Count) > 1
@@ -317,21 +338,21 @@ Public NotInheritable Class PieceExcelWU
     End Sub
 
     Private Shared Sub EcrireLaPremiereFeuille(classeur As Object, dtGlobale As DataTable,
-                                               dateActivite As Date,
+                                               dateActivite As Date, derniereJournee As Date?,
                                                nomFeuille As String, intitule As String,
                                                agence As String)
 
         Dim contexte As New ContexteFeuille() With {
             .NomFeuille = If(String.IsNullOrWhiteSpace(nomFeuille), "PIECE GLOBALE", nomFeuille),
             .Intitule = If(String.IsNullOrWhiteSpace(intitule),
-                           $"PIECE GLOBALE — journée du {dateActivite:dd/MM/yyyy}",
+                           $"PIECE GLOBALE — {LibelleDeLaPeriode(dateActivite, derniereJournee)}",
                            intitule),
             .DateActivite = dateActivite,
             .Numero = NumeroDePiece(dateActivite, 1),
             .TientSurUnePage = False,
             .AgenceEmettrice = If(String.IsNullOrWhiteSpace(agence),
                                   ConstantesWU.PIECE_AGENCE_DEFAUT, agence),
-            .Raison = $"Compensation Western Union — activité du {dateActivite:dd/MM/yyyy}"
+            .Raison = $"Compensation Western Union — {LibelleDeLaPeriode(dateActivite, derniereJournee)}"
         }
 
         Dim feuille As Object = classeur.Worksheets(1)
@@ -350,6 +371,7 @@ Public NotInheritable Class PieceExcelWU
     Private Shared Sub EcrireLesPiecesIndividuelles(classeur As Object,
                                                     aDetailler As List(Of CalculWU),
                                                     dateActivite As Date,
+                                                    derniereJournee As Date?,
                                                     agences As Dictionary(Of String, String),
                                                     progression As ProgressionWU)
 
@@ -384,7 +406,7 @@ Public NotInheritable Class PieceExcelWU
                 .Numero = NumeroDePiece(dateActivite, numero),
                 .AgenceEmettrice = AgenceDe(calc, agences),
                 .Raison = $"Compensation Western Union — {calc.Designation} ({calc.Account}) — " &
-                          $"activité du {dateActivite:dd/MM/yyyy}"
+                          LibelleDeLaPeriode(dateActivite, derniereJournee)
             }
 
             ' Ajoutée APRÈS la dernière : sans cela les onglets sortiraient à l'envers, et
@@ -425,6 +447,13 @@ Public NotInheritable Class PieceExcelWU
 
         Dim premierCredit As Integer = ligne
         ligne = EcrireBloc(feuille, credits, "Credit", ligne, ConstantesWU.PIECE_CREDIT)
+
+        ' Le total des crédits, comme sur la pièce manuelle de la banque : c'est lui qui
+        ' permet de conclure sans additionner douze lignes à la main.
+        If credits.Count > 0 Then
+            LigneDeTotal(feuille, ligne, premierCredit, ligne - 1)
+            ligne += 1
+        End If
 
         Dim derniereLigne As Integer = ligne - 1
 
@@ -532,6 +561,23 @@ Public NotInheritable Class PieceExcelWU
         Next
 
         Dim derniere As Integer = premiereLigne + ecritures.Count - 1
+
+        ' LES NUMÉROS DE COMPTE SONT DU TEXTE, et le format est posé AVANT la valeur.
+        '
+        ' Sans cela, Excel convertit « 32100005296 » en NOMBRE : la cellule s'aligne à droite
+        ' comme un montant, elle devient sommable, un compte commençant par zéro perdrait son
+        ' zéro — et surtout, dès que la colonne est rétrécie, Excel l'affiche « 3,21E+10 ».
+        ' C'est exactement ce que la banque a vu en collant notre pièce à côté de la sienne.
+        '
+        ' Poser le format APRÈS l'écriture ne servirait à rien : la conversion a déjà eu lieu.
+        Dim colonneCompte As Object = feuille.Range(feuille.Cells(premiereLigne, 2),
+                                                    feuille.Cells(derniere, 2))
+        Try
+            colonneCompte.NumberFormat = FORMAT_TEXTE
+        Finally
+            Marshal.ReleaseComObject(colonneCompte)
+        End Try
+
         Dim zone As Object = feuille.Range(feuille.Cells(premiereLigne, 2), feuille.Cells(derniere, 4))
 
         Try
@@ -553,6 +599,32 @@ Public NotInheritable Class PieceExcelWU
 
         Return derniere + 1
     End Function
+
+    ''' <summary>
+    ''' Écrit le total des crédits sous le dernier d'entre eux.
+    '''
+    ''' C'est une FORMULE et non une valeur : elle se recalcule si quelqu'un corrige une ligne
+    ''' dans le classeur, au lieu d'afficher un total qui ne correspondrait plus à rien.
+    ''' </summary>
+    Private Shared Sub LigneDeTotal(feuille As Object, ligne As Integer,
+                                    premierCredit As Integer, dernierCredit As Integer)
+
+        Ecrire(feuille, ligne, 3, ConstantesWU.PIECE_TOTAL_CREDITS,
+               ConstantesWU.PIECE_POLICE_CORPS, TAILLE_ECRITURE, True, XL_DROITE)
+
+        Dim cellule As Object = feuille.Cells(ligne, 4)
+        Try
+            cellule.Formula = $"=SUM(D{premierCredit}:D{dernierCredit})"
+            cellule.NumberFormat = FORMAT_MONTANT
+            cellule.Font.Name = ConstantesWU.PIECE_POLICE_CORPS
+            cellule.Font.Size = TAILLE_ECRITURE
+            cellule.Font.Bold = True
+            cellule.HorizontalAlignment = XL_DROITE
+            cellule.RowHeight = HAUTEUR_ECRITURE
+        Finally
+            Marshal.ReleaseComObject(cellule)
+        End Try
+    End Sub
 
     ''' <summary>Quadrille le tableau, et ferme sa colonne A par un trait à gauche comme le modèle.</summary>
     Private Shared Sub Encadrer(feuille As Object, premiereLigne As Integer, derniereLigne As Integer)

@@ -2538,6 +2538,76 @@ les lignes de `GenererPieceComptable`, l'arrondi au franc ligne par ligne — su
 > compte d'attente (`VerifierEquilibrePiece`). La banque, elle, l'a absorbé dans son compte
 > courant en saisissant 30 408 là où 40 % de 76 017,06 donne 30 407.
 
+## Cinq corrections de forme sur la pièce
+
+Elles viennent toutes du rapprochement ligne à ligne avec la pièce manuelle de la banque
+(AHB020211, semaine du 08 au 14/09/2026). Aucune ne touche un montant ; toutes touchent ce que
+le vérificateur voit.
+
+### 1. La pièce dit la période qu'elle couvre
+
+La date d'activité était déduite de la **première ligne lisible** du fichier, et rien ne
+vérifiait les suivantes. Un rapport hebdomadaire — c'est ainsi que la banque liquide, *« DU 08
+AU 14/09 »* — était donc agrégé en entier puis étiqueté d'une seule journée : celle de sa
+première ligne. Les montants étaient justes, l'intitulé faux, et **rien ne le disait**.
+
+- `WUReportService.JourneesDuRapport` inventorie désormais **toutes** les journées du rapport ;
+- une seule fonction lit une date (`EssayerLireDate`), pour que l'inventaire et la lecture d'une
+  date ne puissent pas comprendre deux choses différentes du même fichier ;
+- l'écran **annonce** le périmètre et le fait confirmer, **avec « Non » par défaut**, en nommant
+  la journée sous laquelle tout sera enregistré et en avertissant du double comptage si l'on
+  charge ensuite une journée déjà comprise dans la période ;
+- la pièce s'intitule alors **« activité du 08/09/2026 au 14/09/2026 »**.
+
+Le traitement n'est **pas** refusé : la banque liquide par semaine, et lui interdire de charger
+sa semaine reviendrait à lui interdire de travailler. La conséquence est dite, l'agent tranche.
+
+> **Ce qui reste à décider.** L'historisation se fait toujours sous **une** date — la première
+> journée du rapport. Tant que la banque charge une semaine par semaine, cela fonctionne ; le
+> jour où elle voudra une clé de période, c'est le modèle de `T_HistoriqueWU` qu'il faudra
+> ouvrir, pas un libellé.
+
+### 2. Les numéros de compte sont du texte
+
+`32100005296` était écrit comme un **nombre**. La cellule s'alignait à droite comme un montant,
+devenait sommable, un compte commençant par zéro aurait perdu son zéro — et surtout, dès que la
+colonne était rétrécie, Excel affichait **`3,21E+10`**. C'est exactement ce que la banque a vu en
+collant notre pièce à côté de la sienne.
+
+Le format `"@"` est posé sur la colonne des comptes **avant** l'écriture des valeurs. Le poser
+après ne servirait à rien : la conversion a déjà eu lieu.
+
+### 3. La ligne de total
+
+La pièce de la banque porte le total des crédits ; la nôtre ne le portait pas. C'est lui qui
+permet de conclure d'un coup d'œil, sans additionner douze lignes. C'est une **formule**
+(`=SUM(...)`) et non une valeur figée : elle se recalcule si quelqu'un corrige une ligne dans le
+classeur, au lieu d'afficher un total qui ne correspondrait plus à rien.
+
+### 4. Un seul ordre de lignes
+
+Le bloc Ecobank allait *transfert / envoi / paiement*, le bloc sous-agent *transfert / paiement /
+envoi*. Deux ordres différents **dans la même pièce**, et un troisième chez la banque. Les trois
+blocs suivent désormais **transfert, paiement, envoi** — celui de la banque. Dans une comparaison
+ligne à ligne, un ordre différent fait perdre du temps au vérificateur et lui fait passer des
+écarts.
+
+### 5. Le libellé n'est plus doublé
+
+Le gabarit préfixe la désignation par `CCS_`, comme le classeur de référence. Mais la plupart des
+désignations commencent **déjà** par « CCS », et la pièce portait
+*« CCS_CCS NGARTA RUE DE 40M ACTIVITE WU »*. Le préfixe n'est désormais posé que lorsqu'il
+manque : `CCS NGARTA RUE DE 40M ACTIVITE WU`, tandis que `BOLOLO` garde son
+`CCS_BOLOLO ACTIVITE WU` d'origine.
+
+### Ce qui a été vérifié
+
+`verif_piece_forme.py` tient les cinq règles — dix-neuf contrôles sur le code : la fonction
+d'inventaire des journées, l'unicité de la lecture de date, la confirmation par défaut sur
+« Non », le libellé de période, le format texte posé **avant** la valeur, la ligne de total en
+formule et dans le quadrillage, l'ordre des trois lignes dans les deux blocs, et le préfixe
+conditionnel — avec les deux cas limites, `CCS NGARTA` et `BOLOLO`.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

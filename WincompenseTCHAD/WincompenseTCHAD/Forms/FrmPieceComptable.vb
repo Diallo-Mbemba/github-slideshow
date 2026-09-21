@@ -51,6 +51,12 @@ Public Class FrmPieceComptable
     Public Property DateActivite As Date = Date.Today
 
     ''' <summary>
+    ''' Dernière journée couverte, quand le rapport en portait plusieurs. Nothing pour une
+    ''' journée unique : la pièce s'intitule alors « activité du X », et non « du X au X ».
+    ''' </summary>
+    Public Property DerniereJournee As Date? = Nothing
+
+    ''' <summary>
     ''' Points de vente à détailler, un onglet chacun, dans le classeur exporté.
     ''' 
     ''' Nothing — le cas par défaut — n'écrit que la pièce affichée, en une feuille. L'appelant
@@ -308,7 +314,8 @@ Public Class FrmPieceComptable
 
             PieceComptableService.ExporterEtOuvrirPieceExcel(
                 _dtPiece, CalculsAExporter(), DateActivite, chemin,
-                NomPremiereFeuille, IntitulePiece, AgencePiece, avancement.Progression)
+                NomPremiereFeuille, IntitulePiece, AgencePiece, avancement.Progression,
+                DerniereJournee)
 
             _exportee = True
             _chemin = chemin

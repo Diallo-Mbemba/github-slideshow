@@ -41,6 +41,15 @@ Public Class FrmCompensationWU
     Private _dateActivite As Date?
 
     ''' <summary>
+    ''' Toutes les journées que porte le rapport chargé, triées.
+    '''
+    ''' La banque liquide par semaine (« DU 08 AU 14/09 ») : un rapport en couvre donc souvent
+    ''' plusieurs. Les connaître permet de le DIRE, et d'intituler la pièce de la période
+    ''' réellement traitée au lieu de la première journée venue.
+    ''' </summary>
+    Private _journeesDuRapport As New List(Of Date)()
+
+    ''' <summary>
     ''' Détail des transactions de la journée, identifiées par leur MTCN. Extrait au moment du
     ''' calcul — le rapport n'est plus en mémoire au moment de générer la pièce — et historisé
     ''' avec l'agrégat pour permettre de retrouver une opération précise.
@@ -434,6 +443,14 @@ Public Class FrmCompensationWU
 
             ' Date de la journée traitée, retenue pour l'historisation.
             _dateActivite = WUReportService.ObtenirDateActivite(dtActivite)
+            _journeesDuRapport = WUReportService.JourneesDuRapport(dtActivite)
+
+            ' Un rapport qui couvre plusieurs journées n'est pas une anomalie — c'est la façon
+            ' dont la banque liquide — mais il ne doit plus passer en silence.
+            If Not ConfirmerLePerimetre() Then
+                tsslStatut.Text = "Chargement abandonné : périmètre du rapport non confirmé."
+                Return
+            End If
 
             ' Détail des transactions, extrait tant que le rapport est en mémoire.
             _transactions = If(_dateActivite.HasValue,
@@ -627,6 +644,65 @@ Public Class FrmCompensationWU
 
         Return liste.OrderBy(Function(c) c.Account, StringComparer.OrdinalIgnoreCase).ToList()
     End Function
+
+    ''' <summary>
+    ''' Annonce le périmètre du rapport chargé, et le fait confirmer s'il couvre plus d'une
+    ''' journée.
+    '''
+    ''' CE QUE CE CONTRÔLE ÉVITE. La date d'activité est déduite de la première ligne lisible du
+    ''' fichier. Un rapport hebdomadaire était donc agrégé en entier, puis historisé et intitulé
+    ''' sous cette seule journée : les montants étaient justes, l'intitulé faux, et rien ne le
+    ''' signalait. La pièce comparée à celle de la banque portait « activité du 09/09/2026 »
+    ''' pour une semaine entière.
+    '''
+    ''' Le traitement n'est pas refusé : la banque liquide par semaine, et lui interdire de
+    ''' charger sa semaine reviendrait à lui interdire de travailler. Mais la conséquence est
+    ''' dite — la journée sous laquelle tout sera enregistré — et c'est l'agent qui tranche.
+    ''' </summary>
+    ''' <returns>Vrai si le traitement peut continuer.</returns>
+    Private Function ConfirmerLePerimetre() As Boolean
+
+        If _journeesDuRapport Is Nothing OrElse _journeesDuRapport.Count <= 1 Then Return True
+
+        Dim premiere As Date = _journeesDuRapport(0)
+        Dim derniere As Date = _journeesDuRapport(_journeesDuRapport.Count - 1)
+
+        Dim liste As New System.Text.StringBuilder()
+        For Each jour As Date In _journeesDuRapport
+            liste.AppendLine($"    {jour:dddd dd/MM/yyyy}")
+        Next
+
+        Dim sous As Date = If(_dateActivite.HasValue, _dateActivite.Value, premiere)
+
+        Return MessageBox.Show(
+            $"Le rapport chargé couvre {_journeesDuRapport.Count} journées, " &
+            $"du {premiere:dd/MM/yyyy} au {derniere:dd/MM/yyyy} :" &
+            Environment.NewLine & Environment.NewLine & liste.ToString() &
+            Environment.NewLine &
+            "La pièce portera le TOTAL de ces journées, et sera enregistrée dans l'historique " &
+            $"sous la seule date du {sous:dd/MM/yyyy}." & Environment.NewLine & Environment.NewLine &
+            "Ne chargez pas ensuite un rapport d'une journée déjà comprise dans cette période : " &
+            "elle serait comptabilisée deux fois." & Environment.NewLine & Environment.NewLine &
+            "Continuer ?",
+            "Le rapport couvre plusieurs journées",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) = DialogResult.Yes
+    End Function
+
+    ''' <summary>
+    ''' Dernière journée du rapport, quand il en couvre plusieurs. Nothing sinon : la pièce
+    ''' d'une seule journée n'a pas à s'intituler « du X au X ».
+    ''' </summary>
+    Private ReadOnly Property DerniereJournee As Date?
+        Get
+            If _journeesDuRapport Is Nothing OrElse _journeesDuRapport.Count <= 1 Then Return Nothing
+
+            Dim fin As Date = _journeesDuRapport(_journeesDuRapport.Count - 1)
+            If _dateActivite.HasValue AndAlso _dateActivite.Value.Date = fin Then Return Nothing
+
+            Return fin
+        End Get
+    End Property
 
 #End Region
 
@@ -1121,6 +1197,7 @@ Public Class FrmCompensationWU
             If _dateActivite.HasValue Then
                 apercu.NomFichierPropose = PieceComptableService.NomDeFichier(_dateActivite.Value)
                 apercu.DateActivite = _dateActivite.Value
+                apercu.DerniereJournee = DerniereJournee
             End If
 
             ' La liste complète part à l'export : le classeur portera la pièce globale, puis
@@ -1295,6 +1372,7 @@ Public Class FrmCompensationWU
                 ' Un seul point de vente : une seule feuille, à son nom, et non une « pièce
                 ' globale » qui ne porterait que lui.
                 If _dateActivite.HasValue Then formulaire.DateActivite = _dateActivite.Value
+                formulaire.DerniereJournee = DerniereJournee
                 formulaire.NomPremiereFeuille = calc.Account
                 formulaire.IntitulePiece = PieceExcelWU.IntituleDe(calc)
                 formulaire.AgencePiece = PieceExcelWU.AgenceDe(calc)

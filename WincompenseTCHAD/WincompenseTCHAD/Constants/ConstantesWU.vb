@@ -122,6 +122,14 @@ Public NotInheritable Class ConstantesWU
     Public Const PIECE_DEBIT As String = "DEBIT :"
     Public Const PIECE_CREDIT As String = "CREDIT :"
     Public Const PIECE_RAISON As String = "RAISON :"
+
+    ''' <summary>
+    ''' Libellé de la ligne de total, posée sous le dernier crédit.
+    '''
+    ''' La pièce manuelle de la banque porte ce total ; la nôtre ne le portait pas. C'est lui
+    ''' qui permet au vérificateur de conclure d'un coup d'œil, sans additionner douze lignes.
+    ''' </summary>
+    Public Const PIECE_TOTAL_CREDITS As String = "TOTAL DES CRÉDITS"
     Public Const PIECE_SIGNATURES As String = "SIGNATURES REQUISES"
     Public Const PIECE_FCU As String = "FCU"
     Public Const PIECE_INITIE As String = "INITIE PAR :"
@@ -174,6 +182,17 @@ Public NotInheritable Class ConstantesWU
     ''' {0} est remplacé par la Designation de l'Account.
     ''' </summary>
     Public Const LIB_MOUVEMENT_ACTIVITE_FORMAT As String = "CCS_{0} ACTIVITE WU"
+
+    ''' <summary>
+    ''' Préfixe du gabarit ci-dessus, isolé pour pouvoir constater qu'il est DÉJÀ présent.
+    '''
+    ''' La plupart des désignations commencent par « CCS », et le gabarit produisait alors
+    ''' « CCS_CCS NGARTA RUE DE 40M ACTIVITE WU ». Voir PieceComptableService.LibelleDuMouvement.
+    ''' </summary>
+    Public Const PREFIXE_CCS As String = "CCS"
+
+    ''' <summary>Fin du gabarit, employée quand le préfixe est déjà porté par la désignation.</summary>
+    Public Const LIB_MOUVEMENT_ACTIVITE_SUFFIXE As String = "ACTIVITE WU"
 
 #End Region
 

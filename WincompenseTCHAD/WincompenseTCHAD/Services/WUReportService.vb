@@ -611,25 +611,44 @@ Public NotInheritable Class WUReportService
         End If
 
         For Each row As DataRow In table.Rows
-            Dim texte As String = ObtenirValeurTexte(row, nomColonneDate)
-            If String.IsNullOrWhiteSpace(texte) Then Continue For
 
             Dim dateValeur As Date
-
-            ' Formats produits par Western Union, essayés en premier : "20260530" (yyyyMMdd) n'est
-            ' reconnu par aucune culture et échouerait silencieusement avec un simple TryParse.
-            If Date.TryParseExact(texte, ConstantesWU.FormatsDateRapport, CultureInfo.InvariantCulture,
-                                  DateTimeStyles.None, dateValeur) Then
-                Return dateValeur.Date
-            End If
-
-            If Date.TryParse(texte, CultureInfo.CurrentCulture, DateTimeStyles.None, dateValeur) OrElse
-               Date.TryParse(texte, CultureInfo.InvariantCulture, DateTimeStyles.None, dateValeur) Then
-                Return dateValeur.Date
+            If EssayerLireDate(ObtenirValeurTexte(row, nomColonneDate), dateValeur) Then
+                Return dateValeur
             End If
         Next
 
         Return Nothing
+    End Function
+
+    ''' <summary>
+    ''' Lit une date telle que Western Union l'écrit. Rend Faux si le texte n'en porte pas.
+    '''
+    ''' Isolée pour que la lecture d'UNE date et l'inventaire de TOUTES les journées du rapport
+    ''' ne puissent pas comprendre deux choses différentes du même fichier.
+    ''' </summary>
+    Private Shared Function EssayerLireDate(texte As String, ByRef resultat As Date) As Boolean
+
+        resultat = Date.MinValue
+        If String.IsNullOrWhiteSpace(texte) Then Return False
+
+        Dim lue As Date
+
+        ' Formats produits par Western Union, essayés en premier : "20260530" (yyyyMMdd) n'est
+        ' reconnu par aucune culture et échouerait silencieusement avec un simple TryParse.
+        If Date.TryParseExact(texte, ConstantesWU.FormatsDateRapport, CultureInfo.InvariantCulture,
+                              DateTimeStyles.None, lue) Then
+            resultat = lue.Date
+            Return True
+        End If
+
+        If Date.TryParse(texte, CultureInfo.CurrentCulture, DateTimeStyles.None, lue) OrElse
+           Date.TryParse(texte, CultureInfo.InvariantCulture, DateTimeStyles.None, lue) Then
+            resultat = lue.Date
+            Return True
+        End If
+
+        Return False
     End Function
 
     ''' <summary>
@@ -670,6 +689,70 @@ Public NotInheritable Class WUReportService
         Next
 
         Return Nothing
+    End Function
+
+    ''' <summary>
+    ''' Toutes les journées présentes dans le rapport d'activité, dédoublonnées et triées.
+    '''
+    ''' POURQUOI CETTE FONCTION EXISTE. ObtenirDateActivite rend la date de la PREMIÈRE ligne
+    ''' exploitable, et rien ne vérifiait que les suivantes portaient le même jour. Un rapport
+    ''' hebdomadaire — c'est ainsi que la banque liquide, « DU 08 AU 14/09 » — était donc agrégé
+    ''' en entier puis étiqueté d'une seule journée : celle de sa première ligne. Les montants
+    ''' étaient justes, l'intitulé faux, et rien ne le disait.
+    '''
+    ''' Rend une liste vide si aucune date n'est lisible : l'appelant décide, comme partout
+    ''' ailleurs, plutôt que de se voir imposer une journée inventée.
+    ''' </summary>
+    Public Shared Function JourneesDuRapport(table As DataTable) As List(Of Date)
+
+        Dim journees As New SortedSet(Of Date)()
+        If table Is Nothing Then Return journees.ToList()
+
+        ' Colonne de date simple d'abord, puis reconstitution depuis Année/Mois/Jour : le même
+        ' ordre de préférence qu'ObtenirDateActivite, pour que les deux ne puissent pas lire
+        ' deux choses différentes du même fichier.
+        If table.Columns.Contains(ConstantesWU.COLONNE_DATE_ACTIVITE) Then
+
+            For Each ligne As DataRow In table.Rows
+                Dim lue As Date
+                If EssayerLireDate(ObtenirValeurTexte(ligne, ConstantesWU.COLONNE_DATE_ACTIVITE), lue) Then
+                    journees.Add(lue.Date)
+                End If
+            Next
+
+            If journees.Count > 0 Then Return journees.ToList()
+        End If
+
+        For Each prefixe As String In ConstantesWU.PrefixesDateActivite
+
+            Dim colAnnee As String = prefixe & ConstantesWU.SUFFIXE_DATE_ANNEE
+            Dim colMois As String = prefixe & ConstantesWU.SUFFIXE_DATE_MOIS
+            Dim colJour As String = prefixe & ConstantesWU.SUFFIXE_DATE_JOUR
+
+            If Not (table.Columns.Contains(colAnnee) AndAlso
+                    table.Columns.Contains(colMois) AndAlso
+                    table.Columns.Contains(colJour)) Then Continue For
+
+            For Each ligne As DataRow In table.Rows
+
+                Dim annee, mois, jour As Integer
+                If Not (Integer.TryParse(ObtenirValeurTexte(ligne, colAnnee), annee) AndAlso
+                        Integer.TryParse(ObtenirValeurTexte(ligne, colMois), mois) AndAlso
+                        Integer.TryParse(ObtenirValeurTexte(ligne, colJour), jour)) Then Continue For
+
+                If annee <= 0 OrElse mois < 1 OrElse mois > 12 OrElse jour < 1 OrElse jour > 31 Then Continue For
+
+                Try
+                    journees.Add(New Date(annee, mois, jour))
+                Catch ex As ArgumentOutOfRangeException
+                    ' Triplet incohérent (31 février) : la ligne est ignorée, pas le rapport.
+                End Try
+            Next
+
+            If journees.Count > 0 Then Return journees.ToList()
+        Next
+
+        Return journees.ToList()
     End Function
 
     ''' <summary>

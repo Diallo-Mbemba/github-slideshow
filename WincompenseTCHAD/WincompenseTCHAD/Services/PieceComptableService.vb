@@ -181,7 +181,7 @@ Public NotInheritable Class PieceComptableService
                 compteMouvement = comptes.CompteCourant
             End If
 
-            Dim libelleMouvement As String = String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, calc.Designation).Trim()
+            Dim libelleMouvement As String = LibelleDuMouvement(calc.Designation)
 
             Dim totalCommissionsEtTaxes As Decimal =
                 calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
@@ -204,12 +204,17 @@ Public NotInheritable Class PieceComptableService
             ' Transfert et Envoi partagent le même compte dans le paramétrage actuel (728300148),
             ' mais la table SystemeWU les porte dans deux colonnes distinctes (Cpte_Produit et
             ' Cpte_Produit_Envoi) : ils sont donc désormais dissociables sans toucher au code.
+            ' L'ORDRE EST TRANSFERT, PAIEMENT, ENVOI — le même que pour le sous-agent plus bas,
+            ' et le même que sur la pièce manuelle de la banque. Il ne l'était pas : le bloc
+            ' banque allait transfert/envoi/paiement et le bloc sous-agent transfert/paiement/
+            ' envoi. Dans une comparaison ligne à ligne, deux ordres différents font perdre du
+            ' temps au vérificateur, et lui font passer des écarts.
             AjouterLigneSiNonNul(dt, comptes.CommissionTransfertBanque,
                                  ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
-                                 ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionPaiementBanque,
                                  ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
+                                 ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
 
             ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
@@ -293,6 +298,29 @@ Public NotInheritable Class PieceComptableService
 
         calc.EcartArrondi = WUCalculationService.ArrondiFCFA(netMouvement) - contrepartiesArrondies
         Return calc.EcartArrondi
+    End Function
+
+    ''' <summary>
+    ''' Libellé de la ligne de mouvement d'un point de vente.
+    '''
+    ''' Le gabarit préfixe la désignation par « CCS_ », comme le classeur de référence de la
+    ''' banque. Mais la plupart des désignations commencent DÉJÀ par « CCS », et la pièce
+    ''' portait alors « CCS_CCS NGARTA RUE DE 40M ACTIVITE WU ». Le préfixe n'est donc posé
+    ''' que lorsqu'il manque.
+    '''
+    ''' La comparaison ignore la casse et le tiret bas : « CCS », « ccs » et « CCS_ » comptent
+    ''' tous pour un préfixe déjà présent.
+    ''' </summary>
+    Private Shared Function LibelleDuMouvement(designation As String) As String
+
+        Dim nom As String = If(designation, String.Empty).Trim()
+        If nom.Length = 0 Then Return String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, nom).Trim()
+
+        If nom.StartsWith(ConstantesWU.PREFIXE_CCS, StringComparison.OrdinalIgnoreCase) Then
+            Return $"{nom} {ConstantesWU.LIB_MOUVEMENT_ACTIVITE_SUFFIXE}".Trim()
+        End If
+
+        Return String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, nom).Trim()
     End Function
 
     ''' <summary>
@@ -429,6 +457,10 @@ Public NotInheritable Class PieceComptableService
     ''' <param name="cheminFichier">Chemin complet du .xlsx.</param>
     ''' <param name="nomPremiereFeuille">Onglet de la première feuille.</param>
     ''' <param name="intitulePremiereFeuille">Ligne d'identification de la première feuille.</param>
+    ''' <param name="derniereJournee">
+    ''' Dernière journée couverte, quand le rapport en portait plusieurs. La pièce s'intitule
+    ''' alors « activité du X au Y » au lieu d'annoncer une seule journée pour une semaine.
+    ''' </param>
     ''' <returns>Le chemin du fichier produit.</returns>
     Public Shared Function ExporterEtOuvrirPieceExcel(dtPiece As DataTable,
                                                       listeCalculs As IEnumerable(Of CalculWU),
@@ -437,11 +469,12 @@ Public NotInheritable Class PieceComptableService
                                                       Optional nomPremiereFeuille As String = "PIECE GLOBALE",
                                                       Optional intitulePremiereFeuille As String = "",
                                                       Optional agencePremiereFeuille As String = "",
-                                                      Optional progression As ProgressionWU = Nothing) As String
+                                                      Optional progression As ProgressionWU = Nothing,
+                                                      Optional derniereJournee As Date? = Nothing) As String
 
         Return PieceExcelWU.Ecrire(dtPiece, listeCalculs, dateActivite, cheminFichier,
                                    nomPremiereFeuille, intitulePremiereFeuille, agencePremiereFeuille,
-                                   progression)
+                                   progression, derniereJournee)
     End Function
 
     ''' <summary>
