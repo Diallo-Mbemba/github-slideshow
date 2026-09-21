@@ -2608,6 +2608,80 @@ d'inventaire des journées, l'unicité de la lecture de date, la confirmation pa
 formule et dans le quadrillage, l'ordre des trois lignes dans les deux blocs, et le préfixe
 conditionnel — avec les deux cas limites, `CCS NGARTA` et `BOLOLO`.
 
+## Le taux de rétrocession est borné des deux côtés
+
+### Où il vit, et ce que la base en garde
+
+```
+T_Pdv_SA.Taux  →  CalculWU.TauxSA  →  RepartirCommissions  →  T_HistoriqueWU.TauxSA
+  (le réglage)      (la journée)        (le partage)            (la trace, figée)
+```
+
+**Chaque journée comptabilisée conserve le taux qui lui a été appliqué** : changer le réglage
+ne réécrit rien. Trois requêtes répondent à « quel taux, depuis quand, décidé par qui » :
+
+```sql
+-- ce que l'application applique aujourd'hui
+SELECT Code_Pdv, Designationagence, Taux, DateModification, ModifiePar
+FROM   T_Pdv_SA WHERE Code_Pdv = 'AHB020211';
+
+-- qui l'a changé, quand, et sur quel double regard
+SELECT IdDemande, Operation, Statut, Taux, SaisiPar, DateSaisie, DecidePar, DateDecision
+FROM   T_DemandeWU WHERE TypeObjet = 'SOUS_AGENT' AND Cle = 'AHB020211' ORDER BY DateSaisie DESC;
+
+-- la décisive : le taux réellement appliqué, journée par journée
+SELECT DateActivite, TauxSA FROM T_HistoriqueWU
+WHERE  Account = 'AHB020211' ORDER BY DateActivite DESC;
+```
+
+La colonne `TauxSA` de l'historique n'existe que depuis `Scripts\16_CommissionsBanque.sql` :
+les journées antérieures à cette migration ne la portent pas.
+
+> **La base dit ce qui est appliqué, pas ce qui est juste.** `T_Pdv_SA.Taux` est une saisie,
+> pas une autorité. La seule autorité est le contrat qui lie la banque à son sous-agent.
+
+### Pourquoi une borne, et pourquoi en base
+
+Le taux est une **fraction** : `0,70` vaut 70 %. Saisir « 70 » multiplierait par cent toutes les
+commissions rétrocédées — le sous-agent recevrait 7000 %, la part de la banque deviendrait
+massivement négative — et **la pièce s'équilibrerait quand même**, puisque le compte courant
+Western Union est calculé par différence et absorbe n'importe quoi.
+
+**L'application le refuse déjà** : `PointDeVenteSA.Anomalies` et `GroupeStatistiqueWU.Anomalies`
+bornent le taux à `[0 ; 1]`, contrôlent les deux décimales de `DECIMAL(4,2)`, et bloquent
+l'enregistrement — sur l'écran des sous-agents, sur celui des groupes, et au chargement d'un
+fichier de paramétrage.
+
+**Trois portes restaient ouvertes**, et la contrainte les ferme d'un coup :
+
+1. un `UPDATE` direct, par l'informatique ou une autre application ;
+2. une ligne posée à la main dans `T_DemandeWU` — `AppliquerSousAgent` écrit le taux de la
+   demande dans `T_Pdv_SA` **sans le revalider** : le contrôle a eu lieu chez le demandeur,
+   pas chez celui qui autorise ;
+3. une reprise de données, une restauration, un script de migration.
+
+`Scripts\19_BornerLeTaux.sql` pose `CK_T_Pdv_SA_Taux`, `CK_T_GroupeStatistique_Taux` et
+`CK_T_DemandeWU_Taux`. Elles valent **quelle que soit la version de l'application** installée
+sur les postes.
+
+### Le script ne corrige jamais une donnée
+
+S'il trouve des valeurs hors bornes, il les **nomme** et s'arrête sans rien poser : corriger un
+taux est une décision métier, pas un effet de bord de script. Il ne contient ni `UPDATE` ni
+`DELETE`. Relancez-le après correction — il est rejouable.
+
+Deux nuances assumées : `NULL` est admis sur `T_DemandeWU` (une suppression, ou une demande
+portant sur une agence propre, n'a pas de taux), et la contrainte y est posée `WITH NOCHECK`
+— les demandes déjà décidées sont des archives, et l'histoire ne se réécrit pas.
+
+### Ce qui a été vérifié
+
+`verif_taux.py` contrôle que **les deux côtés disent la même borne** : si l'une changeait sans
+l'autre, la première saisie limite passerait d'un côté et serait rejetée de l'autre, avec un
+message que personne ne comprendrait. Il vérifie aussi que le script ne corrige aucune donnée,
+qu'il est rejouable, et que l'autorisation d'une demande ne revalide effectivement pas le taux
+— ce qui est la raison d'être de la contrainte.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

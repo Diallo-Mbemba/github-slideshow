@@ -2013,6 +2013,55 @@ END
 GO
 
 -- =========================================================================
+-- 4 ter. Bornes du taux de rétrocession
+--
+--    Le taux est une FRACTION : 0,70 signifie 70 %. Saisir « 70 » multiplierait par cent
+--    toutes les commissions rétrocédées, et la pièce s'équilibrerait quand même — le compte
+--    courant Western Union est calculé par différence, il absorbe n'importe quoi.
+--
+--    L'application borne déjà le taux à [0 ; 1] et bloque l'enregistrement (Anomalies), sur
+--    l'écran des sous-agents, sur celui des groupes et au chargement d'un fichier de
+--    paramétrage. La contrainte ferme les portes qu'elle ne garde pas : un UPDATE direct,
+--    une ligne posée à la main dans T_DemandeWU — l'autorisation écrit le taux SANS le
+--    revalider — et les reprises de données.
+--
+--    Détail et diagnostic des valeurs déjà hors bornes : Scripts\19_BornerLeTaux.sql.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_Pdv_SA') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_T_Pdv_SA_Taux')
+   AND NOT EXISTS (SELECT 1 FROM dbo.T_Pdv_SA WHERE Taux < 0 OR Taux > 1)
+BEGIN
+    ALTER TABLE dbo.T_Pdv_SA
+        ADD CONSTRAINT CK_T_Pdv_SA_Taux CHECK (Taux >= 0 AND Taux <= 1);
+    PRINT 'Contrainte CK_T_Pdv_SA_Taux posee.';
+END
+GO
+
+IF OBJECT_ID(N'dbo.T_GroupeStatistique') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_T_GroupeStatistique_Taux')
+   AND NOT EXISTS (SELECT 1 FROM dbo.T_GroupeStatistique WHERE Taux < 0 OR Taux > 1)
+BEGIN
+    ALTER TABLE dbo.T_GroupeStatistique
+        ADD CONSTRAINT CK_T_GroupeStatistique_Taux CHECK (Taux >= 0 AND Taux <= 1);
+    PRINT 'Contrainte CK_T_GroupeStatistique_Taux posee.';
+END
+GO
+
+-- NULL est admis : une demande de suppression, ou portant sur une agence propre, n'a pas de
+-- taux. WITH NOCHECK : les demandes deja decidees sont des archives, et l'histoire ne se
+-- reecrit pas.
+IF OBJECT_ID(N'dbo.T_DemandeWU') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_T_DemandeWU_Taux')
+   AND NOT EXISTS (SELECT 1 FROM dbo.T_DemandeWU
+                   WHERE Statut = N'EN_ATTENTE' AND Taux IS NOT NULL AND (Taux < 0 OR Taux > 1))
+BEGIN
+    ALTER TABLE dbo.T_DemandeWU WITH NOCHECK
+        ADD CONSTRAINT CK_T_DemandeWU_Taux CHECK (Taux IS NULL OR (Taux >= 0 AND Taux <= 1));
+    PRINT 'Contrainte CK_T_DemandeWU_Taux posee.';
+END
+GO
+
+-- =========================================================================
 -- 5. Accès du compte applicatif
 --
 --    C'est ici que se règle l'erreur « Cannot open database ... requested by the login »
