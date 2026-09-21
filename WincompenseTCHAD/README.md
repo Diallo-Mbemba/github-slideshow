@@ -348,14 +348,18 @@ dans `Installation\LISEZMOI-Installation.md`.
    générer la pièce.
 3. **Structure des écritures de la pièce comptable** : validée par rapprochement algébrique avec
    un exemple réel du classeur `PieceComptabilsationTchad.xlsx` (agence sous-agent "BOLOLO").
-   Une seule ligne de mouvement net (`NetMouvement = PrincipalEnvoi+ChargeEnvoi+Taxes−PrincipalPaye`,
-   Débit si positif) sur le `CompteCompense` du PDV, en contrepartie du compte courant WU pour la
+   Une seule ligne de mouvement net
+   (`NetMouvement = PrincipalEnvoi + ChargeEnvoi + Taxes − PrincipalPaye + TTAReception`,
+   Débit si positif — voir « La TTA sur réception entre dans le versement » plus bas) sur le `CompteCompense` du PDV, en contrepartie du compte courant WU pour la
    part nette bancaire ; commissions et taxes sont des lignes de crédit uniquement, sans ligne de
    débit miroir individuelle (voir commentaires détaillés dans `GenererPieceComptable`). Vérifié à
    l'unité près sur l'exemple disponible ; *le cas d'une agence propre "EC" reste à valider faute
    d'exemple de référence pour ce type de PDV.*
-4. **TTA sur paiement** : due par un sous-agent, **pas par une agence propre** — voir ci-dessous.
-5. **Solde par Account** (grille de contrôle) = `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes)`.
+4. **TTA sur paiement** : due par un sous-agent, **pas par une agence propre**. **Confirmé par la banque** — ce n'est plus une hypothèse. Elle entre au surplus dans le versement du sous-agent : voir « La TTA sur réception entre dans le versement ».
+5. **Solde par Account** (grille de contrôle) = l'opposé de `NetMouvement`, soit
+   `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes + TTAReception)`. Il vaut toujours
+   l'opposé du mouvement porté sur la pièce : deux chiffres pour la même chose, et l'agent ne
+   saurait plus lequel croire.
 6. **Cohérence des dates** : la date du rapport d'activité (`txnDateLOC`) est comparée à celle du
    rapport de règlement, reconstituée depuis `SetDateLOCYear/Month/Day` (à défaut `RepDate`).
    Une divergence bloque le traitement. Si aucune date n'est exploitable d'un côté, la
@@ -2444,7 +2448,102 @@ banque la fournit, il suffit de remplacer le `.ico` : aucune ligne de code ne ch
   bouton de la barre a son image, son gestionnaire, son infobulle et son contrôle de droits ;
 - les dix-neuf dessins ont été rendus en image, à 16, 24 et 72 pixels, et **regardés**.
 
+## La TTA sur réception entre dans le versement du point de vente
+
+### Ce qui n'allait pas
+
+La pièce créditait le compte `434000159` du montant de la TTA sur réception — **sans l'avoir
+encaissée nulle part**. La contrepartie tombait donc sur le compte courant Western Union, qui
+se trouvait financer une taxe tchadienne qu'il ne doit pas.
+
+Ce n'était pas un choix de politique, c'était un oubli. Il valait **19 860 F sur une seule
+semaine et un seul sous-agent** — l'écart exact constaté face à la pièce manuelle de la banque
+sur AHB020211, semaine du 08 au 14/09/2026.
+
+### L'argument qui tranche : l'asymétrie est dans les données
+
+| | À l'envoi | À la réception |
+|---|---|---|
+| Qui prélève la TTA ? | **Western Union** | **personne** |
+| Où la trouve-t-on ? | dans `TaxesREC`, colonne `Tax3REC` | nulle part |
+| Est-elle dans la caisse du point de vente ? | **oui**, et déjà dans le terme « taxes » | **non** |
+
+Vérifié sur les données : `Tax3REC` cumule 41 444 sur la semaine, et 0,2 % du principal envoyé
+vaut 41 443,376. À la réception, la plateforme n'affiche une taxe que trois fois sur cinquante-sept
+paiements, et c'est le simple report de la taxe d'envoi.
+
+**Ce que Western Union encaisse à l'envoi, la banque doit l'encaisser à la réception.** D'où le
+terme qui s'ajoute :
+
+```
+NetMouvement = (PrincipalEnvoi + ChargeEnvoi + Taxes) − PrincipalPaye + TTAReception
+```
+
+### Une seule écriture de la formule
+
+Elle vit dans **`CalculWU.NetMouvement`**, et nulle part ailleurs. `GenererPieceComptable` et
+`CalculerEcartArrondi` la recopiaient chacun de leur côté ; ils l'appellent désormais. Deux
+copies d'une formule finissent toujours par diverger, et celle-ci porte le montant que le point
+de vente doit réellement verser.
+
+Le compte courant Western Union suit **tout seul** : il est le solde
+(`NetMouvement − toutes commissions et taxes`), donc il passe de 11 667 235 à 11 687 095 sans
+qu'on y touche. Le fichier core banking, l'historique et le bordereau lisent la même valeur.
+
+### L'agence propre ne change pas
+
+**Règle confirmée par la banque : une agence propre ne retient pas de TTA sur paiement.** Sa
+`TTAReception` vaut zéro — posé une seule fois, dans `AppliquerFormules` — et le nouveau terme
+est alors sans effet. Le versement d'une agence propre reste inchangé.
+
+### Le passé ne bouge pas, et rien n'a été prévu pour ça
+
+Aucune date d'effet, aucun paramètre : **les journées déjà comptabilisées conservent leurs
+montants par construction.** Une pièce archivée est relue telle quelle dans `T_PieceWU`
+(`Compte, Libelle, Debit, Credit`), jamais recalculée ; les rapports et le bordereau cumulent
+les colonnes stockées de `T_HistoriqueWU`, qui portent déjà `TTAReception`. `GenererPieceComptable`
+n'est appelée que sur la journée en cours.
+
+La seule façon de recalculer une journée ancienne est de **l'annuler puis de la recomptabiliser**,
+ce qui est précisément ce que l'on veut dire quand on la refait : la nouvelle règle s'applique,
+et l'archive de l'annulation conserve l'ancienne.
+
+### Ce qui reste à dire aux sous-agents
+
+« Prélevée sur le nominal payé » se lit de deux façons, et **la comptabilité est la même dans
+les deux cas**, mais pas la caisse :
+
+- le sous-agent **retient** la taxe au guichet : le bénéficiaire reçoit le nominal diminué de
+  0,2 %, la caisse garde la taxe, et le versement correspond à l'espèce détenue ;
+- le sous-agent **verse le nominal entier** : sa caisse est courte de la taxe, qu'il retrouve
+  sur sa commission.
+
+La banque doit dire laquelle des deux s'applique, sinon les caisses ne tomberont jamais juste
+au guichet.
+
+### Ce qui a été vérifié
+
+`simul_tta_reception.py` rejoue la chaîne complète — `AppliquerFormules`, `RepartirCommissions`,
+les lignes de `GenererPieceComptable`, l'arrondi au franc ligne par ligne — sur quatre situations :
+
+- **sous-agent à 60 %** : la pièce tombe **exactement** sur celle saisie par la banque, douze
+  lignes sur douze, débit 12 398 369 et compte courant 11 687 095 ;
+- **sous-agent à 70 %** : la pièce tombe **exactement** sur les colonnes de la feuille de la
+  banque (6 616 / 75 153 / 22 805 / 15 437 / 53 212 / 175 357) ;
+- **agence propre** : aucune ligne de TTA sur réception, débit inchangé à 12 378 509 ;
+- **l'écart** entre l'ancienne et la nouvelle règle vaut la TTA sur réception, au débit comme
+  sur le compte courant : 19 860 des deux côtés.
+
+> Un franc d'écart d'arrondi subsiste au taux de 60 % : c'est le résidu normal, absorbé par le
+> compte d'attente (`VerifierEquilibrePiece`). La banque, elle, l'a absorbé dans son compte
+> courant en saisissant 30 408 là où 40 % de 76 017,06 donne 30 407.
+
 ## Règles tranchées par la banque
+
+- **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.
+  La plateforme ne la prélève pas — contrairement à la TTA sur envoi, qui est déjà dans
+  `TaxesREC` —, la banque la recouvre et la reverse au Trésor. **Une agence propre ne retient
+  pas de TTA sur paiement** : sa TTA sur réception reste nulle, et son versement est inchangé.
 
 - **Agence propre (EC).** La structure de sa pièce est **identique à celle d'un sous-agent** :
   même enchaînement d'écritures, mêmes libellés, mêmes sens. Les trois lignes de commission

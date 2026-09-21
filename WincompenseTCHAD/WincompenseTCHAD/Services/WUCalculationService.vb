@@ -120,9 +120,17 @@ Public NotInheritable Class WUCalculationService
 
     ''' <summary>
     ''' Calcule les totaux de contrôle par Account (grille de contrôle uniquement, hors pièce comptable).
-    ''' Solde = TotalDebit - TotalCredit = PrincipalPaye - (PrincipalEnvoi + ChargeEnvoi + Taxes) :
+    '''
+    ''' Solde = TotalDebit − TotalCredit, et vaut toujours l'opposé de CalculWU.NetMouvement :
     ''' les commissions et taxes s'équilibrent par construction à ce niveau (partie double),
-    ''' seul l'écart net entre principal payé et principal encaissé (+frais +taxes) doit apparaître.
+    ''' seul l'écart net entre ce que le point de vente a payé et ce qu'il a encaissé doit
+    ''' apparaître.
+    '''
+    ''' LA TTA SUR RÉCEPTION EST DU CÔTÉ ENCAISSÉ, comme dans NetMouvement : la plateforme ne
+    ''' la prélève pas, c'est le point de vente qui la reverse. L'oublier ici ferait afficher à
+    ''' la grille de contrôle un solde qui ne serait plus celui de la pièce — deux chiffres pour
+    ''' la même chose, et l'agent ne saurait plus lequel croire.
+    '''
     ''' Conformément à la règle métier, aucun équilibrage n'est forcé Account par Account :
     ''' ce Solde est un indicateur de contrôle, pas une correction.
     ''' </summary>
@@ -136,7 +144,7 @@ Public NotInheritable Class WUCalculationService
             calc.TaxeEnvoi + calc.TVA + calc.TTAEnvoi + calc.TTAReception
 
         calc.TotalDebit = calc.PrincipalPaye + totalCommissionsEtTaxes
-        calc.TotalCredit = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes) + totalCommissionsEtTaxes
+        calc.TotalCredit = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes + calc.TTAReception) + totalCommissionsEtTaxes
         calc.Solde = calc.TotalDebit - calc.TotalCredit
     End Sub
 

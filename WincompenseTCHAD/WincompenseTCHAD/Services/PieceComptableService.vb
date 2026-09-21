@@ -123,6 +123,11 @@ Public NotInheritable Class PieceComptableService
     '''     courant WU pour une agence propre — celle-ci n'a pas de compte de compensation
     '''     propre dans les livres de la banque (confirmé par la banque). Pour le montant net :
     '''         NetMouvement = (PrincipalEnvoi + ChargeEnvoi + Taxes) − PrincipalPaye
+    '''                        + TTAReception
+    '''     La formule vit dans CalculWU.NetMouvement, et nulle part ailleurs. La TTA sur
+    '''     réception s'y ajoute parce que la plateforme ne la prélève pas : à l'envoi elle
+    '''     est déjà dans Taxes, à la réception elle n'est nulle part, et il faut bien
+    '''     l'encaisser pour pouvoir la créditer plus bas.
     '''   - UNE SEULE ligne en contrepartie sur le compte courant WU (32100003292), pour la
     '''     part nette revenant à la banque une fois les commissions et taxes affectées :
     '''         NetCompteCourant = NetMouvement − (toutes commissions + toutes taxes)
@@ -183,7 +188,7 @@ Public NotInheritable Class PieceComptableService
                 calc.CommissionTransfertSA + calc.CommissionPaiementSA + calc.CommissionEnvoiSA +
                 calc.TaxeEnvoi + calc.TVA + calc.TTAEnvoi + calc.TTAReception
 
-            Dim netMouvement As Decimal = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes) - calc.PrincipalPaye
+            Dim netMouvement As Decimal = calc.NetMouvement
             Dim netCompteCourant As Decimal = netMouvement - totalCommissionsEtTaxes
 
             ' Mémorise l'écart d'arrondi apporté par cet Account (visible dans la grille de contrôle).
@@ -262,7 +267,7 @@ Public NotInheritable Class PieceComptableService
             calc.CommissionTransfertSA + calc.CommissionPaiementSA + calc.CommissionEnvoiSA +
             calc.TaxeEnvoi + calc.TVA + calc.TTAEnvoi + calc.TTAReception
 
-        Dim netMouvement As Decimal = (calc.PrincipalEnvoi + calc.ChargeEnvoi + calc.Taxes) - calc.PrincipalPaye
+        Dim netMouvement As Decimal = calc.NetMouvement
         Dim netCompteCourant As Decimal = netMouvement - totalCommissionsEtTaxes
 
         ' Commissions sous-agent : postées uniquement si le CompteCommission est renseigné

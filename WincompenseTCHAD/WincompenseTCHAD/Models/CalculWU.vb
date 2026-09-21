@@ -174,13 +174,39 @@ Public Class CalculWU
     End Property
 
     ''' <summary>
-    ''' Montant net que cet Account aurait apporté à la pièce comptable :
-    ''' (principal envoyé + charges + taxes) − principal payé. Sert à chiffrer ce qui n'est pas
-    ''' comptabilisé lorsque l'Account est écarté — un nombre de lignes ne dit rien de l'enjeu.
+    ''' Montant net porté sur le compte de compensation du point de vente : ce que ce point de
+    ''' vente doit verser à la banque.
+    '''
+    '''     (principal envoyé + charges + taxes) − principal payé + TTA sur réception
+    '''
+    ''' POURQUOI LA TTA SUR RÉCEPTION S'AJOUTE, ALORS QU'ELLE NE FIGURE DANS AUCUN RAPPORT
+    '''
+    ''' La symétrie se lit dans les données de la plateforme. À l'ENVOI, la TTA est déjà
+    ''' encaissée par Western Union : elle est l'une des trois composantes de Taxes (Tax3REC),
+    ''' donc déjà dans la caisse du point de vente, et déjà comptée ici par le terme « taxes ».
+    ''' À la RÉCEPTION, la plateforme ne prélève RIEN : la taxe est due au Trésor tchadien sur
+    ''' une opération que Western Union ignore.
+    '''
+    ''' Sans ce terme, la pièce créditait le compte de TTA sur réception sans l'avoir encaissée
+    ''' nulle part : la contrepartie tombait sur le compte courant Western Union, qui se
+    ''' trouvait financer une taxe tchadienne qu'il ne doit pas. Ce n'était pas un choix, mais
+    ''' un oubli — et il valait 19 860 F sur une seule semaine et un seul sous-agent.
+    '''
+    ''' Une agence propre ne retient pas de TTA sur paiement (règle de la banque) : sa
+    ''' TTAReception vaut zéro, et ce terme est alors sans effet. La règle est posée une seule
+    ''' fois, dans WUCalculationService.AppliquerFormules.
+    '''
+    ''' CETTE PROPRIÉTÉ EST LE SEUL ENDROIT OÙ LA FORMULE EST ÉCRITE. La pièce comptable et le
+    ''' calcul de l'écart d'arrondi l'appellent au lieu de la recopier : deux copies d'une
+    ''' formule finissent toujours par diverger, et celle-ci porte le montant que le point de
+    ''' vente doit réellement verser.
+    '''
+    ''' Sert aussi à chiffrer ce qui n'est pas comptabilisé lorsque l'Account est écarté — un
+    ''' nombre de lignes ne dit rien de l'enjeu.
     ''' </summary>
     Public ReadOnly Property NetMouvement As Decimal
         Get
-            Return (PrincipalEnvoi + ChargeEnvoi + Taxes) - PrincipalPaye
+            Return (PrincipalEnvoi + ChargeEnvoi + Taxes) - PrincipalPaye + TTAReception
         End Get
     End Property
 
