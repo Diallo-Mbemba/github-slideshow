@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 ''' <summary>
@@ -24,8 +24,21 @@ Public NotInheritable Class WUCalculationService
         ' Commission Envoi = ChargeEnvoi * 20,5 %.
         calc.CommissionEnvoi = calc.ChargeEnvoi * ConstantesWU.TAUX_COMMISSION_ENVOI
 
-        ' TVA = ChargeEnvoi * 19,25 %.
-        calc.TVA = calc.ChargeEnvoi * ConstantesWU.TAUX_TVA
+        ' TVA PORTÉE AU COMPTE DE TVA = ChargeEnvoi * 18 %.
+        '
+        ' Le taux de TVA perçu reste 19,25 % (ConstantesWU.TAUX_TVA) : il n'est pas modifié.
+        ' Ce qui est écrit ici, c'est la part de cette TVA qui va sur le COMPTE DE TVA, et
+        ' elle ne vaut que 18 points. Le 1,25 point restant n'est pas de la TVA au sens
+        ' comptable ; il n'est donc pas retranché du solde de taxes quelques lignes plus bas,
+        ' il y demeure et s'y ventile 25 % / 75 % comme le reste du solde.
+        '
+        ' Ne pas remplacer TAUX_TVA_COMPTE_TVA par TAUX_TVA « pour revenir à 19,25 % » : le
+        ' taux perçu EST déjà 19,25 %, la totalité du montant est bien dans la pièce, elle
+        ' est simplement répartie sur trois comptes au lieu d'un seul. Écrire TAUX_TVA ici
+        ' ne relèverait pas le taux, cela déplacerait 1,25 point des impôts et de la
+        ' commission sur transfert vers le compte de TVA — c'est exactement l'écart que la
+        ' banque nous a signalé sur AHB020013.
+        calc.TVA = calc.ChargeEnvoi * ConstantesWU.TAUX_TVA_COMPTE_TVA
 
         ' TTA Envoi = PrincipalEnvoi * 0,2 %.
         calc.TTAEnvoi = calc.PrincipalEnvoi * ConstantesWU.TAUX_TTA
@@ -56,7 +69,11 @@ Public NotInheritable Class WUCalculationService
             calc.TTAReception = calc.PrincipalPaye * ConstantesWU.TAUX_TTA
         End If
 
-        ' Solde de taxes = Taxes - TVA - TTAEnvoi.
+        ' Solde de taxes = Taxes - TVA portée au compte de TVA - TTAEnvoi.
+        '
+        ' La formule est inchangée, et c'est précisément ce qui fait qu'elle absorbe d'elle-même
+        ' le 1,25 point non porté au compte de TVA : le solde étant un RÉSIDU, tout franc qui
+        ' n'est pas retranché ici y reste et se retrouve ensuite réparti 25 % / 75 %.
         calc.SoldeTaxes = calc.Taxes - calc.TVA - calc.TTAEnvoi
 
         ' Reproduction de la logique du classeur bancaire (section 8) : une base arrondie

@@ -1665,6 +1665,62 @@ arrondis à l'unité pratiqués par Western Union. **Aucune modification des for
 justifiée** : les remplacer par les valeurs fournies modifierait les règles du cahier des
 charges pour un gain nul.
 
+### La TVA est perçue à 19,25 %, mais seuls 18 points vont au compte de TVA
+
+Le taux ci-dessus est bien celui que Western Union perçoit : `Tax1REC` vaut `ChargeEnvoi ×
+19,25 %` sur 95 lignes sur 95. Ce taux n'a pas changé et ne doit pas changer.
+
+Ce que la pièce manuelle de la banque a révélé, sur l'agence propre `AHB020013` (Ecobank AGP
+Siège, semaine du 08 au 14/09/2026), c'est que cette TVA perçue **ne va pas en totalité sur le
+compte de TVA**. La banque n'y porte que **18 points** ; le **1,25 point** restant n'est pas de
+la TVA au sens comptable, c'est une taxe additionnelle, et il suit le sort du solde de taxes.
+
+Sur cette semaine, les frais d'envoi valaient 522 000 F — valeur recoupée par deux lignes que la
+banque ne conteste pas : la commission sur envoi (107 010 = 20,5 %) et la TTA sur envoi
+(15 788 = 0,2 % de 7 894 000 de nominal envoyé).
+
+| Destination des 100 485 F de TVA perçue (19,25 % de 522 000) | Compte | Montant |
+|---|---|---:|
+| TVA portée au compte de TVA — 18 % des frais | `434000104` | 93 960 |
+| Part restée dans le solde de taxes, ventilée à 75 % | `434000147` | 4 894 |
+| Part restée dans le solde de taxes, ventilée à 25 % | `728300148` | 1 631 |
+| **Total** | | **100 485** |
+
+**Rien n'est perdu ni ajouté** : la somme des trois comptes vaut exactement 19,25 % des frais
+d'envoi, et le total de la pièce — donc la contrepartie sur le compte courant Western Union —
+est rigoureusement inchangé. Seule la répartition entre trois comptes change.
+
+C'est ce qui explique les deux seules différences que la banque nous avait signalées, et
+pourquoi elle ne signalait pas la ligne qui en était la cause :
+
+| Ligne | Avant | Après | Pièce de la banque |
+|---|---:|---:|---:|
+| `434000104` TVA | 100 485 | **93 960** | 93 960 |
+| `728300148` Commission sur transfert | 7 719 | **9 350** | 9 350 |
+| `434000147` Impôts et taxes sur envoi | 23 157 | **28 050** | 28 050 |
+| Total commissions et taxes | 443 540 | 443 540 | 443 540 |
+
+Le mécanisme tient en une phrase : le solde de taxes est un **résidu**
+(`Taxes − TVA − TTAEnvoi`). Tout franc qui n'est pas retranché au titre de la TVA y demeure, et
+s'y répartit 25 % / 75 % comme le reste. C'est pourquoi la formule du solde n'a pas eu à être
+touchée : seule la valeur retranchée a changé.
+
+Dans le code, `TAUX_TVA` reste à `0.1925D` et demeure la source ; la part portée au compte de
+TVA en est **dérivée** (`TAUX_TVA_COMPTE_TVA = TAUX_TVA - TAUX_TVA_HORS_COMPTE_TVA`), de sorte
+qu'une révision future du taux de TVA se propage d'elle-même sans qu'aucune valeur en dur ne
+puisse diverger.
+
+**Effet sur les autres points de vente.** La correction est une fonction des seuls frais
+d'envoi, identique pour une agence propre et pour un sous-agent : la ligne de TVA baisse de
+1,25 % des frais, la commission sur transfert monte de 0,3125 % et les impôts et taxes sur envoi
+de 0,9375 %. Le total de chaque pièce est inchangé.
+
+**Point resté ouvert avec la banque.** Les 1 631 F ventilés à 25 % atterrissent sur
+`728300148 « Commission sur transfert »`, qui est un compte de produit et non un compte de
+taxe. C'est bien ce que fait la pièce manuelle de la banque, que l'application reproduit
+désormais à l'identique ; il vaut néanmoins la peine de le faire confirmer par leur
+comptabilité.
+
 ## Barre de progression des exports
 
 Un export Excel ne dit rien pendant qu'il travaille. Sur une journée chargée, écrire la pièce

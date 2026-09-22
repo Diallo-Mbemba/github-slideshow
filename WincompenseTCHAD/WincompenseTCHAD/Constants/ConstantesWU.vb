@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 ''' <summary>
@@ -27,8 +27,36 @@ Public NotInheritable Class ConstantesWU
     ''' <summary>Taux de commission sur les envois (20,5 %).</summary>
     Public Const TAUX_COMMISSION_ENVOI As Decimal = 0.205D
 
-    ''' <summary>Taux de TVA appliqué sur les frais d'envoi (19,25 %).</summary>
+    ''' <summary>
+    ''' Taux de TVA perçu sur les frais d'envoi : 19,25 %. CE TAUX NE CHANGE PAS.
+    ''' C'est lui, et lui seul, qui définit le montant de TVA perçu ; il reste la source
+    ''' dont TAUX_TVA_COMPTE_TVA est dérivé. Le modifier ici suffit à tout recalculer.
+    ''' </summary>
     Public Const TAUX_TVA As Decimal = 0.1925D
+
+    ''' <summary>
+    ''' Part du taux de TVA qui n'est PAS portée au compte de TVA : 1,25 point.
+    '''
+    ''' La TVA perçue (19,25 % des frais d'envoi) ne va pas en totalité sur le compte de
+    ''' TVA. La banque n'y porte que 18 points ; le 1,25 point restant n'est pas de la TVA
+    ''' au sens comptable, c'est une taxe additionnelle. Il n'est pas retranché du solde de
+    ''' taxes, il y demeure — et s'y ventile donc 25 % / 75 % comme le reste du solde, sur
+    ''' la commission sur transfert et sur les impôts et taxes sur envoi.
+    '''
+    ''' Rien n'est perdu ni ajouté : sur des frais d'envoi de 522 000 F, les 100 485 F de
+    ''' TVA perçue à 19,25 % se retrouvent intégralement dans la pièce, répartis sur trois
+    ''' comptes — 93 960 F au compte de TVA, 4 894 F aux impôts et taxes sur envoi,
+    ''' 1 631 F à la commission sur transfert.
+    ''' </summary>
+    Public Const TAUX_TVA_HORS_COMPTE_TVA As Decimal = 0.0125D
+
+    ''' <summary>
+    ''' Part du taux de TVA effectivement portée au compte de TVA : 18 %.
+    ''' Valeur DÉRIVÉE, jamais saisie en dur : 19,25 % - 1,25 point. Écrire 0,18 ici
+    ''' romprait le lien avec TAUX_TVA et laisserait les deux valeurs diverger le jour
+    ''' où le taux de TVA changerait.
+    ''' </summary>
+    Public Const TAUX_TVA_COMPTE_TVA As Decimal = TAUX_TVA - TAUX_TVA_HORS_COMPTE_TVA
 
     ''' <summary>Taux de TTA (Taxe sur le Transfert d'Argent), appliqué à l'envoi comme à la réception (0,2 %).</summary>
     Public Const TAUX_TTA As Decimal = 0.002D
