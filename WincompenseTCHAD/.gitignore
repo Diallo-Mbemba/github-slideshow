@@ -12,3 +12,7 @@ obj/
 # Fichiers temporaires divers
 *.tmp
 *.cache
+
+# Programmes d'installation fabriques par Inno Setup : ce sont des binaires
+# reconstructibles a tout moment depuis Installation\Construire-Setup.cmd.
+Installation/Sortie/

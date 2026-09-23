@@ -105,6 +105,23 @@ ou directement :
 ISCC.exe /DDossierRelease="C:\chemin\vers\bin\Release" Wincompense.iss
 ```
 
+### Ce que porte le fichier `Wincompense_Setup.exe`
+
+Le setup n'est pas un binaire anonyme. Il porte l'**icône de l'application** et, dans
+*Propriétés → Détails* de Windows, son éditeur, son produit, sa description et son
+numéro de version. C'est ce que la sécurité de la banque regarde en premier sur un
+exécutable reçu par courriel ; un installateur sans ces propriétés se fait refuser pour
+cette seule raison.
+
+Ces valeurs ne sont saisies nulle part : elles sont **lues dans l'exécutable compilé**
+et dans les `#define` du haut du script.
+
+**Ce qui manque encore, et qui ne dépend pas de nous : la signature numérique.** Un
+setup non signé déclenche l'avertissement « Éditeur inconnu » de Windows SmartScreen.
+Y remédier demande un **certificat de signature de code** — il appartient à la banque
+de dire si elle en possède un. Le cas échéant, une seule directive `SignTool` à ajouter
+dans `[Setup]`, et rien d'autre à changer.
+
 ### Le numéro de version n'est plus à recopier
 
 Il était écrit à la main dans le script, et c'était une dérive silencieuse : le nom du
@@ -545,8 +562,22 @@ Il reste masqué tant que tout va bien : régler le serveur n'est pas un geste q
 
 Panneau de configuration → *Programmes et fonctionnalités* → **Wincompense TCHAD**.
 
-`%PROGRAMDATA%\Wincompense` **n'est pas supprimé** : une réinstallation retrouve ainsi
-le serveur sans qu'on ait à le ressaisir. Pour repartir de zéro, supprimer ce dossier
-à la main.
+La désinstallation **pose désormais la question** : *« Supprimer aussi la configuration
+de ce poste ? »*, et la réponse par défaut est **Non**.
 
-Le fichier partagé, lui, n'est jamais touché : il appartient à la banque, pas au poste.
+- **Non** — `%PROGRAMDATA%\Wincompense` est conservé. Une réinstallation retrouve le
+  serveur, le fichier partagé et le mot de passe SQL sans aucune ressaisie. C'est la
+  réponse d'une désinstallation de dépannage.
+- **Oui** — le dossier est supprimé. C'est la réponse d'un retrait définitif de
+  l'application sur ce poste.
+
+En désinstallation **silencieuse**, aucune question n'est possible : le dossier est
+conservé. C'est aussi le comportement le moins destructeur.
+
+Ce dossier ne contient pas que des réglages : il porte le **mot de passe du compte SQL,
+chiffré par Windows pour cette machine**. L'effacer sans demander ferait payer le geste
+le plus banal qui soit — désinstaller pour réinstaller — par une ressaisie du mot de
+passe que le technicien n'a pas toujours sous la main.
+
+Le fichier partagé, lui, n'est jamais touché, quelle que soit la réponse : il appartient
+à la banque, pas au poste.

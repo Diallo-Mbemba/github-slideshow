@@ -91,6 +91,23 @@
   #error "Wincompense.exe est introuvable dans bin\Release : la solution n'a pas ete compilee en Release. Dans Visual Studio, choisir Release au lieu de Debug dans la liste de la barre d'outils, puis Generer > Generer la solution. Recompiler ensuite ce script."
 #endif
 
+; Icone du programme d'installation lui-meme (celle de Wincompense_Setup.exe dans
+; l'Explorateur, et celle affichee en haut de l'assistant).
+;
+; C'est le MEME fichier que celui embarque dans l'application, pris dans les sources et
+; non dans bin\Release : une icone n'est pas un produit de compilation, elle ne s'y trouve
+; pas. Le jour ou elle change, les deux changent ensemble.
+;
+; Le #if evite qu'un dossier de sources incomplet fasse echouer la compilation du setup
+; sur un detail d'apparence : sans icone, Inno pose la sienne et le setup reste utilisable.
+#define FichierIcone SourcePath + "..\WincompenseTCHAD\Ressources\Wincompense.ico"
+
+#if FileExists(FichierIcone)
+  #define IconeDisponible
+#else
+  #pragma message "Wincompense.ico est introuvable : le setup portera l'icone par defaut d'Inno Setup."
+#endif
+
 ; Version du setup : LUE DANS L'EXECUTABLE, jamais recopiee ici.
 ;
 ; Elle etait ecrite a la main, et c'etait une source de derive silencieuse : le nom du
@@ -143,6 +160,33 @@ MinVersion=6.1sp1
 
 UninstallDisplayName={#NomApplication}
 UninstallDisplayIcon={app}\{#ExecutablePrincipal}
+
+#ifdef IconeDisponible
+SetupIconFile={#FichierIcone}
+#endif
+
+; Proprietes du fichier Wincompense_Setup.exe : ce que Windows montre dans
+; Proprietes > Details, et ce que la securite de la banque regarde en premier sur un
+; executable recu par courriel. Un setup sans editeur ni description ressemble a
+; n'importe quel telechargement, et se fait refuser pour cette seule raison.
+VersionInfoVersion={#VersionApplication}
+VersionInfoProductVersion={#VersionApplication}
+VersionInfoProductName={#NomApplication}
+VersionInfoCompany={#Editeur}
+VersionInfoDescription=Programme d'installation de {#NomApplication}
+
+
+; MISE A JOUR SUR UN POSTE OU L'APPLICATION TOURNE.
+; Les fichiers de Program Files sont verrouilles tant que Wincompense.exe s'execute, et
+; la copie echouerait a mi-parcours. Le Gestionnaire de redemarrage de Windows detecte
+; l'executable en cours et propose de le fermer.
+;
+; RestartApplications=no : l'application n'est PAS relancee toute seule apres la mise a
+; jour. Elle demande une connexion a la base au demarrage ; la relancer dans le dos de
+; l'agent, sous le compte qui a lance l'installation, ouvrirait une session a son nom.
+CloseApplications=yes
+CloseApplicationsFilter=*.exe,*.dll,*.config
+RestartApplications=no
 
 [Languages]
 Name: "francais"; MessagesFile: "compiler:Languages\French.isl"
@@ -615,4 +659,38 @@ begin
     EcrireConfigurationLocale();
     CreerLeFichierPartageSiAbsent();
   end;
+end;
+
+// ---------------------------------------------------------------------------
+//  Desinstallation : la configuration du poste n'est PAS supprimee d'office
+// ---------------------------------------------------------------------------
+//  %PROGRAMDATA%\Wincompense ne contient pas que des reglages : il porte le mot de
+//  passe du compte SQL, chiffre par Windows POUR CETTE MACHINE. L'effacer sans
+//  demander ferait payer une desinstallation de depannage - le geste le plus banal
+//  qui soit - par une ressaisie du mot de passe sur le poste, que le technicien n'a
+//  pas toujours sous la main.
+//
+//  La question est donc posee, et la reponse par defaut est NON. En desinstallation
+//  silencieuse, aucune question n'est possible : le dossier est conserve, ce qui est
+//  aussi le comportement le moins destructeur.
+procedure CurUninstallStepChanged(EtapeCourante: TUninstallStep);
+var
+  DossierConfig: String;
+begin
+  if EtapeCourante <> usPostUninstall then Exit;
+
+  DossierConfig := ExpandConstant('{commonappdata}\Wincompense');
+
+  if not DirExists(DossierConfig) then Exit;
+  if UninstallSilent then Exit;
+
+  if MsgBox('Supprimer aussi la configuration de ce poste ?' + #13#10#13#10 +
+            DossierConfig + #13#10#13#10 +
+            'Elle contient le serveur, le fichier partage et le mot de passe du compte ' +
+            'SQL chiffre pour cette machine.' + #13#10#13#10 +
+            'Repondez NON si vous reinstallez Wincompense ensuite : le poste retrouvera ' +
+            'sa connexion sans ressaisie. Repondez OUI pour retirer definitivement ' +
+            'l''application de ce poste.',
+            mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+    DelTree(DossierConfig, True, True, True);
 end;
