@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 ''' <summary>
@@ -36,8 +36,17 @@ Public Class ComptesSystemeWU
     Public Property CompteCourant As String = ConstantesWU.CPT_COMPTE_COURANT
 
     ''' <summary>
-    ''' Compte inter bancaire (colonnes Cpte_attenteDEBIT et Cpte_attenteCREDIT).
-    ''' C'est lui qui absorbe l'écart d'arrondi résiduel au niveau GLOBAL de la pièce comptable.
+    ''' Compte inter bancaire (colonnes Cpte_attenteDEBIT et Cpte_attenteCREDIT), soit
+    ''' 381000101 « VIREMENTS INTERBANCAIRES ÉMISES » dans le paramétrage actuel.
+    '''
+    ''' Il sert à DEUX choses, et c'est bien le même compte dans les livres de la banque :
+    '''   - il porte la ligne de mouvement des AGENCES PROPRES, qui n'ont pas de compte de
+    '''     compensation à elles (voir PieceComptableService.GenererPieceComptable) ;
+    '''   - il absorbe l'écart d'arrondi résiduel au niveau GLOBAL de la pièce comptable
+    '''     (voir VerifierEquilibrePiece).
+    '''
+    ''' Le jour où la banque distinguerait ces deux usages, il suffirait d'ajouter ici une
+    ''' seconde propriété : la pièce ne lit ce numéro qu'à ces deux endroits.
     ''' </summary>
     Public Property CompteInterBancaire As String = ConstantesWU.CPT_ATTENTE
 

@@ -1,4 +1,4 @@
-' Option Strict est désactivé UNIQUEMENT dans ce fichier car l'écriture du classeur utilise la
+﻿' Option Strict est désactivé UNIQUEMENT dans ce fichier car l'écriture du classeur utilise la
 ' liaison tardive (late binding) sur Microsoft Excel via Type.GetTypeFromProgID, afin de ne pas
 ' imposer de référence COM obligatoire au projet lorsque Excel n'est pas installé (section 1).
 ' Tout le reste du fichier (grille de contrôle, pièce comptable, équilibrage) reste fortement typé.
@@ -120,8 +120,9 @@ Public NotInheritable Class PieceComptableService
     '''
     '''   - UNE SEULE ligne de mouvement (Débit si positif, Crédit si négatif) sur le compte
     '''     de compensation du point de vente : CompteCompense pour un sous-agent, le compte
-    '''     courant WU pour une agence propre — celle-ci n'a pas de compte de compensation
-    '''     propre dans les livres de la banque (confirmé par la banque). Pour le montant net :
+    '''     inter bancaire 381000101 « VIREMENTS INTERBANCAIRES ÉMISES » pour une agence propre
+    '''     — celle-ci n'a pas de compte de compensation propre dans les livres de la banque
+    '''     (confirmé par la banque). Pour le montant net :
     '''         NetMouvement = (PrincipalEnvoi + ChargeEnvoi + Taxes) − PrincipalPaye
     '''                        + TTAReception
     '''     La formule vit dans CalculWU.NetMouvement, et nulle part ailleurs. La TTA sur
@@ -173,12 +174,34 @@ Public NotInheritable Class PieceComptableService
                 Continue For
             End If
 
+            ' COMPTE DE LA LIGNE DE MOUVEMENT.
+            '
+            ' Un sous-agent a son propre compte de compensation dans les livres de la banque
+            ' (T_Pdv_SA.CompteCompense) : son mouvement y va.
+            '
+            ' Une agence propre n'en a pas. Son mouvement va sur le COMPTE INTER BANCAIRE
+            ' (381000101, « VIREMENTS INTERBANCAIRES ÉMISES ») — et non sur le compte courant
+            ' Western Union, comme c'était le cas jusqu'ici. L'écriture ne quitte pas la banque :
+            ' elle passe d'une agence à une autre, ce qu'un compte de virements interbancaires
+            ' décrit exactement, là où le compte courant WU aurait porté deux fois le même
+            ' numéro — une fois pour le mouvement, une fois pour sa propre contrepartie.
+            ' Confirmé par la pièce manuelle de la banque pour AHB020013 (Ecobank AGP Siège).
+            '
+            ' Le numéro n'est pas écrit en dur : c'est celui du compte inter bancaire paramétré
+            ' dans SystemeWU (colonnes Cpte_attenteDEBIT / Cpte_attenteCREDIT), le même que
+            ' celui qui absorbe l'écart d'arrondi global en fin de pièce. C'est bien le même
+            ' compte dans les livres de la banque ; le jour où elle les distinguerait, il
+            ' suffirait d'ajouter une propriété à ComptesSystemeWU — ici et nulle part ailleurs.
+            '
+            ' La branche Else n'est atteinte QUE par une agence propre : un sous-agent sans
+            ' compte de compensation n'est pas comptabilisable et a déjà été écarté plus haut
+            ' par EstComptabilisable, tout comme un Account absent du paramétrage.
             Dim compteMouvement As String
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCompense) Then
                 compteMouvement = calc.CompteCompense
             Else
-                compteMouvement = comptes.CompteCourant
+                compteMouvement = comptes.CompteInterBancaire
             End If
 
             Dim libelleMouvement As String = LibelleDuMouvement(calc.Designation)

@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 ''' <summary>
@@ -94,6 +94,11 @@ Public NotInheritable Class ConstantesWU
     ''' le compte inter bancaire 381000101.
     ''' Cette valeur n'est plus qu'un DÉFAUT : le compte réellement utilisé est celui lu dans
     ''' SystemeWU au démarrage (voir ComptesSystemeWU.CompteInterBancaire).
+    '''
+    ''' Il porte en outre la ligne de mouvement des AGENCES PROPRES, sous le libellé
+    ''' « VIREMENTS INTERBANCAIRES ÉMISES » sur la pièce manuelle de la banque : une agence
+    ''' propre n'ayant pas de compte de compensation, son mouvement passe d'une agence à une
+    ''' autre à l'intérieur de la banque.
     ''' </summary>
     Public Const CPT_ATTENTE As String = "381000101"
 

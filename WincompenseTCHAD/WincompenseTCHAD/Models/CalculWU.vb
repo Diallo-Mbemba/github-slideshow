@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 ''' <summary>
@@ -146,8 +146,9 @@ Public Class CalculWU
     '''   - c'est un sous-agent sans compte de commission : sa rétrocession n'a pas de compte,
     '''     et la pièce partirait en déséquilibre du montant de cette commission.
     '''
-    ''' Une agence propre (EC) connue est toujours comptabilisable : ses écritures vont sur le
-    ''' compte courant WU par règle métier, et non faute de mieux.
+    ''' Une agence propre (EC) connue est toujours comptabilisable : son mouvement va sur le
+    ''' compte inter bancaire (« VIREMENTS INTERBANCAIRES ÉMISES ») et sa contrepartie sur le
+    ''' compte courant WU, par règle métier et non faute de mieux.
     ''' </summary>
     Public ReadOnly Property EstComptabilisable As Boolean
         Get

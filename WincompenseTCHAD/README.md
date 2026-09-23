@@ -353,8 +353,10 @@ dans `Installation\LISEZMOI-Installation.md`.
    Débit si positif — voir « La TTA sur réception entre dans le versement » plus bas) sur le `CompteCompense` du PDV, en contrepartie du compte courant WU pour la
    part nette bancaire ; commissions et taxes sont des lignes de crédit uniquement, sans ligne de
    débit miroir individuelle (voir commentaires détaillés dans `GenererPieceComptable`). Vérifié à
-   l'unité près sur l'exemple disponible ; *le cas d'une agence propre "EC" reste à valider faute
-   d'exemple de référence pour ce type de PDV.*
+   l'unité près sur l'exemple disponible. Le cas d'une agence propre « EC » a depuis été validé
+   sur la pièce manuelle de la banque pour `AHB020013` : sa ligne de mouvement va sur le compte
+   inter bancaire, pas sur le compte courant WU — voir « L'agence propre a désormais son compte
+   de mouvement ».
 4. **TTA sur paiement** : due par un sous-agent, **pas par une agence propre**. **Confirmé par la banque** — ce n'est plus une hypothèse. Elle entre au surplus dans le versement du sous-agent : voir « La TTA sur réception entre dans le versement ».
 5. **Solde par Account** (grille de contrôle) = l'opposé de `NetMouvement`, soit
    `PrincipalPaye − (PrincipalEnvoi + ChargeEnvoi + Taxes + TTAReception)`. Il vaut toujours
@@ -2682,6 +2684,59 @@ message que personne ne comprendrait. Il vérifie aussi que le script ne corrige
 qu'il est rejouable, et que l'autorisation d'une demande ne revalide effectivement pas le taux
 — ce qui est la raison d'être de la contrainte.
 
+## L'agence propre a désormais son compte de mouvement
+
+Jusqu'ici, la pièce d'une agence propre portait **deux fois le même numéro de compte** : sa ligne
+de mouvement et la contrepartie allaient toutes deux sur le compte courant Western Union
+`32100003292`. C'était un choix par défaut, pris faute d'exemple de référence pour ce type de
+point de vente — le README le signalait d'ailleurs comme restant à valider.
+
+La pièce manuelle de la banque pour `AHB020013` (Ecobank AGP Siège, semaine du 08 au 14/09/2026)
+a fourni l'exemple qui manquait. **La ligne de mouvement d'une agence propre va sur le compte
+inter bancaire `381000101` « VIREMENTS INTERBANCAIRES ÉMISES ».**
+
+| Ligne | Avant | Après | Pièce de la banque |
+|---|---|---|---|
+| Mouvement (crédit) | `32100003292` | **`381000101`** | `381000101` |
+| Contrepartie (débit) | `32100003292` | `32100003292` | `32100003292` |
+
+C'est cohérent avec ce que l'écriture décrit. Un sous-agent a son propre compte de compensation
+dans les livres de la banque, et son mouvement y va. Une agence propre n'en a pas : l'argent ne
+sort pas de la banque, il passe d'une agence à une autre — ce qu'un compte de virements
+interbancaires nomme exactement, là où le compte courant Western Union ne nommait rien.
+
+**Le numéro n'est écrit en dur nulle part.** C'est celui du compte inter bancaire déjà paramétré
+dans `SystemeWU` (colonnes `Cpte_attenteDEBIT` / `Cpte_attenteCREDIT`) et modifiable depuis
+l'écran « Comptes Systèmes WU ». Il est donc le même que celui qui absorbe l'écart d'arrondi
+global en fin de pièce — et c'est bien le même compte dans les livres de la banque. Les deux
+usages ne peuvent pas se confondre pour autant : la ligne d'écart porte le libellé
+`ECART D'ARRONDI - COMPTE INTER BANCAIRE` et le code agence du siège (`N01`), et c'est sur ce **libellé**, jamais sur le compte,
+que `FrmCompensationWU` la retrouve pour alimenter l'en-tête. Le jour où la banque distinguerait
+les deux usages, il suffirait d'ajouter une propriété à `ComptesSystemeWU`.
+
+### Ce qui ne bouge pas
+
+Aucun montant. Le changement déplace une ligne d'un compte à un autre : les débits, les crédits,
+l'équilibre de la pièce, l'écart d'arrondi et le fichier destiné au core banking sont
+rigoureusement inchangés. Les pièces déjà archivées ne bougent pas davantage — elles sont relues
+depuis `T_PieceWU`.
+
+Un seul point du code décide de ce compte (`GenererPieceComptable`), et la branche concernée
+n'est atteinte que par une agence propre : un sous-agent sans compte de compensation, comme un
+Account absent du paramétrage, a déjà été écarté plus haut par `EstComptabilisable`.
+
+### Le libellé, lui, n'a pas été repris
+
+Sur la pièce de la banque, cette ligne porte le libellé `VIREMENTS INTERBANCAIRES ÉMISES` et un
+« code lié » (`28009935` dans leur exemple) qui identifie l'agence concernée. L'application
+conserve son propre libellé, `CCS_<désignation> ACTIVITE WU`, pour une raison précise : **nous
+n'avons pas de colonne « code lié »**. Avec plusieurs agences propres dans la même pièce, toutes
+leurs lignes de mouvement porteraient le même compte *et* le même libellé, et plus rien ne
+dirait à quelle agence chacune se rapporte. Le libellé actuel le dit.
+
+Si la banque exige le libellé exact, il faudra d'abord décider ce qui remplace cette
+identification — une colonne « code lié » alimentée par le code agence, très probablement.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.
@@ -2693,8 +2748,10 @@ qu'il est rejouable, et que l'autorisation d'une demande ne revalide effectiveme
   même enchaînement d'écritures, mêmes libellés, mêmes sens. Les trois lignes de commission
   sous-agent n'y figurent pas parce que le taux vaut zéro et qu'une écriture à zéro n'est jamais
   posée — ce n'est pas un traitement à part, c'est la même règle appliquée à 0 %, toute la
-  commission revenant à la banque. Sa ligne de mouvement va sur le **compte courant WU** : une
-  agence propre n'a pas de compte de compensation dans les livres de la banque.
+  commission revenant à la banque. Sa ligne de mouvement va sur le **compte inter bancaire
+  381000101 « VIREMENTS INTERBANCAIRES ÉMISES »** : une agence propre n'a pas de compte de
+  compensation dans les livres de la banque, et l'écriture ne quitte pas la banque — elle passe
+  d'une agence à une autre. La contrepartie, elle, reste sur le compte courant WU.
 - **Accounts non paramétrés.** Ils ne sont **pas comptabilisés** — voir plus haut.
 
 - **Chemin d'installation.** La sécurité de la banque autorise un **fichier à un emplacement**,
