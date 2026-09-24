@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Partial Class FrmParametresConnexion
@@ -139,6 +139,7 @@ Partial Class FrmParametresConnexion
         '
         'lblSecondes
         '
+        Me.lblSecondes.AutoEllipsis = True
         Me.lblSecondes.ForeColor = System.Drawing.SystemColors.ControlDarkDark
         Me.lblSecondes.Location = New System.Drawing.Point(206, 90)
         Me.lblSecondes.Name = "lblSecondes"

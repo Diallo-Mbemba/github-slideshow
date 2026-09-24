@@ -517,6 +517,32 @@ Trois moyens, du plus simple au plus détaillé :
 La distinction compte : un administrateur qui croit lire le partage alors qu'il lit
 une copie locale périmée modifierait un fichier sans aucun effet.
 
+### L'ordre dans lequel l'application cherche sa connexion
+
+Il faut le connaître pour comprendre pourquoi un réglage « ne tient pas ».
+
+| Rang | Source | Remarque |
+|---|---|---|
+| 0 | Saisie pour cette session | Enregistrer **sans** cocher « Conserver ». Disparaît à la fermeture. |
+| 1 | Variable d'environnement | N'engage que ce poste. |
+| **2** | **Fichier partagé** | La source de vérité de la banque. |
+| **3** | **Configuration de ce poste** | `%PROGRAMDATA%\Wincompense\wincompense.config`, écrite par l'installation. |
+| 4 | `App.config` | Repli de poste de développement. Sans rôle en production. |
+| 5 | `.\SQLEXPRESS` | Dernier recours, quand rien n'a été trouvé. |
+
+**Deux conséquences qui surprennent, et qu'il vaut mieux savoir avant :**
+
+- **Tant qu'un réglage de session est actif, cet écran ne dit pas ce que le poste
+  emploiera.** La ligne du haut affiche alors *« saisie pour cette session, non conservée
+  sur le poste »* : c'est le rang 0 qui masque tout le reste. Pour voir la vraie origine,
+  **fermer et rouvrir l'application**, puis relire cette ligne.
+- **Un réglage conservé sur le poste ne prime pas sur le fichier partagé** — c'est
+  l'inverse. Si le champ « Chemin du fichier partagé » est renseigné et que ce fichier
+  nomme un serveur, c'est lui qui gouvernera au prochain démarrage. Pour qu'un réglage
+  local gouverne vraiment : soit cocher **« Appliquer ce réglage à TOUS les postes »**
+  (qui corrige aussi le fichier partagé), soit **vider le champ du fichier partagé** pour
+  que ce poste cesse de le suivre.
+
 ---
 
 ## 7. Dépannage

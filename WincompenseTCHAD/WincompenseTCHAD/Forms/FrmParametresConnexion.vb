@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Imports System.Data.SqlClient
@@ -44,6 +44,7 @@ Public Class FrmParametresConnexion
                           ConfigurationWU.BASE_PAR_DEFAUT, constructeur.InitialCatalog)
 
         nudDelai.Value = BornerLeDelai(constructeur.ConnectTimeout)
+        AfficherLAuthentification(constructeur)
 
         txtPartage.Text = ConfigurationWU.CheminDuPartage
 
@@ -66,6 +67,26 @@ Public Class FrmParametresConnexion
                           $"Configuration de ce poste : {ConfigurationWU.CheminLocal}"
     End Sub
 
+    ''' <summary>
+    ''' Dit comment l'application s'annonce au serveur : compte SQL nommé, ou
+    ''' authentification Windows.
+    '''
+    ''' Cette phrase était ÉCRITE EN DUR dans le Designer — « authentification Windows
+    ''' intégrée, aucun mot de passe » — et ne changeait jamais. Sur un poste connecté par
+    ''' un compte SQL, ce qui est le cas à la banque, l'écran affirmait donc le contraire
+    ''' de la vérité, et laissait croire qu'aucun secret n'était gardé sur la machine
+    ''' alors qu'il y en a un, chiffré par Windows.
+    ''' </summary>
+    Private Sub AfficherLAuthentification(constructeur As SqlConnectionStringBuilder)
+
+        Dim compte As String = If(constructeur.UserID, String.Empty).Trim()
+
+        If compte.Length = 0 Then
+            lblSecondes.Text = "secondes — authentification Windows intégrée, aucun mot de passe."
+        Else
+            lblSecondes.Text = $"secondes — compte SQL « {compte} »."
+        End If
+    End Sub
     ''' <summary>
     ''' Décompose une chaîne de connexion. Une chaîne illisible — écrite à la main dans le
     ''' fichier partagé, par exemple — rend un constructeur vide plutôt que de faire échouer
@@ -114,7 +135,14 @@ Public Class FrmParametresConnexion
 
     ''' <summary>
     ''' Enregistre pour cette session seulement : rien n'est écrit, et le poste reprendra sa
-    ''' chaîne habituelle au prochain démarrage.
+    ''' configuration habituelle au prochain démarrage.
+    '''
+    ''' CE QUE LE POSTE REPREND, ET CE N'EST PAS App.config. L'ordre de résolution est
+    ''' celui de ConfigurationWU.ResoudreLaSource : fichier partagé d'abord, puis la
+    ''' configuration écrite sur ce poste, et App.config seulement en quatrième position
+    ''' — un repli de poste de développement. Le message annonçait « la chaîne publiée
+    ''' avec l'application » et envoyait republier : il désignait un fichier qui n'a plus
+    ''' de rôle en production, et envoyait donc corriger là où rien ne se corrige.
     ''' </summary>
     Private Function RetenirPourLaSession() As Boolean
 
@@ -141,37 +169,67 @@ Public Class FrmParametresConnexion
 
         MessageBox.Show(
             "Le réglage vaut pour cette session seulement." & Environment.NewLine & Environment.NewLine &
-            "Rien n'a été écrit sur ce poste : au prochain démarrage, l'application reprendra la" &
+            "Rien n'a été écrit sur ce poste : en fermant l'application, ce réglage disparaît." &
             Environment.NewLine &
-            "chaîne publiée avec elle. Pour un changement durable, c'est cette chaîne qu'il faut" &
+            "Au prochain démarrage, le poste reprendra sa configuration habituelle — le fichier" &
             Environment.NewLine &
-            "corriger, puis republier l'application.",
+            "partagé s'il en a un, sinon la configuration posée sur ce poste à l'installation." &
+            Environment.NewLine & Environment.NewLine &
+            "POUR QUE LE RÉGLAGE TIENNE : cochez « Conserver ce réglage sur ce poste », puis" &
+            Environment.NewLine &
+            "Enregistrer.",
             "Réglage temporaire", MessageBoxButtons.OK, MessageBoxIcon.Information)
 
         Return True
     End Function
 
     ''' <summary>
-    ''' Fait confirmer un réglage conservé sur le poste.
+    ''' Fait confirmer un réglage conservé sur le poste, en disant CE QUE CELA GOUVERNE
+    ''' RÉELLEMENT.
     '''
-    ''' Un réglage écrit ici l'emporte sur la chaîne publiée avec l'application — et pour
-    ''' toujours. Le poste cesse alors de suivre les republications, sans que rien ne le
-    ''' signale ailleurs que sur cet écran. Cela peut être voulu ; cela ne doit pas être subi.
+    ''' L'écran affirmait qu'un réglage conservé « l'emportera désormais » et que le poste
+    ''' « ne suivra plus les republications ». C'était l'inverse de ce qui se passe. Dans
+    ''' ConfigurationWU.ResoudreLaSource, le FICHIER PARTAGÉ est lu AVANT la configuration
+    ''' du poste ; et EcrireLaConfiguration réécrit toujours la clé PARTAGE avec le chemin
+    ''' affiché ici. Conserver sans propager, le champ du partage étant renseigné, produit
+    ''' donc un réglage que le fichier partagé écrase au démarrage suivant — un « je l'ai
+    ''' enregistré et ça ne tient pas » que rien n'expliquait.
+    '''
+    ''' L'avertissement se règle donc sur l'état du champ, et nomme les deux seules façons
+    ''' de faire gouverner ce réglage : propager, ou cesser de suivre le partage.
     ''' </summary>
     Private Function ConfirmerLaConservation() As Boolean
 
+        Dim partage As String = txtPartage.Text.Trim()
+        Dim portee As String
+
+        If partage.Length = 0 Then
+            portee =
+                "Aucun fichier partagé n'est indiqué : ce poste suivra ce réglage, et lui seul." &
+                Environment.NewLine &
+                "Il ne suivra plus un changement de serveur décidé pour toute la banque."
+        Else
+            portee =
+                "MAIS un fichier partagé est indiqué :" & Environment.NewLine &
+                "    " & partage & Environment.NewLine &
+                "et il est lu AVANT la configuration de ce poste. Tant qu'il nomme un serveur," &
+                Environment.NewLine &
+                "c'est lui que l'application suivra au prochain démarrage — pas ce réglage." &
+                Environment.NewLine & Environment.NewLine &
+                "Pour que ce réglage gouverne vraiment, au choix :" & Environment.NewLine &
+                "    - cocher « Appliquer ce réglage à TOUS les postes », qui corrige aussi le" &
+                Environment.NewLine &
+                "      fichier partagé ;" & Environment.NewLine &
+                "    - ou vider le champ du fichier partagé, pour que ce poste cesse de le suivre."
+        End If
+
         Return MessageBox.Show(
-            "Ce réglage sera CONSERVÉ sur ce poste." & Environment.NewLine & Environment.NewLine &
-            "Il l'emportera désormais sur la chaîne publiée avec l'application : ce poste ne" &
-            Environment.NewLine &
-            "suivra plus les republications, jusqu'à ce que quelqu'un revienne le défaire ici." &
-            Environment.NewLine & Environment.NewLine &
-            "Pour un simple dépannage, décochez « Conserver » : le réglage vaudra le temps de" &
-            Environment.NewLine &
-            "la session, et le poste restera aligné sur la version publiée." & Environment.NewLine & Environment.NewLine &
-            "Conserver tout de même ?",
+            "Ce réglage sera CONSERVÉ sur ce poste, dans :" & Environment.NewLine &
+            "    " & ConfigurationWU.CheminLocal & Environment.NewLine & Environment.NewLine &
+            portee & Environment.NewLine & Environment.NewLine &
+            "Conserver ?",
             "Réglage durable", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
-            MessageBoxDefaultButton.Button2) = DialogResult.Yes
+            MessageBoxDefaultButton.Button1) = DialogResult.Yes
     End Function
 
     Private Sub chkChaineComplete_CheckedChanged(sender As Object, e As EventArgs) Handles chkChaineComplete.CheckedChanged
