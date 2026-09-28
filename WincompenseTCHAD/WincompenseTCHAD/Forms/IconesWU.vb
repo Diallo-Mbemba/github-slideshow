@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Imports System.Drawing
@@ -316,6 +316,7 @@ Public NotInheritable Class IconesWU
             Case IconeWU.Piece : TracerPiece(g)
             Case IconeWU.Silhouette : TracerSilhouette(g)
             Case IconeWU.Groupe : TracerGroupe(g)
+            Case IconeWU.Pourcentage : TracerPourcentage(g)
             Case IconeWU.Coche : TracerCoche(g)
             Case IconeWU.Registre : TracerRegistre(g)
             Case IconeWU.Curseurs : TracerCurseurs(g)
@@ -534,6 +535,28 @@ Public NotInheritable Class IconesWU
     End Sub
 
     ''' <summary>Une coche dans une pastille : les autorisations du référentiel.</summary>
+    ''' <summary>
+    ''' Le barème des taxes : un signe pour cent, dessiné à la main plutôt qu'écrit au
+    ''' clavier. Un caractère posé avec DrawString changerait de forme d'un poste à l'autre
+    ''' selon les polices installées, et se placerait mal aux petites tailles ; deux disques
+    ''' et une barre oblique tiennent leur place à seize pixels comme à soixante-quatre.
+    ''' </summary>
+    Private Shared Sub TracerPourcentage(g As Graphics)
+
+        Boite(g, 2.2F, 2.2F, 11.6F, 11.6F, TEINTE_PAPIER)
+
+        ' La barre d'abord : les deux disques viennent ensuite s'y poser, et la recouvrent
+        ' proprement là où elle les traverserait.
+        Using barre As New Pen(TEINTE_ARDOISE, 1.6F)
+            barre.StartCap = LineCap.Round
+            barre.EndCap = LineCap.Round
+            g.DrawLine(barre, 4.6F, 11.4F, 11.4F, 4.6F)
+        End Using
+
+        Disque(g, 5.4F, 5.4F, 1.9F, TEINTE_OR)
+        Disque(g, 10.6F, 10.6F, 1.9F, TEINTE_BLEU)
+    End Sub
+
     Private Shared Sub TracerCoche(g As Graphics)
 
         Disque(g, 8.0F, 8.0F, 6.2F, TEINTE_VERT)
@@ -743,4 +766,5 @@ Public Enum IconeWU
     MosaiqueV = 17
     FermerTout = 18
     Sortie = 19
+    Pourcentage = 20
 End Enum

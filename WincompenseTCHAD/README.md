@@ -2737,6 +2737,80 @@ dirait à quelle agence chacune se rapporte. Le libellé actuel le dit.
 Si la banque exige le libellé exact, il faudra d'abord décider ce qui remplace cette
 identification — une colonne « code lié » alimentée par le code agence, très probablement.
 
+## Le barème est lisible sans ouvrir le code
+
+`Paramétrage > Taxes et barème` montre, en une fenêtre, ce qui n'existait jusqu'ici que dans
+`ConstantesWU.vb` : cinq taux, cinq comptes, **quatre assiettes différentes** et un résidu
+partagé en deux.
+
+| Taxe | Taux | Assiette | Compte |
+|---|---:|---|---|
+| TVA collectées Western Union | 19,25 % | charges d'envoi | `434000104` |
+| TTA sur transfert de fonds | 0,2 % | **principal envoyé** | `434000145` |
+| TTA sur réception de fonds | 0,2 % | **principal payé** — sous-agents seulement | `434000159` |
+| Impôts et taxe sur envoi | 75 % | **solde de taxes** | `434000147` |
+| Commission sur transfert | 25 % | **solde de taxes** | `728300148` |
+
+```
+solde de taxes  =  TOTAL TAXES lu dans le rapport  −  TVA  −  TTA sur envoi
+```
+
+Cela répond à un besoin que la banque nous a rappelé deux fois ce mois-ci, en contestant des
+lignes de pièce : **personne chez elle ne pouvait vérifier ce barème sans Visual Studio.**
+
+### L'écran ne modifie rien, et c'est une décision de la banque
+
+Il serait facile de descendre ces cinq taux dans une table et de les rendre modifiables.
+La banque a décidé le contraire, et elle a raison : **ce barème est réconcilié.** Il a été
+vérifié ligne à ligne contre ses pièces manuelles — quatre-vingt-seize contrôles jour par jour
+sur `AHB020211`, puis sur l'agence propre `AHB020013` — et la compensation qu'il produit part
+chaque jour au core banking.
+
+Une table se modifie depuis un écran, mais aussi en SQL direct, par quelqu'un qui ne sait pas
+ce qu'il touche. Le jour où un taux changerait ainsi, la compensation changerait avec lui —
+sans commit, sans livraison, sans trace ailleurs que dans une ligne de table. **On ne met pas
+une production réconciliée à la portée d'un `UPDATE`.**
+
+Le barème est donc **construit à partir du code** (`ConstantesWU` pour les taux,
+`ComptesSystemeWU` pour les comptes) et relu à chaque ouverture. Rien n'est recopié : si un
+taux changeait dans les constantes, ou un compte dans `SystemeWU`, l'écran suivrait sans qu'on
+y pense. Une valeur recopiée finit toujours par mentir — l'écran de connexion vient de le
+rappeler, qui annonçait « authentification Windows intégrée » sur des postes connectés par un
+compte SQL.
+
+**Aucune table n'est créée, aucun script SQL n'accompagne cet écran.** `WUCalculationService`
+et `PieceComptableService` ne sont pas touchés d'un octet, et ne référencent pas `BaremeTaxesWU` :
+un vérificateur le contrôle à chaque passage. On peut supprimer cette fenêtre sans qu'une
+compensation change d'un franc.
+
+### Ce que l'écran dit, et que la grille ne peut pas porter
+
+- **Le total des taxes n'est pas calculé** : il est lu dans le rapport, c'est ce que Western
+  Union a déjà prélevé au client. Les deux quotes-parts se partagent ce qu'il en reste.
+- **La commission sur transfert n'est pas une taxe** : `728300148` est un compte de *produit*
+  bancaire. Elle figure au barème parce qu'elle se calcule sur le solde comme sa jumelle à
+  75 %, et qu'on ne comprend ni l'une ni l'autre séparément. Un écran nommé « Taxes » qui
+  pilote une recette doit le dire.
+- **La TTA sur réception n'est pas due par une agence propre** — règle confirmée par la banque.
+- **La commission sur envoi, 20,5 %, ne figure pas au barème** : c'est un produit, pas une taxe.
+
+### Ce que le Tchad n'a pas, et qu'on n'a pas inventé
+
+L'écran équivalent de l'application centrafricaine porte un second bloc — rétrocession par
+défaut, quote-part publicitaire, caution de garantie. **Le Tchad n'a aucune de ces trois
+notions** : le taux de rétrocession vient toujours du sous-agent ou de son groupe, et il n'y a
+pas de valeur par défaut. Le bloc n'a donc pas été repris. De même, le sous-titre centrafricain
+« les taux s'appliquent à la charge, jamais au principal » est **faux ici** : d'où la colonne
+*Assiette*, qui n'existe pas là-bas.
+
+### Pour les produits à venir
+
+`BaremeTaxesWU` porte déjà `Modifiable`, et l'écran s'y règle. Ria, puis les suivants, auront
+leur propre barème — lu en base et modifiable, puisque rien n'y est encore réconcilié. La
+structure les attend ; leur table, leur dépôt et leur script n'existeront qu'avec eux, le jour
+où ils auront quelque chose à lire. Écrire aujourd'hui un dépôt que rien n'appelle et un script
+qui ne crée rien serait du code mort.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Partial Class FrmPrincipal
@@ -36,6 +36,7 @@ Partial Class FrmPrincipal
         Me.mnuDemandes = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP2 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuComptes = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuTaxes = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP7 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuFichierParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuOptions = New System.Windows.Forms.ToolStripMenuItem()
@@ -123,7 +124,7 @@ Partial Class FrmPrincipal
         '
         'mnuParametrage
         '
-        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.mnuOptions, Me.SEP7, Me.mnuFichierParametrage})
+        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.mnuTaxes, Me.mnuOptions, Me.SEP7, Me.mnuFichierParametrage})
         Me.mnuParametrage.Name = "mnuParametrage"
         Me.mnuParametrage.Size = New System.Drawing.Size(100, 20)
         Me.mnuParametrage.Text = "&Paramétrage"
@@ -167,6 +168,12 @@ Partial Class FrmPrincipal
         Me.mnuComptes.Name = "mnuComptes"
         Me.mnuComptes.Size = New System.Drawing.Size(240, 22)
         Me.mnuComptes.Text = "&Comptes systèmes"
+        '
+        'mnuTaxes
+        '
+        Me.mnuTaxes.Name = "mnuTaxes"
+        Me.mnuTaxes.Size = New System.Drawing.Size(240, 22)
+        Me.mnuTaxes.Text = "&Taxes et barème..."
         '
         'mnuOptions
         '
@@ -405,6 +412,7 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuDemandes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP2 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuComptes As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuTaxes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP7 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuFichierParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuOptions As System.Windows.Forms.ToolStripMenuItem

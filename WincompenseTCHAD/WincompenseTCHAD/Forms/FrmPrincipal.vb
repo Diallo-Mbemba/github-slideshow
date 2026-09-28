@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Imports System.Drawing
@@ -165,6 +165,21 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
+    ''' Le barème des taxes du produit en service.
+    '''
+    ''' Rangé juste après les comptes systèmes parce qu'on lit les deux ensemble : les
+    ''' comptes disent OÙ va chaque taxe, le barème dit COMBIEN. Séparés dans le menu, ils
+    ''' obligeraient à ouvrir deux fenêtres pour vérifier une seule ligne de pièce.
+    '''
+    ''' L'écran est en lecture seule tant que Western Union est le seul produit : son barème
+    ''' est réconcilié avec la banque et ne se modifie pas depuis une fenêtre. Il n'est donc
+    ''' réservé à personne — un agent a le droit de LIRE ce qui lui est appliqué.
+    ''' </summary>
+    Private Sub mnuTaxes_Click(sender As Object, e As EventArgs) Handles mnuTaxes.Click
+        AfficherEnfant(Of FrmTaxes)()
+    End Sub
+
+    ''' <summary>
     ''' Les options de traitement : la façon de travailler que la banque a choisie.
     '''
     ''' Rangées à côté des comptes systèmes parce qu'elles ont le même propriétaire —
@@ -226,6 +241,7 @@ Public Class FrmPrincipal
         mnuGroupes.Image = IconesWU.Obtenir(IconeWU.Groupe)
         mnuDemandes.Image = IconesWU.Obtenir(IconeWU.Coche)
         mnuComptes.Image = IconesWU.Obtenir(IconeWU.Registre)
+        mnuTaxes.Image = IconesWU.Obtenir(IconeWU.Pourcentage)
         mnuOptions.Image = IconesWU.Obtenir(IconeWU.Curseurs)
         mnuFichierParametrage.Image = IconesWU.Obtenir(IconeWU.Dossier)
 
