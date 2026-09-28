@@ -1,4 +1,4 @@
-' ATTENTION : Option Strict Off est INDISPENSABLE dans ce fichier, et nulle part ailleurs.
+﻿' ATTENTION : Option Strict Off est INDISPENSABLE dans ce fichier, et nulle part ailleurs.
 '
 ' Excel est piloté par liaison tardive (Type.GetTypeFromProgID), seul moyen de ne pas imposer
 ' une référence à une version précise d'Office sur les postes de la banque. Toutes les
@@ -390,7 +390,8 @@ Public NotInheritable Class PieceExcelWU
 
             Annoncer(progression, $"{calc.Account} — {calc.Designation}")
 
-            Dim dtPdv As DataTable = PieceComptableService.GenererPieceComptable(New CalculWU() {calc})
+            Dim dtPdv As DataTable = PieceComptableService.GenererPieceComptable(
+                New CalculWU() {calc}, dateActivite, derniereJournee)
 
             ' Un point de vente dont tous les montants s'arrondissent à zéro ne produit aucune
             ' écriture. Son étape a déjà été annoncée : la barre avance quand même, sans quoi

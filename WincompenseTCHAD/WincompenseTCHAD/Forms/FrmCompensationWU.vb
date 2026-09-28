@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Imports System.Data
@@ -1051,7 +1051,8 @@ Public Class FrmCompensationWU
         Try
             Cursor = Cursors.WaitCursor
 
-            Dim dtPiece As DataTable = PieceComptableService.GenererPieceComptable(_listeCalculs)
+            Dim dtPiece As DataTable = PieceComptableService.GenererPieceComptable(
+                _listeCalculs, _dateActivite, DerniereJournee)
             Dim messageControle As String = String.Empty
             Dim pieceUtilisable As Boolean = PieceComptableService.VerifierEquilibrePiece(dtPiece, messageControle)
 
@@ -1348,7 +1349,8 @@ Public Class FrmCompensationWU
         Try
             Cursor = Cursors.WaitCursor
 
-            Dim dtPieceAccount As DataTable = PieceComptableService.GenererPieceComptable(New CalculWU() {calc})
+            Dim dtPieceAccount As DataTable = PieceComptableService.GenererPieceComptable(
+                New CalculWU() {calc}, _dateActivite, DerniereJournee)
 
             If dtPieceAccount.Rows.Count = 0 Then
                 MessageBox.Show($"L'Account {calc.Account} ne génère aucune écriture (tous ses montants sont nuls).",

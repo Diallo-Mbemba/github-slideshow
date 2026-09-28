@@ -2811,6 +2811,65 @@ structure les attend ; leur table, leur dépôt et leur script n'existeront qu'a
 où ils auront quelque chose à lire. Écrire aujourd'hui un dépôt que rien n'appelle et un script
 qui ne crée rien serait du code mort.
 
+## Chaque écriture dit la période qu'elle couvre
+
+Le libellé d'une ligne de pièce n'est pas décoratif : `CoreBankingService` le **recopie tel
+quel** dans la colonne `ADDLTEXT` du fichier chargé au core banking. C'est donc lui que le
+comptable de la banque relira dans son système, des mois plus tard, sans avoir la pièce sous
+les yeux.
+
+`TVA COLLECTEES WESTERN UNION` ne lui dit pas quelle semaine elle couvre.
+`TVA COLLECTEES WESTERN UNION DU 08 AU 14 09 2026`, si.
+
+**Les douze libellés de la pièce portent désormais la période**, y compris celui du mouvement
+et celui de la contrepartie. Trois formes, selon ce que la période couvre :
+
+| Période | Narratif |
+|---|---|
+| une seule journée | `DU 09 09 2026` |
+| un même mois | `DU 08 AU 14 09 2026` |
+| à cheval sur deux mois ou deux années | `DU 28/09/2026 AU 04/10/2026` |
+
+La journée s'écrit sans « AU » : `DU 09 AU 09 09 2026` serait exact mais se lit comme une faute
+de frappe, et un narratif dont le comptable doute est un narratif qu'il vient faire vérifier.
+Le cas à cheval écrit les deux dates en entier — c'est plus long, mais c'est le seul où
+l'abrégé serait ambigu, et les compensations de fin de mois y tombent.
+
+### Deux refus délibérés
+
+- **Une période absente ne rend rien**, et surtout pas la date du jour. Un narratif portant une
+  date fausse est pire que muet : il désigne une semaine qui n'existe pas, et rien dans la
+  pièce ne permettrait de le redresser ensuite.
+- **Un intervalle donné à l'envers est remis dans l'ordre, pas refusé.** La pièce doit sortir,
+  et `DU 14 AU 08` ne serait relevé par personne avant l'inspection.
+
+### La période est calculée une fois, et l'ordre décidé à un seul endroit
+
+`SuffixeDePeriode` est appelée **une fois par pièce**, pas une fois par ligne. La recalculer par
+ligne coûterait peu, mais laisserait la possibilité que deux lignes de la même pièce n'annoncent
+pas la même période — et c'est précisément ce qu'un narratif est censé rendre impossible.
+
+`Narratif(libellé, période)` est le **seul endroit qui décide de l'ordre**. Voir la réserve
+ci-dessous : si la banque répond que `ADDLTEXT` tronque, il faudra mettre la période en tête
+plutôt qu'en queue, et ce sera une seule ligne à changer — pas douze appels à revoir.
+
+### ⚠️ Réserve ouverte : la longueur d'`ADDLTEXT`
+
+La période ajoute **20 caractères à chaque ligne**. Mesuré sur des libellés réels :
+
+```
+ 28 ->  48   TVA COLLECTEES WESTERN UNION DU 08 AU 14 09 2026
+ 33 ->  53   CCS NGARTA RUE DE 40M ACTIVITE WU DU 08 AU 14 09 2026
+ 39 ->  59   ECART D'ARRONDI - COMPTE INTER BANCAIRE DU 08 AU 14 09 2026
+ 58 ->  78   Commission sur Transfert_Sous-agence CCS NGARTA RUE DE 40M DU 08 AU 14 09 2026
+```
+
+**Le plus long atteint 78 caractères.** Notre code ne tronque rien — il n'y a aucun `Substring`
+ni `MaxLength` dans `CoreBankingService`. Mais si le core banking borne `ADDLTEXT` à 50 ou à 64,
+**il tronque déjà aujourd'hui** sur les lignes de sous-agent, période ou pas : 58 caractères
+dépassent ces deux bornes. La question est posée à la banque ; tant qu'elle n'a pas répondu,
+la période reste en queue, comme dans l'application centrafricaine.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

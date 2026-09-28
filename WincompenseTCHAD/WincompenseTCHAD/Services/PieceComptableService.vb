@@ -141,7 +141,12 @@ Public NotInheritable Class PieceComptableService
     ''' comptes correspondent à l'unité près, aux arrondis près (écart résiduel ≤ 1 FCFA dans
     ''' l'exemple, absorbé par le mécanisme du compte d'attente, section 14).
     ''' </summary>
-    Public Shared Function GenererPieceComptable(listeCalculs As IEnumerable(Of CalculWU)) As DataTable
+    ''' <param name="listeCalculs">Les points de vente à comptabiliser.</param>
+    ''' <param name="debutPeriode">Premier jour couvert. Nothing si la période est inconnue.</param>
+    ''' <param name="finPeriode">Dernier jour couvert. Nothing pour une pièce d'une seule journée.</param>
+    Public Shared Function GenererPieceComptable(listeCalculs As IEnumerable(Of CalculWU),
+                                                 debutPeriode As Date?,
+                                                 finPeriode As Date?) As DataTable
 
         Dim dt As New DataTable("dtPiece")
         dt.Columns.Add("Compte", GetType(String))
@@ -162,6 +167,11 @@ Public NotInheritable Class PieceComptableService
         ' Les prendre ici, et non à chaque écriture, garantit qu'une même pièce ne mélange jamais
         ' deux paramétrages si les comptes venaient à être modifiés pendant sa génération.
         Dim comptes As ComptesSystemeWU = ComptesSystemeWU.Actuels
+
+        ' La période, calculée UNE FOIS pour toute la pièce. La recalculer par ligne coûterait
+        ' peu, mais laisserait la possibilité que deux lignes de la même pièce n'annoncent pas
+        ' la même période — et c'est précisément ce qu'un narratif est censé rendre impossible.
+        Dim periode As String = SuffixeDePeriode(debutPeriode, finPeriode)
 
         For Each calc As CalculWU In listeCalculs
 
@@ -204,7 +214,7 @@ Public NotInheritable Class PieceComptableService
                 compteMouvement = comptes.CompteInterBancaire
             End If
 
-            Dim libelleMouvement As String = LibelleDuMouvement(calc.Designation)
+            Dim libelleMouvement As String = Narratif(LibelleDuMouvement(calc.Designation), periode)
 
             Dim totalCommissionsEtTaxes As Decimal =
                 calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
@@ -221,7 +231,7 @@ Public NotInheritable Class PieceComptableService
             AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement, calc.CodeAgence)
 
             ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
-            AjouterLigneSigneAuto(dt, comptes.CompteCourant, ConstantesWU.LIB_COMPTE_COURANT, -netCompteCourant, calc.CodeAgence)
+            AjouterLigneSigneAuto(dt, comptes.CompteCourant, Narratif(ConstantesWU.LIB_COMPTE_COURANT, periode), -netCompteCourant, calc.CodeAgence)
 
             ' 3) Commissions part Banque (toujours créditées, quel que soit le type de PDV).
             ' Transfert et Envoi partagent le même compte dans le paramétrage actuel (728300148),
@@ -233,29 +243,29 @@ Public NotInheritable Class PieceComptableService
             ' envoi. Dans une comparaison ligne à ligne, deux ordres différents font perdre du
             ' temps au vérificateur, et lui font passer des écarts.
             AjouterLigneSiNonNul(dt, comptes.CommissionTransfertBanque,
-                                 ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
+                                 Narratif(ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, periode), 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionPaiementBanque,
-                                 ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
+                                 Narratif(ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, periode), 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
-                                 ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
+                                 Narratif(ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, periode), 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
 
             ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCommission) Then
 
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     $"{ConstantesWU.LIB_COMMISSION_TRANSFERT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionTransfertSA, calc.CodeAgence)
+                                     Narratif($"{ConstantesWU.LIB_COMMISSION_TRANSFERT_SA} {calc.Designation}".Trim(), periode), 0D, calc.CommissionTransfertSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     $"{ConstantesWU.LIB_COMMISSION_PAIEMENT_SA} {calc.Designation}".Trim(), 0D, calc.CommissionPaiementSA, calc.CodeAgence)
+                                     Narratif($"{ConstantesWU.LIB_COMMISSION_PAIEMENT_SA} {calc.Designation}".Trim(), periode), 0D, calc.CommissionPaiementSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     $"{ConstantesWU.LIB_COMMISSION_ENVOI_SA} {calc.Designation}".Trim(), 0D, calc.CommissionEnvoiSA, calc.CodeAgence)
+                                     Narratif($"{ConstantesWU.LIB_COMMISSION_ENVOI_SA} {calc.Designation}".Trim(), periode), 0D, calc.CommissionEnvoiSA, calc.CodeAgence)
             End If
 
             ' 5) Taxes (impôts, TVA, TTA) : toujours créditées, à la charge de la banque.
-            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, 0D, calc.TaxeEnvoi, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.TVACollectee, ConstantesWU.LIB_TVA, 0D, calc.TVA, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, ConstantesWU.LIB_TTA_ENVOI, 0D, calc.TTAEnvoi, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.TTAReception, ConstantesWU.LIB_TTA_RECEPTION, 0D, calc.TTAReception, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, Narratif(ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, periode), 0D, calc.TaxeEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TVACollectee, Narratif(ConstantesWU.LIB_TVA, periode), 0D, calc.TVA, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, Narratif(ConstantesWU.LIB_TTA_ENVOI, periode), 0D, calc.TTAEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAReception, Narratif(ConstantesWU.LIB_TTA_RECEPTION, periode), 0D, calc.TTAReception, calc.CodeAgence)
         Next
 
         Return dt
@@ -334,6 +344,76 @@ Public NotInheritable Class PieceComptableService
     ''' La comparaison ignore la casse et le tiret bas : « CCS », « ccs » et « CCS_ » comptent
     ''' tous pour un préfixe déjà présent.
     ''' </summary>
+    ''' <summary>
+    ''' Colle la période au libellé d'une écriture.
+    '''
+    ''' POURQUOI CETTE FONCTION EXISTE, ALORS QU'UNE CONCATÉNATION SUFFIRAIT.
+    ''' Le libellé d'une ligne de pièce n'est pas décoratif : CoreBankingService le recopie
+    ''' tel quel dans la colonne ADDLTEXT du fichier chargé au core banking. C'est donc lui
+    ''' que le comptable de la banque relira dans son système, des mois plus tard, sans
+    ''' avoir la pièce sous les yeux. « TVA COLLECTEES WESTERN UNION » ne lui dit pas quelle
+    ''' semaine elle couvre ; « TVA COLLECTEES WESTERN UNION DU 08 AU 14 09 2026 », si.
+    '''
+    ''' ET SURTOUT : C'EST LE SEUL ENDROIT QUI DÉCIDE DE L'ORDRE. La longueur maximale
+    ''' d'ADDLTEXT n'est pas connue de nous, et la question est posée à la banque. Si elle
+    ''' répond que le champ tronque, il faudra mettre la période EN TÊTE plutôt qu'en queue,
+    ''' pour que la coupe morde sur la désignation et non sur la date. Cette bascule est
+    ''' alors une seule ligne, ici, et douze appels n'ont pas à être revus.
+    '''
+    ''' Une période vide rend le libellé inchangé, sans espace en trop : une pièce dont on
+    ''' ignore la période doit sortir comme avant, et non avec un narratif estropié.
+    ''' </summary>
+    Private Shared Function Narratif(libelle As String, periode As String) As String
+
+        Dim texte As String = If(libelle, String.Empty).Trim()
+        Dim suffixe As String = If(periode, String.Empty).Trim()
+
+        If suffixe.Length = 0 Then Return texte
+        If texte.Length = 0 Then Return suffixe
+
+        Return texte & " " & suffixe
+    End Function
+
+    ''' <summary>
+    ''' Dit la période couverte, sous la forme qu'un comptable lit sans hésiter.
+    '''
+    '''     une seule journée ........ DU 09 09 2026
+    '''     un même mois ............. DU 08 AU 14 09 2026
+    '''     à cheval sur deux mois ... DU 28/09/2026 AU 04/10/2026
+    '''
+    ''' UNE PÉRIODE ABSENTE NE REND RIEN, et surtout pas la date du jour. Un narratif
+    ''' portant une date fausse est pire que muet : il désigne une semaine qui n'existe pas,
+    ''' et rien dans la pièce ne permettrait de le redresser ensuite.
+    '''
+    ''' Un intervalle donné à l'envers est REMIS DANS L'ORDRE plutôt que refusé. La pièce
+    ''' doit sortir, et « DU 14 AU 08 » ne serait relevé par personne avant l'inspection.
+    ''' </summary>
+    Public Shared Function SuffixeDePeriode(debut As Date?, fin As Date?) As String
+
+        If Not debut.HasValue AndAlso Not fin.HasValue Then Return String.Empty
+
+        Dim premier As Date = If(debut.HasValue, debut.Value.Date, fin.Value.Date)
+        Dim dernier As Date = If(fin.HasValue, fin.Value.Date, premier)
+
+        If dernier < premier Then
+            Dim echange As Date = premier
+            premier = dernier
+            dernier = echange
+        End If
+
+        If premier = dernier Then
+            Return String.Format(CultureInfo.InvariantCulture, ConstantesWU.PIECE_JOURNEE_FORMAT,
+                                 premier.Day, premier.Month, premier.Year)
+        End If
+
+        If premier.Year = dernier.Year AndAlso premier.Month = dernier.Month Then
+            Return String.Format(CultureInfo.InvariantCulture, ConstantesWU.PIECE_PERIODE_FORMAT,
+                                 premier.Day, dernier.Day, dernier.Month, dernier.Year)
+        End If
+
+        Return String.Format(CultureInfo.InvariantCulture, ConstantesWU.PIECE_PERIODE_LONGUE_FORMAT,
+                             premier, dernier)
+    End Function
     Private Shared Function LibelleDuMouvement(designation As String) As String
 
         Dim nom As String = If(designation, String.Empty).Trim()

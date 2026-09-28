@@ -174,6 +174,28 @@ Public NotInheritable Class ConstantesWU
     Public Const LIB_COMMISSION_PAIEMENT_SA As String = "Commission sur Paiement_Sous-agence"
     Public Const LIB_COMMISSION_ENVOI_SA As String = "Commission sur Envoi_Sous-agence"
     Public Const LIB_IMPOTS_TAXE_ENVOI As String = "IMPOTS ET TAXE SUR ENVOI"
+
+    ''' <summary>
+    ''' Période d'une pièce qui ne couvre qu'une journée : « DU 09 09 2026 ».
+    '''
+    ''' Écrite sans « AU » : « DU 09 AU 09 09 2026 » serait exact mais se lit comme une
+    ''' faute de frappe, et un narratif dont le comptable doute est un narratif qu'il
+    ''' vient faire vérifier.
+    ''' </summary>
+    Public Const PIECE_JOURNEE_FORMAT As String = "DU {0:00} {1:00} {2}"
+
+    ''' <summary>
+    ''' Période tenant dans un seul mois : « DU 08 AU 14 09 2026 ». Le mois et l'année
+    ''' ne sont écrits qu'une fois, puisqu'ils sont communs aux deux bornes.
+    ''' </summary>
+    Public Const PIECE_PERIODE_FORMAT As String = "DU {0:00} AU {1:00} {2:00} {3}"
+
+    ''' <summary>
+    ''' Période franchissant un mois ou une année : « DU 28/09/2026 AU 04/10/2026 ».
+    ''' Les deux dates sont écrites en entier — c'est plus long, mais c'est le seul cas
+    ''' où l'abrégé serait ambigu, et les compensations de fin de mois y tombent.
+    ''' </summary>
+    Public Const PIECE_PERIODE_LONGUE_FORMAT As String = "DU {0:dd/MM/yyyy} AU {1:dd/MM/yyyy}"
     Public Const LIB_TVA As String = "TVA COLLECTEES WESTERN UNION"
     Public Const LIB_TTA_ENVOI As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
     ' Double espace avant "DE" : reproduit fidèlement le libellé du classeur de référence
