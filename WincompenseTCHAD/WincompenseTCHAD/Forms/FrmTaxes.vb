@@ -114,7 +114,7 @@ Public Class FrmTaxes
 
         dgvTaxes.AutoGenerateColumns = True
         dgvTaxes.DataSource = table
-        dgvTaxes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnMode.Fill
+        dgvTaxes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
 
         ' Le numéro de compte se lit chiffre par chiffre : une police à chasse fixe évite de
         ' confondre deux comptes qui ne diffèrent que par un caractère.
