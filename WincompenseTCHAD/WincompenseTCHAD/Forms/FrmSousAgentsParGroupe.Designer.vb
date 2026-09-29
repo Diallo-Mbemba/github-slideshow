@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Partial Class FrmSousAgentsParGroupe
@@ -152,9 +152,9 @@ Partial Class FrmSousAgentsParGroupe
         Me.lblStatut.Anchor = CType(((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left) _
                     Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.lblStatut.ForeColor = System.Drawing.SystemColors.GrayText
-        Me.lblStatut.Location = New System.Drawing.Point(12, 586)
+        Me.lblStatut.Location = New System.Drawing.Point(244, 586)
         Me.lblStatut.Name = "lblStatut"
-        Me.lblStatut.Size = New System.Drawing.Size(784, 20)
+        Me.lblStatut.Size = New System.Drawing.Size(552, 20)
         Me.lblStatut.TabIndex = 10
         Me.lblStatut.Text = ""
         '

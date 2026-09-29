@@ -2960,6 +2960,16 @@ touchent plus :
 
 Les totaux passent de 600 à 876 pixels de large : ils étaient tronqués même sans la liste par-dessus.
 
+### Le même défaut sur les sous-agents par groupe
+
+`FrmSousAgentsParGroupe` portait la même faute, en plus radicale : `btnExporter` occupe
+`x 12 → 232`, et `lblStatut` commençait **au même x = 12**, aligné à gauche et en gris. Son
+message d'état était donc entièrement caché derrière le bouton sur ses 220 premiers pixels — et
+comme il est gris et discret, personne ne s'était étonné de ne jamais le voir.
+
+Il commence désormais à `x = 244`, après le bouton, et s'arrête à `796` — douze pixels avant
+« Fermer ».
+
 ### Le vérificateur qui l'a trouvé
 
 `verif_chevauchement.py` contrôle qu'aucun contrôle posé directement sur un formulaire n'en
