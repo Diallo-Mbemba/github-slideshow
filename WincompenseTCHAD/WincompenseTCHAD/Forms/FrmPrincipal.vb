@@ -41,12 +41,22 @@ Public Class FrmPrincipal
     ''' <typeparam name="T">Type du formulaire à ouvrir.</typeparam>
     Public Function AfficherEnfant(Of T As {Form, New})() As T
 
+        Dim pleinCadre As Boolean = DoitOccuperLaZone(GetType(T))
+
         For Each enfant As Form In Me.MdiChildren
 
             If Not TypeOf enfant Is T Then Continue For
 
-            ' Une fenêtre réduite doit être rétablie, sinon « l'ouvrir » ne montrerait rien.
-            If enfant.WindowState = FormWindowState.Minimized Then
+            If pleinCadre Then
+
+                ' « Toujours plein cadre » vaut aussi pour un retour : l'écran que
+                ' l'utilisateur avait réduit ou redimensionné reprend toute la zone quand il
+                ' le rouvre.
+                AjusterALaZoneMdi(enfant)
+
+            ElseIf enfant.WindowState = FormWindowState.Minimized Then
+
+                ' Une fenêtre réduite doit être rétablie, sinon « l'ouvrir » ne montrerait rien.
                 enfant.WindowState = FormWindowState.Normal
             End If
 
@@ -61,11 +71,66 @@ Public Class FrmPrincipal
         ' vaut que pour un affichage modal, le second la placerait au centre de l'écran, donc
         ' à cheval sur les bords de la zone MDI. Le placement est donc calculé à la main.
         nouveau.StartPosition = FormStartPosition.Manual
-        CentrerDansLaZoneMdi(nouveau)
+
+        If pleinCadre Then
+            AjusterALaZoneMdi(nouveau)
+        Else
+            CentrerDansLaZoneMdi(nouveau)
+        End If
 
         nouveau.Show()
+
+        ' L'ajustement est repris APRÈS l'affichage : si l'utilisateur avait maximisé une
+        ' autre fenêtre fille à la main, Windows propagerait cet état à celle qui s'ouvre, et
+        ' la dimension posée juste avant serait perdue.
+        If pleinCadre Then AjusterALaZoneMdi(nouveau)
+
         Return nouveau
     End Function
+
+    ''' <summary>
+    ''' Les écrans qui occupent toute la zone MDI dès leur ouverture.
+    '''
+    ''' Le traitement de la compense en fait partie : sa grille de contrôle porte une ligne
+    ''' par point de vente et une dizaine de colonnes de montants. À la taille de conception
+    ''' elle se lit à la barre de défilement ; sur toute la zone, elle tient à l'écran.
+    ''' C'est la fenêtre où l'utilisateur passe sa journée, et la seule qu'il ouvre pour
+    ''' travailler plutôt que pour consulter un paramètre.
+    '''
+    ''' LES ÉCRANS DE PARAMÉTRAGE EN SONT EXCLUS, et ce n'est pas un oubli : leurs champs
+    ''' sont disposés pour une largeur donnée, et l'agrandissement ne leur ajouterait que
+    ''' du vide autour d'une colonne de saisie.
+    ''' </summary>
+    Private Shared Function DoitOccuperLaZone(ecran As Type) As Boolean
+        Return ecran Is GetType(FrmCompensationWU)
+    End Function
+
+    ''' <summary>
+    ''' Donne à une fenêtre fille toute la zone de travail MDI.
+    '''
+    ''' Bounds plutôt que WindowState.Maximized : une fenêtre fille maximisée fait remonter
+    ''' ses boutons système dans la barre de menus du parent, et Windows propage ensuite cet
+    ''' état à TOUTES les filles qui s'ouvrent. Occuper la zone sans être « maximisée »
+    ''' laisse chaque écran indépendant.
+    ''' </summary>
+    Private Sub AjusterALaZoneMdi(enfant As Form)
+
+        If enfant Is Nothing Then Return
+
+        Dim zone As MdiClient = ZoneMdi()
+        If zone Is Nothing Then Return
+
+        Dim disponible As Size = zone.ClientSize
+        If disponible.Width <= 0 OrElse disponible.Height <= 0 Then Return
+
+        ' Une fenêtre réduite ou maximisée n'obéit pas à Bounds : son état est rétabli
+        ' d'abord, faute de quoi la dimension serait mémorisée sans jamais être appliquée.
+        If enfant.WindowState <> FormWindowState.Normal Then
+            enfant.WindowState = FormWindowState.Normal
+        End If
+
+        enfant.Bounds = New Rectangle(Point.Empty, disponible)
+    End Sub
 
     ''' <summary>
     ''' Centre une fenêtre fille dans la zone de travail MDI, en la rétrécissant d'abord si

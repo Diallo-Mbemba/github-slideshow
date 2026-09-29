@@ -2981,6 +2981,69 @@ sa partie gauche passer sous un bouton, pour réserver la place d'un compteur qu
 projet s'en sert trois fois. Sans cette exception, les vrais chevauchements se perdraient dans le
 bruit.
 
+## Tous les boutons portent leur icône
+
+Les trente-huit boutons du projet sortaient nus. Ils portent désormais leur dessin, **posé
+d'après leur NOM** et non dans chaque Designer.
+
+```vb
+table("btnSupprimer") = IconeWU.Supprimer
+table("btnValider")   = IconeWU.Enregistrer
+table("btnRejeter")   = IconeWU.Annuler
+```
+
+Trente-huit boutons répartis sur vingt-cinq fenêtres, c'est trente-huit endroits à retoucher et
+trente-huit endroits à ne pas oublier quand un écran s'ajoute. La table le dit **une fois**, et
+tout bouton qui s'appellera `btnSupprimer` demain portera sa corbeille sans qu'on y pense.
+
+`Habiller(ecran)` — que les vingt-cinq fenêtres appellent déjà — s'en charge : **aucun formulaire
+n'a été modifié.**
+
+### Douze dessins de plus, et pourquoi ils sont à part
+
+Les vingt premiers nomment un **écran** : une balance, un bâtiment, un classeur. Les douze
+nouveaux nomment un **verbe** : enregistrer, fermer, supprimer, actualiser, exporter, copier,
+annuler, calculer, télécharger, un calendrier, un nouveau, un modifier. La distinction n'est pas
+décorative — **un bouton porte ce qu'il fait, un menu ce qu'il ouvre.**
+
+### Trois règles que l'habillage respecte
+
+- **Un bouton qui porte déjà une image n'est pas touché.** L'automatique ne défait jamais un
+  choix explicite fait dans un Designer.
+- **Un nom inconnu laisse le bouton nu, sans erreur.** Un écran neuf doit s'ouvrir normalement ;
+  c'est `verif_icones_boutons.py` qui signale l'oubli au développeur, pas l'utilisateur qui le
+  découvre.
+- **L'icône est retracée à la taille de la police de la fenêtre**, et non étirée depuis 16 pixels.
+  Sur un poste réglé à 125 %, les fenêtres étant en `AutoScaleMode.Font`, la police grandit — et
+  le dessin avec elle, net.
+
+### La seule entrée que le portage a dû ajouter
+
+`btnReglement`. La compensation du Tchad part de **deux** rapports, activité et règlement ;
+l'application centrafricaine en charge deux autres, et sa table ne connaissait donc pas ce nom.
+C'était exactement l'avertissement donné avant le chantier, et c'était le seul.
+
+Un vérificateur le tient maintenant : `verif_icones_boutons.py` contrôle que **tout** bouton est
+dans la table, qu'aucune entrée ne nomme un bouton inexistant, et que chaque valeur de
+l'énumération a bien un tracé — sans quoi le bouton sortirait vide.
+
+## L'écran de compensation s'ouvre plein cadre
+
+Sa grille de contrôle porte une ligne par point de vente et une dizaine de colonnes de montants.
+À sa taille de conception, elle se lisait à la barre de défilement ; elle occupe désormais toute
+la zone MDI dès l'ouverture, et y tient à l'écran. C'est la fenêtre où l'agent passe sa journée,
+et la seule qu'il ouvre pour **travailler** plutôt que pour consulter un paramètre.
+
+Les écrans de paramétrage en sont exclus, et ce n'est pas un oubli : leurs champs sont disposés
+pour une largeur donnée, et l'agrandissement ne leur ajouterait que du vide autour d'une colonne
+de saisie.
+
+**`Bounds` plutôt que `WindowState.Maximized`** : une fenêtre fille maximisée fait remonter ses
+boutons système dans la barre de menus du parent, et Windows propage ensuite cet état à *toutes*
+les filles qui s'ouvrent. Occuper la zone sans être « maximisée » laisse chaque écran indépendant.
+L'ajustement est d'ailleurs repris **après** `Show()`, précisément parce qu'une autre fille
+maximisée à la main propagerait son état et effacerait la dimension posée juste avant.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

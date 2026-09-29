@@ -210,10 +210,167 @@ Public NotInheritable Class IconesWU
         If ecran Is Nothing Then Return
 
         Dim marque As Icon = IconeApplication()
-        If marque Is Nothing Then Return
+        If marque IsNot Nothing Then ecran.Icon = marque
 
-        ecran.Icon = marque
+        ' L'icône manquante ne doit pas priver les boutons des leurs. Elles ne viennent pas
+        ' de la même source — le fichier .ico pour l'une, des tracés pour les autres — et
+        ' les faire échouer ensemble reviendrait à punir deux fois la même absence.
+        HabillerLesBoutons(ecran)
     End Sub
+
+    ''' <summary>
+    ''' Pose son icône sur chaque bouton de la fenêtre, d'après son NOM.
+    '''
+    ''' POURQUOI PAR LE NOM, ET NON DANS CHAQUE DESIGNER. Trente-huit boutons répartis sur
+    ''' vingt-cinq fenêtres, c'est trente-huit endroits à retoucher, et trente-huit endroits
+    ''' à ne pas oublier quand un écran s'ajoute. La table dit une fois pour toutes que
+    ''' « btnSupprimer » porte une corbeille, et tout bouton qui s'appellera ainsi demain la
+    ''' portera sans qu'on y pense.
+    '''
+    ''' UN BOUTON QUI PORTE DÉJÀ UNE IMAGE N'EST PAS TOUCHÉ : l'habillage automatique ne
+    ''' doit jamais défaire un choix explicite fait dans un Designer.
+    '''
+    ''' UN NOM INCONNU LAISSE LE BOUTON NU, sans erreur. Un écran neuf dont les boutons ne
+    ''' sont pas encore dans la table doit s'ouvrir normalement ; verif_icones_boutons.py
+    ''' signale l'oubli au développeur, l'utilisateur n'a pas à le découvrir.
+    ''' </summary>
+    Public Shared Sub HabillerLesBoutons(ecran As Form)
+
+        If ecran Is Nothing Then Return
+
+        ' La taille suit la police de la fenêtre, qui suit elle-même la mise à l'échelle de
+        ' Windows : les fenêtres sont en AutoScaleMode.Font, donc sur un poste réglé à 125 %
+        ' la police grandit — et l'icône avec elle, RETRACÉE à la bonne taille plutôt
+        ' qu'étirée depuis 16 pixels.
+        Dim cote As Integer = Math.Max(16, ecran.Font.Height + 2)
+
+        PoserSurLesBoutons(ecran.Controls, cote)
+    End Sub
+
+    ''' <summary>
+    ''' Parcourt les contrôles ET LEURS ENFANTS : la moitié des boutons du projet vivent
+    ''' dans un GroupBox ou un Panel, et un parcours de surface les manquerait tous.
+    ''' </summary>
+    Private Shared Sub PoserSurLesBoutons(controles As Control.ControlCollection, cote As Integer)
+
+        If controles Is Nothing Then Return
+
+        For Each controle As Control In controles
+
+            Dim bouton As Button = TryCast(controle, Button)
+            If bouton IsNot Nothing Then PoserSurUnBouton(bouton, cote)
+
+            If controle.HasChildren Then PoserSurLesBoutons(controle.Controls, cote)
+        Next
+    End Sub
+
+    Private Shared Sub PoserSurUnBouton(bouton As Button, cote As Integer)
+
+        If bouton.Image IsNot Nothing Then Return
+
+        Dim icone As IconeWU = IconeDuBouton(bouton.Name)
+        If icone = IconeWU.Aucune Then Return
+
+        bouton.Image = Obtenir(icone, cote)
+
+        ' ImageBeforeText place l'image et le texte CÔTE À CÔTE, puis centre l'ensemble.
+        ' Poser l'image à gauche en laissant le texte centré les ferait se chevaucher sur
+        ' les boutons étroits — « Fermer » n'en fait que cent.
+        bouton.ImageAlign = ContentAlignment.MiddleCenter
+        bouton.TextAlign = ContentAlignment.MiddleCenter
+        bouton.TextImageRelation = TextImageRelation.ImageBeforeText
+    End Sub
+
+    ''' <summary>
+    ''' L'icône d'un bouton, d'après son nom. Aucune si le nom n'est pas connu.
+    '''
+    ''' La comparaison ignore la casse : Visual Basic ne la distingue pas, et un bouton
+    ''' nommé « btnfermer » dans un Designer retouché à la main doit être habillé comme
+    ''' les autres.
+    ''' </summary>
+    Public Shared Function IconeDuBouton(nom As String) As IconeWU
+
+        Dim cherche As String = If(nom, String.Empty).Trim()
+        If cherche.Length = 0 Then Return IconeWU.Aucune
+
+        Dim icone As IconeWU
+        If _iconesDesBoutons.TryGetValue(cherche, icone) Then Return icone
+
+        Return IconeWU.Aucune
+    End Function
+
+    ''' <summary>
+    ''' Le nom de chaque bouton du projet, et le dessin qu'il porte.
+    '''
+    ''' ELLE EST RANGÉE PAR INTENTION, ET NON PAR ORDRE ALPHABÉTIQUE. Ce qui compte en la
+    ''' relisant, c'est de voir que « btnValider » porte le même dessin que
+    ''' « btnEnregistrer » et « btnRejeter » le même que « btnAnnuler » : deux boutons qui
+    ''' font la même chose doivent se ressembler, et l'alphabet les aurait séparés.
+    ''' </summary>
+    Private Shared ReadOnly _iconesDesBoutons As Dictionary(Of String, IconeWU) =
+        ConstruireLaTableDesBoutons()
+
+    Private Shared Function ConstruireLaTableDesBoutons() As Dictionary(Of String, IconeWU)
+
+        Dim table As New Dictionary(Of String, IconeWU)(StringComparer.OrdinalIgnoreCase)
+
+        ' --- Enregistrer, fermer, renoncer -------------------------------------------------
+        table("btnEnregistrer") = IconeWU.Enregistrer
+        table("btnValider") = IconeWU.Enregistrer
+        table("btnFermer") = IconeWU.Fermer
+        table("btnRenoncer") = IconeWU.Annuler
+        table("btnAnnuler") = IconeWU.Annuler
+        table("btnRejeter") = IconeWU.Annuler
+
+        ' --- Le référentiel : créer, modifier, supprimer -------------------------------------
+        table("btnNouveau") = IconeWU.Nouveau
+        table("btnNouveauGroupe") = IconeWU.Nouveau
+        table("btnModifier") = IconeWU.Modifier
+        table("btnSupprimer") = IconeWU.Supprimer
+        table("btnCopier") = IconeWU.Copier
+
+        ' --- Relire, resynchroniser -----------------------------------------------------------
+        table("btnActualiser") = IconeWU.Actualiser
+        table("btnActualiserHistorique") = IconeWU.Actualiser
+        table("btnActualiserJournal") = IconeWU.Actualiser
+        table("btnSynchroniser") = IconeWU.Actualiser
+
+        ' --- Les deux rapports de la journée, et les fichiers en général ---------------------
+        ' btnReglement est PROPRE AU TCHAD : la compensation y part de deux rapports, activité
+        ' et règlement. L'application centrafricaine en charge deux autres, et sa table ne
+        ' connaît donc pas ce nom. C'est la seule entrée que le portage a dû ajouter.
+        table("btnActivite") = IconeWU.Telecharger
+        table("btnReglement") = IconeWU.Telecharger
+        table("btnCharger") = IconeWU.Telecharger
+        table("btnChoisir") = IconeWU.Dossier
+
+        ' --- Ce que la journée produit --------------------------------------------------------
+        table("btnAfficher") = IconeWU.Calculer
+        table("btnGenererPiece") = IconeWU.Piece
+        table("btnPiece") = IconeWU.Piece
+        table("btnPieceAccount") = IconeWU.Piece
+        table("btnPieceGroupe") = IconeWU.Groupe
+        table("btnParGroupe") = IconeWU.Groupe
+        table("btnBordereau") = IconeWU.Registre
+        table("btnCoreBanking") = IconeWU.BaseDeDonnees
+        table("btnExporter") = IconeWU.Exporter
+        table("btnMois") = IconeWU.Calendrier
+
+        ' --- Le double regard : ce qui s'autorise et ce qui se vise --------------------------
+        table("btnAutoriser") = IconeWU.Coche
+        table("btnViser") = IconeWU.Coche
+        table("btnDeposer") = IconeWU.Coche
+
+        ' --- Les accès, et la base -------------------------------------------------------------
+        table("btnConnexion") = IconeWU.Cle
+        table("btnReinitialiser") = IconeWU.Cle
+        table("btnDeverrouiller") = IconeWU.Cle
+        table("btnParametres") = IconeWU.BaseDeDonnees
+        table("btnTester") = IconeWU.BaseDeDonnees
+        table("btnPreparer") = IconeWU.BaseDeDonnees
+
+        Return table
+    End Function
 
     ''' <summary>
     ''' Rend une copie de l'image, marquée d'une pastille portant un nombre.
@@ -317,6 +474,18 @@ Public NotInheritable Class IconesWU
             Case IconeWU.Silhouette : TracerSilhouette(g)
             Case IconeWU.Groupe : TracerGroupe(g)
             Case IconeWU.Pourcentage : TracerPourcentage(g)
+            Case IconeWU.Enregistrer : TracerEnregistrer(g)
+            Case IconeWU.Fermer : TracerFermer(g)
+            Case IconeWU.Nouveau : TracerNouveau(g)
+            Case IconeWU.Modifier : TracerModifier(g)
+            Case IconeWU.Supprimer : TracerSupprimer(g)
+            Case IconeWU.Actualiser : TracerActualiser(g)
+            Case IconeWU.Exporter : TracerExporter(g)
+            Case IconeWU.Copier : TracerCopier(g)
+            Case IconeWU.Annuler : TracerAnnuler(g)
+            Case IconeWU.Calculer : TracerCalculer(g)
+            Case IconeWU.Telecharger : TracerTelecharger(g)
+            Case IconeWU.Calendrier : TracerCalendrier(g)
             Case IconeWU.Coche : TracerCoche(g)
             Case IconeWU.Registre : TracerRegistre(g)
             Case IconeWU.Curseurs : TracerCurseurs(g)
@@ -541,6 +710,211 @@ Public NotInheritable Class IconesWU
     ''' selon les polices installées, et se placerait mal aux petites tailles ; deux disques
     ''' et une barre oblique tiennent leur place à seize pixels comme à soixante-quatre.
     ''' </summary>
+    ''' <summary>Disquette : enregistrer. Le volet clair en haut, l'étiquette en bas.</summary>
+    Private Shared Sub TracerEnregistrer(g As Graphics)
+
+        Boite(g, 2.0F, 2.5F, 12.0F, 11.0F, TEINTE_BLEU)
+
+        ' L'obturateur, en haut : c'est lui qui fait reconnaître la disquette à 16 pixels,
+        ' bien plus que le carré qui la porte.
+        Boite(g, 5.0F, 3.0F, 6.0F, 4.0F, TEINTE_PAPIER)
+        Boite(g, 8.6F, 3.6F, 1.6F, 2.8F, TEINTE_ARDOISE, False)
+
+        ' L'étiquette, en bas.
+        Boite(g, 4.0F, 9.0F, 8.0F, 4.5F, TEINTE_PAPIER)
+    End Sub
+
+    ''' <summary>Croix : fermer la fenêtre. Ardoise, et non rouge — fermer n'est pas annuler.</summary>
+    Private Shared Sub TracerFermer(g As Graphics)
+
+        Disque(g, 8.0F, 8.0F, 6.0F, TEINTE_PAPIER)
+
+        Using stylo As Pen = Contour(1.8F)
+            g.DrawLine(stylo, 5.4F, 5.4F, 10.6F, 10.6F)
+            g.DrawLine(stylo, 10.6F, 5.4F, 5.4F, 10.6F)
+        End Using
+    End Sub
+
+    ''' <summary>Feuille et signe plus : créer un élément.</summary>
+    Private Shared Sub TracerNouveau(g As Graphics)
+
+        Boite(g, 3.0F, 1.5F, 8.0F, 11.0F, TEINTE_PAPIER)
+
+        Using stylo As Pen = Contour(0.9F)
+            g.DrawLine(stylo, 4.8F, 4.5F, 9.2F, 4.5F)
+            g.DrawLine(stylo, 4.8F, 6.5F, 9.2F, 6.5F)
+        End Using
+
+        ' Le plus est posé par-dessus, en bas à droite : il déborde de la feuille, sinon il se
+        ' confond avec une ligne de texte.
+        Disque(g, 11.5F, 11.5F, 4.0F, TEINTE_VERT)
+
+        Using stylo As New Pen(TEINTE_PAPIER, 1.6F)
+            g.DrawLine(stylo, 9.4F, 11.5F, 13.6F, 11.5F)
+            g.DrawLine(stylo, 11.5F, 9.4F, 11.5F, 13.6F)
+        End Using
+    End Sub
+
+    ''' <summary>Crayon en diagonale : modifier.</summary>
+    Private Shared Sub TracerModifier(g As Graphics)
+
+        ' Le corps, de la pointe en bas à gauche vers la gomme en haut à droite.
+        Forme(g, New PointF() {New PointF(5.0F, 13.0F), New PointF(3.0F, 13.5F),
+                               New PointF(3.5F, 11.5F), New PointF(11.5F, 3.5F),
+                               New PointF(13.0F, 5.0F)}, TEINTE_OR)
+
+        ' La pointe, plus sombre : c'est elle qui donne le sens du crayon.
+        Forme(g, New PointF() {New PointF(3.0F, 13.5F), New PointF(3.5F, 11.5F),
+                               New PointF(5.0F, 13.0F)}, TEINTE_ARDOISE)
+
+        ' La virole, en haut.
+        Forme(g, New PointF() {New PointF(11.5F, 3.5F), New PointF(12.5F, 2.5F),
+                               New PointF(14.0F, 4.0F), New PointF(13.0F, 5.0F)}, TEINTE_BLEU)
+    End Sub
+
+    ''' <summary>Corbeille : supprimer. La seule icône d'action en teinte d'alerte.</summary>
+    Private Shared Sub TracerSupprimer(g As Graphics)
+
+        ' Le couvercle et sa poignée.
+        Boite(g, 2.5F, 4.0F, 11.0F, 1.8F, TEINTE_ALERTE)
+        Boite(g, 6.2F, 2.2F, 3.6F, 1.8F, TEINTE_ALERTE)
+
+        ' Le corps, légèrement tronconique.
+        Forme(g, New PointF() {New PointF(4.0F, 6.2F), New PointF(12.0F, 6.2F),
+                               New PointF(11.0F, 14.0F), New PointF(5.0F, 14.0F)}, TEINTE_ALERTE)
+
+        Using stylo As New Pen(TEINTE_PAPIER, 0.9F)
+            g.DrawLine(stylo, 6.6F, 8.0F, 6.4F, 12.2F)
+            g.DrawLine(stylo, 8.0F, 8.0F, 8.0F, 12.2F)
+            g.DrawLine(stylo, 9.4F, 8.0F, 9.6F, 12.2F)
+        End Using
+    End Sub
+
+    ''' <summary>Flèche circulaire : actualiser, resynchroniser.</summary>
+    Private Shared Sub TracerActualiser(g As Graphics)
+
+        Using stylo As New Pen(TEINTE_BLEU, 2.0F)
+            stylo.StartCap = LineCap.Round
+            stylo.EndCap = LineCap.Round
+
+            ' L'arc est ouvert en haut à droite : c'est cette ouverture qui fait lire une
+            ' flèche plutôt qu'un cercle.
+            g.DrawArc(stylo, 3.0F, 3.0F, 10.0F, 10.0F, 300.0F, 300.0F)
+        End Using
+
+        Forme(g, New PointF() {New PointF(11.0F, 1.2F), New PointF(14.2F, 4.2F),
+                               New PointF(10.0F, 5.2F)}, TEINTE_BLEU, False)
+    End Sub
+
+    ''' <summary>Feuille et flèche sortante : exporter, imprimer un document.</summary>
+    Private Shared Sub TracerExporter(g As Graphics)
+
+        Boite(g, 2.0F, 1.5F, 8.0F, 11.0F, TEINTE_PAPIER)
+
+        Using stylo As Pen = Contour(0.9F)
+            g.DrawLine(stylo, 3.8F, 4.2F, 8.2F, 4.2F)
+            g.DrawLine(stylo, 3.8F, 6.2F, 8.2F, 6.2F)
+            g.DrawLine(stylo, 3.8F, 8.2F, 6.5F, 8.2F)
+        End Using
+
+        ' La flèche sort de la feuille vers la droite : c'est le sens qui distingue l'export
+        ' de l'import, et non la couleur.
+        Using stylo As New Pen(TEINTE_VERT, 1.8F)
+            stylo.StartCap = LineCap.Round
+            g.DrawLine(stylo, 8.0F, 11.5F, 12.5F, 11.5F)
+        End Using
+
+        Forme(g, New PointF() {New PointF(12.0F, 9.2F), New PointF(15.0F, 11.5F),
+                               New PointF(12.0F, 13.8F)}, TEINTE_VERT, False)
+    End Sub
+
+    ''' <summary>Deux feuilles décalées : copier.</summary>
+    Private Shared Sub TracerCopier(g As Graphics)
+
+        Boite(g, 2.0F, 1.5F, 7.5F, 9.5F, TEINTE_PAPIER)
+        Boite(g, 6.5F, 5.0F, 7.5F, 9.5F, TEINTE_BLEU_CLAIR)
+
+        Using stylo As New Pen(TEINTE_PAPIER, 0.9F)
+            g.DrawLine(stylo, 8.2F, 7.8F, 12.3F, 7.8F)
+            g.DrawLine(stylo, 8.2F, 10.0F, 12.3F, 10.0F)
+            g.DrawLine(stylo, 8.2F, 12.2F, 10.5F, 12.2F)
+        End Using
+    End Sub
+
+    ''' <summary>Flèche de retour : annuler, renoncer, rejeter.</summary>
+    Private Shared Sub TracerAnnuler(g As Graphics)
+
+        Using stylo As New Pen(TEINTE_ARDOISE, 1.9F)
+            stylo.EndCap = LineCap.Round
+            g.DrawArc(stylo, 3.5F, 4.0F, 10.0F, 9.0F, 200.0F, 250.0F)
+        End Using
+
+        ' La pointe tournée vers la gauche : on revient en arrière.
+        Forme(g, New PointF() {New PointF(1.5F, 6.5F), New PointF(6.5F, 5.0F),
+                               New PointF(5.2F, 9.8F)}, TEINTE_ARDOISE, False)
+    End Sub
+
+    ''' <summary>Calculatrice : afficher et calculer la journée.</summary>
+    Private Shared Sub TracerCalculer(g As Graphics)
+
+        Boite(g, 2.5F, 1.5F, 11.0F, 13.0F, TEINTE_ARDOISE)
+
+        ' L'écran, en haut.
+        Boite(g, 4.0F, 3.0F, 8.0F, 3.0F, TEINTE_VERT, False)
+
+        ' SIX TOUCHES, POSÉES UNE PAR UNE. Elles l'étaient par deux boucles imbriquées, ce qui
+        ' se lisait mieux — mais l'outil qui rend ces dessins en PNG n'interprète que les
+        ' appels littéraux : la calculatrice sortait en ardoise unie sur la planche de
+        ' contrôle, et le seul moyen de la regarder avant de livrer était perdu.
+        '
+        ' Neuf touches donnaient d'ailleurs des carrés d'un pixel et demi. Six se voient.
+        Boite(g, 4.0F, 8.0F, 2.1F, 2.2F, TEINTE_PAPIER, False)
+        Boite(g, 6.9F, 8.0F, 2.1F, 2.2F, TEINTE_PAPIER, False)
+        Boite(g, 9.8F, 8.0F, 2.1F, 2.2F, TEINTE_PAPIER, False)
+        Boite(g, 4.0F, 11.2F, 2.1F, 2.2F, TEINTE_PAPIER, False)
+        Boite(g, 6.9F, 11.2F, 2.1F, 2.2F, TEINTE_PAPIER, False)
+        Boite(g, 9.8F, 11.2F, 2.1F, 2.2F, TEINTE_PAPIER, False)
+    End Sub
+
+    ''' <summary>Flèche descendante sur un bac : charger un rapport depuis un fichier.</summary>
+    Private Shared Sub TracerTelecharger(g As Graphics)
+
+        Using stylo As New Pen(TEINTE_BLEU, 2.0F)
+            stylo.StartCap = LineCap.Round
+            g.DrawLine(stylo, 8.0F, 1.5F, 8.0F, 7.5F)
+        End Using
+
+        Forme(g, New PointF() {New PointF(4.8F, 6.8F), New PointF(11.2F, 6.8F),
+                               New PointF(8.0F, 10.5F)}, TEINTE_BLEU, False)
+
+        ' Le bac : deux jambages et un fond. Sans lui, la flèche seule se lit « descendre ».
+        Using stylo As Pen = Contour(1.6F)
+            g.DrawLine(stylo, 2.5F, 10.5F, 2.5F, 13.5F)
+            g.DrawLine(stylo, 2.5F, 13.5F, 13.5F, 13.5F)
+            g.DrawLine(stylo, 13.5F, 13.5F, 13.5F, 10.5F)
+        End Using
+    End Sub
+
+    ''' <summary>Calendrier : la période complète d'un mois.</summary>
+    Private Shared Sub TracerCalendrier(g As Graphics)
+
+        Boite(g, 2.0F, 3.0F, 12.0F, 11.0F, TEINTE_PAPIER)
+        Boite(g, 2.0F, 3.0F, 12.0F, 3.0F, TEINTE_OR)
+
+        ' Les deux anneaux, qui débordent du bandeau.
+        Using stylo As Pen = Contour(1.4F)
+            g.DrawLine(stylo, 5.0F, 1.5F, 5.0F, 4.0F)
+            g.DrawLine(stylo, 11.0F, 1.5F, 11.0F, 4.0F)
+        End Using
+
+        ' Trois jours marqués : assez pour lire un calendrier, trop peu pour faire une grille
+        ' illisible à seize pixels.
+        Boite(g, 4.0F, 8.0F, 2.0F, 2.0F, TEINTE_BLEU_CLAIR, False)
+        Boite(g, 7.0F, 8.0F, 2.0F, 2.0F, TEINTE_BLEU_CLAIR, False)
+        Boite(g, 10.0F, 8.0F, 2.0F, 2.0F, TEINTE_BLEU_CLAIR, False)
+        Boite(g, 4.0F, 11.0F, 2.0F, 2.0F, TEINTE_BLEU_CLAIR, False)
+    End Sub
+
     Private Shared Sub TracerPourcentage(g As Graphics)
 
         Boite(g, 2.2F, 2.2F, 11.6F, 11.6F, TEINTE_PAPIER)
@@ -747,6 +1121,11 @@ End Class
 ''' porter le nom de l'un des deux.
 ''' </summary>
 Public Enum IconeWU
+
+    ''' <summary>Aucune icône : un bouton dont le nom n'est pas connu reste nu.</summary>
+    Aucune = 0
+
+    ' Les vingt dessins d'ÉCRAN : ils nomment une fenêtre, et habillent les menus.
     Balance = 1
     Graphique = 2
     Batiment = 3
@@ -767,4 +1146,20 @@ Public Enum IconeWU
     FermerTout = 18
     Sortie = 19
     Pourcentage = 20
+
+    ' Les douze dessins d'ACTION, posés sur les boutons. Les vingt précédents nomment des
+    ' écrans ; ceux-ci nomment des VERBES — enregistrer, fermer, supprimer. La distinction
+    ' n'est pas décorative : un bouton porte ce qu'il FAIT, un menu ce qu'il OUVRE.
+    Enregistrer = 21
+    Fermer = 22
+    Nouveau = 23
+    Modifier = 24
+    Supprimer = 25
+    Actualiser = 26
+    Exporter = 27
+    Copier = 28
+    Annuler = 29
+    Calculer = 30
+    Telecharger = 31
+    Calendrier = 32
 End Enum
