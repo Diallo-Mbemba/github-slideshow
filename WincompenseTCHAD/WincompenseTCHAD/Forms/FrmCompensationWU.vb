@@ -385,6 +385,7 @@ Public Class FrmCompensationWU
                                Not String.IsNullOrWhiteSpace(_cheminReglement)
         btnGenererPiece.Enabled = False
         btnPieceAccount.Enabled = False
+        btnPieceGroupe.Enabled = False
     End Sub
 
     ''' <summary>Réinitialise les résultats de calcul lorsqu'un nouveau fichier est sélectionné.</summary>
@@ -394,6 +395,7 @@ Public Class FrmCompensationWU
         _dateActivite = Nothing
         _transactions = New List(Of TransactionWU)
         btnPieceAccount.Enabled = False
+        btnPieceGroupe.Enabled = False
         dgvControle.DataSource = Nothing
         progressBarTraitement.Value = 0
         tsslLignesActivite.Text = "Lignes activité : 0"
@@ -500,6 +502,7 @@ Public Class FrmCompensationWU
 
             btnGenererPiece.Enabled = _listeCalculs.Count > 0
             btnPieceAccount.Enabled = _listeCalculs.Count > 0
+            btnPieceGroupe.Enabled = _listeCalculs.Count > 0
 
             avancement.Progression.Terminer()
 
@@ -1415,6 +1418,19 @@ Public Class FrmCompensationWU
         If e.RowIndex < 0 OrElse e.RowIndex >= dgvControle.Rows.Count Then Return
 
         dgvControle.CurrentCell = dgvControle.Rows(e.RowIndex).Cells(Math.Max(e.ColumnIndex, 0))
+    End Sub
+
+    ''' <summary>
+    ''' La même commande, atteignable de deux façons.
+    '''
+    ''' Le menu contextuel la met sous la main de qui travaille déjà dans la grille ; le
+    ''' bouton la rend VISIBLE. Un menu contextuel ne s'annonce pas : il faut savoir qu'il
+    ''' existe pour le chercher, et une commande qu'on ignore vaut une commande absente.
+    '''
+    ''' Les deux appellent la même procédure. Aucune ne duplique la règle.
+    ''' </summary>
+    Private Sub btnPieceGroupe_Click(sender As Object, e As EventArgs) Handles btnPieceGroupe.Click
+        AfficherPieceDuGroupeSelectionne()
     End Sub
 
     Private Sub mnuPieceGroupe_Click(sender As Object, e As EventArgs) Handles mnuPieceGroupe.Click

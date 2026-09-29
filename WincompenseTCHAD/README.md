@@ -2913,13 +2913,23 @@ précisément ce qu'on vient y chercher quand un sous-agent conteste.
   tard, quand la composition du groupe a changé : sans lui, rien ne dirait combien de sous-agents
   elle totalisait.
 
-### Pourquoi un menu contextuel, et non un bouton
+### Un bouton ET un menu contextuel
 
-La barre du haut de l'écran de compensation est **pleine** : six boutons occupent 1 172 pixels
-sur 1 184, et la seconde ligne porte les deux chemins de fichier, dont l'ellipse mangerait le nom
-si on les rétrécissait. Plutôt que d'amputer un libellé utile ou d'élargir une fenêtre qui doit
-tenir sur les postes de la banque, la commande est posée là où la main de l'utilisateur se trouve
-déjà : il doit de toute façon sélectionner une ligne.
+La commande est atteignable de deux façons, qui appellent la **même** procédure.
+
+Le **menu contextuel** la met sous la main de qui travaille déjà dans la grille. Mais un menu
+contextuel ne s'annonce pas : il faut savoir qu'il existe pour le chercher, et une commande qu'on
+ignore vaut une commande absente. Le **bouton « Pièce du groupe »** la rend visible.
+
+Trouver la place du bouton a demandé un arbitrage. La barre du haut est pleine — six boutons
+occupant 1 172 pixels sur 1 184 — et élargir la fenêtre l'aurait rendue dépendante de la
+résolution du poste : le MDI s'ouvre maximisé, mais un écran en 1 280 ne l'aurait plus contenue.
+Les **100 pixels** repris à chacun des deux libellés de chemin étaient la dépense la moins chère :
+ils en avaient de reste, et le bouton s'aligne exactement sous « Pièce de l'Account ».
+
+Un vérificateur, `verif_chevauchement.py`, contrôle désormais qu'aucun contrôle posé directement
+sur un formulaire n'en recouvre un autre — la seule erreur de ce genre que le compilateur ne voit
+jamais, et qui ne se découvre que sur le poste de l'agent.
 
 ## Règles tranchées par la banque
 

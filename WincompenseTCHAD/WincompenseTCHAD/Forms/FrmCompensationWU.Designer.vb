@@ -31,6 +31,7 @@ Partial Class FrmCompensationWU
         Me.btnAfficher = New System.Windows.Forms.Button()
         Me.btnGenererPiece = New System.Windows.Forms.Button()
         Me.btnPieceAccount = New System.Windows.Forms.Button()
+        Me.btnPieceGroupe = New System.Windows.Forms.Button()
         Me.lblActivite = New System.Windows.Forms.Label()
         Me.lblReglement = New System.Windows.Forms.Label()
         Me.dgvControle = New System.Windows.Forms.DataGridView()
@@ -107,13 +108,23 @@ Partial Class FrmCompensationWU
         Me.btnPieceAccount.Text = "Pièce de l'Account"
         Me.btnPieceAccount.UseVisualStyleBackColor = True
         '
+        'btnPieceGroupe
+        '
+        Me.btnPieceGroupe.Enabled = False
+        Me.btnPieceGroupe.Location = New System.Drawing.Point(980, 48)
+        Me.btnPieceGroupe.Name = "btnPieceGroupe"
+        Me.btnPieceGroupe.Size = New System.Drawing.Size(192, 27)
+        Me.btnPieceGroupe.TabIndex = 5
+        Me.btnPieceGroupe.Text = "Pièce du groupe"
+        Me.btnPieceGroupe.UseVisualStyleBackColor = True
+        '
         'lblActivite
         '
         Me.lblActivite.AutoEllipsis = True
         Me.lblActivite.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
         Me.lblActivite.Location = New System.Drawing.Point(12, 50)
         Me.lblActivite.Name = "lblActivite"
-        Me.lblActivite.Size = New System.Drawing.Size(570, 23)
+        Me.lblActivite.Size = New System.Drawing.Size(470, 23)
         Me.lblActivite.TabIndex = 4
         Me.lblActivite.Text = "(aucun fichier sélectionné)"
         Me.lblActivite.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
@@ -122,9 +133,9 @@ Partial Class FrmCompensationWU
         '
         Me.lblReglement.AutoEllipsis = True
         Me.lblReglement.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
-        Me.lblReglement.Location = New System.Drawing.Point(588, 50)
+        Me.lblReglement.Location = New System.Drawing.Point(488, 50)
         Me.lblReglement.Name = "lblReglement"
-        Me.lblReglement.Size = New System.Drawing.Size(574, 23)
+        Me.lblReglement.Size = New System.Drawing.Size(474, 23)
         Me.lblReglement.TabIndex = 5
         Me.lblReglement.Text = "(aucun fichier sélectionné)"
         Me.lblReglement.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
@@ -226,6 +237,7 @@ Partial Class FrmCompensationWU
         Me.Controls.Add(Me.lblReglement)
         Me.Controls.Add(Me.lblActivite)
         Me.Controls.Add(Me.btnPieceAccount)
+        Me.Controls.Add(Me.btnPieceGroupe)
         Me.Controls.Add(Me.btnGenererPiece)
         Me.Controls.Add(Me.btnCoreBanking)
         Me.Controls.Add(Me.btnAfficher)
@@ -250,6 +262,7 @@ Partial Class FrmCompensationWU
     Friend WithEvents btnAfficher As System.Windows.Forms.Button
     Friend WithEvents btnGenererPiece As System.Windows.Forms.Button
     Friend WithEvents btnPieceAccount As System.Windows.Forms.Button
+    Friend WithEvents btnPieceGroupe As System.Windows.Forms.Button
     Friend WithEvents lblActivite As System.Windows.Forms.Label
     Friend WithEvents lblReglement As System.Windows.Forms.Label
     Friend WithEvents dgvControle As System.Windows.Forms.DataGridView
