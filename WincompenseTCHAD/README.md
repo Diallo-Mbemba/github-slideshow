@@ -2870,6 +2870,57 @@ ni `MaxLength` dans `CoreBankingService`. Mais si le core banking borne `ADDLTEX
 dépassent ces deux bornes. La question est posée à la banque ; tant qu'elle n'a pas répondu,
 la période reste en queue, comme dans l'application centrafricaine.
 
+## La pièce d'un groupe statistique
+
+La journée se lisait par la **pièce globale**, ou **point de vente par point de vente**. Entre
+les deux, il manquait le **groupe** — c'est-à-dire le contrat : même taux de rétrocession pour
+tous ses membres. C'est à ce niveau que la banque discute avec un réseau de sous-agents, et donc
+à ce niveau qu'elle veut un document.
+
+**Clic droit sur une ligne de la grille de contrôle → « Pièce comptable du groupe de ce point de
+vente ».** La première feuille porte le groupe, les suivantes un onglet par point de vente — la
+même mécanique que la pièce globale, sur une liste filtrée.
+
+### Pourquoi c'est sûr
+
+Une pièce de groupe **s'équilibre par construction**, exactement comme la pièce globale et pour
+la même raison : la contrepartie sur le compte courant WU est calculée par différence **point de
+vente par point de vente**, chacun portant la sienne, qui absorbe son propre reste. N'importe
+quel sous-ensemble d'Accounts est donc équilibré — un seul, un groupe, ou tous. Ce n'est pas une
+nouvelle arithmétique : c'est la même, sur une liste filtrée.
+
+`VerifierEquilibrePiece` n'est **pas** appelée, pour la même raison que sur la pièce d'un seul
+point de vente : le compte d'attente ne s'applique qu'à la pièce globale, jamais à un
+sous-ensemble (section 14).
+
+### Les lignes restent par Account
+
+Cinq sous-agents donnent **cinq lignes de TVA** sur le même compte, et elles ne sont pas fondues.
+C'est voulu : le compte de compensation et le compte de commission d'un sous-agent sont
+**nominatifs** et ne se consolident pas. Ne fondre que les comptes de la banque donnerait un
+document lisible à moitié, et surtout plus rapprochable sous-agent par sous-agent — ce qui est
+précisément ce qu'on vient y chercher quand un sous-agent conteste.
+
+### Trois détails qui évitent des dégâts
+
+- **Le clic droit déplace d'abord le curseur.** Une `DataGridView` ne déplace pas sa sélection au
+  clic droit : sans cela, viser le cinquième sous-agent donnerait la pièce du groupe du premier,
+  sans que rien ne le signale — la pièce sortirait, juste et complète, mais pour un autre groupe.
+- **Le groupe est pris par la même règle qui sert à l'intituler** (`PieceExcelWU.GroupeDe`). Si
+  l'une rangeait une agence propre dans « (sans groupe) » et que l'autre l'intitulait autrement,
+  la pièce annoncerait un groupe qui ne contient pas les points de vente qu'elle totalise.
+- **L'intitulé porte le nombre de points de vente.** Une pièce de groupe se relit des mois plus
+  tard, quand la composition du groupe a changé : sans lui, rien ne dirait combien de sous-agents
+  elle totalisait.
+
+### Pourquoi un menu contextuel, et non un bouton
+
+La barre du haut de l'écran de compensation est **pleine** : six boutons occupent 1 172 pixels
+sur 1 184, et la seconde ligne porte les deux chemins de fichier, dont l'ellipse mangerait le nom
+si on les rétrécissait. Plutôt que d'amputer un libellé utile ou d'élargir une fenêtre qui doit
+tenir sur les postes de la banque, la commande est posée là où la main de l'utilisateur se trouve
+déjà : il doit de toute façon sélectionner une ligne.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

@@ -211,6 +211,15 @@ Public NotInheritable Class ConstantesWU
     Public Const LIB_MOUVEMENT_ACTIVITE_FORMAT As String = "CCS_{0} ACTIVITE WU"
 
     ''' <summary>
+    ''' Groupe d'un point de vente qui n'en porte aucun — une agence propre, ou un
+    ''' sous-agent dont le groupe reste à renseigner.
+    '''
+    ''' Nommé plutôt que laissé vide : une pièce intitulée « Groupe  » se lit comme un
+    ''' défaut d'affichage, « Groupe (sans groupe) » se lit comme un état des lieux.
+    ''' </summary>
+    Public Const PIECE_GROUPE_SANS As String = "(sans groupe)"
+
+    ''' <summary>
     ''' Préfixe du gabarit ci-dessus, isolé pour pouvoir constater qu'il est DÉJÀ présent.
     '''
     ''' La plupart des désignations commencent par « CCS », et le gabarit produisait alors
@@ -425,6 +434,19 @@ Public NotInheritable Class ConstantesWU
     ''' vente — la ligne d'écart d'arrondi, notamment.
     ''' </summary>
     Public Const CB_AGENCE_SIEGE As String = "N01"
+
+    ''' <summary>
+    ''' Longueur maximale du narratif (colonne ADDLTEXT) du fichier chargé au core banking.
+    ''' CONFIRMÉE PAR LA BANQUE : 150 caractères.
+    '''
+    ''' Elle n'est pas là pour tronquer — on ne coupe pas un narratif comptable, un libellé
+    ''' amputé à mi-mot ne dit plus de quel sous-agent il s'agit — mais pour AVERTIR avant
+    ''' l'envoi. Le plus long libellé produit aujourd'hui atteint 78 caractères, période
+    ''' comprise ; la marge est confortable, et ce contrôle ne devrait jamais se déclencher.
+    ''' C'est précisément pour cela qu'il doit exister : le jour où un point de vente portera
+    ''' une désignation à rallonge, personne ne pensera à recompter.
+    ''' </summary>
+    Public Const CB_NARRATIF_LONGUEUR_MAX As Integer = 150
 
     ''' <summary>
     ''' Comptes rattachés d'office à l'agence du siège dans la colonne ACBRN.

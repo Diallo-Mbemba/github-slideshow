@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Partial Class FrmCompensationWU
@@ -34,6 +34,8 @@ Partial Class FrmCompensationWU
         Me.lblActivite = New System.Windows.Forms.Label()
         Me.lblReglement = New System.Windows.Forms.Label()
         Me.dgvControle = New System.Windows.Forms.DataGridView()
+        Me.cmsGrille = New System.Windows.Forms.ContextMenuStrip(Me.components)
+        Me.mnuPieceGroupe = New System.Windows.Forms.ToolStripMenuItem()
         Me.progressBarTraitement = New System.Windows.Forms.ProgressBar()
         Me.statusStripPrincipal = New System.Windows.Forms.StatusStrip()
         Me.tsslLignesActivite = New System.Windows.Forms.ToolStripStatusLabel()
@@ -44,6 +46,7 @@ Partial Class FrmCompensationWU
         Me.ofdReglement = New System.Windows.Forms.OpenFileDialog()
         Me.sfdPieceExcel = New System.Windows.Forms.SaveFileDialog()
         CType(Me.dgvControle, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.cmsGrille.SuspendLayout()
         Me.statusStripPrincipal.SuspendLayout()
         Me.SuspendLayout()
         '
@@ -126,6 +129,18 @@ Partial Class FrmCompensationWU
         Me.lblReglement.Text = "(aucun fichier sélectionné)"
         Me.lblReglement.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         '
+        'cmsGrille
+        '
+        Me.cmsGrille.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuPieceGroupe})
+        Me.cmsGrille.Name = "cmsGrille"
+        Me.cmsGrille.Size = New System.Drawing.Size(320, 26)
+        '
+        'mnuPieceGroupe
+        '
+        Me.mnuPieceGroupe.Name = "mnuPieceGroupe"
+        Me.mnuPieceGroupe.Size = New System.Drawing.Size(319, 22)
+        Me.mnuPieceGroupe.Text = "Pièce comptable du &groupe de ce point de vente"
+        '
         'dgvControle
         '
         Me.dgvControle.AllowUserToAddRows = False
@@ -134,6 +149,7 @@ Partial Class FrmCompensationWU
             Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.dgvControle.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        Me.dgvControle.ContextMenuStrip = Me.cmsGrille
         Me.dgvControle.Location = New System.Drawing.Point(12, 90)
         Me.dgvControle.Name = "dgvControle"
         Me.dgvControle.ReadOnly = True
@@ -220,6 +236,7 @@ Partial Class FrmCompensationWU
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
         Me.Text = "Compensation Western Union J+1 - Tchad"
         CType(Me.dgvControle, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.cmsGrille.ResumeLayout(False)
         Me.statusStripPrincipal.ResumeLayout(False)
         Me.statusStripPrincipal.PerformLayout()
         Me.ResumeLayout(False)
@@ -236,6 +253,8 @@ Partial Class FrmCompensationWU
     Friend WithEvents lblActivite As System.Windows.Forms.Label
     Friend WithEvents lblReglement As System.Windows.Forms.Label
     Friend WithEvents dgvControle As System.Windows.Forms.DataGridView
+    Friend WithEvents cmsGrille As System.Windows.Forms.ContextMenuStrip
+    Friend WithEvents mnuPieceGroupe As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents progressBarTraitement As System.Windows.Forms.ProgressBar
     Friend WithEvents statusStripPrincipal As System.Windows.Forms.StatusStrip
     Friend WithEvents tsslLignesActivite As System.Windows.Forms.ToolStripStatusLabel

@@ -19,6 +19,10 @@ Public Class FrmCompensationWU
     Public Sub New()
         InitializeComponent()
         IconesWU.Habiller(Me)
+
+        ' L'entrée du menu contextuel porte son icône comme les commandes du menu principal :
+        ' un menu dont une seule entrée est nue se lit comme un menu inachevé.
+        mnuPieceGroupe.Image = IconesWU.Obtenir(IconeWU.Groupe)
     End Sub
 
 #Region "État interne du formulaire"
@@ -1391,6 +1395,184 @@ Public Class FrmCompensationWU
             Cursor = Cursors.Default
         End Try
     End Sub
+
+#End Region
+
+#Region "Pièce d'un groupe statistique"
+
+    ''' <summary>
+    ''' Place le curseur sur la ligne cliquée du bouton droit avant d'ouvrir le menu.
+    '''
+    ''' SANS CELA, LE MENU PORTERAIT SUR LA MAUVAISE LIGNE. Une DataGridView ne déplace pas
+    ''' sa sélection au clic droit : l'utilisateur viserait le cinquième sous-agent et
+    ''' obtiendrait la pièce du groupe du premier, sans que rien ne le signale — la pièce
+    ''' sortirait, juste et complète, mais pour un autre groupe.
+    ''' </summary>
+    Private Sub dgvControle_CellMouseDown(sender As Object, e As DataGridViewCellMouseEventArgs) _
+        Handles dgvControle.CellMouseDown
+
+        If e.Button <> MouseButtons.Right Then Return
+        If e.RowIndex < 0 OrElse e.RowIndex >= dgvControle.Rows.Count Then Return
+
+        dgvControle.CurrentCell = dgvControle.Rows(e.RowIndex).Cells(Math.Max(e.ColumnIndex, 0))
+    End Sub
+
+    Private Sub mnuPieceGroupe_Click(sender As Object, e As EventArgs) Handles mnuPieceGroupe.Click
+        AfficherPieceDuGroupeSelectionne()
+    End Sub
+
+    ''' <summary>
+    ''' La pièce comptable de TOUS les points de vente d'un même groupe statistique.
+    '''
+    ''' POURQUOI CE NIVEAU MANQUAIT
+    '''
+    ''' La journée se lisait par la pièce globale, ou point de vente par point de vente.
+    ''' Entre les deux, le groupe — c'est-à-dire le contrat : même taux de rétrocession pour
+    ''' tous ses membres. C'est à ce niveau que la banque discute avec un réseau de
+    ''' sous-agents, et c'est donc à ce niveau qu'elle veut un document.
+    '''
+    ''' POURQUOI C'EST SÛR
+    '''
+    ''' Une pièce de groupe s'équilibre PAR CONSTRUCTION, exactement comme la pièce globale
+    ''' et pour la même raison : la contrepartie sur le compte courant WU est calculée par
+    ''' différence POINT DE VENTE PAR POINT DE VENTE, chacun portant la sienne, qui absorbe
+    ''' son propre reste. N'importe quel sous-ensemble d'Accounts est donc équilibré — un
+    ''' seul, un groupe, ou tous. Ce n'est pas une nouvelle arithmétique : c'est la même,
+    ''' sur une liste filtrée.
+    '''
+    ''' VerifierEquilibrePiece n'est volontairement PAS appelée, pour la même raison que sur
+    ''' la pièce d'un seul point de vente : le compte d'attente ne s'applique qu'à la pièce
+    ''' globale, jamais à un sous-ensemble (section 14).
+    '''
+    ''' LES LIGNES RESTENT PAR ACCOUNT, et ne sont pas consolidées. Cinq sous-agents donnent
+    ''' cinq lignes de TVA sur le même compte. C'est voulu : le compte de compensation et le
+    ''' compte de commission d'un sous-agent sont NOMINATIFS et ne se consolident pas. Ne
+    ''' fondre que les comptes de la banque donnerait un document lisible à moitié, et
+    ''' surtout plus rapprochable sous-agent par sous-agent — ce qui est précisément ce qu'on
+    ''' vient y chercher quand un sous-agent conteste.
+    ''' </summary>
+    Private Sub AfficherPieceDuGroupeSelectionne()
+
+        If _listeCalculs Is Nothing OrElse _listeCalculs.Count = 0 Then
+            MessageBox.Show("Veuillez d'abord charger les rapports et lancer le calcul (Afficher / Calculer).",
+                            "Action impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        If dgvControle.CurrentRow Is Nothing Then
+            MessageBox.Show("Sélectionnez d'abord une ligne dans la grille : la pièce couvrira " &
+                            "tout le groupe de ce point de vente.",
+                            "Aucune sélection", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim account As String = Convert.ToString(dgvControle.CurrentRow.Cells("Account").Value)
+        Dim choisi As CalculWU = _listeCalculs.FirstOrDefault(
+            Function(c) String.Equals(c.Account, account, StringComparison.OrdinalIgnoreCase))
+
+        If choisi Is Nothing Then
+            MessageBox.Show($"Aucun calcul trouvé pour l'Account {account}.",
+                            "Account introuvable", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' Le groupe est pris par la MÊME règle que celle qui servira à l'intituler : une agence
+        ' propre n'en porte aucun et tombe dans « (sans groupe) ».
+        Dim groupe As String = PieceExcelWU.GroupeDe(choisi)
+
+        Dim duGroupe As List(Of CalculWU) = _listeCalculs.Where(
+            Function(c) String.Equals(PieceExcelWU.GroupeDe(c), groupe,
+                                      StringComparison.OrdinalIgnoreCase)).ToList()
+
+        ' Where(...).Count() et non Count(...) : sur une List(Of T), Count est une PROPRIÉTÉ,
+        ' qui masque l'extension LINQ du même nom — BC32016.
+        Dim comptabilisables As Integer = duGroupe.Where(Function(c) c.EstComptabilisable).Count()
+
+        ' Un groupe dont AUCUN point de vente n'est comptabilisable ne produit aucune écriture.
+        ' Le dire, plutôt que d'ouvrir une pièce vide qui laisserait croire à un groupe sans
+        ' activité, alors que c'est son paramétrage qui manque.
+        If comptabilisables = 0 Then
+            MessageBox.Show(
+                $"Aucun des {duGroupe.Count} point(s) de vente du groupe « {groupe} » n'est comptabilisé." &
+                Environment.NewLine & Environment.NewLine &
+                "Leur activité ne figure ni dans la pièce comptable, ni dans le fichier destiné " &
+                "au core banking." & Environment.NewLine &
+                "Créez-les dans l'écran des sous-agents ou des agences, puis relancez le calcul.",
+                "Groupe non comptabilisé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Try
+            Cursor = Cursors.WaitCursor
+
+            Dim dtPieceGroupe As DataTable = PieceComptableService.GenererPieceComptable(
+                duGroupe, _dateActivite, DerniereJournee)
+
+            If dtPieceGroupe.Rows.Count = 0 Then
+                MessageBox.Show($"Le groupe « {groupe} » ne génère aucune écriture (tous ses montants sont nuls).",
+                                "Pièce vide", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Dim ecartes As Integer = duGroupe.Count - comptabilisables
+
+            Dim titre As String = $"Pièce comptable — groupe {groupe}"
+            Dim sousTitre As String =
+                $"{comptabilisables} point(s) de vente comptabilisé(s) sur {duGroupe.Count}" &
+                If(ecartes = 0, "     tous les points de vente du groupe sont paramétrés.",
+                   $"     {ecartes} écarté(s), faute de paramétrage.") &
+                $"     {dtPieceGroupe.Rows.Count} écriture(s)"
+
+            Using formulaire As New FrmPieceComptable(dtPieceGroupe, titre, sousTitre)
+
+                ' Le nom porte le groupe : un dossier mêlant la pièce globale, des pièces de
+                ' groupe et des pièces de point de vente doit rester lisible sans ouvrir les
+                ' classeurs. Les caractères interdits par Windows sont retirés — « (sans
+                ' groupe) » n'en contient pas, mais un groupe saisi à la main peut en porter,
+                ' et un nom de fichier refusé arrêterait l'export après le calcul.
+                formulaire.NomFichierPropose = $"PieceWU_GROUPE_{NomDeFichierSain(groupe)}.xlsx"
+
+                If _dateActivite.HasValue Then formulaire.DateActivite = _dateActivite.Value
+                formulaire.DerniereJournee = DerniereJournee
+
+                ' La première feuille porte le groupe, les suivantes un onglet par point de
+                ' vente — la même mécanique que la pièce globale, sur la liste filtrée.
+                formulaire.NomPremiereFeuille = "GROUPE " & groupe
+                formulaire.IntitulePiece = PieceExcelWU.IntituleDuGroupe(groupe, comptabilisables)
+                formulaire.Calculs = duGroupe
+
+                formulaire.ShowDialog(Me)
+            End Using
+
+            tsslStatut.Text = $"Pièce comptable affichée pour le groupe « {groupe} » " &
+                              $"({comptabilisables} point(s) de vente)."
+
+        Catch ex As Exception
+            MessageBox.Show("Erreur lors de la génération de la pièce du groupe : " & ex.Message,
+                            "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            Cursor = Cursors.Default
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Rend un nom de groupe utilisable dans un nom de fichier.
+    '''
+    ''' Les caractères que Windows refuse sont remplacés, et les espaces aussi : un nom de
+    ''' fichier refusé arrêterait l'export APRÈS que la pièce a été calculée et affichée,
+    ''' c'est-à-dire au pire moment.
+    ''' </summary>
+    Private Shared Function NomDeFichierSain(groupe As String) As String
+
+        Dim brut As String = If(groupe, String.Empty).Trim()
+        If brut.Length = 0 Then Return "SANS_GROUPE"
+
+        For Each interdit As Char In IO.Path.GetInvalidFileNameChars()
+            brut = brut.Replace(interdit, "_"c)
+        Next
+
+        Return brut.Replace(" ", "_")
+    End Function
 
 #End Region
 

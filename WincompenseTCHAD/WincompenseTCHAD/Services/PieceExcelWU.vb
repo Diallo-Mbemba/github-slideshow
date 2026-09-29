@@ -315,6 +315,39 @@ Public NotInheritable Class PieceExcelWU
     ''' au 14 : la date venait de la première ligne du rapport, et rien ne disait le reste.
     ''' Une pièce qui annonce une journée pour une semaine est impossible à rapprocher.
     ''' </summary>
+    ''' <summary>
+    ''' Groupe statistique d'un point de vente, tel qu'il s'emploie partout.
+    '''
+    ''' UNE SEULE ÉCRITURE DE CETTE RÈGLE, parce que le regroupement et l'intitulé de la
+    ''' pièce doivent s'accorder : si l'un rangeait une agence propre dans « (sans groupe) »
+    ''' et que l'autre l'intitulait autrement, la pièce annoncerait un groupe qui ne
+    ''' contient pas les points de vente qu'elle totalise.
+    ''' </summary>
+    Public Shared Function GroupeDe(calc As CalculWU) As String
+
+        If calc Is Nothing Then Return ConstantesWU.PIECE_GROUPE_SANS
+
+        Dim groupe As String = If(calc.GroupeStatistique, String.Empty).Trim()
+        If groupe.Length = 0 Then Return ConstantesWU.PIECE_GROUPE_SANS
+
+        Return groupe
+    End Function
+
+    ''' <summary>
+    ''' Ligne d'identification d'une pièce de GROUPE : le groupe et le nombre de points de
+    ''' vente qu'il comptait ce jour-là.
+    '''
+    ''' Le nombre y figure parce qu'une pièce de groupe se relit des mois plus tard, quand
+    ''' la composition du groupe a changé : sans lui, rien ne dirait combien de sous-agents
+    ''' elle totalisait, et le rapprochement deviendrait impossible.
+    ''' </summary>
+    Public Shared Function IntituleDuGroupe(groupe As String, nombreDePointsDeVente As Integer) As String
+
+        Dim nom As String = If(groupe, String.Empty).Trim()
+        If nom.Length = 0 Then nom = ConstantesWU.PIECE_GROUPE_SANS
+
+        Return $"Groupe {nom} : {nombreDePointsDeVente} point(s) de vente"
+    End Function
     Private Shared Function LibelleDeLaPeriode(debut As Date, fin As Date?) As String
 
         If Not fin.HasValue OrElse fin.Value.Date <= debut.Date Then

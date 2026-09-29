@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Imports System.Data
@@ -87,6 +87,7 @@ Public NotInheritable Class CoreBankingService
         End If
 
         If Not ControlerEquilibre(dtPiece, messageErreur) Then Return Nothing
+        If Not ControlerLesNarratifs(dtPiece, messageErreur) Then Return Nothing
 
         Dim numeroLot As String = NumeroDeLot(dateActivite)
         Dim table As DataTable = TableVide()
@@ -127,6 +128,40 @@ Public NotInheritable Class CoreBankingService
     ''' ce fichier impacte des comptes réels, et rien ne garantit qu'il soit produit dans la
     ''' foulée de la génération.
     ''' </summary>
+    ''' <summary>
+    ''' Refuse une pièce dont un narratif dépasse ce que le core banking accepte.
+    '''
+    ''' La banque a confirmé 150 caractères pour ADDLTEXT. Un narratif plus long serait
+    ''' tronqué par son système, ou ferait rejeter le lot : dans les deux cas, personne ne
+    ''' s'en apercevrait au moment de l'export, et la découverte se ferait au chargement,
+    ''' c'est-à-dire chez eux.
+    '''
+    ''' LE FICHIER N'EST PAS PRODUIT, ET ON NE TRONQUE PAS. Couper à 150 laisserait partir
+    ''' un libellé amputé à mi-mot, qui ne dirait plus de quel sous-agent il s'agit — un
+    ''' défaut silencieux là où l'arrêt est bruyant. Le message nomme la ligne fautive et sa
+    ''' longueur, pour que la désignation soit raccourcie dans le référentiel.
+    ''' </summary>
+    Private Shared Function ControlerLesNarratifs(dtPiece As DataTable, ByRef messageErreur As String) As Boolean
+
+        For Each ligne As DataRow In dtPiece.Rows
+
+            Dim narratif As String = Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
+            If narratif Is Nothing OrElse narratif.Length <= ConstantesWU.CB_NARRATIF_LONGUEUR_MAX Then Continue For
+
+            messageErreur =
+                $"Un libellé dépasse ce que le core banking accepte : {narratif.Length} caractères " &
+                $"pour un maximum de {ConstantesWU.CB_NARRATIF_LONGUEUR_MAX}." &
+                Environment.NewLine & Environment.NewLine &
+                narratif & Environment.NewLine & Environment.NewLine &
+                "Le fichier n'est pas produit. Le libellé n'est pas tronqué non plus : coupé, il ne " &
+                "dirait plus de quel point de vente il s'agit. Raccourcissez la désignation de ce " &
+                "point de vente dans le référentiel, puis régénérez la pièce."
+
+            Return False
+        Next
+
+        Return True
+    End Function
     Private Shared Function ControlerEquilibre(dtPiece As DataTable, ByRef messageErreur As String) As Boolean
 
         Dim totalDebit As Long = 0L
