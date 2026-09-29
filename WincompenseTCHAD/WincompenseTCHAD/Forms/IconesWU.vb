@@ -359,6 +359,7 @@ Public NotInheritable Class IconesWU
         ' --- Le choix du produit de transfert -------------------------------------------------
         table("btnOuvrir") = IconeWU.Coche
         table("btnQuitter") = IconeWU.Sortie
+        table("btnCouleur") = IconeWU.Modifier
 
         ' --- Le double regard : ce qui s'autorise et ce qui se vise --------------------------
         table("btnAutoriser") = IconeWU.Coche

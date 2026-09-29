@@ -150,7 +150,11 @@ Public Class FrmPrincipal
     ''' s'ouvrir sur les données d'un produit qu'il ne sait pas traiter.
     ''' </summary>
     Private Shared Function EcranCommun(ecran As Type) As Boolean
-        Return ecran Is GetType(FrmUtilisateurs)
+
+        ' L'écran des produits liste TOUS les produits : il ne peut pas dépendre de celui qui
+        ' est ouvert, sans quoi on ne pourrait en déclarer un qu'en étant sur Western Union —
+        ' et un produit en attente serait impossible à corriger depuis son propre espace.
+        Return ecran Is GetType(FrmUtilisateurs) OrElse ecran Is GetType(FrmProduits)
     End Function
 
     ''' <summary>
@@ -212,6 +216,7 @@ Public Class FrmPrincipal
             Case NameOf(FrmTaxes) : Return "Taxes et barème"
             Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
             Case NameOf(FrmParametrageFichier) : Return "Paramétrage : fichier de secours"
+            Case NameOf(FrmProduits) : Return "Produits de transfert"
 
             ' Écrans communs : ils ne montrent jamais l'avis d'indisponibilité, mais leur
             ' libellé est posé quand même. Le jour où EcranCommun changerait, l'avis parlerait
@@ -338,6 +343,17 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
+    ''' La déclaration des produits de transfert.
+    '''
+    ''' C'est un ÉCRAN COMMUN : il s'ouvre quel que soit le produit en cours, y compris
+    ''' depuis l'espace d'un produit encore en attente. Sans cela, un produit mal déclaré
+    ''' serait impossible à corriger sans revenir au choix et passer par Western Union.
+    ''' </summary>
+    Private Sub mnuProduits_Click(sender As Object, e As EventArgs) Handles mnuProduits.Click
+        AfficherEnfant(Of FrmProduits)()
+    End Sub
+
+    ''' <summary>
     ''' Les options de traitement : la façon de travailler que la banque a choisie.
     '''
     ''' Rangées à côté des comptes systèmes parce qu'elles ont le même propriétaire —
@@ -400,6 +416,7 @@ Public Class FrmPrincipal
         mnuDemandes.Image = IconesWU.Obtenir(IconeWU.Coche)
         mnuComptes.Image = IconesWU.Obtenir(IconeWU.Registre)
         mnuTaxes.Image = IconesWU.Obtenir(IconeWU.Pourcentage)
+        mnuProduits.Image = IconesWU.Obtenir(IconeWU.Groupe)
         mnuOptions.Image = IconesWU.Obtenir(IconeWU.Curseurs)
         mnuFichierParametrage.Image = IconesWU.Obtenir(IconeWU.Dossier)
 

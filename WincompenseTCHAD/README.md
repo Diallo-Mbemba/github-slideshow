@@ -3106,6 +3106,26 @@ Deux choses qu'aucun compilateur n'aurait signalées, trouvées par les vérific
   le temps d'une image au démarrage, et serait resté faux si le `Load` échouait. Il est neutre
   désormais, et c'est le `Load` qui le complète du nom du produit.
 
+### Déclarer un produit : `Paramétrage > Produits de transfert…`
+
+La liste dit quels produits **existent**, avec leur code, leur nom, leur couleur, leur rang
+d'affichage et leur état. On y en crée un, on le renomme, on le range, on le retire du service —
+mais **on ne le supprime jamais** : un produit supprimé laisserait son historique, ses pièces et
+son référentiel orphelins, sans moyen de retrouver à quoi ils se rapportaient. La colonne
+`EnService` est là pour cela, et la table n'accorde de `DELETE` à personne.
+
+**Le code ne se modifie plus après création.** Il nomme le fichier du logo (`Logos\CODE.png`) et,
+demain, les tables du produit : le changer romprait les deux.
+
+**C'est un écran commun.** Il s'ouvre quel que soit le produit en cours, y compris depuis
+l'espace d'un produit encore en attente — sans quoi un produit mal déclaré serait impossible à
+corriger sans revenir au choix et repasser par Western Union.
+
+Déclarer un produit ici ne le rend pas traitable pour autant : il apparaît « En attente » tant
+que son code n'est pas dans `CodesTraites`, c'est-à-dire tant qu'une livraison n'a pas apporté
+son métier. **L'écran déclare ce qui existe ; il ne décide pas de ce que l'application sait
+faire.**
+
 ### Ce qui reste à faire pour Ria
 
 Trois choses, et elles viennent de la banque : le **schéma comptable**, les **fichiers de
