@@ -2062,6 +2062,131 @@ END
 GO
 
 -- =========================================================================
+-- 4 quater. Les produits de transfert déclarés
+--
+--    L'application ne traite plus « la compensation » mais LA COMPENSATION D'UN PRODUIT.
+--    Cette table dit lesquels EXISTENT ; c'est l'application qui sait lesquels elle sait
+--    TRAITER. Un produit déclaré ici sans que son traitement soit écrit reste « En attente »
+--    à l'écran de choix, et ses fenêtres affichent un avis plutôt que des montants faux.
+--
+--    LES DROITS SONT ACCORDÉS ICI, ET NON PAR LA SECTION 5 : celle-ci les pose plus HAUT
+--    dans ce fichier, avant que la table n'existe. Un GRANT sur une table absente échoue,
+--    et la table serait restée sans aucun droit — illisible par l'application, alors que
+--    tout le reste aurait paru installé.
+--    Détail et commentaires : Scripts\20_ProduitsTransfert.sql.
+-- =========================================================================
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_ProduitTransfert' AND schema_id = SCHEMA_ID(N'dbo'))
+BEGIN
+    CREATE TABLE dbo.T_ProduitTransfert
+    (
+        -- Le code est la clé : court, en majuscules, sans accent ni espace. Il nomme le
+        -- fichier du logo et, demain, les tables du produit.
+        Code                NVARCHAR(10)    NOT NULL PRIMARY KEY,
+
+        Nom                 NVARCHAR(100)   NOT NULL,
+        Description         NVARCHAR(500)   NULL,
+
+        -- La couleur de l'emblème dessiné tant que le logo officiel n'est pas déposé.
+        -- Trois composantes séparées : plus lisibles qu'un entier signé dans une requête,
+        -- et bornées par une contrainte plutôt que par la confiance.
+        CouleurRouge        TINYINT         NOT NULL DEFAULT (108),
+        CouleurVert         TINYINT         NOT NULL DEFAULT (117),
+        CouleurBleu         TINYINT         NOT NULL DEFAULT (125),
+
+        -- Rang d'affichage dans la fenêtre de choix, croissant.
+        Ordre               INT             NOT NULL DEFAULT (100),
+
+        -- Hors service : le produit n'apparaît plus au choix. Rien n'est effacé.
+        EnService           BIT             NOT NULL DEFAULT (1),
+
+        CreePar             NVARCHAR(50)    NULL,
+        DateCreation        DATETIME        NULL,
+        ModifiePar          NVARCHAR(50)    NULL,
+        DateModification    DATETIME        NULL,
+
+        CONSTRAINT CK_T_ProduitTransfert_Code
+            CHECK (LEN(LTRIM(RTRIM(Code))) >= 2)
+    );
+
+    PRINT 'Table T_ProduitTransfert créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_ProduitTransfert déjà présente : création ignorée.';
+END
+GO
+
+-- =========================================================================
+-- 2. Les deux produits que l'application connaît aujourd'hui
+--
+--    AMORÇAGE SEULEMENT. Les lignes déjà présentes ne sont pas réécrites : un administrateur
+--    qui a corrigé un nom ou une couleur ne doit pas les voir revenir à chaque exécution du
+--    script.
+--
+--    « installation » comme auteur, et non un identifiant d'utilisateur : la pose initiale
+--    n'est pas une saisie de quelqu'un.
+-- =========================================================================
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ProduitTransfert WHERE Code = N'WU')
+BEGIN
+    INSERT INTO dbo.T_ProduitTransfert
+        (Code, Nom, Description, CouleurRouge, CouleurVert, CouleurBleu, Ordre, EnService,
+         CreePar, DateCreation)
+    VALUES
+        (N'WU', N'Western Union',
+         N'La compensation Western Union : rapport d''activité, commissions sur envois et sur réceptions, pièce comptable et fichier core banking.',
+         255, 182, 0, 10, 1, N'installation', GETDATE());
+
+    PRINT 'Produit WU amorcé.';
+END
+ELSE
+    PRINT 'Produit WU déjà présent : amorçage ignoré.';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ProduitTransfert WHERE Code = N'RIA')
+BEGIN
+    INSERT INTO dbo.T_ProduitTransfert
+        (Code, Nom, Description, CouleurRouge, CouleurVert, CouleurBleu, Ordre, EnService,
+         CreePar, DateCreation)
+    VALUES
+        (N'RIA', N'Ria',
+         N'Produit en projet à la banque. L''environnement est en place ; le traitement de sa compensation reste à écrire.',
+         238, 118, 35, 20, 1, N'installation', GETDATE());
+
+    PRINT 'Produit RIA amorcé.';
+END
+ELSE
+    PRINT 'Produit RIA déjà présent : amorçage ignoré.';
+GO
+
+-- =========================================================================
+-- 3. Droits
+--
+--    Tout le monde LIT : la fenêtre de choix s'affiche avant que le rôle n'ait la moindre
+--    importance, et tout utilisateur doit pouvoir choisir son produit.
+--
+--    Seul l'administrateur ÉCRIT : déclarer un produit est un acte de configuration, au même
+--    titre que les comptes systèmes et les taxes.
+--
+--    AUCUN DELETE, pour personne. Un produit supprimé laisserait son historique, ses pièces
+--    et son référentiel orphelins, sans moyen de retrouver à quoi ils se rapportaient. La
+--    colonne EnService est là pour cela.
+-- =========================================================================
+
+-- Les trois rôles, comme pour les comptes systèmes. AUCUN DELETE, pour personne : un produit
+-- supprimé laisserait son historique, ses pièces et son référentiel orphelins, sans moyen de
+-- retrouver à quoi ils se rapportaient. La colonne EnService est là pour cela.
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_compense')
+    EXEC('GRANT SELECT ON dbo.T_ProduitTransfert TO wu_compense');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_commercial')
+    EXEC('GRANT SELECT ON dbo.T_ProduitTransfert TO wu_commercial');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_admin')
+    EXEC('GRANT SELECT, INSERT, UPDATE ON dbo.T_ProduitTransfert TO wu_admin');
+GO
+
+-- =========================================================================
 -- 5. Accès du compte applicatif
 --
 --    C'est ici que se règle l'erreur « Cannot open database ... requested by the login »

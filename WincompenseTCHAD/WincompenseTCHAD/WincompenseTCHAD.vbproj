@@ -90,6 +90,7 @@
     <Compile Include="Models\ComptesSystemeWU.vb" />
     <Compile Include="Models\TaxeWU.vb" />
     <Compile Include="Models\BaremeTaxesWU.vb" />
+    <Compile Include="Models\ProduitTransfert.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
     <Compile Include="Models\TransactionWU.vb" />
@@ -99,6 +100,7 @@
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
+    <Compile Include="Services\ProduitRepository.vb" />
     <Compile Include="Services\PdvRepository.vb" />
     <Compile Include="Services\WUCalculationService.vb" />
     <Compile Include="Services\PieceComptableService.vb" />
@@ -164,6 +166,19 @@
     </Compile>
     <Compile Include="Forms\FrmTaxes.Designer.vb">
       <DependentUpon>FrmTaxes.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\LogosProduits.vb" />
+    <Compile Include="Forms\FrmChoixProduit.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmChoixProduit.Designer.vb">
+      <DependentUpon>FrmChoixProduit.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmEcranIndisponible.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmEcranIndisponible.Designer.vb">
+      <DependentUpon>FrmEcranIndisponible.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\FrmSousAgents.vb">
       <SubType>Form</SubType>
@@ -309,6 +324,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmTaxes.resx">
       <DependentUpon>FrmTaxes.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmChoixProduit.resx">
+      <DependentUpon>FrmChoixProduit.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmEcranIndisponible.resx">
+      <DependentUpon>FrmEcranIndisponible.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmSousAgents.resx">
       <DependentUpon>FrmSousAgents.vb</DependentUpon>

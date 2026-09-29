@@ -3044,6 +3044,75 @@ les filles qui s'ouvrent. Occuper la zone sans être « maximisée » laisse cha
 L'ajustement est d'ailleurs repris **après** `Show()`, précisément parce qu'une autre fille
 maximisée à la main propagerait son état et effacerait la dimension posée juste avant.
 
+## Wincompense n'est plus une application Western Union
+
+C'est une application **de compensation**, dont Western Union n'est que le premier produit. La
+banque veut y traiter **Ria**, puis d'autres.
+
+À la connexion, une fenêtre de **choix du produit**. L'utilisateur travaille ensuite dans
+l'espace de ce produit, et peut en changer sans quitter par **« Changer de produit »**, à droite
+de la barre de menus.
+
+### Deux listes, et c'est tout le mécanisme
+
+| | |
+|---|---|
+| `T_ProduitTransfert` | dit quels produits **EXISTENT**. La banque la remplit. |
+| `ProduitTransfert.CodesTraites` | dit lesquels l'application sait **TRAITER**. Le code la porte. |
+
+Un produit qui est dans la première et pas dans la seconde s'affiche **« En attente »** : ses
+menus répondent, son espace de travail s'ouvre, mais ses écrans métier montrent un avis au lieu
+de montants faux.
+
+`CodesTraites` **n'est pas modifiable depuis l'interface**, et c'est tout son intérêt : elle ne
+grandit qu'avec une livraison qui apporte, pour le produit ajouté, la lecture de ses rapports,
+ses taux, sa pièce comptable et son jeu de tables. Un vérificateur interdit à tout écran d'y
+toucher.
+
+### Le défaut est « cet écran dépend du produit »
+
+`EcranCommun` nomme les **exceptions**, pas la règle. Un écran ajouté plus tard et oublié dans
+cette liste affichera l'avis d'indisponibilité : visible, corrigeable. L'inverse — nommer les
+écrans métier — l'aurait laissé s'ouvrir sur les données d'un produit qu'il ne sait pas traiter.
+
+### Un écran, et non une boîte de message
+
+`FrmEcranIndisponible` s'ouvre dans la zone MDI comme les autres et se range dans le menu
+Fenêtres. Une boîte de message se claque et ne laisse rien ; cette fenêtre reste sous les yeux :
+l'utilisateur voit qu'il est bien dans l'espace Ria, que le menu a **répondu**, et que c'est le
+métier qui manque — non son geste qui a échoué. Une seule instance, réemployée en changeant son
+texte : dix clics sur dix menus donneraient sinon dix fenêtres disant la même chose.
+
+### Pourquoi `Program.Main` boucle désormais
+
+La version précédente faisait `Application.Run(New FrmPrincipal())` : fermer l'espace de travail
+arrêtait l'application, et changer de produit aurait voulu dire **quitter et se reconnecter**. La
+boucle sépare les deux — l'espace se ferme soit pour revenir au choix, soit pour quitter, et
+c'est lui qui le dit, par un simple booléen qui se lit encore une fois la fenêtre libérée.
+
+**L'identification reste hors de la boucle** : changer de produit ne change pas d'utilisateur. Un
+utilisateur habilité à traiter la compense la traite pour tous les produits — **le produit n'est
+pas un droit.**
+
+### Ce que le portage a dû corriger
+
+Deux choses qu'aucun compilateur n'aurait signalées, trouvées par les vérificateurs :
+
+- **La table `T_ProduitTransfert` était créée après les `GRANT`** dans `00_InstallationComplete`.
+  Un `GRANT` sur une table absente échoue : la table serait restée sans aucun droit, illisible
+  par l'application, alors que tout le reste aurait paru installé. Les droits sont donc posés
+  juste après sa création.
+- **Le titre du MDI était figé** sur « Compensation Western Union » dans le Designer. Il s'affiche
+  le temps d'une image au démarrage, et serait resté faux si le `Load` échouait. Il est neutre
+  désormais, et c'est le `Load` qui le complète du nom du produit.
+
+### Ce qui reste à faire pour Ria
+
+Trois choses, et elles viennent de la banque : le **schéma comptable**, les **fichiers de
+chargement**, et un **prototype de pièce comptable**. Le jour où elles arrivent, il n'y a ni
+fenêtre à créer ni menu à ajouter — seulement le métier à écrire, et `RIA` à inscrire dans
+`CodesTraites`.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.

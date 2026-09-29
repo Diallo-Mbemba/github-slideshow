@@ -356,6 +356,10 @@ Public NotInheritable Class IconesWU
         table("btnExporter") = IconeWU.Exporter
         table("btnMois") = IconeWU.Calendrier
 
+        ' --- Le choix du produit de transfert -------------------------------------------------
+        table("btnOuvrir") = IconeWU.Coche
+        table("btnQuitter") = IconeWU.Sortie
+
         ' --- Le double regard : ce qui s'autorise et ce qui se vise --------------------------
         table("btnAutoriser") = IconeWU.Coche
         table("btnViser") = IconeWU.Coche

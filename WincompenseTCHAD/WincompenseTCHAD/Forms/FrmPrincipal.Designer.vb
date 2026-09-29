@@ -37,6 +37,7 @@ Partial Class FrmPrincipal
         Me.SEP2 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuComptes = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuTaxes = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuChangerProduit = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP7 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuFichierParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuOptions = New System.Windows.Forms.ToolStripMenuItem()
@@ -73,7 +74,7 @@ Partial Class FrmPrincipal
         '
         'menuPrincipal
         '
-        Me.menuPrincipal.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuCompensation, Me.mnuParametrage, Me.mnuSecurite, Me.mnuFenetres, Me.mnuQuitter})
+        Me.menuPrincipal.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuCompensation, Me.mnuParametrage, Me.mnuSecurite, Me.mnuFenetres, Me.mnuQuitter, Me.mnuChangerProduit})
         Me.menuPrincipal.Location = New System.Drawing.Point(0, 0)
         Me.menuPrincipal.MdiWindowListItem = Me.mnuFenetres
         Me.menuPrincipal.Name = "menuPrincipal"
@@ -226,6 +227,16 @@ Partial Class FrmPrincipal
         Me.mnuConnexionBase.Name = "mnuConnexionBase"
         Me.mnuConnexionBase.Size = New System.Drawing.Size(260, 22)
         Me.mnuConnexionBase.Text = "&Connexion à la base de données..."
+        '
+        'mnuChangerProduit
+        '
+        ' Aligné à DROITE comme Quitter, et ajouté APRÈS lui : les éléments alignés à droite
+        ' se posent du bord vers l'intérieur dans l'ordre où ils sont ajoutés. Quitter reste
+        ' donc à l'extrémité, où l'utilisateur a l'habitude de le trouver.
+        Me.mnuChangerProduit.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right
+        Me.mnuChangerProduit.Name = "mnuChangerProduit"
+        Me.mnuChangerProduit.Size = New System.Drawing.Size(150, 20)
+        Me.mnuChangerProduit.Text = "Changer de &produit"
         '
         'mnuFenetres
         '
@@ -384,7 +395,10 @@ Partial Class FrmPrincipal
         Me.MainMenuStrip = Me.menuPrincipal
         Me.Name = "FrmPrincipal"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
-        Me.Text = "Wincompense TCHAD — Compensation Western Union"
+        ' Neutre, et non « — Compensation Western Union » : le Load le remplace par le nom du
+        ' produit en cours. Un titre figé sur un produit s'afficherait le temps d'une image au
+        ' démarrage d'un autre, et resterait faux si le Load échouait.
+        Me.Text = "Wincompense TCHAD"
         Me.WindowState = System.Windows.Forms.FormWindowState.Maximized
         Me.menuPrincipal.ResumeLayout(False)
         Me.menuPrincipal.PerformLayout()
@@ -413,6 +427,7 @@ Partial Class FrmPrincipal
     Friend WithEvents SEP2 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuComptes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuTaxes As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuChangerProduit As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP7 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuFichierParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuOptions As System.Windows.Forms.ToolStripMenuItem

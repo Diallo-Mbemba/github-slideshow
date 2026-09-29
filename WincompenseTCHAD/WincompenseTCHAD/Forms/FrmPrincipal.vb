@@ -41,8 +41,16 @@ Public Class FrmPrincipal
     ''' <typeparam name="T">Type du formulaire à ouvrir.</typeparam>
     Public Function AfficherEnfant(Of T As {Form, New})() As T
 
-        Dim pleinCadre As Boolean = DoitOccuperLaZone(GetType(T))
+        ' Un écran métier ne s'ouvre pas pour un produit dont le traitement n'est pas écrit.
+        ' L'avis prend sa place dans la zone MDI plutôt que de claquer une boîte de message :
+        ' l'utilisateur voit que le menu a RÉPONDU, et que c'est le métier qui manque — non
+        ' son geste qui a échoué.
+        If Not EcranCommun(GetType(T)) AndAlso Not ProduitTransfert.ActifEstDisponible Then
+            AfficherEcranIndisponible(GetType(T))
+            Return Nothing
+        End If
 
+        Dim pleinCadre As Boolean = DoitOccuperLaZone(GetType(T))
         For Each enfant As Form In Me.MdiChildren
 
             If Not TypeOf enfant Is T Then Continue For
@@ -131,6 +139,91 @@ Public Class FrmPrincipal
 
         enfant.Bounds = New Rectangle(Point.Empty, disponible)
     End Sub
+
+    ''' <summary>
+    ''' Les écrans qui ne dépendent d'AUCUN produit, et qui s'ouvrent donc quel que soit le
+    ''' produit en cours.
+    '''
+    ''' LA LISTE NOMME LES COMMUNS, ET NON LES ÉCRANS MÉTIER, ET C'EST VOLONTAIRE. Le défaut
+    ''' est donc « cet écran dépend du produit ». Un écran ajouté plus tard et oublié ici
+    ''' affichera l'avis d'indisponibilité — visible, corrigeable. L'inverse le laisserait
+    ''' s'ouvrir sur les données d'un produit qu'il ne sait pas traiter.
+    ''' </summary>
+    Private Shared Function EcranCommun(ecran As Type) As Boolean
+        Return ecran Is GetType(FrmUtilisateurs)
+    End Function
+
+    ''' <summary>
+    ''' Affiche l'avis qui remplace un écran métier indisponible pour le produit en cours.
+    '''
+    ''' UNE SEULE INSTANCE, réemployée en changeant son texte : dix clics sur dix menus
+    ''' donneraient sinon dix fenêtres disant la même chose.
+    ''' </summary>
+    Private Sub AfficherEcranIndisponible(ecran As Type)
+
+        Dim libelle As String = LibelleDeLEcran(ecran)
+
+        For Each enfant As Form In Me.MdiChildren
+
+            Dim avis As FrmEcranIndisponible = TryCast(enfant, FrmEcranIndisponible)
+            If avis Is Nothing Then Continue For
+
+            avis.Annoncer(libelle)
+
+            If avis.WindowState = FormWindowState.Minimized Then
+                avis.WindowState = FormWindowState.Normal
+            End If
+
+            avis.Activate()
+            Return
+        Next
+
+        Dim nouvel As New FrmEcranIndisponible()
+        nouvel.Annoncer(libelle)
+
+        nouvel.MdiParent = Me
+        nouvel.StartPosition = FormStartPosition.Manual
+        CentrerDansLaZoneMdi(nouvel)
+
+        nouvel.Show()
+    End Sub
+
+    ''' <summary>
+    ''' Le nom d'un écran tel que le menu le nomme, pour que l'avis d'indisponibilité parle
+    ''' la langue de l'utilisateur et non celle du code.
+    ''' </summary>
+    Private Shared Function LibelleDeLEcran(ecran As Type) As String
+
+        If ecran Is Nothing Then Return "Cet écran"
+
+        Select Case ecran.Name
+
+            Case NameOf(FrmCompensationWU) : Return "Traitement de la compense"
+            Case NameOf(FrmRapportSousAgents) : Return "Rapport d'activité — sous-agents"
+            Case NameOf(FrmRapportAgences) : Return "Rapport d'activité — agences propres"
+            Case NameOf(FrmPiecesArchivees) : Return "Pièces comptables conservées"
+            Case NameOf(FrmCommissionsBanque) : Return "Commissions encaissées par la banque"
+            Case NameOf(FrmSousAgents) : Return "Sous-agents"
+            Case NameOf(FrmSousAgentsParGroupe) : Return "Sous-agents par groupe statistique"
+            Case NameOf(FrmAgences) : Return "Agences propres"
+            Case NameOf(FrmGroupesStatistiques) : Return "Groupes statistiques"
+            Case NameOf(FrmDemandes) : Return "Autorisations du référentiel"
+            Case NameOf(FrmComptesSysteme) : Return "Comptes systèmes"
+            Case NameOf(FrmTaxes) : Return "Taxes et barème"
+            Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
+            Case NameOf(FrmParametrageFichier) : Return "Paramétrage : fichier de secours"
+
+            ' Écrans communs : ils ne montrent jamais l'avis d'indisponibilité, mais leur
+            ' libellé est posé quand même. Le jour où EcranCommun changerait, l'avis parlerait
+            ' déjà la bonne langue plutôt que de nommer une classe.
+            Case NameOf(FrmUtilisateurs) : Return "Utilisateurs et connexions"
+        End Select
+
+        ' Un écran ajouté et non inscrit ici se nomme par son type, privé de son préfixe. Le
+        ' message reste lisible : mieux vaut un nom approximatif qu'une phrase à trou.
+        If ecran.Name.StartsWith("Frm", StringComparison.Ordinal) Then Return ecran.Name.Substring(3)
+        Return ecran.Name
+    End Function
 
     ''' <summary>
     ''' Centre une fenêtre fille dans la zone de travail MDI, en la rétrécissant d'abord si
@@ -309,6 +402,10 @@ Public Class FrmPrincipal
         mnuTaxes.Image = IconesWU.Obtenir(IconeWU.Pourcentage)
         mnuOptions.Image = IconesWU.Obtenir(IconeWU.Curseurs)
         mnuFichierParametrage.Image = IconesWU.Obtenir(IconeWU.Dossier)
+
+        ' Posée sur la barre elle-même, comme « Quitter » : ce n'est pas un titre de menu
+        ' mais une commande, et une commande porte son icône.
+        mnuChangerProduit.Image = IconesWU.Obtenir(IconeWU.Groupe)
 
         ' Menu Sécurité.
         mnuMonMotDePasse.Image = IconesWU.Obtenir(IconeWU.Cle)
@@ -726,6 +823,12 @@ Public Class FrmPrincipal
 
     Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
+        ' Le titre nomme le produit en cours : c'est la seule chose qui distingue deux
+        ' espaces de travail par ailleurs identiques, et l'utilisateur doit pouvoir le lire
+        ' sans ouvrir un menu. Il est posé ici et non dans le Designer, où il serait figé
+        ' sur un produit.
+        Me.Text = ProduitTransfert.TitreDeLEspace
+
         PoserFiligrane()
         PoserLesIcones()
         AppliquerLesDroits()
@@ -811,6 +914,35 @@ Public Class FrmPrincipal
         End Try
     End Sub
 
+    ''' <summary>
+    ''' Vrai si l'espace de travail s'est fermé pour revenir au choix du produit, faux s'il
+    ''' s'est fermé pour quitter. C'est Program.Main qui pose la question, après la fermeture.
+    '''
+    ''' Le drapeau est un simple booléen, et non un état de fenêtre : il se lit encore une
+    ''' fois la fenêtre libérée par Application.Run.
+    ''' </summary>
+    Public ReadOnly Property RetourAuChoixDuProduit As Boolean
+        Get
+            Return _retourAuChoixDuProduit
+        End Get
+    End Property
+
+    Private _retourAuChoixDuProduit As Boolean
+
+    ''' <summary>
+    ''' Ferme l'espace de travail et ramène au choix du produit, sans quitter l'application
+    ''' ni redemander le mot de passe : changer de produit ne change pas d'utilisateur.
+    ''' </summary>
+    Private Sub mnuChangerProduit_Click(sender As Object, e As EventArgs) Handles mnuChangerProduit.Click
+
+        _retourAuChoixDuProduit = True
+        Close()
+
+        ' Si une fenêtre fille a refusé de se fermer, l'espace de travail est toujours là : le
+        ' drapeau doit retomber, faute de quoi un « Quitter » plus tard rouvrirait le choix du
+        ' produit au lieu d'arrêter l'application.
+        If Not Me.IsDisposed Then _retourAuChoixDuProduit = False
+    End Sub
     Private Sub mnuQuitter_Click(sender As Object, e As EventArgs) Handles mnuQuitter.Click
         Close()
     End Sub
