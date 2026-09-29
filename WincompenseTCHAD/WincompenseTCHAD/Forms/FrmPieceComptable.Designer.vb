@@ -1,4 +1,4 @@
-Option Strict On
+﻿Option Strict On
 Option Explicit On
 
 Partial Class FrmPieceComptable
@@ -76,24 +76,24 @@ Partial Class FrmPieceComptable
         Me.lblTotaux.Anchor = CType(((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.lblTotaux.Font = New System.Drawing.Font("Microsoft Sans Serif", 9.0!, System.Drawing.FontStyle.Bold)
-        Me.lblTotaux.Location = New System.Drawing.Point(12, 480)
+        Me.lblTotaux.Location = New System.Drawing.Point(12, 476)
         Me.lblTotaux.Name = "lblTotaux"
-        Me.lblTotaux.Size = New System.Drawing.Size(600, 18)
-        Me.lblTotaux.TabIndex = 3
+        Me.lblTotaux.Size = New System.Drawing.Size(876, 18)
+        Me.lblTotaux.TabIndex = 5
         '
         'lblEcart
         '
         Me.lblEcart.Anchor = CType(((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.lblEcart.Location = New System.Drawing.Point(12, 502)
+        Me.lblEcart.Location = New System.Drawing.Point(12, 498)
         Me.lblEcart.Name = "lblEcart"
-        Me.lblEcart.Size = New System.Drawing.Size(600, 32)
-        Me.lblEcart.TabIndex = 4
+        Me.lblEcart.Size = New System.Drawing.Size(876, 32)
+        Me.lblEcart.TabIndex = 6
         '
         'lblPortee
         '
         Me.lblPortee.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
-        Me.lblPortee.Location = New System.Drawing.Point(12, 493)
+        Me.lblPortee.Location = New System.Drawing.Point(12, 545)
         Me.lblPortee.Name = "lblPortee"
         Me.lblPortee.Size = New System.Drawing.Size(130, 20)
         Me.lblPortee.TabIndex = 3
@@ -103,7 +103,7 @@ Partial Class FrmPieceComptable
         '
         Me.cboPortee.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left), System.Windows.Forms.AnchorStyles)
         Me.cboPortee.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
-        Me.cboPortee.Location = New System.Drawing.Point(148, 490)
+        Me.cboPortee.Location = New System.Drawing.Point(148, 542)
         Me.cboPortee.Name = "cboPortee"
         Me.cboPortee.Size = New System.Drawing.Size(280, 21)
         Me.cboPortee.TabIndex = 4
@@ -111,10 +111,10 @@ Partial Class FrmPieceComptable
         'btnExporter
         '
         Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.btnExporter.Location = New System.Drawing.Point(618, 486)
+        Me.btnExporter.Location = New System.Drawing.Point(618, 538)
         Me.btnExporter.Name = "btnExporter"
         Me.btnExporter.Size = New System.Drawing.Size(160, 32)
-        Me.btnExporter.TabIndex = 5
+        Me.btnExporter.TabIndex = 7
         Me.btnExporter.Text = "Exporter vers Excel"
         Me.btnExporter.UseVisualStyleBackColor = True
         '
@@ -122,10 +122,10 @@ Partial Class FrmPieceComptable
         '
         Me.btnFermer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.btnFermer.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.btnFermer.Location = New System.Drawing.Point(788, 486)
+        Me.btnFermer.Location = New System.Drawing.Point(788, 538)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(100, 32)
-        Me.btnFermer.TabIndex = 6
+        Me.btnFermer.TabIndex = 8
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -135,7 +135,7 @@ Partial Class FrmPieceComptable
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(900, 534)
+        Me.ClientSize = New System.Drawing.Size(900, 582)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.btnExporter)
         Me.Controls.Add(Me.cboPortee)

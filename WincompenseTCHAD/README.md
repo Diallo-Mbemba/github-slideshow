@@ -2931,6 +2931,46 @@ Un vérificateur, `verif_chevauchement.py`, contrôle désormais qu'aucun contr�
 sur un formulaire n'en recouvre un autre — la seule erreur de ce genre que le compilateur ne voit
 jamais, et qui ne se découvre que sur le poste de l'agent.
 
+## La liste « Portée » ne cache plus les totaux
+
+Sur l'écran de la pièce comptable, quatre contrôles occupaient la même bande de 50 pixels au bas
+de la fenêtre :
+
+```
+lblTotaux    x  12 → 612    y 480 → 498
+lblEcart     x  12 → 612    y 502 → 534     (jusqu'au bord exact de la fenêtre)
+lblPortee    x  12 → 142    y 493 → 513     par-dessus les deux
+cboPortee    x 148 → 428    y 490 → 511     par-dessus les deux
+```
+
+Ce n'était pas théorique. `cboPortee` est ajouté **avant** `lblTotaux` dans les contrôles du
+formulaire, donc peint **au-dessus**, et le texte des totaux est long —
+`27 écritures     TOTAL DÉBIT : 20 129 379 FCFA     TOTAL CRÉDIT : 20 129 379 FCFA` — il dépasse
+largement x = 148. La liste n'apparaît que lorsqu'il existe des pièces par point de vente,
+c'est-à-dire **sur la pièce globale, précisément là où les totaux comptent**.
+
+La fenêtre gagne 48 pixels de hauteur, et le bas est réorganisé en trois bandes qui ne se
+touchent plus :
+
+| | |
+|---|---|
+| sous la grille | les **totaux**, puis l'**écart** — sur toute la largeur, 876 px au lieu de 600 |
+| en bas à gauche | **Pièces individuelles :** et sa liste |
+| en bas à droite | **Exporter vers Excel** et **Fermer** |
+
+Les totaux passent de 600 à 876 pixels de large : ils étaient tronqués même sans la liste par-dessus.
+
+### Le vérificateur qui l'a trouvé
+
+`verif_chevauchement.py` contrôle qu'aucun contrôle posé directement sur un formulaire n'en
+recouvre un autre — la seule erreur de mise en page que le compilateur ne voit jamais, et qui ne
+se découvre que sur le poste de l'agent.
+
+Il connaît un idiome et ne crie pas dessus : un libellé **aligné à droite** laisse volontairement
+sa partie gauche passer sous un bouton, pour réserver la place d'un compteur qui s'allonge. Le
+projet s'en sert trois fois. Sans cette exception, les vrais chevauchements se perdraient dans le
+bruit.
+
 ## Règles tranchées par la banque
 
 - **La TTA sur réception est supportée par le sous-agent**, et s'ajoute donc à son versement.
