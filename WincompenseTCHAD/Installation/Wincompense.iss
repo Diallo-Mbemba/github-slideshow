@@ -1,4 +1,4 @@
-; ============================================================================
+﻿; ============================================================================
 ;  Wincompense TCHAD - script d'installation Inno Setup
 ; ============================================================================
 ;
@@ -224,6 +224,17 @@ Type: files; Name: "{app}\WincompenseTCHAD.pdb"
 ; pas changer de serveur depuis l'ecran prevu pour cela : ProgramData n'est pas
 ; modifiable par un utilisateur standard sans cette permission explicite.
 Name: "{commonappdata}\Wincompense"; Permissions: users-modify
+
+; Le dossier des logos de produits. L'application y cherche Logos\WU.png, Logos\RIA.png,
+; et retombe sur les initiales du produit dessinees sur un carre de couleur quand le
+; fichier manque -- ce qui est le cas tant que la banque n'en a pas fourni.
+;
+; LE DOSSIER EST CREE MEME VIDE, ET C'EST VOULU. Sans lui, la banque devrait deviner
+; l'emplacement exact ET le creer elle-meme dans Program Files, ce qui demande des droits
+; d'administrateur : un logo qu'on ne sait pas ou deposer est un logo qu'on ne depose pas.
+; Aucune permission particuliere : y deposer un fichier reste un geste d'administrateur,
+; comme l'installation elle-meme.
+Name: "{app}\Logos"
 
 [Icons]
 Name: "{group}\{#NomApplication}"; Filename: "{app}\{#ExecutablePrincipal}"

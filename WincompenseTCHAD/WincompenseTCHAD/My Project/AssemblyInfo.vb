@@ -1,4 +1,4 @@
-Imports System.Reflection
+﻿Imports System.Reflection
 Imports System.Runtime.InteropServices
 
 ' Informations générales relatives à un assembly sont contrôlées par le jeu d'attributs suivant.
@@ -23,5 +23,5 @@ Imports System.Runtime.InteropServices
 '      Numéro de build
 '      Révision
 '
-<Assembly: AssemblyVersion("1.0.0.0")>
-<Assembly: AssemblyFileVersion("1.0.0.0")>
+<Assembly: AssemblyVersion("1.1.0.0")>
+<Assembly: AssemblyFileVersion("1.1.0.0")>

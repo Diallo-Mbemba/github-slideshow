@@ -122,6 +122,20 @@ Y remédier demande un **certificat de signature de code** — il appartient à 
 de dire si elle en possède un. Le cas échéant, une seule directive `SignTool` à ajouter
 dans `[Setup]`, et rien d'autre à changer.
 
+### Le dossier des logos
+
+L'installation crée `…\SetupWincompense\Logos\`, **même vide**. L'application y cherche
+`WU.png`, `RIA.png` — un fichier par code de produit — et, quand il manque, dessine les
+**initiales du produit sur un carré de sa couleur**. C'est le comportement normal tant que la
+banque n'a pas fourni d'image : la fenêtre de choix reste lisible.
+
+Le dossier est créé même vide **à dessein** : sans lui, il faudrait deviner l'emplacement exact
+*et* le créer soi-même dans Program Files, ce qui demande des droits d'administrateur. Un logo
+qu'on ne sait pas où déposer est un logo qu'on ne dépose pas.
+
+Format attendu : **PNG carré**, 128 pixels de côté suffisent, fond transparent de préférence.
+Y déposer un fichier reste un geste d'administrateur, comme l'installation elle-même.
+
 ### Le numéro de version n'est plus à recopier
 
 Il était écrit à la main dans le script, et c'était une dérive silencieuse : le nom du
