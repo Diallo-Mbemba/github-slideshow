@@ -127,6 +127,69 @@ Le détail de ces étapes est dans `LISEZMOI-Installation.md`.
 
 ---
 
+## Phase 4 bis — Recette technique de la version multi-produit
+
+Cette version change deux choses dans la **comptabilité**, et beaucoup de choses à l'**écran**.
+Les deux ne se vérifient pas de la même façon, et il faut commencer par les premières.
+
+### D'abord : ce qui change la pièce comptable
+
+Deux modifications seulement touchent ce qui part au core banking. Rejouez **une journée déjà
+comptabilisée** et comparez à la pièce précédente — pas à la pièce manuelle de la banque, mais à
+celle que l'application produisait avant.
+
+| | Ce qu'il faut voir | Ce que ce serait si c'était faux |
+|---|---|---|
+| ☐ | Pour une **agence propre**, la ligne de mouvement va sur `381000101` et non plus sur `32100003292` | la contrepartie porte encore deux fois le même compte |
+| ☐ | La contrepartie, elle, reste sur `32100003292` | les deux lignes ont basculé |
+| ☐ | **Tous** les libellés portent la période : `… DU 08 AU 14 09 2026` | un libellé nu — un appel au générateur a été oublié |
+| ☐ | Une pièce d'**une seule journée** dit `DU 09 09 2026`, sans « AU » | la forme longue s'applique partout |
+| ☐ | Les **montants sont identiques** à ceux d'avant, au franc près | une modification a débordé de son périmètre |
+| ☐ | Le fichier core banking sort, et sa colonne `ADDLTEXT` porte la période | le garde-fou des 150 caractères a bloqué : lisez son message, il nomme la ligne |
+
+> **Si un montant a changé, arrêtez-vous là et dites-le-moi.** Aucune des modifications de cette
+> version n'est censée déplacer un franc : elles déplacent une ligne d'un compte à un autre, et
+> ajoutent du texte à des libellés.
+
+### Ensuite : le démarrage, qui est entièrement neuf
+
+C'est le seul endroit où un défaut empêcherait l'application de s'ouvrir.
+
+| | Étape |
+|---|---|
+| ☐ | Exécuter `Scripts\20_ProduitsTransfert.sql`, puis `Scripts\19_BornerLeTaux.sql` s'il ne l'a pas été |
+| ☐ | Lancer : après l'identification, la **fenêtre de choix du produit** s'affiche |
+| ☐ | Western Union y est **Disponible**, Ria **En attente** |
+| ☐ | Ouvrir Western Union : le titre dit `Wincompense TCHAD — Western Union` |
+| ☐ | Tout fonctionne comme avant : compensation, rapports, pièces, référentiel |
+| ☐ | **Changer de produit** (à droite de la barre) ramène au choix **sans redemander le mot de passe** |
+| ☐ | Ouvrir **Ria** : les menus répondent, et chaque écran métier affiche « pas encore disponible » |
+| ☐ | Depuis Ria, `Paramétrage > Produits de transfert…` **s'ouvre quand même** — c'est un écran commun |
+| ☐ | Y créer un produit d'essai, vérifier qu'il apparaît « En attente » au choix suivant |
+| ☐ | Le retirer du service, vérifier qu'il disparaît du choix — **et qu'aucun bouton ne le supprime** |
+
+### Enfin : ce qui se voit
+
+| | Étape |
+|---|---|
+| ☐ | Les **boutons portent une icône** sur tous les écrans |
+| ☐ | Le **traitement de la compense s'ouvre plein cadre**, les écrans de paramétrage non |
+| ☐ | `Paramétrage > Taxes et barème` affiche les cinq lignes, **tout grisé**, avec son bandeau |
+| ☐ | Sur la pièce comptable, la liste « Pièces individuelles » **ne recouvre plus les totaux** |
+| ☐ | Sur les sous-agents par groupe, le **message d'état est lisible** à droite du bouton |
+| ☐ | Clic droit dans la grille de contrôle, **et** le bouton « Pièce du groupe » : même résultat |
+| ☐ | Sur un poste réglé à **125 %**, les icônes sont nettes et non étirées |
+
+### Deux points que je n'ai pas pu vérifier moi-même
+
+- **Les logos.** `Logos\WU.png` et `Logos\RIA.png` sont cherchés à côté de l'exécutable. Le
+  dossier n'existe pas encore : la fenêtre de choix doit alors dessiner les **initiales sur un
+  carré de couleur**. Si elle affiche un cadre vide, dites-le-moi.
+- **Le rendu des douze nouvelles icônes** aux tailles réelles de l'écran. Je les ai rendues hors
+  de Windows ; c'est fidèle, mais ce n'est pas GDI+.
+
+---
+
 ## Phase 5 — Recette — go / no-go
 
 C'est ici que le déploiement se joue.
