@@ -300,12 +300,12 @@ Public NotInheritable Class ChangeRepository
                                       resultat As ResultatChangeWU)
 
         Const insertion As String =
-            "INSERT INTO " & TABLE_ECART & " (Mtcn, DateReglement, Sens, CodeProduit, Statut, " &
-            "DeviseLocale, MontantLocal, ClearPrincipalLoc, ClearFxLoc, MontantEnDevise, Parite, " &
-            "ContreValeur, Ecart, Nature, FichierSource, DateEnregistrement, EnregistrePar) " &
-            "VALUES (@mtcn, @jour, @sens, @produit, @statut, @devise, @local, @principalDevise, " &
-            "@changeDevise, @devisePayee, @parite, @contreValeur, @ecart, @nature, @fichier, " &
-            "GETDATE(), @auteur)"
+            "INSERT INTO " & TABLE_ECART & " (Mtcn, Account, DateReglement, Sens, CodeProduit, " &
+            "Statut, DeviseLocale, MontantLocal, ClearPrincipalLoc, ClearFxLoc, MontantEnDevise, " &
+            "Parite, ContreValeur, Ecart, Nature, FichierSource, DateEnregistrement, EnregistrePar) " &
+            "VALUES (@mtcn, @account, @jour, @sens, @produit, @statut, @devise, @local, " &
+            "@principalDevise, @changeDevise, @devisePayee, @parite, @contreValeur, @ecart, " &
+            "@nature, @fichier, GETDATE(), @auteur)"
 
         For Each ligne As EcartChangeWU In resultat.Ecarts
 
@@ -317,6 +317,7 @@ Public NotInheritable Class ChangeRepository
             Using commande As New SqlCommand(insertion, connexion, transaction)
 
                 commande.Parameters.Add("@mtcn", SqlDbType.NVarChar, 30).Value = ligne.Mtcn
+                commande.Parameters.Add("@account", SqlDbType.NVarChar, 20).Value = Texte(ligne.Account)
                 commande.Parameters.Add("@jour", SqlDbType.Date).Value = ligne.DateReglement.Value.Date
                 commande.Parameters.Add("@sens", SqlDbType.NChar, 1).Value = ligne.Sens
                 commande.Parameters.Add("@produit", SqlDbType.NVarChar, 10).Value = Texte(ligne.CodeProduit)
@@ -366,11 +367,11 @@ Public NotInheritable Class ChangeRepository
                                        pieces As List(Of PieceChangeWU))
 
         Const insertion As String =
-            "INSERT INTO " & TABLE_PIECE & " (CleGroupe, DateReglement, Sens, CodeProduit, Ligne, " &
-            "Compte, Libelle, Debit, Credit, CodeAgence, NombreTransactions, Parite, FichierSource, " &
-            "DateEnregistrement, EnregistrePar) " &
-            "VALUES (@cle, @jour, @sens, @produit, @ligne, @compte, @libelle, @debit, @credit, " &
-            "@codeAgence, @transactions, @parite, @fichier, GETDATE(), @auteur)"
+            "INSERT INTO " & TABLE_PIECE & " (CleGroupe, DateReglement, Sens, CodeProduit, " &
+            "Account, Mtcn, Ligne, Compte, Libelle, Debit, Credit, CodeAgence, NombreTransactions, " &
+            "Parite, FichierSource, DateEnregistrement, EnregistrePar) " &
+            "VALUES (@cle, @jour, @sens, @produit, @account, @mtcn, @ligne, @compte, @libelle, " &
+            "@debit, @credit, @codeAgence, @transactions, @parite, @fichier, GETDATE(), @auteur)"
 
         For Each piece As PieceChangeWU In pieces
 
@@ -388,6 +389,8 @@ Public NotInheritable Class ChangeRepository
                     commande.Parameters.Add("@jour", SqlDbType.Date).Value = piece.DateReglement.Date
                     commande.Parameters.Add("@sens", SqlDbType.NVarChar, 10).Value = Texte(piece.Sens)
                     commande.Parameters.Add("@produit", SqlDbType.NVarChar, 10).Value = Texte(piece.CodeProduit)
+                    commande.Parameters.Add("@account", SqlDbType.NVarChar, 20).Value = Texte(piece.Account)
+                    commande.Parameters.Add("@mtcn", SqlDbType.NVarChar, 30).Value = Texte(piece.Mtcn)
                     commande.Parameters.Add("@ligne", SqlDbType.Int).Value = rang
                     commande.Parameters.Add("@compte", SqlDbType.NVarChar, 50).Value =
                         Convert.ToString(ecriture("Compte"))
@@ -424,7 +427,8 @@ Public NotInheritable Class ChangeRepository
         messageErreur = String.Empty
 
         Const requete As String =
-            "SELECT CleGroupe, DateReglement, Sens, CodeProduit, Ligne, Compte, Libelle, " &
+            "SELECT CleGroupe, DateReglement, Sens, CodeProduit, Account, Mtcn, " &
+            "Ligne, Compte, Libelle, " &
             "Debit, Credit, CodeAgence, NombreTransactions, FichierSource, " &
             "DateEnregistrement, EnregistrePar " &
             "FROM " & TABLE_PIECE & " " &

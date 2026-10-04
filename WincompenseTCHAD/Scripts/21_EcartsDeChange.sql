@@ -161,6 +161,7 @@ BEGIN
         Id                  BIGINT          IDENTITY(1,1) PRIMARY KEY,
 
         Mtcn                NVARCHAR(30)    NOT NULL,
+        Account             NVARCHAR(20)    NULL,       -- point de vente, pour la narrative
         DateReglement       DATE            NOT NULL,
         Sens                NCHAR(1)        NOT NULL,   -- S envoi, P paiement
         CodeProduit         NVARCHAR(10)    NULL,       -- IMTR, FTSS, AVSS...
@@ -261,6 +262,8 @@ BEGIN
         DateReglement       DATE            NOT NULL,
         Sens                NVARCHAR(10)    NULL,       -- vide si le découpage ne distingue pas le sens
         CodeProduit         NVARCHAR(10)    NULL,       -- vide si le découpage ne distingue pas le produit
+        Account             NVARCHAR(20)    NULL,       -- renseigné si la pièce ne porte qu'un point de vente
+        Mtcn                NVARCHAR(30)    NULL,       -- renseigné si la pièce ne porte qu'une transaction
 
         Ligne               INT             NOT NULL,
         Compte              NVARCHAR(50)    NOT NULL,
@@ -291,6 +294,40 @@ BEGIN
 END
 ELSE
     PRINT 'Table T_PieceChangeWU déjà présente : création ignorée.';
+GO
+
+-- =========================================================================
+-- 5 bis. Les colonnes de la narrative, sur une base où le script est rejoué
+--
+--    LA BANQUE A DEMANDÉ QUE LE MTCN ET LE ACCOUNT RESSORTENT DANS LA NARRATIVE. Les tables
+--    créées plus haut les portent ; celles d'une base où ce script a déjà été exécuté avant
+--    cette demande ne les portent pas. Ces trois ALTER les ajoutent sans toucher aux données.
+-- =========================================================================
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_EcartChangeWU' AND schema_id = SCHEMA_ID(N'dbo'))
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_EcartChangeWU') AND name = N'Account')
+BEGIN
+    ALTER TABLE dbo.T_EcartChangeWU ADD Account NVARCHAR(20) NULL;
+    PRINT 'Colonne Account ajoutée à T_EcartChangeWU.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceChangeWU' AND schema_id = SCHEMA_ID(N'dbo'))
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_PieceChangeWU') AND name = N'Account')
+BEGIN
+    ALTER TABLE dbo.T_PieceChangeWU ADD Account NVARCHAR(20) NULL;
+    PRINT 'Colonne Account ajoutée à T_PieceChangeWU.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceChangeWU' AND schema_id = SCHEMA_ID(N'dbo'))
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_PieceChangeWU') AND name = N'Mtcn')
+BEGIN
+    ALTER TABLE dbo.T_PieceChangeWU ADD Mtcn NVARCHAR(30) NULL;
+    PRINT 'Colonne Mtcn ajoutée à T_PieceChangeWU.';
+END
 GO
 
 -- =========================================================================

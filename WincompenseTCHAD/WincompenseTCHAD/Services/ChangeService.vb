@@ -285,6 +285,7 @@ Public NotInheritable Class ChangeService
 
         Return New EcartChangeWU() With {
             .Mtcn = LireTexte(row, ConstantesWU.COLONNE_MTCN),
+            .Account = LireTexte(row, ConstantesWU.COLONNE_ACCOUNT),
             .DateReglement = DateDeReglement(row),
             .Sens = sens,
             .CodeProduit = LireTexte(row, ConstantesWU.COLONNE_CODE_PRODUIT),

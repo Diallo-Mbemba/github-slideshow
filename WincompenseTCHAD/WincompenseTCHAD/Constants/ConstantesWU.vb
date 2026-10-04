@@ -331,6 +331,12 @@ Public NotInheritable Class ConstantesWU
     ' tout entier. C'est la faute la plus coûteuse que ce calcul puisse commettre, et la seule
     ' que le compilateur ne voit pas.
 
+    ''' <summary>
+    ''' Identifiant du point de vente dans les rapports Western Union : « AHB020013 », « ADJ226820 ».
+    ''' C'est la clé par laquelle le référentiel reconnaît un sous-agent ou une agence propre.
+    ''' </summary>
+    Public Const COLONNE_ACCOUNT As String = "Account"
+
     ''' <summary>Numéro de contrôle du transfert : la référence citée par la banque et par le client.</summary>
     Public Const COLONNE_MTCN As String = "MTCN"
 
@@ -373,7 +379,7 @@ Public NotInheritable Class ConstantesWU
 
     ''' <summary>Les colonnes sans lesquelles aucun écart de change ne peut être calculé.</summary>
     Public Shared ReadOnly ColonnesEcartsDeChange As String() = {
-        COLONNE_MTCN, COLONNE_TYPE_TRANSACTION, COLONNE_SENS, COLONNE_DEVISE_LOC,
+        COLONNE_MTCN, COLONNE_ACCOUNT, COLONNE_TYPE_TRANSACTION, COLONNE_SENS, COLONNE_DEVISE_LOC,
         COLONNE_PRINCIPAL_ENVOI_LOCAL, COLONNE_PRINCIPAL_PAYE_LOCAL,
         COLONNE_PRINCIPAL_DEVISE, COLONNE_CHANGE_DEVISE
     }

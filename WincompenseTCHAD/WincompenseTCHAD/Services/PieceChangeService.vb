@@ -28,6 +28,32 @@ Public Enum DecoupageChangeWU
     ''' </summary>
     ParJourneeSensEtProduit = 3
 
+    ''' <summary>
+    ''' Une pièce par journée, sens, produit ET POINT DE VENTE. 943 pièces et 2 318 écritures
+    ''' sur le rapport de référence.
+    '''
+    ''' C'EST LE PREMIER NIVEAU OÙ LE ACCOUNT EXISTE. Au niveau précédent, une pièce agrège
+    ''' les transactions de plusieurs centaines de points de vente : il n'y a pas « un »
+    ''' Account à inscrire dans la narrative, et sur les quarante groupes du rapport de
+    ''' référence, neuf seulement n'en portaient qu'un.
+    ''' </summary>
+    ParJourneeSensProduitEtAccount = 4
+
+    ''' <summary>
+    ''' Une pièce PAR TRANSACTION. 1 702 pièces et 3 404 écritures sur le rapport de
+    ''' référence — les 665 transactions dont l'écart est nul ne produisent aucune pièce.
+    '''
+    ''' C'EST LE SEUL NIVEAU OÙ LE MTCN EXISTE, et c'est pour lui qu'il a été ajouté : un MTCN
+    ''' désigne UNE transaction, donc une pièce d'une transaction. La narrative y porte alors
+    ''' le MTCN et le Account, et chaque ligne du core banking se relit directement dans le
+    ''' rapport Western Union du jour.
+    '''
+    ''' CE QU'IL COÛTE, ET IL FAUT LE SAVOIR AVANT DE LE CHOISIR : trois mille quatre cents
+    ''' lignes de core banking pour trois journées, dont la plupart portent un ou deux francs.
+    ''' La traçabilité est totale, le volume aussi.
+    ''' </summary>
+    ParTransaction = 5
+
 End Enum
 
 ''' <summary>
@@ -54,6 +80,21 @@ Public Class PieceChangeWU
 
     ''' <summary>Code produit, ou vide si le découpage ne le distingue pas.</summary>
     Public Property CodeProduit As String = String.Empty
+
+    ''' <summary>
+    ''' Point de vente de la pièce, si elle n'en porte qu'un. Vide sinon.
+    '''
+    ''' VIDE N'EST PAS « INCONNU », C'EST « PLUSIEURS ». Une pièce qui agrège les transactions
+    ''' de quatre cents points de vente ne peut en nommer aucun sans mentir, et c'est pourquoi
+    ''' la narrative se tait plutôt que de citer le premier venu.
+    ''' </summary>
+    Public Property Account As String = String.Empty
+
+    ''' <summary>
+    ''' MTCN de la pièce, si elle ne porte qu'une transaction. Vide sinon. Même règle que
+    ''' <see cref="Account"/>.
+    ''' </summary>
+    Public Property Mtcn As String = String.Empty
 
     Public Property NombreTransactions As Integer
     Public Property Gains As Decimal
@@ -153,25 +194,90 @@ Public NotInheritable Class PieceChangeService
     Public Const MENTION As String = "écart de change"
 
     ''' <summary>
-    ''' Compose le libellé de la pièce : « WU IMTR Envoi - écart de change - 27/03/2026 - 390 trx ».
-    '''
-    ''' Les parties que le découpage ne distingue pas disparaissent plutôt que de laisser un
-    ''' trou : par journée seule, le libellé devient « WU - écart de change - 27/03/2026 -
-    ''' 1 234 trx ». Le pire cas mesure 58 caractères, loin des 150 que le core banking
-    ''' accepte dans ADDLTEXT.
+    ''' Nombre maximum de pièces détaillées dans la synthèse. Au-delà, le compte des pièces
+    ''' restantes remplace leur liste : voir Synthese.
     ''' </summary>
-    Public Shared Function Narratif(sens As String, codeProduit As String,
-                                    jour As Date, nombreTransactions As Integer) As String
+    Private Const DETAIL_MAXIMUM As Integer = 60
 
-        Dim morceaux As New List(Of String)
-        morceaux.Add(ProduitTransfert.CODE_WESTERN_UNION)
+    ''' <summary>
+    ''' Compose la narrative de la pièce — celle que le core banking recopie dans ADDLTEXT.
+    '''
+    '''     WU IMTR Envoi - écart de change - 27/03/2026 - MTCN 0050908785 - Account ADJ226820
+    '''     WU IMTR Envoi - écart de change - 27/03/2026 - 390 trx - Account ADJ220286
+    '''     WU - écart de change - 27/03/2026 - 1145 trx
+    '''
+    ''' ELLE NE NOMME QUE CE QUE LA PIÈCE IDENTIFIE VRAIMENT, et c'est toute la règle. La
+    ''' banque demande que le MTCN et le Account y ressortent ; encore faut-il qu'ils
+    ''' existent. Une pièce qui agrège 1 145 transactions de 426 points de vente n'a NI MTCN
+    ''' NI Account : y inscrire celui de la première ligne du groupe serait inventer une
+    ''' référence, et cette référence serait citée de bonne foi par un comptable qui
+    ''' chercherait ensuite en vain les 1 144 autres transactions.
+    '''
+    ''' La narrative nomme donc le MTCN quand la pièce ne porte QU'UNE transaction, et le
+    ''' Account quand elle ne porte QU'UN point de vente. Les découpages ParTransaction et
+    ''' ParJourneeSensProduitEtAccount sont là pour que ce soit le cas ; aux niveaux
+    ''' supérieurs, le nombre de transactions prend la place du MTCN, ce qui est l'information
+    ''' honnête.
+    '''
+    ''' « n trx » DISPARAÎT QUAND LE MTCN EST NOMMÉ : un MTCN désigne une transaction, et
+    ''' « MTCN 0050908785 - 1 trx » ne dirait rien de plus en douze caractères de plus.
+    '''
+    ''' LONGUEUR. Le pire cas mesuré sur le rapport de référence est de 86 caractères, au
+    ''' découpage par transaction. Le core banking accepte 150 dans ADDLTEXT, et
+    ''' CoreBankingService refuse le fichier au-delà — il ne tronque pas.
+    ''' </summary>
+    ''' <param name="mtcn">Le MTCN, si la pièce n'en porte qu'un. Vide sinon.</param>
+    ''' <param name="account">Le point de vente, si la pièce n'en porte qu'un. Vide sinon.</param>
+    Public Shared Function Narratif(sens As String, codeProduit As String, jour As Date,
+                                    nombreTransactions As Integer,
+                                    mtcn As String, account As String) As String
 
-        If Not String.IsNullOrWhiteSpace(codeProduit) Then morceaux.Add(codeProduit.Trim())
+        Dim entete As New List(Of String)
+        entete.Add(ProduitTransfert.CODE_WESTERN_UNION)
+
+        If Not String.IsNullOrWhiteSpace(codeProduit) Then entete.Add(codeProduit.Trim())
 
         Dim sensLisible As String = LibelleDuSens(sens)
-        If sensLisible.Length > 0 Then morceaux.Add(sensLisible)
+        If sensLisible.Length > 0 Then entete.Add(sensLisible)
 
-        Return $"{String.Join(" ", morceaux)} - {MENTION} - {jour:dd/MM/yyyy} - {nombreTransactions} trx"
+        Dim narratif As String = $"{String.Join(" ", entete)} - {MENTION} - {jour:dd/MM/yyyy}"
+
+        Dim reference As String = If(mtcn, String.Empty).Trim()
+
+        If reference.Length > 0 Then
+            narratif &= $" - MTCN {reference}"
+        Else
+            narratif &= $" - {nombreTransactions} trx"
+        End If
+
+        Dim pointDeVente As String = If(account, String.Empty).Trim()
+        If pointDeVente.Length > 0 Then narratif &= $" - Account {pointDeVente}"
+
+        Return narratif
+    End Function
+
+    ''' <summary>
+    ''' La valeur commune d'un champ sur tout un groupe, ou une chaîne vide si elle diffère
+    ''' d'une ligne à l'autre.
+    '''
+    ''' C'EST CETTE FONCTION QUI EMPÊCHE D'INVENTER UNE RÉFÉRENCE. Elle ne rend une valeur que
+    ''' si TOUTES les lignes du groupe la portent ; une seule divergence, et le champ reste
+    ''' vide — donc absent de la narrative, plutôt que faux.
+    ''' </summary>
+    Private Shared Function ValeurCommune(lignes As List(Of EcartChangeWU),
+                                          champ As Func(Of EcartChangeWU, String)) As String
+
+        Dim premiere As String = If(champ(lignes(0)), String.Empty).Trim()
+        If premiere.Length = 0 Then Return String.Empty
+
+        For Each ligne As EcartChangeWU In lignes
+            If Not String.Equals(If(champ(ligne), String.Empty).Trim(), premiere,
+                                 StringComparison.OrdinalIgnoreCase) Then
+                Return String.Empty
+            End If
+        Next
+
+        Return premiere
     End Function
 
     ''' <summary>Le sens, écrit pour l'écran : Envoi, Paiement, ou rien.</summary>
@@ -298,6 +404,15 @@ Public NotInheritable Class PieceChangeService
             Case DecoupageChangeWU.ParJourneeSensEtProduit
                 Return $"{jour}|{ligne.Sens}|{ligne.CodeProduit}"
 
+            Case DecoupageChangeWU.ParJourneeSensProduitEtAccount
+                Return $"{jour}|{ligne.Sens}|{ligne.CodeProduit}|{ligne.Account}"
+
+            Case DecoupageChangeWU.ParTransaction
+                ' Le MTCN suffirait à identifier la transaction, mais la clé reste
+                ' HIÉRARCHIQUE : son tri alphabétique est alors le tri chronologique des
+                ' pièces, et une clé qui commence par la journée se lit dans une table.
+                Return $"{jour}|{ligne.Sens}|{ligne.CodeProduit}|{ligne.Account}|{ligne.Mtcn}"
+
             Case Else
                 Return jour
         End Select
@@ -320,20 +435,31 @@ Public NotInheritable Class PieceChangeService
         Dim premiere As EcartChangeWU = lignes(0)
 
         Dim sens As String = If(decoupage = DecoupageChangeWU.ParJournee, String.Empty, premiere.Sens)
-        Dim produit As String = If(decoupage = DecoupageChangeWU.ParJourneeSensEtProduit,
+
+        Dim produit As String = If(decoupage >= DecoupageChangeWU.ParJourneeSensEtProduit,
                                    premiere.CodeProduit, String.Empty)
+
+        ' LE MTCN ET LE ACCOUNT SONT CONSTATÉS, ET NON DÉDUITS DU DÉCOUPAGE. Les découpages
+        ' ParTransaction et ParJourneeSensProduitEtAccount les rendent communs à tout le
+        ' groupe par construction — mais un groupe d'un niveau supérieur peut l'être aussi,
+        ' par le seul fait des données : une journée dont un produit n'a été vendu que par un
+        ' point de vente. ValeurCommune s'en aperçoit, et la narrative en profite.
+        Dim account As String = ValeurCommune(lignes, Function(l) l.Account)
+        Dim mtcn As String = ValeurCommune(lignes, Function(l) l.Mtcn)
 
         Dim piece As New PieceChangeWU()
         piece.CleGroupe = groupe.Key
         piece.DateReglement = premiere.DateReglement.Value
         piece.Sens = sens
         piece.CodeProduit = produit
+        piece.Account = account
+        piece.Mtcn = mtcn
         piece.NombreTransactions = lignes.Count
         piece.Gains = gains
         piece.Pertes = pertes
         piece.Parite = premiere.Parite
         piece.FichierSource = resultat.FichierSource
-        piece.Libelle = Narratif(sens, produit, piece.DateReglement, lignes.Count)
+        piece.Libelle = Narratif(sens, produit, piece.DateReglement, lignes.Count, mtcn, account)
 
         piece.Lignes = TableVide()
 
@@ -455,26 +581,47 @@ Public NotInheritable Class PieceChangeService
 
         texte.AppendLine($"Pièces   : {pieces.Count:N0}")
         texte.AppendLine()
-        texte.AppendLine("Journée      Sens  Prod.    Trx        Gains      Pertes         Net  Éq.")
-        texte.AppendLine(New String("-"c, 78))
+        texte.AppendLine("Journée      Sens  Prod.  Account    Référence        Gains      Pertes         Net  Éq.")
+        texte.AppendLine(New String("-"c, 96))
+
+        ' LE DÉTAIL EST PLAFONNÉ, et ce n'est pas une facilité. Le découpage par transaction
+        ' produit mille sept cents pièces sur trois journées : les lister toutes donnerait une
+        ' synthèse que personne ne lit, dans laquelle le total — la seule ligne qui compte —
+        ' serait à mille sept cents lignes du début. Le détail complet est ailleurs : dans la
+        ' grille, qui se trie, et dans le classeur exporté.
+        Dim plafond As Integer = Math.Min(pieces.Count, DETAIL_MAXIMUM)
 
         ' Les colonnes sont composées AVANT d'être alignées. Une expression un peu longue
         ' glissée dans le trou d'une chaîne interpolée, avec en plus une largeur d'alignement,
         ' se compile mais ne se relit pas — et c'est précisément ce tableau que la banque
         ' lira pour rapprocher ses pièces.
-        For Each piece As PieceChangeWU In pieces
+        For rang As Integer = 0 To plafond - 1
+
+            Dim piece As PieceChangeWU = pieces(rang)
 
             Dim sens As String = If(piece.Sens.Length = 0, "-", piece.Sens)
             Dim produit As String = If(piece.CodeProduit.Length = 0, "-", piece.CodeProduit)
+            Dim account As String = If(piece.Account.Length = 0, "-", piece.Account)
             Dim equilibre As String = If(piece.EstEquilibree, "ok", "NON")
 
+            ' La référence est le MTCN quand la pièce en porte un, le nombre de transactions
+            ' sinon : exactement ce que dit la narrative, et pour la même raison.
+            Dim reference As String = If(piece.Mtcn.Length > 0,
+                                         piece.Mtcn,
+                                         $"{piece.NombreTransactions} trx")
+
             texte.AppendLine(
-                $"{piece.DateReglement:dd/MM/yyyy}   {sens,-4}  {produit,-6} " &
-                $"{piece.NombreTransactions,6} " &
-                $"{Montant(piece.Gains, fr),12} " &
+                $"{piece.DateReglement:dd/MM/yyyy}   {sens,-4}  {produit,-6} {account,-10} {reference,-12} " &
+                $"{Montant(piece.Gains, fr),11} " &
                 $"{Montant(piece.Pertes, fr),11} " &
                 $"{Montant(piece.Net, fr),11}  " & equilibre)
         Next
+
+        If pieces.Count > plafond Then
+            texte.AppendLine($"... et {pieces.Count - plafond:N0} autre(s) pièce(s). " &
+                             "Le détail complet est dans la grille et dans le classeur exporté ; " &
+                             "les totaux ci-dessous portent sur TOUTES les pièces.")
+        End If
 
         Dim gains As Decimal = pieces.Sum(Function(p) p.Gains)
         Dim pertes As Decimal = pieces.Sum(Function(p) p.Pertes)
@@ -484,9 +631,11 @@ Public NotInheritable Class PieceChangeService
         Dim ecritures As Integer = pieces.Where(Function(p) p.Lignes IsNot Nothing).
                                           Sum(Function(p) p.Lignes.Rows.Count)
 
-        texte.AppendLine(New String("-"c, 78))
-        texte.AppendLine($"TOTAL        {transactions,19} " &
-                         $"{Montant(gains, fr),12} {Montant(pertes, fr),11} " &
+        Dim totalTrx As String = $"{transactions:N0} trx"
+
+        texte.AppendLine(New String("-"c, 96))
+        texte.AppendLine($"TOTAL                            {totalTrx,-12} " &
+                         $"{Montant(gains, fr),11} {Montant(pertes, fr),11} " &
                          $"{Montant(gains - pertes, fr),11}")
         texte.AppendLine()
         texte.AppendLine($"Écritures                : {ecritures:N0}")
@@ -510,9 +659,16 @@ Public NotInheritable Class PieceChangeService
     Public Shared Function LibelleDuDecoupage(decoupage As DecoupageChangeWU) As String
 
         Select Case decoupage
-            Case DecoupageChangeWU.ParJourneeEtSens : Return "une pièce par journée et par sens"
-            Case DecoupageChangeWU.ParJourneeSensEtProduit : Return "une pièce par journée, sens et code produit"
-            Case Else : Return "une pièce par journée de règlement"
+            Case DecoupageChangeWU.ParJourneeEtSens
+                Return "une pièce par journée et par sens"
+            Case DecoupageChangeWU.ParJourneeSensEtProduit
+                Return "une pièce par journée, sens et code produit"
+            Case DecoupageChangeWU.ParJourneeSensProduitEtAccount
+                Return "une pièce par journée, sens, produit et point de vente (Account dans la narrative)"
+            Case DecoupageChangeWU.ParTransaction
+                Return "une pièce par transaction (MTCN et Account dans la narrative)"
+            Case Else
+                Return "une pièce par journée de règlement"
         End Select
     End Function
 

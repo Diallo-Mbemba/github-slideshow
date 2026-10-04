@@ -47,6 +47,16 @@ Public Class EcartChangeWU
     Public Property Mtcn As String = String.Empty
 
     ''' <summary>
+    ''' Identifiant du point de vente dans le rapport (colonne Account) : « ADJ226820 ».
+    '''
+    ''' IL ENTRE DANS LA NARRATIVE DE LA PIÈCE, à la demande de la banque. Un écart de change
+    ''' sans point de vente est un montant que personne ne peut rattacher à un guichet ; avec
+    ''' lui, la ligne du core banking se relit depuis le rapport du jour. Il ne participe à
+    ''' AUCUN calcul : l'écart de change naît de la conversion, pas du point de vente.
+    ''' </summary>
+    Public Property Account As String = String.Empty
+
+    ''' <summary>
     ''' Date de règlement de la ligne, reconstituée depuis le triplet SetDateLOC. Nothing si
     ''' le rapport ne la porte pas : la date sert à présenter et à regrouper, jamais à calculer.
     ''' </summary>

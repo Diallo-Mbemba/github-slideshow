@@ -35,6 +35,7 @@ Public Class FrmEcartsChange
     Private Const COL_DATE As String = "Règlement"
     Private Const COL_SENS As String = "Sens"
     Private Const COL_PRODUIT As String = "Produit"
+    Private Const COL_ACCOUNT As String = "Account"
     Private Const COL_LOCAL As String = "Montant local"
     Private Const COL_DEVISE As String = "Montant devise"
     Private Const COL_CONTREVALEUR As String = "Contre-valeur"
@@ -84,6 +85,8 @@ Public Class FrmEcartsChange
         cboDecoupage.Items.Add("Une pièce par journée de règlement")
         cboDecoupage.Items.Add("Une pièce par journée et par sens")
         cboDecoupage.Items.Add("Une pièce par journée, sens et code produit")
+        cboDecoupage.Items.Add("Une pièce par journée, sens, produit et point de vente — Account dans la narrative")
+        cboDecoupage.Items.Add("Une pièce par transaction — MTCN et Account dans la narrative")
         cboDecoupage.SelectedIndex = 0
     End Sub
 
@@ -92,6 +95,8 @@ Public Class FrmEcartsChange
         Select Case cboDecoupage.SelectedIndex
             Case 1 : Return DecoupageChangeWU.ParJourneeEtSens
             Case 2 : Return DecoupageChangeWU.ParJourneeSensEtProduit
+            Case 3 : Return DecoupageChangeWU.ParJourneeSensProduitEtAccount
+            Case 4 : Return DecoupageChangeWU.ParTransaction
             Case Else : Return DecoupageChangeWU.ParJournee
         End Select
     End Function
@@ -385,6 +390,11 @@ Public Class FrmEcartsChange
         If piece.Sens.Length > 0 Then qualificatifs.Add(PieceChangeService.LibelleDuSens(piece.Sens))
         If piece.CodeProduit.Length > 0 Then qualificatifs.Add(piece.CodeProduit)
 
+        ' Le MTCN et le Account, quand la pièce les identifie : ce sont eux que la banque
+        ' cite, et c'est donc par eux qu'on retrouve une pièce dans la liste.
+        If piece.Account.Length > 0 Then qualificatifs.Add(piece.Account)
+        If piece.Mtcn.Length > 0 Then qualificatifs.Add("MTCN " & piece.Mtcn)
+
         Dim precision As String = If(qualificatifs.Count = 0,
                                      String.Empty,
                                      " " & String.Join(" ", qualificatifs))
@@ -492,6 +502,7 @@ Public Class FrmEcartsChange
         table.Columns.Add(COL_DATE, GetType(Date))
         table.Columns.Add(COL_SENS, GetType(String))
         table.Columns.Add(COL_PRODUIT, GetType(String))
+        table.Columns.Add(COL_ACCOUNT, GetType(String))
         table.Columns.Add(COL_LOCAL, GetType(Decimal))
         table.Columns.Add(COL_DEVISE, GetType(Decimal))
         table.Columns.Add(COL_CONTREVALEUR, GetType(Decimal))
@@ -506,6 +517,7 @@ Public Class FrmEcartsChange
                                CType(ligne.DateReglement.Value, Object), DBNull.Value)
             row(COL_SENS) = ligne.SensLisible
             row(COL_PRODUIT) = ligne.CodeProduit
+            row(COL_ACCOUNT) = ligne.Account
             row(COL_LOCAL) = ligne.MontantLocal
             row(COL_DEVISE) = ligne.MontantEnDevise
             row(COL_CONTREVALEUR) = ligne.ContreValeur
@@ -530,6 +542,7 @@ Public Class FrmEcartsChange
         GrilleWU.LargeurFixe(dgvEcarts, COL_DATE, 90)
         GrilleWU.LargeurFixe(dgvEcarts, COL_SENS, 80)
         GrilleWU.LargeurFixe(dgvEcarts, COL_PRODUIT, 70)
+        GrilleWU.LargeurFixe(dgvEcarts, COL_ACCOUNT, 90)
     End Sub
 
     Private Shared Sub AlignerUnMontant(grille As DataGridView, nomColonne As String, format As String)

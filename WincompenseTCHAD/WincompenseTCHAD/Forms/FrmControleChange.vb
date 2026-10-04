@@ -30,6 +30,7 @@ Public Class FrmControleChange
     Private Const COL_DATE As String = "Règlement"
     Private Const COL_SENS As String = "Sens"
     Private Const COL_PRODUIT As String = "Produit"
+    Private Const COL_ACCOUNT As String = "Account"
     Private Const COL_STATUT As String = "Statut"
     Private Const COL_LOCAL As String = "Montant local"
     Private Const COL_DEVISE As String = "Montant devise"
@@ -242,6 +243,7 @@ Public Class FrmControleChange
         table.Columns.Add(COL_DATE, GetType(Date))
         table.Columns.Add(COL_SENS, GetType(String))
         table.Columns.Add(COL_PRODUIT, GetType(String))
+        table.Columns.Add(COL_ACCOUNT, GetType(String))
         table.Columns.Add(COL_STATUT, GetType(String))
         table.Columns.Add(COL_LOCAL, GetType(Decimal))
         table.Columns.Add(COL_DEVISE, GetType(Decimal))
@@ -257,6 +259,7 @@ Public Class FrmControleChange
             row(COL_DATE) = If(ligne.DateReglement.HasValue, CType(ligne.DateReglement.Value, Object), DBNull.Value)
             row(COL_SENS) = ligne.SensLisible
             row(COL_PRODUIT) = ligne.CodeProduit
+            row(COL_ACCOUNT) = ligne.Account
             row(COL_STATUT) = ligne.Statut
             row(COL_LOCAL) = ligne.MontantLocal
             row(COL_DEVISE) = ligne.MontantEnDevise
@@ -292,6 +295,7 @@ Public Class FrmControleChange
         ' autant de place qu'aux montants rejetterait l'écart hors de l'écran.
         GrilleWU.LargeurFixe(dgvEcarts, COL_SENS, 80)
         GrilleWU.LargeurFixe(dgvEcarts, COL_PRODUIT, 70)
+        GrilleWU.LargeurFixe(dgvEcarts, COL_ACCOUNT, 90)
         GrilleWU.LargeurFixe(dgvEcarts, COL_STATUT, 60)
         GrilleWU.LargeurFixe(dgvEcarts, COL_NATURE, 70)
         GrilleWU.LargeurFixe(dgvEcarts, COL_DATE, 90)
