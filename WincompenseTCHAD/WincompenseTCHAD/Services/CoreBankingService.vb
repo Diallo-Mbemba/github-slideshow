@@ -64,12 +64,56 @@ Public NotInheritable Class CoreBankingService
         Return New String(caracteres)
     End Function
 
+    ''' <summary>
+    ''' Numéro de lot de la pièce des ÉCARTS DE CHANGE d'une journée.
+    '''
+    ''' LE PROBLÈME QU'IL RÉSOUT. Le numéro de lot d'une journée de compensation est dérivé de
+    ''' cette journée : le 27/03/2026 donne « 07ob », toujours. La pièce de change porte sur la
+    ''' MÊME journée ; produite avec la même règle, elle arriverait au core banking sous « 07ob »
+    ''' elle aussi. Le core banking n'a que ce numéro pour reconnaître un lot déjà chargé : il
+    ''' rejetterait le second fichier comme un doublon du premier, ou les confondrait.
+    '''
+    ''' LA RÈGLE. Le numéro garde la journée, mais dans un ESPACE DISTINCT : la lettre « c »
+    ''' pour change, suivie de la journée sur trois caractères en base 36. Le 27/03/2026 donne
+    ''' donc « c7ob » là où la compensation donne « 07ob » : même journée reconnaissable, deux
+    ''' lots qui ne peuvent pas se confondre.
+    '''
+    ''' POURQUOI AUCUNE COLLISION N'EST POSSIBLE. Un lot de compensation commence par le
+    ''' quotient de la journée par 46 656 : il vaut « 0 » aujourd'hui et n'atteindrait « c »
+    ''' qu'au bout de 559 872 jours, soit en 3531. Les trois caractères du lot de change
+    ''' couvrent de leur côté 46 656 jours à partir de 1999, c'est-à-dire jusqu'en 2126.
+    '''
+    ''' DEUX PROPRIÉTÉS CONSERVÉES, les mêmes que pour la compensation : une journée donne
+    ''' toujours le même numéro — un fichier réexporté est reconnu comme le même — et deux
+    ''' journées n'en partagent jamais un.
+    ''' </summary>
+    Public Shared Function NumeroDeLotDeChange(dateActivite As Date) As String
+
+        Dim jours As Integer = CInt((dateActivite.Date - ConstantesWU.CB_ORIGINE_LOT.Date).TotalDays)
+        If jours < 0 Then jours = 0
+
+        ' Au-delà de la capacité des trois caractères, on repart de zéro plutôt que de produire
+        ' un numéro plus long que ce que le core banking accepte. Le cas se présenterait en 2126.
+        Dim capacite As Integer = ALPHABET_LOT.Length * ALPHABET_LOT.Length * ALPHABET_LOT.Length
+        jours = jours Mod capacite
+
+        Dim caracteres(ConstantesWU.CB_LONGUEUR_LOT - 2) As Char
+
+        For position As Integer = caracteres.Length - 1 To 0 Step -1
+            caracteres(position) = ALPHABET_LOT(jours Mod ALPHABET_LOT.Length)
+            jours \= ALPHABET_LOT.Length
+        Next
+
+        Return ConstantesWU.CB_LOT_PREFIXE_CHANGE & New String(caracteres)
+    End Function
+
 #End Region
 
 #Region "Construction du fichier"
 
     ''' <summary>
-    ''' Transforme la pièce comptable en table à treize colonnes.
+    ''' Transforme la pièce comptable en table à treize colonnes, sous le numéro de lot de sa
+    ''' journée.
     ''' </summary>
     ''' <param name="dtPiece">Pièce comptable produite par PieceComptableService.</param>
     ''' <param name="dateActivite">Journée traitée. Elle détermine le numéro de lot.</param>
@@ -79,7 +123,31 @@ Public NotInheritable Class CoreBankingService
     Public Shared Function Construire(dtPiece As DataTable, dateActivite As Date, dateValeur As Date,
                                       ByRef messageErreur As String) As DataTable
 
+        Return ConstruireSousLot(dtPiece, NumeroDeLot(dateActivite), dateValeur, messageErreur)
+    End Function
+
+    ''' <summary>
+    ''' Même construction, mais sous un numéro de lot IMPOSÉ.
+    '''
+    ''' POURQUOI CETTE PORTE D'ENTRÉE EXISTE. La pièce des écarts de change porte sur la même
+    ''' journée que la pièce de compensation, et le numéro de lot est dérivé de la journée :
+    ''' les deux fichiers arriveraient donc au core banking SOUS LE MÊME NUMÉRO. Or ce numéro
+    ''' est précisément ce par quoi le core banking reconnaît qu'on lui présente deux fois le
+    ''' même lot — le second serait rejeté comme doublon, ou pire, fondu dans le premier.
+    '''
+    ''' L'appelant qui impose un lot doit donc en garantir l'unicité. Pour le change, c'est
+    ''' NumeroDeLotDeChange qui s'en charge.
+    ''' </summary>
+    Public Shared Function ConstruireSousLot(dtPiece As DataTable, numeroLotImpose As String,
+                                             dateValeur As Date,
+                                             ByRef messageErreur As String) As DataTable
+
         messageErreur = String.Empty
+
+        If String.IsNullOrWhiteSpace(numeroLotImpose) Then
+            messageErreur = "Aucun numéro de lot : le fichier ne peut pas être produit."
+            Return Nothing
+        End If
 
         If dtPiece Is Nothing OrElse dtPiece.Rows.Count = 0 Then
             messageErreur = "La pièce comptable est vide : il n'y a rien à charger."
@@ -89,7 +157,7 @@ Public NotInheritable Class CoreBankingService
         If Not ControlerEquilibre(dtPiece, messageErreur) Then Return Nothing
         If Not ControlerLesNarratifs(dtPiece, messageErreur) Then Return Nothing
 
-        Dim numeroLot As String = NumeroDeLot(dateActivite)
+        Dim numeroLot As String = numeroLotImpose.Trim()
         Dim table As DataTable = TableVide()
 
         For Each ligne As DataRow In dtPiece.Rows
@@ -242,6 +310,16 @@ Public NotInheritable Class CoreBankingService
     Public Shared Function NomDeFichier(dateActivite As Date) As String
 
         Return $"WU_CORE_{dateActivite:yyyyMMdd}_{NumeroDeLot(dateActivite)}.xlsx"
+    End Function
+
+    ''' <summary>
+    ''' Nom proposé pour le fichier des ÉCARTS DE CHANGE. Il porte CHANGE dans son nom et le
+    ''' lot de change dans son suffixe : deux fichiers retrouvés dans le même dossier ne
+    ''' peuvent pas être confondus, ni l'un chargé à la place de l'autre.
+    ''' </summary>
+    Public Shared Function NomDeFichierDeChange(dateActivite As Date) As String
+
+        Return $"WU_CHANGE_CORE_{dateActivite:yyyyMMdd}_{NumeroDeLotDeChange(dateActivite)}.xlsx"
     End Function
 
 #End Region

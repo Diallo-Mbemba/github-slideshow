@@ -120,7 +120,17 @@ Public Class FrmEcartsChange
 
         btnAfficher.Enabled = _rapport IsNot Nothing
         btnPiece.Enabled = _resultat IsNot Nothing AndAlso _resultat.Ecarts.Count > 0
-        btnExporter.Enabled = _pieces IsNot Nothing AndAlso _pieces.Count > 0
+
+        Dim piecesPretes As Boolean = _pieces IsNot Nothing AndAlso _pieces.Count > 0
+
+        btnExporter.Enabled = piecesPretes
+        cboPiece.Enabled = piecesPretes
+
+        ' LE FICHIER CORE BANKING EXIGE L'ÉQUILIBRE DE TOUTES LES PIÈCES, et pas seulement de
+        ' celle qu'on regarde : il couvre la journée entière. CoreBankingService le revérifie
+        ' de son côté — ce fichier impacte des comptes réels, le contrôle est au dernier verrou.
+        btnCoreBanking.Enabled = piecesPretes AndAlso
+                                 _pieces.Where(Function(p) Not p.EstEquilibree).Count() = 0
 
         ' CONSERVER EXIGE TROIS CHOSES À LA FOIS : une pièce, le droit de traiter la compense,
         ' et des pièces toutes équilibrées. Les trois sont vérifiées ici, et de nouveau par le
@@ -215,6 +225,7 @@ Public Class FrmEcartsChange
 
         dgvEcarts.DataSource = Nothing
         dgvPiece.DataSource = Nothing
+        cboPiece.Items.Clear()
         txtSynthese.Text = String.Empty
         lblTotaux.Text = "Aucune pièce produite."
     End Sub
@@ -240,6 +251,7 @@ Public Class FrmEcartsChange
 
         _pieces = Nothing
         dgvPiece.DataSource = Nothing
+        cboPiece.Items.Clear()
         lblTotaux.Text = "Calcul effectué. Cliquez sur « Produire la pièce »."
 
         RemplirLeDetail()
@@ -341,20 +353,107 @@ Public Class FrmEcartsChange
         Return False
     End Function
 
+    ''' <summary>
+    ''' Remplit la liste des pièces produites, et affiche la première.
+    '''
+    ''' UNE PIÈCE À LA FOIS, ET C'EST CE QUE LA BANQUE A DEMANDÉ. Afficher toutes les pièces
+    ''' bout à bout dans une seule grille obligeait à ajouter des colonnes pour dire de
+    ''' quelle pièce chaque ligne venait — journée, sens, produit — c'est-à-dire exactement
+    ''' les colonnes dont une pièce comptable ne doit pas s'encombrer. Une pièce se choisit
+    ''' donc, et ne montre que ses quatre colonnes.
+    ''' </summary>
     Private Sub RemplirLaPiece()
 
-        dgvPiece.DataSource = PieceChangeService.ConsoliderLesLignes(_pieces)
+        cboPiece.Items.Clear()
+
+        For Each piece As PieceChangeWU In _pieces
+            cboPiece.Items.Add(LibelleDuChoix(piece))
+        Next
+
+        ' L'affectation déclenche SelectedIndexChanged, donc l'affichage de la pièce.
+        If cboPiece.Items.Count > 0 Then cboPiece.SelectedIndex = 0
+    End Sub
+
+    ''' <summary>
+    ''' Ce que la liste des pièces affiche : de quoi reconnaître une pièce sans l'ouvrir.
+    ''' </summary>
+    Private Shared Function LibelleDuChoix(piece As PieceChangeWU) As String
+
+        Dim fr As Globalization.CultureInfo = Globalization.CultureInfo.GetCultureInfo("fr-FR")
+
+        Dim qualificatifs As New List(Of String)
+        If piece.Sens.Length > 0 Then qualificatifs.Add(PieceChangeService.LibelleDuSens(piece.Sens))
+        If piece.CodeProduit.Length > 0 Then qualificatifs.Add(piece.CodeProduit)
+
+        Dim precision As String = If(qualificatifs.Count = 0,
+                                     String.Empty,
+                                     " " & String.Join(" ", qualificatifs))
+
+        Return $"{piece.DateReglement:dd/MM/yyyy}{precision} — {piece.NombreTransactions} trx — " &
+               $"net {piece.Net.ToString("N0", fr)} {ConstantesWU.DEVISE_FCFA}"
+    End Function
+
+    ''' <summary>La pièce choisie dans la liste, ou Nothing.</summary>
+    Private Function PieceChoisie() As PieceChangeWU
+
+        If _pieces Is Nothing Then Return Nothing
+        If cboPiece.SelectedIndex < 0 OrElse cboPiece.SelectedIndex >= _pieces.Count Then Return Nothing
+
+        Return _pieces(cboPiece.SelectedIndex)
+    End Function
+
+    Private Sub cboPiece_SelectedIndexChanged(sender As Object, e As EventArgs) _
+        Handles cboPiece.SelectedIndexChanged
+
+        AfficherLaPieceChoisie()
+    End Sub
+
+    ''' <summary>
+    ''' Affiche la pièce choisie : QUATRE COLONNES, et rien d'autre.
+    '''
+    ''' CodeAgence reste dans les données et disparaît de l'écran. Elle n'est pas décorative —
+    ''' c'est elle qui aiguille chaque écriture vers son agence dans le fichier core banking —
+    ''' mais elle n'a rien à faire sur une pièce que lit un comptable. La pièce principale la
+    ''' masque de la même façon, au même endroit de son code.
+    ''' </summary>
+    Private Sub AfficherLaPieceChoisie()
+
+        Dim piece As PieceChangeWU = PieceChoisie()
+
+        If piece Is Nothing OrElse piece.Lignes Is Nothing Then
+            dgvPiece.DataSource = Nothing
+            lblTotaux.Text = "Aucune pièce produite."
+            Return
+        End If
+
+        dgvPiece.DataSource = piece.Lignes
 
         If dgvPiece.Columns.Count > 0 Then
 
             dgvPiece.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
 
+            If dgvPiece.Columns.Contains("CodeAgence") Then
+                dgvPiece.Columns("CodeAgence").Visible = False
+            End If
+
             AlignerUnMontant(dgvPiece, "Debit", "N0")
             AlignerUnMontant(dgvPiece, "Credit", "N0")
 
-            GrilleWU.LargeurFixe(dgvPiece, "Compte", 120)
-            GrilleWU.LargeurFixe(dgvPiece, "CodeAgence", 90)
+            GrilleWU.LargeurFixe(dgvPiece, "Compte", 140)
         End If
+
+        AfficherLesTotaux(piece)
+    End Sub
+
+    ''' <summary>
+    ''' Les totaux de la pièce affichée, puis ceux de l'ensemble.
+    '''
+    ''' LES DEUX SONT NÉCESSAIRES, et pour deux lectures différentes : la pièce qu'on passe
+    ''' au journal, et le rapport qu'on rapproche du calcul. N'afficher que la première
+    ''' laisserait croire, sur un rapport de trois journées, que le gain de change du jour est
+    ''' le gain de change du rapport.
+    ''' </summary>
+    Private Sub AfficherLesTotaux(piece As PieceChangeWU)
 
         Dim fr As Globalization.CultureInfo = Globalization.CultureInfo.GetCultureInfo("fr-FR")
 
@@ -369,9 +468,12 @@ Public Class FrmEcartsChange
                                    $"{desequilibrees} PIÈCE(S) DÉSÉQUILIBRÉE(S)")
 
         lblTotaux.Text =
-            $"{_pieces.Count} pièce(s), {dgvPiece.Rows.Count} écritures — " &
-            $"gains {gains.ToString("N0", fr)}, pertes {pertes.ToString("N0", fr)} — " &
-            $"débits {debits.ToString("N0", fr)}, crédits {credits.ToString("N0", fr)} ({verdict})."
+            $"Cette pièce : {piece.Lignes.Rows.Count} écritures, " &
+            $"débit {piece.TotalDebit.ToString("N0", fr)} = crédit {piece.TotalCredit.ToString("N0", fr)} " &
+            $"{ConstantesWU.DEVISE_FCFA}." & Environment.NewLine &
+            $"Les {_pieces.Count} pièce(s) : gains {gains.ToString("N0", fr)}, " &
+            $"pertes {pertes.ToString("N0", fr)}, débits {debits.ToString("N0", fr)}, " &
+            $"crédits {credits.ToString("N0", fr)} ({verdict})."
 
         lblTotaux.ForeColor = If(desequilibrees = 0,
                                  Drawing.SystemColors.ControlText,
@@ -460,25 +562,36 @@ Public Class FrmEcartsChange
 
 #End Region
 
-#Region "Export"
+#Region "Export de la pièce"
 
+    ''' <summary>
+    ''' Exporte LA PIÈCE AFFICHÉE, et ses quatre colonnes.
+    '''
+    ''' QUATRE COLONNES, PAS DIX. La première version du classeur portait aussi la clé de la
+    ''' pièce, la journée, le sens, le code produit, le nombre de transactions et le code
+    ''' agence : nécessaire pour distinguer les pièces d'un classeur qui les contenait toutes,
+    ''' inutile dès lors qu'on en exporte UNE. Une pièce comptable a quatre colonnes — compte,
+    ''' libellé, débit, crédit — et tout le reste est du contexte, qui appartient au nom du
+    ''' fichier et à l'en-tête, pas aux écritures.
+    ''' </summary>
     Private Sub btnExporter_Click(sender As Object, e As EventArgs) Handles btnExporter.Click
 
-        If _pieces Is Nothing OrElse _pieces.Count = 0 Then Return
+        Dim piece As PieceChangeWU = PieceChoisie()
+        If piece Is Nothing Then Return
 
-        sfdExport.FileName = $"Piece_change_{_pieces(0).DateReglement:yyyyMMdd}.xlsx"
+        sfdExport.FileName = NomDuClasseur(piece)
 
         If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
 
-        Dim table As DataTable = TableExportable()
+        Dim table As DataTable = TableDeLaPiece(piece)
 
         Cursor = Cursors.WaitCursor
         Try
             ' Debit et Credit sont déclarés NUMÉRIQUES : sans cela Excel les écrirait en texte
-            ' et la somme de contrôle du comptable rendrait zéro. Compte et CodeAgence restent
-            ' du TEXTE, faute de quoi un compte perdrait ses zéros de tête.
+            ' et la somme de contrôle du comptable rendrait zéro. Compte reste du TEXTE, faute
+            ' de quoi un numéro de compte perdrait ses zéros de tête.
             ExcelExportService.ExporterTableBrute(table,
-                                                  New String() {"Debit", "Credit", "NombreTransactions"},
+                                                  New String() {"Debit", "Credit"},
                                                   "Pièce de change",
                                                   sfdExport.FileName,
                                                   True)
@@ -491,15 +604,7 @@ Public Class FrmEcartsChange
                             MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
         Catch ex As System.Runtime.InteropServices.COMException
-            ' Excel absent du poste, ou refusant de démarrer. Le message d'Interop est
-            ' illisible pour un agent : on le remplace par ce qu'il doit faire.
-            MessageBox.Show(Me,
-                            "Microsoft Excel n'a pas pu être démarré sur ce poste." & Environment.NewLine &
-                            Environment.NewLine &
-                            "La pièce reste consultable à l'écran, et la synthèse se copie depuis " &
-                            "l'onglet « Synthèse »." & Environment.NewLine & Environment.NewLine &
-                            $"Détail technique : {ex.Message}",
-                            "Export impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AvertirDExcel(ex)
 
         Finally
             Cursor = Cursors.Default
@@ -507,51 +612,151 @@ Public Class FrmEcartsChange
     End Sub
 
     ''' <summary>
-    ''' La table exportée : les écritures, précédées des colonnes qui disent de quelle pièce
-    ''' chacune vient. La grille les masque — elle n'affiche qu'une pièce à la fois dans
-    ''' l'esprit du lecteur — mais un classeur qui les perdrait serait inexploitable dès qu'il
-    ''' porte plus d'une pièce.
+    ''' Les quatre colonnes de la pièce : compte, libellé, débit, crédit.
+    '''
+    ''' CodeAgence n'y est pas. Elle reste dans les données de la pièce, où le fichier core
+    ''' banking la lit pour aiguiller chaque écriture, mais elle n'a rien à faire sur le
+    ''' document que lit un comptable.
     ''' </summary>
-    Private Function TableExportable() As DataTable
+    Private Shared Function TableDeLaPiece(piece As PieceChangeWU) As DataTable
 
         Dim table As New DataTable("PieceChange")
 
-        table.Columns.Add("Piece", GetType(String))
-        table.Columns.Add("DateReglement", GetType(String))
-        table.Columns.Add("Sens", GetType(String))
-        table.Columns.Add("CodeProduit", GetType(String))
-        table.Columns.Add("NombreTransactions", GetType(Integer))
         table.Columns.Add("Compte", GetType(String))
         table.Columns.Add("Libelle", GetType(String))
         table.Columns.Add("Debit", GetType(Long))
         table.Columns.Add("Credit", GetType(Long))
-        table.Columns.Add("CodeAgence", GetType(String))
 
-        For Each piece As PieceChangeWU In _pieces
+        If piece.Lignes Is Nothing Then Return table
 
-            If piece.Lignes Is Nothing Then Continue For
+        For Each ecriture As DataRow In piece.Lignes.Rows
 
-            For Each ecriture As DataRow In piece.Lignes.Rows
-
-                Dim row As DataRow = table.NewRow()
-
-                row("Piece") = piece.CleGroupe
-                row("DateReglement") = piece.DateReglement.ToString("dd/MM/yyyy")
-                row("Sens") = piece.Sens
-                row("CodeProduit") = piece.CodeProduit
-                row("NombreTransactions") = piece.NombreTransactions
-                row("Compte") = Convert.ToString(ecriture("Compte"))
-                row("Libelle") = Convert.ToString(ecriture("Libelle"))
-                row("Debit") = Convert.ToInt64(ecriture("Debit"))
-                row("Credit") = Convert.ToInt64(ecriture("Credit"))
-                row("CodeAgence") = Convert.ToString(ecriture("CodeAgence"))
-
-                table.Rows.Add(row)
-            Next
+            table.Rows.Add(Convert.ToString(ecriture("Compte")),
+                           Convert.ToString(ecriture("Libelle")),
+                           Convert.ToInt64(ecriture("Debit")),
+                           Convert.ToInt64(ecriture("Credit")))
         Next
 
         Return table
     End Function
+
+    ''' <summary>
+    ''' Nom proposé pour le classeur. Il porte ce que les colonnes ne portent plus : la
+    ''' journée, et le sens et le produit quand le découpage les distingue.
+    ''' </summary>
+    Private Shared Function NomDuClasseur(piece As PieceChangeWU) As String
+
+        Dim morceaux As New List(Of String)
+        morceaux.Add("Piece_change")
+        morceaux.Add(piece.DateReglement.ToString("yyyyMMdd"))
+
+        If piece.Sens.Length > 0 Then morceaux.Add(piece.Sens)
+        If piece.CodeProduit.Length > 0 Then morceaux.Add(piece.CodeProduit)
+
+        Return String.Join("_", morceaux) & ".xlsx"
+    End Function
+
+#End Region
+
+#Region "Fichier core banking des écarts de change"
+
+    ''' <summary>
+    ''' Produit le fichier d'interface core banking des écarts de change.
+    '''
+    ''' IL EST SÉPARÉ DE CELUI DE LA COMPENSATION, ET SOUS SON PROPRE NUMÉRO DE LOT. Le
+    ''' numéro de lot est dérivé de la journée : les deux fichiers d'un même jour seraient
+    ''' arrivés sous le même numéro, et le core banking n'a que ce numéro pour reconnaître un
+    ''' lot déjà chargé — il aurait rejeté le second comme doublon du premier. Le lot de change
+    ''' porte donc la lettre « c » : « c7ob » là où la compensation du 27/03/2026 donne
+    ''' « 07ob ». Voir CoreBankingService.NumeroDeLotDeChange.
+    '''
+    ''' LE FICHIER COUVRE UNE JOURNÉE, ET NON UNE PIÈCE. Un lot du core banking est une
+    ''' journée ; si le découpage produit plusieurs pièces pour le 27/03 — par sens, par
+    ''' produit — elles appartiennent toutes au même lot et au même fichier. Le fichier
+    ''' reprend donc TOUTES les pièces de change de la journée de la pièce affichée.
+    '''
+    ''' LA DATE DE VALEUR EST LA JOURNÉE DE RÈGLEMENT, et non le jour de la production. Un
+    ''' même fichier réexporté la semaine suivante doit être identique au premier : avec la
+    ''' date du jour, il aurait porté le même numéro de lot et un contenu différent, ce qui
+    ''' est exactement ce qu'un contrôle de doublon ne sait pas démêler.
+    ''' </summary>
+    Private Sub btnCoreBanking_Click(sender As Object, e As EventArgs) Handles btnCoreBanking.Click
+
+        Dim piece As PieceChangeWU = PieceChoisie()
+        If piece Is Nothing Then Return
+
+        Dim journee As Date = piece.DateReglement.Date
+
+        Dim duJour As List(Of PieceChangeWU) =
+            _pieces.Where(Function(p) p.DateReglement.Date = journee).ToList()
+
+        Dim lot As String = CoreBankingService.NumeroDeLotDeChange(journee)
+
+        Dim messageErreur As String = String.Empty
+
+        Dim fichier As DataTable = CoreBankingService.ConstruireSousLot(
+            PieceChangeService.ConsoliderLesLignes(duJour), lot, journee, messageErreur)
+
+        If fichier Is Nothing Then
+            MessageBox.Show(Me, messageErreur, "Fichier core banking impossible",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim reponse As DialogResult = MessageBox.Show(Me,
+            $"Produire le fichier core banking des écarts de change du {journee:dd/MM/yyyy} ?" &
+            Environment.NewLine & Environment.NewLine &
+            $"    pièces de la journée .... {duJour.Count}" & Environment.NewLine &
+            $"    lignes du fichier ....... {fichier.Rows.Count}" & Environment.NewLine &
+            $"    numéro de lot ........... {lot}" & Environment.NewLine &
+            $"    date de valeur .......... {journee:dd/MM/yyyy}" & Environment.NewLine & Environment.NewLine &
+            "Ce lot est distinct de celui de la compensation de la même journée : les deux " &
+            "fichiers se chargent l'un après l'autre sans se confondre.",
+            "Fichier core banking des écarts de change", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If reponse <> DialogResult.Yes Then Return
+
+        sfdExport.FileName = CoreBankingService.NomDeFichierDeChange(journee)
+        If sfdExport.ShowDialog(Me) <> DialogResult.OK Then Return
+
+        Cursor = Cursors.WaitCursor
+        Try
+            ' Seul AMOUNT est écrit en nombre : tout le reste est du texte, sans quoi Excel
+            ' réinterpréterait les numéros de compte et le numéro de lot — « c7ob » resterait
+            ' du texte quand un lot tout en chiffres deviendrait un nombre.
+            ExcelExportService.ExporterTableBrute(fichier, New String() {"AMOUNT"},
+                                                  "CoreBanking", sfdExport.FileName, True)
+
+            lblStatut.ForeColor = Drawing.SystemColors.ControlText
+            lblStatut.Text = $"Fichier core banking produit : {IO.Path.GetFileName(sfdExport.FileName)} " &
+                             $"— lot {lot}, {fichier.Rows.Count} lignes."
+
+        Catch ex As InvalidOperationException
+            MessageBox.Show(Me, ex.Message, "Production impossible",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+        Catch ex As System.Runtime.InteropServices.COMException
+            AvertirDExcel(ex)
+
+        Finally
+            Cursor = Cursors.Default
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Excel absent du poste, ou refusant de démarrer. Le message d'Interop est illisible
+    ''' pour un agent : on le remplace par ce qu'il doit faire.
+    ''' </summary>
+    Private Sub AvertirDExcel(ex As System.Runtime.InteropServices.COMException)
+
+        MessageBox.Show(Me,
+                        "Microsoft Excel n'a pas pu être démarré sur ce poste." & Environment.NewLine &
+                        Environment.NewLine &
+                        "La pièce reste consultable à l'écran, et la synthèse se copie depuis " &
+                        "l'onglet « Synthèse »." & Environment.NewLine & Environment.NewLine &
+                        $"Détail technique : {ex.Message}",
+                        "Export impossible", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+    End Sub
 
 #End Region
 

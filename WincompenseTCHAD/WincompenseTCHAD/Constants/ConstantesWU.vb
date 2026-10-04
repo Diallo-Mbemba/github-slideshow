@@ -554,6 +554,15 @@ Public NotInheritable Class ConstantesWU
     ''' <summary>Longueur du numéro de lot, en caractères.</summary>
     Public Const CB_LONGUEUR_LOT As Integer = 4
 
+    ''' <summary>
+    ''' Première lettre du numéro de lot de la pièce des ÉCARTS DE CHANGE.
+    '''
+    ''' Elle met ce lot dans un espace distinct de celui de la compensation, qui porte sur la
+    ''' MÊME journée et produirait sans cela le même numéro. Voir
+    ''' CoreBankingService.NumeroDeLotDeChange, qui démontre qu'aucune collision n'est possible.
+    ''' </summary>
+    Public Const CB_LOT_PREFIXE_CHANGE As String = "c"
+
 #End Region
 
 End Class

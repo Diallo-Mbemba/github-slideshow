@@ -174,7 +174,8 @@ Public NotInheritable Class PieceChangeService
         Return $"{String.Join(" ", morceaux)} - {MENTION} - {jour:dd/MM/yyyy} - {nombreTransactions} trx"
     End Function
 
-    Private Shared Function LibelleDuSens(sens As String) As String
+    ''' <summary>Le sens, écrit pour l'écran : Envoi, Paiement, ou rien.</summary>
+    Public Shared Function LibelleDuSens(sens As String) As String
 
         Select Case If(sens, String.Empty).Trim().ToUpperInvariant()
             Case ConstantesWU.SENS_ENVOI : Return "Envoi"

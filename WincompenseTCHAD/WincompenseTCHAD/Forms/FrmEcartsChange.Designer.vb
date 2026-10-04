@@ -35,6 +35,9 @@ Partial Class FrmEcartsChange
         Me.dgvPiece = New System.Windows.Forms.DataGridView()
         Me.panelTotaux = New System.Windows.Forms.Panel()
         Me.lblTotaux = New System.Windows.Forms.Label()
+        Me.panelChoix = New System.Windows.Forms.Panel()
+        Me.lblPieceChoisie = New System.Windows.Forms.Label()
+        Me.cboPiece = New System.Windows.Forms.ComboBox()
         Me.pageDetail = New System.Windows.Forms.TabPage()
         Me.dgvEcarts = New System.Windows.Forms.DataGridView()
         Me.pageSynthese = New System.Windows.Forms.TabPage()
@@ -42,6 +45,7 @@ Partial Class FrmEcartsChange
         Me.lblStatut = New System.Windows.Forms.Label()
         Me.btnExporter = New System.Windows.Forms.Button()
         Me.btnEnregistrer = New System.Windows.Forms.Button()
+        Me.btnCoreBanking = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
         Me.ofdRapport = New System.Windows.Forms.OpenFileDialog()
         Me.sfdExport = New System.Windows.Forms.SaveFileDialog()
@@ -51,6 +55,7 @@ Partial Class FrmEcartsChange
         Me.pagePiece.SuspendLayout()
         CType(Me.dgvPiece, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.panelTotaux.SuspendLayout()
+        Me.panelChoix.SuspendLayout()
         Me.pageDetail.SuspendLayout()
         CType(Me.dgvEcarts, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.pageSynthese.SuspendLayout()
@@ -175,17 +180,18 @@ Partial Class FrmEcartsChange
         Me.onglets.Location = New System.Drawing.Point(12, 184)
         Me.onglets.Name = "onglets"
         Me.onglets.SelectedIndex = 0
-        Me.onglets.Size = New System.Drawing.Size(1000, 388)
+        Me.onglets.Size = New System.Drawing.Size(1000, 368)
         Me.onglets.TabIndex = 2
         '
         'pagePiece
         '
         Me.pagePiece.Controls.Add(Me.dgvPiece)
         Me.pagePiece.Controls.Add(Me.panelTotaux)
+        Me.pagePiece.Controls.Add(Me.panelChoix)
         Me.pagePiece.Location = New System.Drawing.Point(4, 22)
         Me.pagePiece.Name = "pagePiece"
         Me.pagePiece.Padding = New System.Windows.Forms.Padding(6)
-        Me.pagePiece.Size = New System.Drawing.Size(992, 362)
+        Me.pagePiece.Size = New System.Drawing.Size(992, 342)
         Me.pagePiece.TabIndex = 0
         Me.pagePiece.Text = "Pièce comptable"
         Me.pagePiece.UseVisualStyleBackColor = True
@@ -202,14 +208,14 @@ Partial Class FrmEcartsChange
         Me.dgvPiece.ReadOnly = True
         Me.dgvPiece.RowHeadersWidth = 25
         Me.dgvPiece.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
-        Me.dgvPiece.Size = New System.Drawing.Size(980, 312)
+        Me.dgvPiece.Size = New System.Drawing.Size(980, 258)
         Me.dgvPiece.TabIndex = 1
         '
         'panelTotaux
         '
         Me.panelTotaux.Controls.Add(Me.lblTotaux)
         Me.panelTotaux.Dock = System.Windows.Forms.DockStyle.Bottom
-        Me.panelTotaux.Location = New System.Drawing.Point(6, 318)
+        Me.panelTotaux.Location = New System.Drawing.Point(6, 298)
         Me.panelTotaux.Name = "panelTotaux"
         Me.panelTotaux.Size = New System.Drawing.Size(980, 38)
         Me.panelTotaux.TabIndex = 0
@@ -225,13 +231,43 @@ Partial Class FrmEcartsChange
         Me.lblTotaux.Text = "Aucune pièce produite."
         Me.lblTotaux.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         '
+        'panelChoix
+        '
+        Me.panelChoix.Controls.Add(Me.lblPieceChoisie)
+        Me.panelChoix.Controls.Add(Me.cboPiece)
+        Me.panelChoix.Dock = System.Windows.Forms.DockStyle.Top
+        Me.panelChoix.Location = New System.Drawing.Point(6, 6)
+        Me.panelChoix.Name = "panelChoix"
+        Me.panelChoix.Size = New System.Drawing.Size(980, 34)
+        Me.panelChoix.TabIndex = 0
+        '
+        'lblPieceChoisie
+        '
+        Me.lblPieceChoisie.Location = New System.Drawing.Point(0, 7)
+        Me.lblPieceChoisie.Name = "lblPieceChoisie"
+        Me.lblPieceChoisie.Size = New System.Drawing.Size(42, 18)
+        Me.lblPieceChoisie.TabIndex = 0
+        Me.lblPieceChoisie.Text = "Pièce"
+        '
+        'cboPiece
+        '
+        ' La pièce affichée se choisit : UNE pièce comptable à la fois, et ses quatre colonnes.
+        ' Les afficher toutes bout à bout aurait exigé des colonnes supplémentaires pour dire
+        ' de quelle pièce chaque ligne vient — exactement les colonnes dont la banque ne veut
+        ' pas sur une pièce.
+        Me.cboPiece.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
+        Me.cboPiece.Location = New System.Drawing.Point(48, 4)
+        Me.cboPiece.Name = "cboPiece"
+        Me.cboPiece.Size = New System.Drawing.Size(560, 24)
+        Me.cboPiece.TabIndex = 1
+        '
         'pageDetail
         '
         Me.pageDetail.Controls.Add(Me.dgvEcarts)
         Me.pageDetail.Location = New System.Drawing.Point(4, 22)
         Me.pageDetail.Name = "pageDetail"
         Me.pageDetail.Padding = New System.Windows.Forms.Padding(6)
-        Me.pageDetail.Size = New System.Drawing.Size(992, 362)
+        Me.pageDetail.Size = New System.Drawing.Size(992, 342)
         Me.pageDetail.TabIndex = 1
         Me.pageDetail.Text = "Détail des transactions"
         Me.pageDetail.UseVisualStyleBackColor = True
@@ -248,7 +284,7 @@ Partial Class FrmEcartsChange
         Me.dgvEcarts.ReadOnly = True
         Me.dgvEcarts.RowHeadersWidth = 25
         Me.dgvEcarts.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
-        Me.dgvEcarts.Size = New System.Drawing.Size(980, 350)
+        Me.dgvEcarts.Size = New System.Drawing.Size(980, 330)
         Me.dgvEcarts.TabIndex = 0
         '
         'pageSynthese
@@ -257,7 +293,7 @@ Partial Class FrmEcartsChange
         Me.pageSynthese.Location = New System.Drawing.Point(4, 22)
         Me.pageSynthese.Name = "pageSynthese"
         Me.pageSynthese.Padding = New System.Windows.Forms.Padding(6)
-        Me.pageSynthese.Size = New System.Drawing.Size(992, 362)
+        Me.pageSynthese.Size = New System.Drawing.Size(992, 342)
         Me.pageSynthese.TabIndex = 2
         Me.pageSynthese.Text = "Synthèse"
         Me.pageSynthese.UseVisualStyleBackColor = True
@@ -272,7 +308,7 @@ Partial Class FrmEcartsChange
         Me.txtSynthese.Name = "txtSynthese"
         Me.txtSynthese.ReadOnly = True
         Me.txtSynthese.ScrollBars = System.Windows.Forms.ScrollBars.Both
-        Me.txtSynthese.Size = New System.Drawing.Size(980, 350)
+        Me.txtSynthese.Size = New System.Drawing.Size(980, 330)
         Me.txtSynthese.TabIndex = 0
         Me.txtSynthese.WordWrap = False
         '
@@ -280,18 +316,18 @@ Partial Class FrmEcartsChange
         '
         Me.lblStatut.Anchor = CType(((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.lblStatut.Location = New System.Drawing.Point(12, 584)
+        Me.lblStatut.Location = New System.Drawing.Point(12, 558)
         Me.lblStatut.Name = "lblStatut"
-        Me.lblStatut.Size = New System.Drawing.Size(534, 48)
+        Me.lblStatut.Size = New System.Drawing.Size(1000, 48)
         Me.lblStatut.TabIndex = 3
         Me.lblStatut.Text = "Chargez un rapport de règlement, puis calculez."
         '
         'btnExporter
         '
         Me.btnExporter.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.btnExporter.Location = New System.Drawing.Point(562, 590)
+        Me.btnExporter.Location = New System.Drawing.Point(490, 614)
         Me.btnExporter.Name = "btnExporter"
-        Me.btnExporter.Size = New System.Drawing.Size(150, 32)
+        Me.btnExporter.Size = New System.Drawing.Size(114, 32)
         Me.btnExporter.TabIndex = 4
         Me.btnExporter.Text = "Exporter"
         Me.btnExporter.UseVisualStyleBackColor = True
@@ -299,20 +335,30 @@ Partial Class FrmEcartsChange
         'btnEnregistrer
         '
         Me.btnEnregistrer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.btnEnregistrer.Location = New System.Drawing.Point(722, 590)
+        Me.btnEnregistrer.Location = New System.Drawing.Point(608, 614)
         Me.btnEnregistrer.Name = "btnEnregistrer"
-        Me.btnEnregistrer.Size = New System.Drawing.Size(170, 32)
+        Me.btnEnregistrer.Size = New System.Drawing.Size(150, 32)
         Me.btnEnregistrer.TabIndex = 5
-        Me.btnEnregistrer.Text = "Conserver la pièce"
+        Me.btnEnregistrer.Text = "Conserver"
         Me.btnEnregistrer.UseVisualStyleBackColor = True
+        '
+        'btnCoreBanking
+        '
+        Me.btnCoreBanking.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.btnCoreBanking.Location = New System.Drawing.Point(762, 614)
+        Me.btnCoreBanking.Name = "btnCoreBanking"
+        Me.btnCoreBanking.Size = New System.Drawing.Size(146, 32)
+        Me.btnCoreBanking.TabIndex = 6
+        Me.btnCoreBanking.Text = "Core banking"
+        Me.btnCoreBanking.UseVisualStyleBackColor = True
         '
         'btnFermer
         '
         Me.btnFermer.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.btnFermer.Location = New System.Drawing.Point(902, 590)
+        Me.btnFermer.Location = New System.Drawing.Point(912, 614)
         Me.btnFermer.Name = "btnFermer"
-        Me.btnFermer.Size = New System.Drawing.Size(110, 32)
-        Me.btnFermer.TabIndex = 6
+        Me.btnFermer.Size = New System.Drawing.Size(100, 32)
+        Me.btnFermer.TabIndex = 7
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
@@ -332,8 +378,9 @@ Partial Class FrmEcartsChange
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(1024, 640)
+        Me.ClientSize = New System.Drawing.Size(1024, 672)
         Me.Controls.Add(Me.btnFermer)
+        Me.Controls.Add(Me.btnCoreBanking)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.btnExporter)
         Me.Controls.Add(Me.lblStatut)
@@ -341,7 +388,7 @@ Partial Class FrmEcartsChange
         Me.Controls.Add(Me.grpSource)
         Me.Controls.Add(Me.panelTitre)
         Me.Font = New System.Drawing.Font("Segoe UI", 9.0!)
-        Me.MinimumSize = New System.Drawing.Size(920, 580)
+        Me.MinimumSize = New System.Drawing.Size(940, 620)
         Me.Name = "FrmEcartsChange"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
         Me.Text = "Écarts de change — pièce comptable"
@@ -351,6 +398,7 @@ Partial Class FrmEcartsChange
         Me.pagePiece.ResumeLayout(False)
         CType(Me.dgvPiece, System.ComponentModel.ISupportInitialize).EndInit()
         Me.panelTotaux.ResumeLayout(False)
+        Me.panelChoix.ResumeLayout(False)
         Me.pageDetail.ResumeLayout(False)
         CType(Me.dgvEcarts, System.ComponentModel.ISupportInitialize).EndInit()
         Me.pageSynthese.ResumeLayout(False)
@@ -380,6 +428,10 @@ Partial Class FrmEcartsChange
     Friend WithEvents lblStatut As System.Windows.Forms.Label
     Friend WithEvents btnExporter As System.Windows.Forms.Button
     Friend WithEvents btnEnregistrer As System.Windows.Forms.Button
+    Friend WithEvents panelChoix As System.Windows.Forms.Panel
+    Friend WithEvents lblPieceChoisie As System.Windows.Forms.Label
+    Friend WithEvents cboPiece As System.Windows.Forms.ComboBox
+    Friend WithEvents btnCoreBanking As System.Windows.Forms.Button
     Friend WithEvents btnFermer As System.Windows.Forms.Button
     Friend WithEvents ofdRapport As System.Windows.Forms.OpenFileDialog
     Friend WithEvents sfdExport As System.Windows.Forms.SaveFileDialog
