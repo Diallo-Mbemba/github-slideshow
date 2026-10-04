@@ -184,8 +184,11 @@ Public Class FrmCompensationWU
             entete.TotalDebit += debit
             entete.TotalCredit += credit
 
+            ' LE LIBELLÉ EST DEMANDÉ À CELUI QUI LE POSE, et non recopié depuis la constante :
+            ' il porte désormais le préfixe LD, et la constante seule ne lui correspond plus.
             If Not String.Equals(Convert.ToString(ligne("Libelle")),
-                                 ConstantesWU.LIB_ECART_ATTENTE, StringComparison.Ordinal) Then Continue For
+                                 PieceComptableService.LibelleEcartArrondi,
+                                 StringComparison.Ordinal) Then Continue For
 
             ' Signé : un écart au crédit et un écart au débit ne se compensent pas dans la
             ' tête de celui qui relit.

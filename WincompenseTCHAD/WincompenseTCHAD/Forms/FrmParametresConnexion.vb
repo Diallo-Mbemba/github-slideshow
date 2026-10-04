@@ -172,6 +172,7 @@ Public Class FrmParametresConnexion
         ' passé sur l'une et pas sur l'autre — sont relues à la première demande.
         OptionsWU.Oublier()
         WURepository.OublierLaStructure()
+        PieceRepository.OublierLaStructure()
 
         MessageBox.Show(
             "Le réglage vaut pour cette session seulement." & Environment.NewLine & Environment.NewLine &
