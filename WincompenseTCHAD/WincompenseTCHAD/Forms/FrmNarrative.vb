@@ -1,11 +1,12 @@
 Option Strict On
 Option Explicit On
 
+Imports System.Data
 Imports System.Windows.Forms
 
 ''' <summary>
-''' LA NARRATIVE COMPTABLE : l'écran où la banque écrit elle-même la phrase que portera chaque
-''' ligne de ses pièces, et que son core banking recevra dans la colonne ADDLTEXT.
+''' LA NARRATIVE COMPTABLE : l'écran où la banque écrit elle-même les libellés que porteront
+''' ses écritures, et que son core banking recevra dans la colonne ADDLTEXT.
 '''
 ''' POURQUOI CET ÉCRAN EXISTE
 '''
@@ -14,21 +15,31 @@ Imports System.Windows.Forms
 ''' postes de la banque — pour un texte qui n'entre dans aucun calcul. Ce qui se lit dans le
 ''' grand livre appartient à la Direction Comptable ; ce qui s'y calcule reste au code.
 '''
+''' DEUX PARAMÉTRAGES, ET UNE BASCULE ENTRE LES DEUX
+'''
+'''   — UN SEUL LIBELLÉ pour les douze lignes d'un point de vente. C'est la forme dictée par
+'''     la banque, et le mode par défaut : ce que chaque ligne EST se lit dans son numéro de
+'''     compte, ce qu'elle COUVRE se lit dans son libellé.
+'''   — UN LIBELLÉ PAR NATURE de mouvement, pour qui veut distinguer la TVA de la TTA et des
+'''     commissions dans son grand livre.
+'''
+''' BASCULER NE CHANGE RIEN TANT QUE RIEN N'EST SAISI. Les treize natures s'affichent avec le
+''' modèle qu'elles appliquent réellement — le modèle global pour douze d'entre elles — et
+''' seules celles que la banque modifie sont conservées. Une bascule qui réécrirait treize
+''' libellés d'un coup serait un piège : on ne découvre pas au grand livre ce qu'un bouton
+''' radio a décidé.
+'''
 ''' L'ÉCRAN NE SE CONTENTE PAS DE RECUEILLIR UNE SAISIE
 '''
 ''' Il la MESURE. Le core banking refuse un narratif de plus de cent cinquante caractères, et
 ''' l'application refuse alors de produire le fichier — un refus qui tomberait le matin de la
-''' compense, à l'heure où personne n'a le temps. L'aperçu est donc calculé sur le PIRE CAS
-''' RÉEL : le point de vente dont le nom est le plus long dans le référentiel, l'Account le
-''' plus long, le code agence le plus long, et la période la plus longue que l'application
-''' sache écrire. Ce qui est validé ici passera en production.
+''' compense. L'aperçu est donc calculé sur le PIRE CAS RÉEL : le point de vente dont le nom
+''' est le plus long dans le référentiel, l'Account le plus long, le code agence le plus long,
+''' et la période la plus longue que l'application sache écrire. Ce qui est validé ici passera
+''' en production, et chaque nature est mesurée séparément.
 '''
-''' CE QU'IL NE PERMET PAS DE FAIRE
-'''
-''' Saisir un repère que l'application ne connaît pas : il partirait au grand livre avec ses
-''' accolades. Saisir un modèle vide : douze écritures sans libellé partiraient sans que rien
-''' n'avertisse. Et il n'ouvre pas la saisie des majuscules — elles sont posées par le code,
-''' parce qu'une journée saisie en minuscules ne ressemblerait pas aux autres.
+''' ET IL GARDE TRACE. Le troisième onglet montre le journal : qui a changé quoi, quand, depuis
+''' quel poste, et ce qu'il y avait avant.
 ''' </summary>
 Public Class FrmNarrative
 
@@ -108,6 +119,49 @@ Public Class FrmNarrative
         If agence.Length > _pireCodeAgence.Length Then _pireCodeAgence = agence
     End Sub
 
+    ''' <summary>Le modèle rendu sur le pire cas du référentiel, tel qu'il partira au core banking.</summary>
+    Private Function RenduPireCas(modele As String) As String
+
+        Return ModeleNarrativeWU.Appliquer(modele, _pireDesignation, _pireAccount,
+                                           _pireCodeAgence, _pirePeriode)
+    End Function
+
+#End Region
+
+#Region "État de l'écran"
+
+    ''' <summary>
+    ''' Faux si T_NarrativeNatureWU est absente — script 23 non exécuté. Le mode « par nature »
+    ''' est alors proposé en lecture seule avec le script à lancer, plutôt que offert puis
+    ''' incapable de rien retenir.
+    ''' </summary>
+    Private _naturesDisponibles As Boolean = False
+
+    ''' <summary>Vrai si le journal est tenu : son absence n'empêche rien, elle se dit.</summary>
+    Private _journalDisponible As Boolean = False
+
+    ''' <summary>
+    ''' Les modèles effectifs au chargement, nature par nature. Ils servent à n'écrire que ce
+    ''' qui a CHANGÉ : réenregistrer treize natures identiques ferait treize transactions pour
+    ''' rien, et l'écran est ouvert pour changer une ligne, pas treize.
+    ''' </summary>
+    Private ReadOnly _naturesChargees As New Dictionary(Of NatureMouvementWU, String)
+
+    ''' <summary>
+    ''' Le modèle global tel qu'il était au chargement.
+    '''
+    ''' IL EST RETENU À PART, et non déduit de la nature « Mouvement » : celle-là peut être
+    ''' personnalisée, et servir de référence au modèle global ferait suivre les douze autres
+    ''' à une valeur qui n'est pas le global.
+    ''' </summary>
+    Private _modeleGlobalCharge As String = String.Empty
+
+    ''' <summary>
+    ''' Vrai pendant le chargement de la grille et des boutons radio, pour que leurs événements
+    ''' ne déclenchent pas d'aperçu sur un écran encore à moitié rempli.
+    ''' </summary>
+    Private _enChargement As Boolean = False
+
 #End Region
 
 #Region "Ouverture"
@@ -117,8 +171,8 @@ Public Class FrmNarrative
         If Not SessionWU.PeutGererLesComptesSystemes Then
             MessageBox.Show("La narrative comptable est réservée à l'administrateur." &
                             Environment.NewLine & Environment.NewLine &
-                            "Ce texte part dans le grand livre de la banque, sur toutes les " &
-                            "écritures de toutes les journées : il ne se change pas depuis le " &
+                            "Ces textes partent dans le grand livre de la banque, sur toutes les " &
+                            "écritures de toutes les journées : ils ne se changent pas depuis le " &
                             "guichet.",
                             "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
@@ -138,22 +192,66 @@ Public Class FrmNarrative
 
     Private Sub Charger()
 
-        txtModele.MaxLength = ConstantesWU.NARRATIVE_MODELE_LONGUEUR_MAX
+        _enChargement = True
+        Try
+            txtModele.MaxLength = ConstantesWU.NARRATIVE_MODELE_LONGUEUR_MAX
+            AfficherLaLegende()
+            ChargerLePireCas()
 
-        AfficherLaLegende()
-        ChargerLePireCas()
+            ' Les valeurs sont relues en base, et non prises dans le cache : on vient
+            ' précisément les modifier, et quelqu'un d'autre a pu le faire avant.
+            OptionsWU.Oublier()
+            NarrativeRepository.Oublier()
+            JournalParametreWU.Oublier()
 
-        ' La valeur est relue en base, et non prise dans le cache : on vient précisément la
-        ' modifier, et quelqu'un d'autre a pu le faire avant.
-        OptionsWU.Oublier()
-        txtModele.Text = OptionsWU.NarrativeModele
+            _naturesDisponibles = NarrativeRepository.Disponible()
+            _journalDisponible = JournalParametreWU.Disponible()
 
-        lblDerniereModification.Text = Historique()
+            _modeleGlobalCharge = OptionsWU.NarrativeModele
+            txtModele.Text = _modeleGlobalCharge
 
-        lblStatut.ForeColor = Drawing.SystemColors.GrayText
-        lblStatut.Text = String.Empty
+            AfficherLeMode(OptionsWU.NarrativeMode)
+            ChargerLesNatures()
+            ChargerLeJournal()
+
+            lblDerniereModification.Text = Historique()
+            lblStatut.ForeColor = Drawing.SystemColors.GrayText
+            lblStatut.Text = String.Empty
+
+        Finally
+            _enChargement = False
+        End Try
 
         AfficherLApercu()
+        AfficherLApercuDeLaNature()
+    End Sub
+
+    ''' <summary>
+    ''' Coche le mode en vigueur, et ferme le mode « par nature » si sa table est absente.
+    '''
+    ''' LE MODE N'EST PAS SEULEMENT GRISÉ : L'ÉCRAN DIT POURQUOI. Un bouton radio inactif sans
+    ''' explication se lit comme un défaut de l'application, et l'informatique de la banque
+    ''' n'a aucun moyen de deviner qu'il lui manque un script.
+    ''' </summary>
+    Private Sub AfficherLeMode(mode As ModeNarrativeWU)
+
+        rdoModeParNature.Enabled = _naturesDisponibles
+
+        Dim parNature As Boolean = _naturesDisponibles AndAlso mode = ModeNarrativeWU.ParNature
+
+        rdoModeParNature.Checked = parNature
+        rdoModeUnique.Checked = Not parNature
+
+        If _naturesDisponibles Then
+            lblModeIndisponible.Visible = False
+            Return
+        End If
+
+        lblModeIndisponible.Visible = True
+        lblModeIndisponible.Text =
+            "Mode indisponible : la table T_NarrativeNatureWU est absente de la base. " &
+            "Faites exécuter Scripts\23_NarrativeParNature.sql par l'informatique — il la crée, " &
+            "et crée aussi le journal des modifications."
     End Sub
 
     ''' <summary>
@@ -191,10 +289,18 @@ Public Class FrmNarrative
 
 #End Region
 
-#Region "Aperçu"
+#Region "Le modèle global"
 
     Private Sub txtModele_TextChanged(sender As Object, e As EventArgs) Handles txtModele.TextChanged
+
+        If _enChargement Then Return
+
         AfficherLApercu()
+
+        ' Les natures qui reprennent le modèle global suivent la saisie en direct : sans cela
+        ' la grille afficherait l'ancien modèle, et la banque croirait devoir les corriger une
+        ' à une.
+        RafraichirLesNaturesSuivantLeGlobal()
     End Sub
 
     ''' <summary>
@@ -207,25 +313,16 @@ Public Class FrmNarrative
     ''' </summary>
     Private Sub AfficherLApercu()
 
-        Dim rendu As String = ModeleNarrativeWU.Appliquer(txtModele.Text, _pireDesignation,
-                                                           _pireAccount, _pireCodeAgence,
-                                                           _pirePeriode)
+        Dim rendu As String = RenduPireCas(txtModele.Text)
 
         lblApercu.Text = rendu
-
-        Dim tient As Boolean = rendu.Length <= ConstantesWU.CB_NARRATIF_LONGUEUR_MAX
-
-        lblLongueur.ForeColor = If(tient, Drawing.Color.DarkGreen, Drawing.Color.Firebrick)
-        lblLongueur.Text =
-            $"{rendu.Length} caractères sur les {ConstantesWU.CB_NARRATIF_LONGUEUR_MAX} " &
-            "que le core banking accepte." &
-            If(tient, String.Empty, " Ce modèle ne peut pas être enregistré.")
+        Mesurer(lblLongueur, rendu)
 
         lblPireCas.Text = DescriptionDuPireCas()
 
-        ' UN MODÈLE SANS AUCUN REPÈRE N'EST PAS REFUSÉ, mais il est dit : toutes les
-        ' écritures de tous les points de vente de toutes les journées porteraient le même
-        ' texte, et le grand livre ne dirait plus ni qui ni quand.
+        ' UN MODÈLE SANS AUCUN REPÈRE N'EST PAS REFUSÉ, mais il est dit : toutes les écritures
+        ' de tous les points de vente de toutes les journées porteraient le même texte, et le
+        ' grand livre ne dirait plus ni qui ni quand.
         If Not ModeleNarrativeWU.EmploieUnRepere(txtModele.Text) Then
             lblPireCas.ForeColor = Drawing.Color.Firebrick
             lblPireCas.Text =
@@ -236,6 +333,18 @@ Public Class FrmNarrative
         End If
 
         lblPireCas.ForeColor = Drawing.SystemColors.GrayText
+    End Sub
+
+    ''' <summary>Écrit la longueur rendue, et la passe au rouge si le core banking la refuserait.</summary>
+    Private Sub Mesurer(etiquette As Label, rendu As String)
+
+        Dim tient As Boolean = rendu.Length <= ConstantesWU.CB_NARRATIF_LONGUEUR_MAX
+
+        etiquette.ForeColor = If(tient, Drawing.Color.DarkGreen, Drawing.Color.Firebrick)
+        etiquette.Text =
+            $"{rendu.Length} caractères sur les {ConstantesWU.CB_NARRATIF_LONGUEUR_MAX} " &
+            "que le core banking accepte." &
+            If(tient, String.Empty, " Ce modèle ne peut pas être enregistré.")
     End Sub
 
     ''' <summary>
@@ -260,10 +369,6 @@ Public Class FrmNarrative
                $"à cheval sur deux années (« {_pirePeriode} »)."
     End Function
 
-#End Region
-
-#Region "Enregistrement"
-
     Private Sub btnDefaut_Click(sender As Object, e As EventArgs) Handles btnDefaut.Click
 
         txtModele.Text = ModeleNarrativeWU.ModeleParDefaut
@@ -273,43 +378,438 @@ Public Class FrmNarrative
         lblStatut.Text = "Modèle par défaut rétabli à l'écran — pas encore enregistré."
     End Sub
 
+#End Region
+
+#Region "Le mode"
+
+    Private Sub rdoModeUnique_CheckedChanged(sender As Object, e As EventArgs) Handles rdoModeUnique.CheckedChanged
+        AppliquerLeMode()
+    End Sub
+
+    Private Sub rdoModeParNature_CheckedChanged(sender As Object, e As EventArgs) Handles rdoModeParNature.CheckedChanged
+        AppliquerLeMode()
+    End Sub
+
+    ''' <summary>
+    ''' Ouvre ou ferme la grille des natures selon le mode choisi, et redit ce que le mode fait.
+    '''
+    ''' LA GRILLE RESTE VISIBLE EN MODE UNIQUE, mais en lecture seule : la banque doit pouvoir
+    ''' REGARDER ce que la bascule produirait avant de basculer. Un onglet qui disparaît ne se
+    ''' consulte pas.
+    ''' </summary>
+    Private Sub AppliquerLeMode()
+
+        Dim parNature As Boolean = rdoModeParNature.Checked
+
+        dgvNatures.ReadOnly = Not parNature
+        dgvNatures.DefaultCellStyle.BackColor = If(parNature, Drawing.SystemColors.Window,
+                                                   Drawing.SystemColors.Control)
+
+        lblAideNatures.Text =
+            If(parNature,
+               "Chaque ligne de la pièce portera le libellé de sa nature. Une case laissée au " &
+               "modèle global le suit : seules les natures que vous modifiez sont conservées.",
+               "Mode « un seul libellé » : ces libellés ne sont PAS appliqués. Ils sont " &
+               "affichés pour que vous voyiez ce que la bascule produirait. L'écart d'arrondi " &
+               "fait exception — il garde toujours son libellé propre, dans les deux modes.")
+
+        If _enChargement Then Return
+        AfficherLApercuDeLaNature()
+    End Sub
+
+#End Region
+
+#Region "Les libellés par nature"
+
+    Private Const COL_CODE As String = "Code"
+    Private Const COL_NATURE As String = "Nature"
+    Private Const COL_MODELE As String = "Modele"
+
+    ''' <summary>
+    ''' Remplit la grille avec le modèle EFFECTIF de chaque nature — celui qui serait posé si
+    ''' le mode « par nature » était actif.
+    '''
+    ''' POURQUOI L'EFFECTIF, ET NON LA SEULE SAISIE. Une case vide pour la TVA signifierait
+    ''' « suit le modèle global », ce qui est vrai mais illisible : la banque ne verrait pas ce
+    ''' que la ligne porterait. Et pour l'écart d'arrondi, ce serait FAUX — il ne suit pas le
+    ''' modèle global, il a son texte propre. Montrer l'effectif dit la vérité dans les deux
+    ''' cas, et l'enregistrement ne garde que ce qui s'en écarte.
+    ''' </summary>
+    Private Sub ChargerLesNatures()
+
+        Dim narratives As NarrativesWU = NarrativeRepository.EnVigueur()
+
+        Dim table As New DataTable("natures")
+        table.Columns.Add(COL_CODE, GetType(String))
+        table.Columns.Add(COL_NATURE, GetType(String))
+        table.Columns.Add(COL_MODELE, GetType(String))
+
+        _naturesChargees.Clear()
+
+        For Each nature As NatureMouvementWU In NaturesMouvementWU.Toutes()
+
+            Dim modele As String = narratives.Modele(nature)
+            _naturesChargees(nature) = modele
+
+            table.Rows.Add(NaturesMouvementWU.Code(nature),
+                           NaturesMouvementWU.Intitule(nature),
+                           modele)
+        Next
+
+        dgvNatures.DataSource = table
+        HabillerLaGrilleDesNatures()
+    End Sub
+
+    Private Sub HabillerLaGrilleDesNatures()
+
+        If Not dgvNatures.Columns.Contains(COL_CODE) Then Return
+
+        dgvNatures.Columns(COL_CODE).Visible = False
+
+        dgvNatures.Columns(COL_NATURE).HeaderText = "Nature du mouvement"
+        dgvNatures.Columns(COL_NATURE).ReadOnly = True
+        dgvNatures.Columns(COL_NATURE).AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+        dgvNatures.Columns(COL_NATURE).Width = 260
+
+        dgvNatures.Columns(COL_MODELE).HeaderText = "Libellé de la ligne"
+        dgvNatures.Columns(COL_MODELE).AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+
+        AppliquerLeMode()
+    End Sub
+
+    Private Sub dgvNatures_SelectionChanged(sender As Object, e As EventArgs) Handles dgvNatures.SelectionChanged
+        AfficherLApercuDeLaNature()
+    End Sub
+
+    Private Sub dgvNatures_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles dgvNatures.CellEndEdit
+        AfficherLApercuDeLaNature()
+    End Sub
+
+    ''' <summary>
+    ''' Mesure la nature sélectionnée, séparément des autres.
+    '''
+    ''' CHAQUE NATURE A SON PROPRE PIRE CAS. Mesurer le seul modèle global ne dirait rien d'un
+    ''' libellé de TVA que la banque aurait rallongé : c'est lui qui ferait échouer la
+    ''' production du fichier, et sur sa seule ligne.
+    ''' </summary>
+    Private Sub AfficherLApercuDeLaNature()
+
+        Dim nature As NatureMouvementWU? = NatureSelectionnee()
+
+        If Not nature.HasValue Then
+            lblApercuNature.Text = String.Empty
+            lblLongueurNature.Text = String.Empty
+            Return
+        End If
+
+        Dim modele As String = ModeleSaisi(nature.Value)
+        Dim rendu As String = RenduPireCas(modele)
+
+        lblApercuNature.Text = $"{NaturesMouvementWU.Intitule(nature.Value)} : {rendu}"
+        Mesurer(lblLongueurNature, rendu)
+    End Sub
+
+    ''' <summary>La nature de la ligne sélectionnée, ou Nothing si la grille est vide.</summary>
+    Private Function NatureSelectionnee() As NatureMouvementWU?
+
+        If dgvNatures.CurrentRow Is Nothing Then Return Nothing
+
+        Dim cellule As DataGridViewCell = dgvNatures.CurrentRow.Cells(COL_CODE)
+        If cellule Is Nothing OrElse cellule.Value Is Nothing Then Return Nothing
+
+        Return NaturesMouvementWU.DepuisCode(Convert.ToString(cellule.Value))
+    End Function
+
+    ''' <summary>Le modèle actuellement saisi dans la grille pour cette nature.</summary>
+    Private Function ModeleSaisi(nature As NatureMouvementWU) As String
+
+        Dim recherche As String = NaturesMouvementWU.Code(nature)
+
+        For Each ligne As DataGridViewRow In dgvNatures.Rows
+
+            If ligne.IsNewRow Then Continue For
+
+            Dim code As String = Convert.ToString(ligne.Cells(COL_CODE).Value)
+            If Not String.Equals(code, recherche, StringComparison.OrdinalIgnoreCase) Then Continue For
+
+            Return Convert.ToString(ligne.Cells(COL_MODELE).Value)
+        Next
+
+        Return String.Empty
+    End Function
+
+    ''' <summary>
+    ''' Fait suivre la saisie du modèle global aux natures qui le reprennent, c'est-à-dire
+    ''' celles dont la case montre encore le modèle chargé.
+    '''
+    ''' L'ÉCART D'ARRONDI N'EST JAMAIS TOUCHÉ : il ne suit pas le modèle global, et le faire
+    ''' suivre ici le remplacerait par « LD WU ACTIVITE » dès la première frappe.
+    ''' </summary>
+    Private Sub RafraichirLesNaturesSuivantLeGlobal()
+
+        If dgvNatures.DataSource Is Nothing Then Return
+
+        Dim ancienGlobal As String = _modeleGlobalCharge
+        Dim nouveauGlobal As String = txtModele.Text
+
+        For Each ligne As DataGridViewRow In dgvNatures.Rows
+
+            If ligne.IsNewRow Then Continue For
+
+            Dim nature As NatureMouvementWU? =
+                NaturesMouvementWU.DepuisCode(Convert.ToString(ligne.Cells(COL_CODE).Value))
+
+            If Not nature.HasValue OrElse nature.Value = NatureMouvementWU.EcartArrondi Then Continue For
+
+            ' Seules les cases restées sur l'ancien modèle global suivent : une nature que la
+            ' banque a personnalisée n'est pas écrasée par une frappe dans l'onglet voisin.
+            If Not String.Equals(Convert.ToString(ligne.Cells(COL_MODELE).Value),
+                                 ancienGlobal, StringComparison.Ordinal) Then Continue For
+
+            ligne.Cells(COL_MODELE).Value = nouveauGlobal
+        Next
+
+        ' L'ancien global devient le nouveau : sans cela, une deuxième frappe ne trouverait
+        ' plus aucune case à faire suivre.
+        For Each nature As NatureMouvementWU In NaturesMouvementWU.Toutes()
+            If nature = NatureMouvementWU.EcartArrondi Then Continue For
+            If Not _naturesChargees.ContainsKey(nature) Then Continue For
+            If Not String.Equals(_naturesChargees(nature), ancienGlobal, StringComparison.Ordinal) Then Continue For
+            _naturesChargees(nature) = nouveauGlobal
+        Next
+
+        _modeleGlobalCharge = nouveauGlobal
+
+        AfficherLApercuDeLaNature()
+    End Sub
+
+#End Region
+
+#Region "Le journal"
+
+    Private Sub ChargerLeJournal()
+
+        If Not _journalDisponible Then
+            dgvJournal.DataSource = Nothing
+            lblJournal.ForeColor = Drawing.Color.Firebrick
+            lblJournal.Text = JournalParametreWU.MESSAGE_TABLE_ABSENTE.Replace(Environment.NewLine, " ")
+            Return
+        End If
+
+        Dim messageErreur As String = String.Empty
+        Dim lignes As List(Of JournalParametreWU.Modification) =
+            JournalParametreWU.Lister(LIMITE_JOURNAL, messageErreur)
+
+        dgvJournal.DataSource = lignes
+        HabillerLaGrilleDuJournal()
+
+        If messageErreur.Length > 0 Then
+            lblJournal.ForeColor = Drawing.Color.Firebrick
+            lblJournal.Text = messageErreur.Replace(Environment.NewLine, " ")
+            Return
+        End If
+
+        lblJournal.ForeColor = Drawing.SystemColors.GrayText
+
+        If lignes.Count = 0 Then
+            lblJournal.Text = "Aucune modification enregistrée : le paramétrage est celui " &
+                              "d'origine, ou il a été changé avant la création du journal."
+            Return
+        End If
+
+        lblJournal.Text =
+            $"{lignes.Count} modification(s), de la plus récente à la plus ancienne " &
+            $"(les {LIMITE_JOURNAL} dernières). Ce journal ne peut être ni modifié ni effacé " &
+            "depuis l'application, et aucun droit d'écriture n'est accordé dessus en base."
+    End Sub
+
+    ''' <summary>
+    ''' Combien de modifications la grille charge. Un journal se consulte et ne se télécharge
+    ''' pas : au bout de deux ans, tout charger mettrait l'écran plusieurs secondes à s'ouvrir
+    ''' pour montrer trente lignes qu'on ne fera jamais défiler.
+    ''' </summary>
+    Private Const LIMITE_JOURNAL As Integer = 200
+
+    Private Sub HabillerLaGrilleDuJournal()
+
+        ' La grille se lie à une liste d'objets : ses colonnes portent les noms des propriétés,
+        ' et celles qui n'intéressent pas le lecteur sont retirées plutôt que renommées.
+        If dgvJournal.Columns.Contains("Cle") Then dgvJournal.Columns("Cle").Visible = False
+        If dgvJournal.Columns.Contains("AncienneValeur") Then dgvJournal.Columns("AncienneValeur").Visible = False
+
+        Renommer("DateModification", "Date", 130)
+        Renommer("Intitule", "Ce qui a changé", 200)
+        Renommer("Avant", "Avant", 0)
+        Renommer("NouvelleValeur", "Après", 0)
+        Renommer("ModifiePar", "Par", 110)
+        Renommer("Poste", "Poste", 120)
+
+        If dgvJournal.Columns.Contains("DateModification") Then
+            dgvJournal.Columns("DateModification").DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"
+        End If
+    End Sub
+
+    ''' <summary>Renomme une colonne et lui donne sa largeur. Largeur 0 : la colonne s'étire.</summary>
+    Private Sub Renommer(nom As String, entete As String, largeur As Integer)
+
+        If Not dgvJournal.Columns.Contains(nom) Then Return
+
+        dgvJournal.Columns(nom).HeaderText = entete
+
+        If largeur <= 0 Then
+            dgvJournal.Columns(nom).AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+            Return
+        End If
+
+        dgvJournal.Columns(nom).AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+        dgvJournal.Columns(nom).Width = largeur
+    End Sub
+
+#End Region
+
+#Region "Enregistrement"
+
     Private Sub btnEnregistrer_Click(sender As Object, e As EventArgs) Handles btnEnregistrer.Click
+
+        ' LA CELLULE EN COURS DE SAISIE EST VALIDÉE D'ABORD. Sans cela, cliquer Enregistrer
+        ' sans avoir quitté la case lirait l'ANCIENNE valeur : le libellé que la banque vient
+        ' de taper serait perdu, et l'écran annoncerait un enregistrement réussi.
+        dgvNatures.EndEdit()
 
         Dim modele As String = txtModele.Text.Trim()
         Dim messageErreur As String = String.Empty
 
         If Not ModeleNarrativeWU.Controler(modele, _pireDesignation, _pireAccount,
                                             _pireCodeAgence, _pirePeriode, messageErreur) Then
-            lblStatut.ForeColor = Drawing.Color.Firebrick
-            lblStatut.Text = "Modèle non enregistré."
-            FrmDiagnostic.Afficher(Me, "Narrative comptable", messageErreur)
+            Refuser("Le modèle global n'est pas enregistrable.", messageErreur)
             Return
         End If
 
-        If Not Confirmer(modele) Then Return
+        Dim parNature As Boolean = rdoModeParNature.Checked
+
+        ' CHAQUE NATURE EST CONTRÔLÉE SÉPARÉMENT, et seulement si elle va servir. Contrôler des
+        ' libellés que le mode unique n'appliquera pas empêcherait d'enregistrer un modèle
+        ' global parfaitement valable à cause d'une case qui ne sort nulle part.
+        If parNature AndAlso Not ControlerLesNatures(messageErreur) Then
+            Refuser("Un libellé par nature n'est pas enregistrable.", messageErreur)
+            Return
+        End If
+
+        If Not Confirmer(modele, parNature) Then Return
 
         Cursor = Cursors.WaitCursor
-        Dim enregistre As Boolean = OptionsWU.Enregistrer(
-            OptionsWU.CLE_NARRATIVE_MODELE, modele,
-            OptionsWU.LIBELLE_NARRATIVE_MODELE, messageErreur)
-        Cursor = Cursors.Default
+        Try
+            If Not OptionsWU.Enregistrer(OptionsWU.CLE_NARRATIVE_MODELE, modele,
+                                         OptionsWU.LIBELLE_NARRATIVE_MODELE, messageErreur) Then
+                Refuser("Modèle global non enregistré.", messageErreur)
+                Return
+            End If
 
-        If Not enregistre Then
-            lblStatut.ForeColor = Drawing.Color.Firebrick
-            lblStatut.Text = "Modèle non enregistré."
-            FrmDiagnostic.Afficher(Me, "Narrative comptable", messageErreur)
-            Return
-        End If
+            Dim mode As ModeNarrativeWU =
+                If(parNature, ModeNarrativeWU.ParNature, ModeNarrativeWU.ModeleUnique)
+
+            If Not OptionsWU.Enregistrer(OptionsWU.CLE_NARRATIVE_MODE, NarrativesWU.CodeDeMode(mode),
+                                         OptionsWU.LIBELLE_NARRATIVE_MODE, messageErreur) Then
+                Refuser("Mode non enregistré.", messageErreur)
+                Return
+            End If
+
+            If _naturesDisponibles AndAlso Not EnregistrerLesNatures(messageErreur) Then
+                Refuser("Libellés par nature partiellement enregistrés.", messageErreur)
+                Return
+            End If
+
+        Finally
+            Cursor = Cursors.Default
+        End Try
 
         UtilisateurRepository.Journaliser(SessionWU.Identifiant, True,
-                                          "Narrative comptable : " & modele)
+                                          "Narrative comptable : " & NarrativesWU.IntituleDeMode(
+                                              If(parNature, ModeNarrativeWU.ParNature,
+                                                 ModeNarrativeWU.ModeleUnique)))
 
-        txtModele.Text = modele
-        lblDerniereModification.Text = Historique()
+        ' Tout est relu plutôt que supposé : le journal vient de gagner des lignes, et la
+        ' grille des natures a pu perdre celles qui ont rejoint le modèle global.
+        Charger()
 
         lblStatut.ForeColor = Drawing.Color.DarkGreen
-        lblStatut.Text = "Modèle enregistré."
+        lblStatut.Text = "Paramétrage enregistré."
     End Sub
+
+    ''' <summary>
+    ''' Dit en une ligne que rien n'a été enregistré, et ouvre le détail.
+    '''
+    ''' Le paramètre ne s'appelle PAS « resume » : Visual Basic réserve ce mot à l'instruction
+    ''' Resume Next, et une variable qui le porte est refusée (BC30183).
+    ''' </summary>
+    Private Sub Refuser(constat As String, detail As String)
+
+        lblStatut.ForeColor = Drawing.Color.Firebrick
+        lblStatut.Text = constat
+        FrmDiagnostic.Afficher(Me, "Narrative comptable", detail)
+    End Sub
+
+    ''' <summary>
+    ''' Contrôle les treize libellés, et nomme celui qui ne passe pas.
+    '''
+    ''' « Un modèle dépasse » ne serait pas une information : il y en a treize, et l'agent
+    ''' chercherait lequel case par case.
+    ''' </summary>
+    Private Function ControlerLesNatures(ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        For Each nature As NatureMouvementWU In NaturesMouvementWU.Toutes()
+
+            Dim modele As String = ModeleSaisi(nature).Trim()
+            Dim detail As String = String.Empty
+
+            If ModeleNarrativeWU.Controler(modele, _pireDesignation, _pireAccount,
+                                           _pireCodeAgence, _pirePeriode, detail) Then Continue For
+
+            messageErreur = $"Nature « {NaturesMouvementWU.Intitule(nature)} » :" &
+                            Environment.NewLine & Environment.NewLine & detail
+            Return False
+        Next
+
+        Return True
+    End Function
+
+    ''' <summary>
+    ''' Enregistre les natures qui ont CHANGÉ, et seulement elles.
+    '''
+    ''' UNE NATURE REVENUE AU MODÈLE GLOBAL EST EFFACÉE, pas enregistrée à l'identique : c'est
+    ''' ce qui garde vivant son repli, et ce qui fait qu'un futur changement du modèle global
+    ''' la suivra au lieu de la laisser sur l'ancienne phrase. L'écart d'arrondi, lui, se
+    ''' compare à SA valeur par défaut, puisqu'il ne suit jamais le modèle global.
+    ''' </summary>
+    Private Function EnregistrerLesNatures(ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        Dim modeleGlobal As String = txtModele.Text.Trim()
+
+        For Each nature As NatureMouvementWU In NaturesMouvementWU.Toutes()
+
+            Dim saisi As String = ModeleSaisi(nature).Trim()
+
+            Dim repli As String = If(nature = NatureMouvementWU.EcartArrondi,
+                                     ConstantesWU.NARRATIVE_ECART_DEFAUT, modeleGlobal)
+
+            Dim aEcrire As String = If(String.Equals(saisi, repli, StringComparison.Ordinal),
+                                       String.Empty, saisi)
+
+            Dim chargee As String = String.Empty
+            If _naturesChargees.ContainsKey(nature) Then chargee = _naturesChargees(nature)
+
+            ' Inchangée : ni écriture, ni transaction, ni ligne de journal.
+            If String.Equals(saisi, chargee.Trim(), StringComparison.Ordinal) Then Continue For
+
+            If Not NarrativeRepository.Enregistrer(nature, aEcrire, messageErreur) Then Return False
+        Next
+
+        Return True
+    End Function
 
     ''' <summary>
     ''' Fait relire la phrase avant de l'enregistrer.
@@ -319,24 +819,33 @@ Public Class FrmNarrative
     ''' produites ne changeront pas — elles garderont l'ancien. Relire la phrase rendue, et
     ''' non le gabarit, est le seul moment où l'on voit ce qu'on décide.
     ''' </summary>
-    Private Function Confirmer(modele As String) As Boolean
+    Private Function Confirmer(modele As String, parNature As Boolean) As Boolean
 
-        Dim exemple As String = ModeleNarrativeWU.Appliquer(modele, _pireDesignation,
-                                                             _pireAccount, _pireCodeAgence,
-                                                             _pirePeriode)
+        Dim mode As ModeNarrativeWU =
+            If(parNature, ModeNarrativeWU.ParNature, ModeNarrativeWU.ModeleUnique)
+
+        Dim detail As String
+
+        If parNature Then
+            detail = "Chaque ligne portera le libellé de sa nature. Les natures laissées au " &
+                     "modèle global le suivront :" & Environment.NewLine & Environment.NewLine &
+                     RenduPireCas(modele)
+        Else
+            detail = "Les écritures sortiront ainsi :" & Environment.NewLine & Environment.NewLine &
+                     RenduPireCas(modele)
+        End If
 
         Return MessageBox.Show(Me,
-            "Enregistrer ce modèle de narrative ?" & Environment.NewLine & Environment.NewLine &
-            modele & Environment.NewLine & Environment.NewLine &
-            "Les écritures sortiront désormais ainsi :" & Environment.NewLine & Environment.NewLine &
-            exemple & Environment.NewLine & Environment.NewLine &
-            "Ce texte part sur toutes les lignes de toutes les pièces à venir, et dans la " &
+            "Enregistrer ce paramétrage de narrative ?" & Environment.NewLine & Environment.NewLine &
+            "Mode : " & NarrativesWU.IntituleDeMode(mode) & "." & Environment.NewLine & Environment.NewLine &
+            detail & Environment.NewLine & Environment.NewLine &
+            "Ces textes partent sur toutes les lignes de toutes les pièces à venir, et dans la " &
             "colonne ADDLTEXT du fichier core banking. Les pièces déjà produites gardent le " &
             "leur : elles ne sont pas réécrites." &
             If(ModeleNarrativeWU.EmploieUnRepere(modele), String.Empty,
                Environment.NewLine & Environment.NewLine &
-               "ATTENTION : ce modèle n'emploie aucun repère. Toutes les écritures porteront " &
-               "le même texte, sans nommer le point de vente ni la période."),
+               "ATTENTION : le modèle global n'emploie aucun repère. Les écritures qui le " &
+               "suivent porteront le même texte, sans nommer le point de vente ni la période."),
             "Confirmer la narrative", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
             MessageBoxDefaultButton.Button2) = DialogResult.Yes
     End Function

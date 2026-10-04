@@ -1435,6 +1435,137 @@ BEGIN
 END
 GO
 
+-- LE MODE : laquelle des deux facons de choisir les libelles s'applique.
+--
+--   GLOBAL      les douze lignes d'un point de vente portent LE MEME libelle, celui du
+--               modele global ci-dessus. C'est la forme dictee par la banque, et le DEFAUT.
+--   PAR_NATURE  chaque ligne porte le libelle de sa nature : mouvement, contrepartie,
+--               commissions, taxes, ecart d'arrondi (table T_NarrativeNatureWU plus bas).
+--
+-- BASCULER NE CHANGE RIEN TANT QUE RIEN N'EST SAISI : une nature absente de
+-- T_NarrativeNatureWU suit le modele global, et cette table est creee vide.
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'NARRATIVE_MODE')
+BEGIN
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'NARRATIVE_MODE', N'GLOBAL',
+            N'GLOBAL : les douze lignes d''un point de vente portent le même libellé. PAR_NATURE : chaque ligne porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU).',
+            GETDATE(), N'installation');
+
+    PRINT 'Option NARRATIVE_MODE créée à GLOBAL.';
+END
+ELSE
+BEGIN
+    PRINT 'Option NARRATIVE_MODE déjà présente : valeur conservée.';
+END
+GO
+
+-- =========================================================================
+-- T_NarrativeNatureWU — le libelle de chaque nature de mouvement
+--
+-- CREEE VIDE, ET C'EST VOULU. Une nature absente suit le modele global : une base basculee
+-- en PAR_NATURE sans saisie rend donc exactement la piece d'avant. La bascule est un choix
+-- de la banque, pas une reecriture de treize libelles.
+--
+-- La cle est le CODE de la nature, une chaine (NaturesMouvementWU.Code) : MOUVEMENT,
+-- COMPTE_COURANT, COMMISSION_TRANSFERT_BANQUE, COMMISSION_PAIEMENT_BANQUE,
+-- COMMISSION_ENVOI_BANQUE, COMMISSION_TRANSFERT_SA, COMMISSION_PAIEMENT_SA,
+-- COMMISSION_ENVOI_SA, IMPOTS_TAXE_ENVOI, TVA, TTA_ENVOI, TTA_RECEPTION, ECART_ARRONDI.
+-- Un entier aurait rendu la table illisible, et renumeroter l'enumeration du code aurait
+-- reaffecte silencieusement les libelles saisis a d'autres lignes de la piece.
+--
+-- Detail et commentaires : Scripts_NarrativeParNature.sql.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_NarrativeNatureWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_NarrativeNatureWU
+    (
+        Nature              NVARCHAR(40)    NOT NULL,
+        Modele              NVARCHAR(255)   NOT NULL,
+        DateModification    DATETIME        NULL,
+        ModifiePar          NVARCHAR(50)    NULL,
+
+        -- Une ligne sans modele serait une nature « personnalisee » a vide, c'est-a-dire des
+        -- ecritures sans libelle. L'absence de ligne est la facon de dire « modele global ».
+        CONSTRAINT CK_T_NarrativeNatureWU_Modele CHECK (LEN(LTRIM(RTRIM(Modele))) > 0),
+
+        CONSTRAINT PK_T_NarrativeNatureWU PRIMARY KEY (Nature)
+    );
+
+    PRINT 'Table T_NarrativeNatureWU créée (vide : toutes les natures suivent le modèle global).';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_NarrativeNatureWU déjà présente : création ignorée.';
+END
+GO
+
+-- DELETE compris pour l'administrateur, et c'est voulu : remettre une nature sur le modele
+-- global, c'est EFFACER sa ligne.
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_compense')
+    EXEC('GRANT SELECT ON dbo.T_NarrativeNatureWU TO wu_compense');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_commercial')
+    EXEC('GRANT SELECT ON dbo.T_NarrativeNatureWU TO wu_commercial');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_admin')
+    EXEC('GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.T_NarrativeNatureWU TO wu_admin');
+GO
+
+-- =========================================================================
+-- T_JournalParametreWU — qui a change quoi, quand, et ce qu'il y avait avant
+--
+-- T_ParametreWU ne garde que le DERNIER modificateur : le precedent est ecrase par le
+-- suivant. Pour une case a cocher, c'est assez. Pour le libelle qui part sur toutes les
+-- ecritures du grand livre, non.
+--
+-- IL EST ECRIT DANS LA MEME TRANSACTION QUE LE CHANGEMENT. Pas de changement sans trace, et
+-- pas de trace sans changement — la seconde serait pire, elle accuserait quelqu'un d'une
+-- modification qui n'a pas eu lieu.
+--
+-- IL NE SE REECRIT PAS : aucun GRANT UPDATE ni DELETE, pour aucun role, pas meme wu_admin.
+-- Purger deux ans d'historique reste un geste du DBA, fait sciemment avec ses propres
+-- droits, et non un clic dans l'application.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_JournalParametreWU') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_JournalParametreWU
+    (
+        Id                  BIGINT          IDENTITY(1,1) NOT NULL,
+        Cle                 NVARCHAR(60)    NOT NULL,
+
+        -- NULL, et non chaine vide, quand la cle n'avait pas de valeur avant.
+        AncienneValeur      NVARCHAR(255)   NULL,
+        NouvelleValeur      NVARCHAR(255)   NULL,
+
+        ModifiePar          NVARCHAR(50)    NULL,
+        Poste               NVARCHAR(100)   NULL,
+
+        DateModification    DATETIME        NOT NULL DEFAULT (GETDATE()),
+
+        CONSTRAINT PK_T_JournalParametreWU PRIMARY KEY (Id)
+    );
+
+    CREATE INDEX IX_T_JournalParametreWU_Date
+        ON dbo.T_JournalParametreWU (DateModification DESC, Id DESC);
+
+    PRINT 'Table T_JournalParametreWU créée.';
+END
+ELSE
+BEGIN
+    PRINT 'Table T_JournalParametreWU déjà présente : création ignorée.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_compense')
+    EXEC('GRANT SELECT ON dbo.T_JournalParametreWU TO wu_compense');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_commercial')
+    EXEC('GRANT SELECT ON dbo.T_JournalParametreWU TO wu_commercial');
+GO
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_admin')
+    EXEC('GRANT SELECT, INSERT ON dbo.T_JournalParametreWU TO wu_admin');
+GO
+
 -- =========================================================================
 -- T_TraitementWU — l'en-tête du traitement d'une journée, et son visa
 --

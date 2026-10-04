@@ -198,24 +198,24 @@ Public NotInheritable Class ConstantesWU
     ' Double espace avant "DE" : reproduit fidèlement le libellé du classeur de référence
     ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception).
     Public Const LIB_TTA_RECEPTION As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU)"
-    Public Const LIB_ECART_ATTENTE As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE"
-
     ''' <summary>
-    ''' PRÉFIXE DEMANDÉ PAR LA BANQUE DEVANT SES LIBELLÉS, sur demande écrite.
+    ''' LE LIBELLÉ DE LA LIGNE D'ÉCART D'ARRONDI, préfixe compris.
     '''
-    ''' IL NE SERT PLUS QU'À LA LIGNE D'ÉCART D'ARRONDI. Les douze libellés d'un point de
-    ''' vente le portent désormais parce que le MODÈLE DE NARRATIVE commence par lui — et la
-    ''' banque peut le retirer de ce modèle si elle le décide un jour.
+    ''' IL NE SORT PAS DU MODÈLE DE NARRATIVE, ET DANS AUCUN DES DEUX MODES. Cette ligne est
+    ''' posée APRÈS la pièce, pour absorber la différence globale, et ne se rattache ni à un
+    ''' point de vente ni à une période — les deux repères du modèle. Lui appliquer ce modèle
+    ''' la réduirait à « LD WU ACTIVITE », c'est-à-dire à une écriture qui ne dit plus ce
+    ''' qu'elle est.
     '''
-    ''' CE LIBELLÉ-LÀ RESTE TENU PAR LE CODE, mais plus par nécessité : l'écran de traitement
-    ''' reconnaissait cette ligne EN COMPARANT SON TEXTE, et c'est fini — celle qui pose la
-    ''' ligne annonce désormais ce qu'elle a posé. Rien ne s'appuie plus sur ces mots, et ils
-    ''' pourront rejoindre le paramétrage sans rien casser.
+    ''' C'EST UNE VALEUR PAR DÉFAUT, ET NON UNE FATALITÉ : la banque peut l'éditer comme les
+    ''' douze autres, dans l'écran « Narrative comptable », onglet des libellés par nature.
+    ''' Elle y figure sous « Écart d'arrondi (compte inter bancaire) ».
     '''
-    ''' Voir PieceComptableService.LibelleEcartArrondi, redevenu PRIVÉ, seul lecteur de ce
-    ''' préfixe.
+    ''' LE PRÉFIXE EST ÉCRIT ICI, et non posé par du code. Il l'était, du temps où douze
+    ''' libellés distincts devaient tous le recevoir ; il ne reste qu'un libellé à préfixer, et
+    ''' deux lettres au début d'une constante se lisent mieux qu'une fonction qui les ajoute.
     ''' </summary>
-    Public Const LIB_PREFIXE As String = "LD"
+    Public Const NARRATIVE_ECART_DEFAUT As String = "LD ECART D'ARRONDI - COMPTE INTER BANCAIRE"
 
     ''' <summary>
     ''' LE MODÈLE DE NARRATIVE APPLIQUÉ TANT QUE LA BANQUE N'EN A SAISI AUCUN.

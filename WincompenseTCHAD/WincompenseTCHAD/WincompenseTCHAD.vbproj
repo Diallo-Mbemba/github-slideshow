@@ -100,6 +100,8 @@
     <Compile Include="Models\DemandeWU.vb" />
     <Compile Include="Models\LigneCoreBankingWU.vb" />
     <Compile Include="Models\ModeleNarrativeWU.vb" />
+    <Compile Include="Models\NatureMouvementWU.vb" />
+    <Compile Include="Models\NarrativesWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
@@ -120,6 +122,8 @@
     <Compile Include="Services\TraitementRepository.vb" />
     <Compile Include="Services\BordereauService.vb" />
     <Compile Include="Services\OptionsWU.vb" />
+    <Compile Include="Services\NarrativeRepository.vb" />
+    <Compile Include="Services\JournalParametreWU.vb" />
     <Compile Include="Services\ExcelExportService.vb" />
     <Compile Include="Services\HistoriqueRepository.vb" />
     <Compile Include="Services\RapportActiviteService.vb" />

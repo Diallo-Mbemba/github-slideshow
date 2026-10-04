@@ -75,6 +75,20 @@ Public NotInheritable Class OptionsWU
         "Modèle de la narrative des lignes de la pièce comptable et de la colonne ADDLTEXT du " &
         "fichier core banking. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}."
 
+    ''' <summary>
+    ''' COMMENT LES LIBELLÉS SONT CHOISIS : un seul modèle pour les douze lignes d'un point de
+    ''' vente (GLOBAL), ou un modèle par nature de mouvement (PAR_NATURE).
+    '''
+    ''' GLOBAL PAR DÉFAUT, et par défaut en cas de doute : une valeur mal orthographiée, une
+    ''' table absente, une base injoignable laissent le mode actuel. Basculer treize libellés
+    ''' d'un coup sur un malentendu de lecture n'est pas une option.
+    ''' </summary>
+    Public Const CLE_NARRATIVE_MODE As String = "NARRATIVE_MODE"
+
+    Public Const LIBELLE_NARRATIVE_MODE As String =
+        "GLOBAL : les douze lignes d'un point de vente portent le même libellé. PAR_NATURE : " &
+        "chaque ligne porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU)."
+
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208
 
@@ -179,6 +193,16 @@ Public NotInheritable Class OptionsWU
             Dim saisi As String = Lire(CLE_NARRATIVE_MODELE)
             If String.IsNullOrWhiteSpace(saisi) Then Return ModeleNarrativeWU.ModeleParDefaut
             Return saisi
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Le mode de narrative en vigueur. MODE UNIQUE par défaut, et en cas de doute : voir
+    ''' CLE_NARRATIVE_MODE.
+    ''' </summary>
+    Public Shared ReadOnly Property NarrativeMode As ModeNarrativeWU
+        Get
+            Return NarrativesWU.ModeDepuisCode(Lire(CLE_NARRATIVE_MODE))
         End Get
     End Property
 
@@ -311,18 +335,53 @@ Public NotInheritable Class OptionsWU
             "INSERT INTO " & TABLE & " (Cle, Valeur, Libelle, DateModification, ModifiePar) " &
             "VALUES (@cle, @valeur, @libelle, GETDATE(), @auteur);"
 
+        ' LA QUESTION EST POSÉE AVANT D'OUVRIR LA TRANSACTION : Disponible() ouvre sa propre
+        ' connexion, et l'appeler transaction ouverte ferait tenir deux connexions à la fois
+        ' pour une réponse mise en cache de toute façon.
+        Dim journalDisponible As Boolean = JournalParametreWU.Disponible()
+
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
 
-                Using commande As New SqlCommand(requete, connexion)
+                ' UNE SEULE TRANSACTION POUR LES DEUX ÉCRITURES. Le paramètre et sa trace
+                ' partent ensemble ou ne partent pas : un changement sans trace laisserait le
+                ' grand livre inexplicable, et une trace sans changement serait pire — elle
+                ' accuserait quelqu'un d'une modification qui n'a pas eu lieu.
+                Using transaction As SqlTransaction = connexion.BeginTransaction()
 
-                    commande.Parameters.Add("@cle", SqlDbType.NVarChar, 50).Value = cle.Trim()
-                    commande.Parameters.Add("@valeur", SqlDbType.NVarChar, 255).Value = If(valeur, String.Empty)
-                    commande.Parameters.Add("@libelle", SqlDbType.NVarChar, 255).Value = If(libelle, String.Empty)
-                    commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
+                    ' L'ancienne valeur est lue DANS la transaction, et la ligne est verrouillée
+                    ' en lecture : sans cela, deux administrateurs enregistrant en même temps
+                    ' journaliseraient tous deux la même « ancienne » valeur, et l'un des deux
+                    ' changements n'aurait aucune trace de son point de départ.
+                    Dim ancienne As String = ValeurVerrouillee(connexion, transaction, cle.Trim())
 
-                    commande.ExecuteNonQuery()
+                    ' JOURNALISÉ SEULEMENT SI LA VALEUR CHANGE RÉELLEMENT. Réenregistrer le même
+                    ' modèle est un geste d'écran — on ouvre, on regarde, on valide — et un
+                    ' journal rempli de lignes identiques ne se lit plus.
+                    Dim aJournaliser As Boolean =
+                        journalDisponible AndAlso
+                        Not String.Equals(ancienne.Trim(), If(valeur, String.Empty).Trim(),
+                                          StringComparison.Ordinal)
+
+                    Dim sql As String = requete
+                    If aJournaliser Then sql &= " " & JournalParametreWU.INSERTION
+
+                    Using commande As New SqlCommand(sql, connexion, transaction)
+
+                        commande.Parameters.Add("@cle", SqlDbType.NVarChar, 50).Value = cle.Trim()
+                        commande.Parameters.Add("@valeur", SqlDbType.NVarChar, 255).Value = If(valeur, String.Empty)
+                        commande.Parameters.Add("@libelle", SqlDbType.NVarChar, 255).Value = If(libelle, String.Empty)
+                        commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
+
+                        If aJournaliser Then
+                            JournalParametreWU.AjouterLesParametres(commande, cle, ancienne, valeur)
+                        End If
+
+                        commande.ExecuteNonQuery()
+                    End Using
+
+                    transaction.Commit()
                 End Using
             End Using
 
@@ -339,6 +398,28 @@ Public NotInheritable Class OptionsWU
 
         Oublier()
         Return True
+    End Function
+
+    ''' <summary>
+    ''' La valeur actuelle d'une clé, lue DANS la transaction de l'appelant et la ligne
+    ''' verrouillée jusqu'à son terme. Chaîne vide si la clé n'existe pas encore — ce qui est
+    ''' une information, et non une absence de réponse : le journal l'écrira NULL.
+    ''' </summary>
+    Private Shared Function ValeurVerrouillee(connexion As SqlConnection, transaction As SqlTransaction,
+                                              cle As String) As String
+
+        Const lecture As String =
+            "SELECT Valeur FROM " & TABLE & " WITH (UPDLOCK, HOLDLOCK) WHERE Cle = @cle"
+
+        Using commande As New SqlCommand(lecture, connexion, transaction)
+
+            commande.Parameters.Add("@cle", SqlDbType.NVarChar, 50).Value = cle
+
+            Dim valeur As Object = commande.ExecuteScalar()
+            If valeur Is Nothing OrElse valeur Is DBNull.Value Then Return String.Empty
+
+            Return Convert.ToString(valeur)
+        End Using
     End Function
 
 #End Region

@@ -258,6 +258,11 @@ Public NotInheritable Class PieceExcelWU
             ' LE MODÈLE DE NARRATIVE, lu lui aussi UNE FOIS : la ligne RAISON de chaque feuille
             ' en sort, et les cinquante feuilles d'un classeur doivent annoncer la même phrase
             ' que les lignes qu'elles portent.
+            '
+            ' C'EST LE MODÈLE GLOBAL, ET DANS LES DEUX MODES. La RAISON résume la pièce entière
+            ' — douze natures de mouvement à la fois — et aucune de ces natures ne la décrit
+            ' mieux que les autres. En mode « par nature », elle garde donc le modèle global,
+            ' qui est précisément le texte qui parle du point de vente et de sa période.
             Dim modeleNarrative As String = OptionsWU.NarrativeModele
 
             Annoncer(progression, $"Pièce globale — journée du {dateActivite:dd/MM/yyyy}")

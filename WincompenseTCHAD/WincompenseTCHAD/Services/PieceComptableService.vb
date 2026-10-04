@@ -174,11 +174,12 @@ Public NotInheritable Class PieceComptableService
         ' la même période — et c'est précisément ce qu'un narratif est censé rendre impossible.
         Dim periode As String = SuffixeDePeriode(debutPeriode, finPeriode)
 
-        ' LE MODÈLE DE NARRATIVE, lu UNE FOIS pour toute la pièce, et pour la même raison que
-        ' les comptes juste au-dessus : une pièce ne doit jamais mélanger deux paramétrages si
-        ' quelqu'un enregistrait un nouveau modèle pendant sa génération. La lecture elle-même
-        ' ne coûte rien — OptionsWU garde ses valeurs le temps de la session.
-        Dim modeleNarrative As String = OptionsWU.NarrativeModele
+        ' LE PARAMÉTRAGE DE NARRATIVE, lu UNE FOIS pour toute la pièce, et pour la même raison
+        ' que les comptes juste au-dessus : une pièce ne doit jamais mélanger deux paramétrages
+        ' si quelqu'un enregistrait un libellé pendant sa génération. L'objet rendu est
+        ' immuable, et la lecture ne coûte rien — le mode, le modèle global et les treize
+        ' libellés par nature sont gardés le temps de la session.
+        Dim narratives As NarrativesWU = NarrativeRepository.EnVigueur()
 
         For Each calc As CalculWU In listeCalculs
 
@@ -221,22 +222,20 @@ Public NotInheritable Class PieceComptableService
                 compteMouvement = comptes.CompteInterBancaire
             End If
 
-            ' LE LIBELLÉ DE TOUTES LES LIGNES DE CE POINT DE VENTE, le même pour les douze.
+            ' LES LIBELLÉS DES LIGNES DE CE POINT DE VENTE, un par nature de mouvement.
             '
-            ' IL EST DÉSORMAIS DICTÉ PAR LE MODÈLE PARAMÉTRÉ PAR LA BANQUE, et non plus par un
-            ' gabarit figé dans le code. Par défaut le modèle vaut « LD WU ACTIVITE {AGENCE}
-            ' {PERIODE} », c'est-à-dire la forme exacte qu'elle avait dictée : rien ne change
-            ' tant qu'elle n'édite rien. Le jour où elle veut d'autres mots, elle les saisit
-            ' dans l'écran « Narrative comptable » et la pièce suivante les porte — sans
-            ' livraison, sans recompilation, sans pull sur les postes.
+            ' EN MODE « UN SEUL MODÈLE » — celui par défaut — LES DOUZE SONT IDENTIQUES : c'est
+            ' la forme que la banque a dictée, « LD WU ACTIVITE <point de vente> <période> »,
+            ' et ce que chaque ligne EST se lit dans son numéro de compte. En mode « par
+            ' nature », chacune porte le libellé de sa nature. Le choix est celui de la banque,
+            ' dans l'écran « Narrative comptable » ; le code n'en sait rien et n'a pas à le
+            ' savoir — il demande le libellé de la nature qu'il pose.
             '
-            ' CE QUE CHAQUE LIGNE EST se lit dans son NUMÉRO DE COMPTE, qui est de toute façon
-            ' ce que la comptabilité impute. Les douze libellés distincts — « Commission sur
-            ' Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… — avaient disparu à la
-            ' demande de la banque ; les comptes, eux, restent nommés dans l'écran des comptes
-            ' systèmes et dans celui du barème.
-            Dim libellePdv As String = ModeleNarrativeWU.Appliquer(modeleNarrative, calc.Designation,
-                                                                   calc.Account, calc.CodeAgence, periode)
+            ' CALCULÉS TOUS D'UN COUP, et non ligne à ligne : les douze appels ci-dessous se
+            ' contentent d'indexer leur nature, ce qui les laisse lisibles, et une seule
+            ' résolution de mode a lieu par point de vente.
+            Dim libelles As Dictionary(Of NatureMouvementWU, String) =
+                narratives.Libelles(calc.Designation, calc.Account, calc.CodeAgence, periode)
 
             Dim totalCommissionsEtTaxes As Decimal =
                 calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
@@ -250,10 +249,12 @@ Public NotInheritable Class PieceComptableService
             CalculerEcartArrondi(calc)
 
             ' 1) Ligne de mouvement (compte de compensation du point de vente).
-            AjouterLigneSigneAuto(dt, compteMouvement, libellePdv, netMouvement, calc.CodeAgence)
+            AjouterLigneSigneAuto(dt, compteMouvement, libelles(NatureMouvementWU.Mouvement),
+                                  netMouvement, calc.CodeAgence)
 
             ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
-            AjouterLigneSigneAuto(dt, comptes.CompteCourant, libellePdv, -netCompteCourant, calc.CodeAgence)
+            AjouterLigneSigneAuto(dt, comptes.CompteCourant, libelles(NatureMouvementWU.CompteCourant),
+                                  -netCompteCourant, calc.CodeAgence)
 
             ' 3) Commissions part Banque (toujours créditées, quel que soit le type de PDV).
             ' Transfert et Envoi partagent le même compte dans le paramétrage actuel (728300148),
@@ -265,29 +266,39 @@ Public NotInheritable Class PieceComptableService
             ' envoi. Dans une comparaison ligne à ligne, deux ordres différents font perdre du
             ' temps au vérificateur, et lui font passer des écarts.
             AjouterLigneSiNonNul(dt, comptes.CommissionTransfertBanque,
-                                 libellePdv, 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
+                                 libelles(NatureMouvementWU.CommissionTransfertBanque),
+                                 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionPaiementBanque,
-                                 libellePdv, 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
+                                 libelles(NatureMouvementWU.CommissionPaiementBanque),
+                                 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
-                                 libellePdv, 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
+                                 libelles(NatureMouvementWU.CommissionEnvoiBanque),
+                                 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
 
             ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCommission) Then
 
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     libellePdv, 0D, calc.CommissionTransfertSA, calc.CodeAgence)
+                                     libelles(NatureMouvementWU.CommissionTransfertSousAgent),
+                                     0D, calc.CommissionTransfertSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     libellePdv, 0D, calc.CommissionPaiementSA, calc.CodeAgence)
+                                     libelles(NatureMouvementWU.CommissionPaiementSousAgent),
+                                     0D, calc.CommissionPaiementSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     libellePdv, 0D, calc.CommissionEnvoiSA, calc.CodeAgence)
+                                     libelles(NatureMouvementWU.CommissionEnvoiSousAgent),
+                                     0D, calc.CommissionEnvoiSA, calc.CodeAgence)
             End If
 
             ' 5) Taxes (impôts, TVA, TTA) : toujours créditées, à la charge de la banque.
-            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, libellePdv, 0D, calc.TaxeEnvoi, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.TVACollectee, libellePdv, 0D, calc.TVA, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, libellePdv, 0D, calc.TTAEnvoi, calc.CodeAgence)
-            AjouterLigneSiNonNul(dt, comptes.TTAReception, libellePdv, 0D, calc.TTAReception, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, libelles(NatureMouvementWU.ImpotsTaxeEnvoi),
+                                 0D, calc.TaxeEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TVACollectee, libelles(NatureMouvementWU.TVA),
+                                 0D, calc.TVA, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, libelles(NatureMouvementWU.TTAEnvoi),
+                                 0D, calc.TTAEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAReception, libelles(NatureMouvementWU.TTAReception),
+                                 0D, calc.TTAReception, calc.CodeAgence)
         Next
 
         Return dt
@@ -353,53 +364,6 @@ Public NotInheritable Class PieceComptableService
 
         calc.EcartArrondi = WUCalculationService.ArrondiFCFA(netMouvement) - contrepartiesArrondies
         Return calc.EcartArrondi
-    End Function
-
-    ''' <summary>
-    ''' Libellé de la ligne d'écart d'arrondi, préfixe compris.
-    '''
-    ''' IL EST REDEVENU PRIVÉ, ET C'EST TOUT L'OBJET DE CETTE ÉTAPE. Il a été public le temps
-    ''' que l'écran de traitement reconnaisse cette ligne EN COMPARANT SON LIBELLÉ, pour en
-    ''' isoler l'écart dans son en-tête. C'était la dernière comparaison de texte du projet,
-    ''' et elle avait un coût caché : elle interdisait de rendre ce libellé paramétrable comme
-    ''' les autres. La banque aurait changé un mot, la comparaison aurait échoué, et l'écart
-    ''' aurait disparu du bordereau sans qu'aucun message ne le dise.
-    '''
-    ''' DÉSORMAIS VerifierEquilibrePiece DIT CE QU'ELLE A POSÉ — le montant signé et le compte
-    ''' — et l'écran le retient. Ce texte n'est plus qu'un texte : personne ne s'appuie dessus
-    ''' pour retrouver quoi que ce soit, et il pourra rejoindre le paramétrage sans rien
-    ''' casser.
-    ''' </summary>
-    Private Shared ReadOnly Property LibelleEcartArrondi As String
-        Get
-            Return Prefixer(ConstantesWU.LIB_ECART_ATTENTE)
-        End Get
-    End Property
-
-    ''' <summary>
-    ''' Pose le préfixe LD devant un libellé, s'il ne le porte pas déjà.
-    '''
-    ''' IL N'A PLUS QU'UN SEUL LECTEUR : la ligne d'écart d'arrondi ci-dessus. Les douze
-    ''' libellés d'un point de vente le portent parce que le MODÈLE DE NARRATIVE paramétré par
-    ''' la banque commence par lui, et c'est à elle de décider s'il y reste.
-    '''
-    ''' LE LIBELLÉ QUI LE PORTE DÉJÀ N'EST PAS DOUBLÉ : « LD LD ECART D'ARRONDI » serait
-    ''' exactement la faute que l'ancien préfixe CCS commettait avant d'être corrigé. Le cas ne
-    ''' se présente pas aujourd'hui — LIB_ECART_ATTENTE ne commence pas par LD — et la
-    ''' précaution reste, parce que ce libellé-là est une constante qu'on peut rééditer.
-    '''
-    ''' Un libellé vide le reste : préfixer le vide donnerait un narratif réduit à « LD », qui
-    ''' ne dit rien et occupe une ligne de pièce.
-    ''' </summary>
-    Private Shared Function Prefixer(libelle As String) As String
-
-        If libelle.Length = 0 Then Return libelle
-
-        If libelle.StartsWith(ConstantesWU.LIB_PREFIXE & " ", StringComparison.OrdinalIgnoreCase) Then
-            Return libelle
-        End If
-
-        Return $"{ConstantesWU.LIB_PREFIXE} {libelle}"
     End Function
 
     ''' <summary>
@@ -547,13 +511,24 @@ Public NotInheritable Class PieceComptableService
         ' dans SystemeWU (colonnes Cpte_attenteDEBIT / Cpte_attenteCREDIT).
         Dim compteDAttente As String = ComptesSystemeWU.Actuels.CompteInterBancaire
 
+        ' SON LIBELLÉ VIENT DU PARAMÉTRAGE, COMME LES DOUZE AUTRES — mais de SA NATURE, et
+        ' dans les DEUX modes. Cette ligne est posée après la pièce et ne se rattache ni à un
+        ' point de vente ni à une période : le modèle global la réduirait à « LD WU ACTIVITE ».
+        ' La banque peut l'éditer, dans l'onglet des libellés par nature.
+        '
+        ' LES QUATRE REPÈRES SONT VIDES, et c'est exact : il n'y a ici ni désignation, ni
+        ' Account, ni code agence, ni période. Un repère vide ne laisse pas de trou dans la
+        ' phrase — ModeleNarrativeWU résorbe les espaces.
+        Dim libelleEcart As String = NarrativeRepository.EnVigueur().Libelle(
+            NatureMouvementWU.EcartArrondi, String.Empty, String.Empty, String.Empty, String.Empty)
+
         If differenceGlobale > 0D AndAlso differenceGlobale <= ConstantesWU.SEUIL_ECART_TOLERE Then
             ' PRÉFIXÉE COMME LES AUTRES. Cette ligne est la seule à ne pas sortir du modèle
             ' de narrative : elle est posée APRÈS la pièce, pour absorber l'écart d'arrondi
             ' global, et ne se rattache ni à un point de vente ni à une période — les deux
             ' repères que le modèle emploie. Elle n'en reste pas moins un libellé de la pièce,
             ' et la banque les a demandés tous préfixés.
-            AjouterLigne(dtPiece, compteDAttente, LibelleEcartArrondi, 0L,
+            AjouterLigne(dtPiece, compteDAttente, libelleEcart, 0L,
                          CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE)
 
             ecartAbsorbe = CLng(differenceGlobale)
@@ -564,7 +539,7 @@ Public NotInheritable Class PieceComptableService
         End If
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, compteDAttente, LibelleEcartArrondi,
+            AjouterLigne(dtPiece, compteDAttente, libelleEcart,
                          CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE)
 
             ' SIGNÉ, et négatif ici : un écart au débit et un écart au crédit ne se compensent
