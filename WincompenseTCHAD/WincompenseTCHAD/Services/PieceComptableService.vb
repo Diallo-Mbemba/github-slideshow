@@ -334,17 +334,6 @@ Public NotInheritable Class PieceComptableService
     End Function
 
     ''' <summary>
-    ''' Libellé de la ligne de mouvement d'un point de vente.
-    '''
-    ''' Le gabarit préfixe la désignation par « CCS_ », comme le classeur de référence de la
-    ''' banque. Mais la plupart des désignations commencent DÉJÀ par « CCS », et la pièce
-    ''' portait alors « CCS_CCS NGARTA RUE DE 40M ACTIVITE WU ». Le préfixe n'est donc posé
-    ''' que lorsqu'il manque.
-    '''
-    ''' La comparaison ignore la casse et le tiret bas : « CCS », « ccs » et « CCS_ » comptent
-    ''' tous pour un préfixe déjà présent.
-    ''' </summary>
-    ''' <summary>
     ''' Colle la période au libellé d'une écriture.
     '''
     ''' POURQUOI CETTE FONCTION EXISTE, ALORS QU'UNE CONCATÉNATION SUFFIRAIT.
@@ -365,13 +354,39 @@ Public NotInheritable Class PieceComptableService
     ''' </summary>
     Private Shared Function Narratif(libelle As String, periode As String) As String
 
-        Dim texte As String = If(libelle, String.Empty).Trim()
+        Dim texte As String = Prefixer(If(libelle, String.Empty).Trim())
         Dim suffixe As String = If(periode, String.Empty).Trim()
 
         If suffixe.Length = 0 Then Return texte
         If texte.Length = 0 Then Return suffixe
 
         Return texte & " " & suffixe
+    End Function
+
+    ''' <summary>
+    ''' Pose le préfixe LD devant un libellé, s'il ne le porte pas déjà.
+    '''
+    ''' LA BANQUE L'A DEMANDÉ DEVANT TOUS LES LIBELLÉS, et c'est ici qu'il se pose — en un seul
+    ''' endroit, par lequel passent les douze libellés de la pièce. Les écrire préfixés un par
+    ''' un dans ConstantesWU aurait marché aussi, et aurait laissé douze occasions d'en oublier
+    ''' un, plus une à chaque libellé ajouté.
+    '''
+    ''' LE LIBELLÉ QUI LE PORTE DÉJÀ N'EST PAS DOUBLÉ : celui de la ligne de mouvement commence
+    ''' par « LD WU ACTIVITE », et « LD LD WU ACTIVITE » serait exactement la faute que l'ancien
+    ''' préfixe CCS commettait avant d'être corrigé.
+    '''
+    ''' Un libellé vide le reste : préfixer le vide donnerait un narratif réduit à « LD », qui
+    ''' ne dit rien et occupe une ligne de pièce.
+    ''' </summary>
+    Private Shared Function Prefixer(libelle As String) As String
+
+        If libelle.Length = 0 Then Return libelle
+
+        If libelle.StartsWith(ConstantesWU.LIB_PREFIXE & " ", StringComparison.OrdinalIgnoreCase) Then
+            Return libelle
+        End If
+
+        Return $"{ConstantesWU.LIB_PREFIXE} {libelle}"
     End Function
 
     ''' <summary>
@@ -414,16 +429,27 @@ Public NotInheritable Class PieceComptableService
         Return String.Format(CultureInfo.InvariantCulture, ConstantesWU.PIECE_PERIODE_LONGUE_FORMAT,
                              premier, dernier)
     End Function
+
+    ''' <summary>
+    ''' Libellé de la ligne de mouvement d'un point de vente : « LD WU ACTIVITE <désignation> ».
+    '''
+    ''' LE DOUBLE PRÉFIXE A DISPARU AVEC LE PRÉFIXE, et cette fonction a fondu de moitié. Le
+    ''' gabarit commençait par « CCS_ » ; la plupart des désignations de la banque commençant
+    ''' elles-mêmes par CCS, il fallait constater le préfixe avant de le poser, sous peine de
+    ''' lire « CCS_CCS NGARTA RUE DE 40M ACTIVITE WU ». Le nouveau gabarit commence par
+    ''' LD WU ACTIVITE, qu'aucune désignation ne porte : il se pose sans précaution.
+    '''
+    ''' CE QUE CE CHANGEMENT NE FAIT PAS, et il faut le savoir : il retire le CCS QUE NOUS
+    ''' AJOUTIONS, pas celui que portent les désignations elles-mêmes. Un point de vente nommé
+    ''' « CCS NGARTA RUE DE 40M » continuera de le voir dans ses narratifs, parce que c'est son
+    ''' nom. Le faire disparaître tout à fait demanderait soit de renommer ces points de vente
+    ''' dans le référentiel, soit de porter ici l'Account plutôt que la désignation — et c'est
+    ''' une décision de la banque, pas une correction de code.
+    ''' </summary>
     Private Shared Function LibelleDuMouvement(designation As String) As String
 
-        Dim nom As String = If(designation, String.Empty).Trim()
-        If nom.Length = 0 Then Return String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, nom).Trim()
-
-        If nom.StartsWith(ConstantesWU.PREFIXE_CCS, StringComparison.OrdinalIgnoreCase) Then
-            Return $"{nom} {ConstantesWU.LIB_MOUVEMENT_ACTIVITE_SUFFIXE}".Trim()
-        End If
-
-        Return String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT, nom).Trim()
+        Return String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT,
+                             If(designation, String.Empty).Trim()).Trim()
     End Function
 
     ''' <summary>
@@ -505,14 +531,18 @@ Public NotInheritable Class PieceComptableService
         Dim compteEcart As String = ComptesSystemeWU.Actuels.CompteInterBancaire
 
         If differenceGlobale > 0D AndAlso differenceGlobale <= ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE, 0L,
+            ' PRÉFIXÉE COMME LES AUTRES. Cette ligne est la seule à ne pas passer par
+            ' Narratif : elle est posée après la pièce, pour absorber l'écart d'arrondi
+            ' global, et ne se rattache à aucune période. Elle n'en reste pas moins un
+            ' libellé de la pièce, et la banque les a demandés tous préfixés.
+            AjouterLigne(dtPiece, compteEcart, Prefixer(ConstantesWU.LIB_ECART_ATTENTE), 0L,
                          CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE)
             messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte inter bancaire {compteEcart}."
             Return True
         End If
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, compteEcart, ConstantesWU.LIB_ECART_ATTENTE,
+            AjouterLigne(dtPiece, compteEcart, Prefixer(ConstantesWU.LIB_ECART_ATTENTE),
                          CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE)
             messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte inter bancaire {compteEcart}."
             Return True

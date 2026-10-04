@@ -204,11 +204,34 @@ Public NotInheritable Class ConstantesWU
     Public Const LIB_ECART_ATTENTE As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE"
 
     ''' <summary>
-    ''' Gabarit du libellé de la ligne de mouvement (activité) du point de vente, tel que
-    ''' constaté dans le classeur de référence : "CCS_BOLOLO ACTIVITE WU" pour l'agence BOLOLO.
-    ''' {0} est remplacé par la Designation de l'Account.
+    ''' PRÉFIXE PORTÉ PAR TOUS LES LIBELLÉS DE LA PIÈCE, sur demande écrite de la banque.
+    '''
+    ''' Il part dans la colonne ADDLTEXT du fichier core banking, où leur système l'attend en
+    ''' tête de chaque narratif. Posé une fois ici, il suit les douze libellés de la pièce sans
+    ''' qu'aucun d'eux ait à le connaître : voir PieceComptableService.Narratif, qui l'ajoute à
+    ''' celui qui ne le porte pas déjà.
     ''' </summary>
-    Public Const LIB_MOUVEMENT_ACTIVITE_FORMAT As String = "CCS_{0} ACTIVITE WU"
+    Public Const LIB_PREFIXE As String = "LD"
+
+    ''' <summary>
+    ''' Gabarit du libellé de la ligne de mouvement (activité) du point de vente.
+    ''' {0} est remplacé par la Designation de l'Account.
+    '''
+    ''' IL A CHANGÉ SUR DEMANDE ÉCRITE DE LA BANQUE. Il valait « CCS_{0} ACTIVITE WU », et
+    ''' c'est ce gabarit — notre propre préfixe, et non une donnée du référentiel — qui faisait
+    ''' apparaître CCS « partout dans la narrative » du core banking, comme la banque l'a
+    ''' relevé : chaque ligne de mouvement de chaque point de vente le portait.
+    '''
+    ''' La nouvelle forme est celle qu'elle a dictée : LD WU ACTIVITE, puis le point de vente,
+    ''' puis la période — cette dernière ajoutée par Narratif, comme pour tous les autres
+    ''' libellés.
+    '''
+    ''' « AGENCE OU SOUS-AGENT » EST LA DÉSIGNATION, et non le code Account. C'est elle que la
+    ''' pièce portait déjà, c'est elle qu'un comptable lit, et la demande ne nommait pas de
+    ''' code. Si la banque voulait l'Account, c'est l'appel de LibelleDuMouvement qu'il faut
+    ''' changer, et lui seul.
+    ''' </summary>
+    Public Const LIB_MOUVEMENT_ACTIVITE_FORMAT As String = "LD WU ACTIVITE {0}"
 
     ''' <summary>
     ''' Groupe d'un point de vente qui n'en porte aucun — une agence propre, ou un
@@ -220,15 +243,22 @@ Public NotInheritable Class ConstantesWU
     Public Const PIECE_GROUPE_SANS As String = "(sans groupe)"
 
     ''' <summary>
-    ''' Préfixe du gabarit ci-dessus, isolé pour pouvoir constater qu'il est DÉJÀ présent.
+    ''' Gabarit de la ligne RAISON, en bas de chaque pièce.
     '''
-    ''' La plupart des désignations commencent par « CCS », et le gabarit produisait alors
-    ''' « CCS_CCS NGARTA RUE DE 40M ACTIVITE WU ». Voir PieceComptableService.LibelleDuMouvement.
+    ''' LA BANQUE L'A DEMANDÉE « POUR CHAQUE SOUS-AGENT », et c'est ce que le classeur produit :
+    ''' une pièce par point de vente, chacune portant en bas la raison de ses écritures. La
+    ''' pièce GLOBALE, qui les rassemble toutes, ne peut en nommer aucun : elle emploie le
+    ''' gabarit ci-dessous.
+    '''
+    ''' {0} est le point de vente, {1} la période.
     ''' </summary>
-    Public Const PREFIXE_CCS As String = "CCS"
+    Public Const PIECE_RAISON_FORMAT As String = "LD WU ACTIVITE {0} {1}"
 
-    ''' <summary>Fin du gabarit, employée quand le préfixe est déjà porté par la désignation.</summary>
-    Public Const LIB_MOUVEMENT_ACTIVITE_SUFFIXE As String = "ACTIVITE WU"
+    ''' <summary>
+    ''' Raison de la pièce GLOBALE, qui ne se rattache à aucun point de vente en particulier.
+    ''' {0} est la période.
+    ''' </summary>
+    Public Const PIECE_RAISON_GLOBALE_FORMAT As String = "LD WU ACTIVITE {0}"
 
 #End Region
 
