@@ -221,7 +221,7 @@ Public NotInheritable Class DiagnosticSqlWU
                "    USE " & NomDeLaBase(chaine) & ";" & vbCrLf &
                "    ALTER ROLE wu_compense ADD MEMBER " & Crochets(compte) & ";" & vbCrLf & vbCrLf &
                "Remplacez wu_compense par wu_commercial ou wu_admin selon le poste. Si le serveur " &
-               "répond que le rôle n'existe pas, c'est que Scripts\08_RolesSQLServer.sql n'a pas " &
+               "répond que le rôle n'existe pas, c'est que Scripts\00_InstallationComplete.sql n'a pas " &
                "encore été exécuté."
     End Function
 

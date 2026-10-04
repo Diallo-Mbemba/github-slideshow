@@ -250,7 +250,7 @@ Public Class FrmNarrative
         lblModeIndisponible.Visible = True
         lblModeIndisponible.Text =
             "Mode indisponible : la table T_NarrativeNatureWU est absente de la base. " &
-            "Faites exécuter Scripts\23_NarrativeParNature.sql par l'informatique — il la crée, " &
+            "Faites exécuter Scripts\00_InstallationComplete.sql par l'informatique — il la crée, " &
             "et crée aussi le journal des modifications."
     End Sub
 

@@ -28,14 +28,18 @@ Public NotInheritable Class HistoriqueRepository
     ''' <summary>Message posé lorsque la table n'existe pas : le script d'installation n'a pas été joué.</summary>
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_HistoriqueWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\05_HistoriqueWU.sql : il la crée." & vbCrLf &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée." & vbCrLf &
+        "C'est le SEUL script à exécuter — il contient tous les autres — et il peut être " &
+        "rejoué sans risque : il ne crée que ce qui manque." & vbCrLf &
         "Tant qu'elle est absente, les journées comptabilisées ne sont pas historisées et les " &
         "rapports d'activité restent vides."
 
     ''' <summary>Message posé lorsque la table du détail des transactions n'existe pas.</summary>
     Public Const MESSAGE_TABLE_MTCN_ABSENTE As String =
         "La table T_HistoriqueMTCN n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\06_HistoriqueMTCN.sql : il la crée." & vbCrLf &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée." & vbCrLf &
+        "C'est le SEUL script à exécuter — il contient tous les autres — et il peut être " &
+        "rejoué sans risque : il ne crée que ce qui manque." & vbCrLf &
         "Tant qu'elle est absente, le détail des MTCN n'est pas conservé."
 
 #Region "Une journée déjà comptabilisée"
@@ -254,9 +258,8 @@ Public NotInheritable Class HistoriqueRepository
             nombreTransactions = 0
             messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
                                MESSAGE_TABLE_ABSENTE & vbCrLf & vbCrLf &
-                               "Si seule T_HistoriqueMTCN manque, exécutez aussi " &
-                               "Scripts\06_HistoriqueMTCN.sql ; si c'est T_PieceWU, " &
-                               "Scripts\13_PiecesComptables.sql.",
+                               "Qu'il manque T_HistoriqueMTCN ou T_PieceWU, le même script " &
+                               "les crée toutes les deux.",
                                $"Historisation de la journée du {jour:dd/MM/yyyy} impossible : {ex.Message}")
             Return False
 

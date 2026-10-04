@@ -49,14 +49,14 @@ Public NotInheritable Class UtilisateurRepository
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_UtilisateurWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\07_Utilisateurs.sql : il crée les tables des utilisateurs " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il crée les tables des utilisateurs " &
         "et du journal des connexions, et ajoute les colonnes de traçabilité."
 
     Public Const MESSAGE_COLONNE_ABSENTE As String =
         "La base n'est pas à jour : il lui manque une colonne que cette version attend." & vbCrLf & vbCrLf &
-        "Exécutez les scripts du dossier Scripts\ qui n'ont pas encore été joués, dans l'ordre " &
-        "numéroté. Le double regard sur le référentiel demande en particulier " &
-        "Scripts\09_Demandes.sql, qui ajoute la colonne Fonction à la table des utilisateurs."
+        "Exécutez Scripts\00_InstallationComplete.sql : il ajoute les colonnes manquantes sans " &
+        "toucher aux données, et il peut être rejoué sans risque. C'est lui, en particulier, qui " &
+        "pose la colonne Fonction que le double regard sur le référentiel attend."
 
 #Region "Authentification"
 

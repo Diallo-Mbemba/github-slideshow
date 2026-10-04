@@ -237,7 +237,7 @@ Public Class FrmRapportActivite
             "Cause la plus fréquente : ces journées ont été comptabilisées AVANT la mise en place " &
             "du suivi des MTCN." & Environment.NewLine & Environment.NewLine &
             "Pour l'obtenir :" & Environment.NewLine &
-            "   1. exécuter le script Scripts\06_HistoriqueMTCN.sql s'il ne l'a pas encore été ;" & Environment.NewLine &
+            "   1. exécuter le script Scripts\00_InstallationComplete.sql s'il ne l'a pas encore été ;" & Environment.NewLine &
             "   2. recharger les rapports de ces journées et regénérer leur pièce comptable." & Environment.NewLine &
             Environment.NewLine &
             "Une journée regénérée remplace proprement la précédente : l'opération est sans risque.",

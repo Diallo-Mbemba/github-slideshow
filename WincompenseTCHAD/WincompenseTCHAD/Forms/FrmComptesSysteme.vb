@@ -152,7 +152,7 @@ Public Class FrmComptesSysteme
         End If
 
         lblChange.ForeColor = Drawing.Color.FromArgb(183, 28, 28)
-        lblChange.Text = "Comptes de change indisponibles : le script Scripts\21_EcartsDeChange.sql " &
+        lblChange.Text = "Comptes de change indisponibles : le script Scripts\00_InstallationComplete.sql " &
                          "n'a pas encore été exécuté sur cette base. Faites-le exécuter par " &
                          "l'informatique, puis rouvrez cet écran."
     End Sub

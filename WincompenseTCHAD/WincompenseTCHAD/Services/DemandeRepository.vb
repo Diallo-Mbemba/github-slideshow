@@ -32,13 +32,13 @@ Public NotInheritable Class DemandeRepository
     Public Const MESSAGE_COLONNES_ABSENTES As String =
         "La table T_DemandeWU existe, mais il lui manque les colonnes ajoutées pour " &
         "l'annulation des comptabilisations." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\14_AnnulationComptabilisation.sql : il les ajoute et " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il les ajoute et " &
         "ouvre la file des demandes aux annulations." & vbCrLf &
         "Tant qu'il n'est pas exécuté, AUCUNE demande ne peut être déposée ni décidée."
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_DemandeWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\09_Demandes.sql : il crée la file des demandes et ajoute " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il crée la file des demandes et ajoute " &
         "la colonne Fonction à la table des utilisateurs."
 
     Private Const COLONNES As String =

@@ -13,10 +13,13 @@ en VB.NET (.NET Framework 4.8 / Visual Studio 2019 / SQL Server Express).
 2. Vérifier que le Framework cible du projet est bien **.NET Framework 4.8**.
 3. Adapter la chaîne de connexion SQL Server dans `WincompenseTCHAD\App.config` si nécessaire
    (par défaut : `Server=.\SQLEXPRESS;Database=GWC_WINCOMPENSE_ETD;Integrated Security=True;`).
-4. Exécuter **tous** les scripts SQL du dossier `Scripts\`, dans l'ordre numéroté, sur
-   l'instance `.\SQLEXPRESS`. Les scripts `07` et `08` ne sont pas optionnels : sans le `07`,
-   la table des utilisateurs et les colonnes de traçabilité n'existent pas, et l'application ne
-   peut ni identifier personne ni écrire.
+4. Exécuter **`Scripts\00_InstallationComplete.sql`**, et lui seul, sur l'instance
+   `.\SQLEXPRESS`. Il contient tous les autres fichiers du dossier, qui sont la documentation
+   de ce qu'il fait — découpée par sujet — et non des scripts à lancer un par un. Il est
+   **rejouable** : à relancer après chaque livraison, il crée ce qui manque et ne touche à
+   rien d'autre. Seuls `11_AccesUtilisateurs.sql` et `12_AccesCompteApplicatif.sql` restent à
+   part, parce qu'ils demandent une valeur propre à la banque — comptes Active Directory, nom
+   du compte SQL Server — que `00` ne peut pas deviner.
 5. Compiler et lancer (F5). Au premier lancement, l'application propose de créer le premier
    compte administrateur : c'est lui qui créera ensuite les autres.
 
@@ -175,7 +178,7 @@ WincompenseTCHAD/
         └── FrmParametresConnexion.vb       ' Changement de serveur, pour ce poste ou pour toute la banque
 
 Scripts/
-├── 00_InstallationComplete.sql            ' LES DIX SCRIPTS EN UN SEUL, à donner à l'informatique
+├── 00_InstallationComplete.sql            ' LE SEUL À EXÉCUTER — il contient tous les autres
 ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
 ├── 02_DonneesExemple.sql
 ├── 03_SystemeWU.sql                       ' Comptes comptables paramétrés
@@ -242,7 +245,8 @@ passe est retiré de la chaîne **avant toute écriture**, puis chiffré par Win
 clé `MOTDEPASSE` du fichier local. Le partage ne reçoit que le serveur, la base et le **nom** du
 compte. Il reste ainsi lisible par tous, ce qui est la condition même de son utilité.
 
-Les droits d'accès à la base restent donnés par `Scripts\08_RolesSQLServer.sql`.
+Les droits d'accès à la base restent donnés par `Scripts\00_InstallationComplete.sql` (dont le
+détail sur ce point est documenté dans `08_RolesSQLServer.sql`).
 
 ### Trois façons de changer de serveur
 

@@ -340,7 +340,7 @@ Public Class FrmCommissionsBanque
         Else
             phrase &= Environment.NewLine &
                       "Aucune journée de cette période n'est répartie : exécutez " &
-                      "Scripts\16_CommissionsBanque.sql, puis comptabilisez normalement."
+                      "Scripts\00_InstallationComplete.sql, puis comptabilisez normalement."
         End If
 
         lblAvertissement.Text = phrase

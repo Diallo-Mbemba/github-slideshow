@@ -32,7 +32,9 @@ Public NotInheritable Class TraitementRepository
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_TraitementWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\17_BordereauJournee.sql : il la crée." & vbCrLf &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée." & vbCrLf &
+        "C'est le SEUL script à exécuter — il contient tous les autres — et il peut être " &
+        "rejoué sans risque : il ne crée que ce qui manque." & vbCrLf &
         "Tant qu'elle est absente, le bordereau de fin de journée se reconstitue depuis " &
         "l'historique et la pièce, mais sans le nom des rapports Western Union — et aucune " &
         "journée ne peut être visée."

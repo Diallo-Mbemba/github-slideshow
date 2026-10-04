@@ -149,7 +149,7 @@ Public NotInheritable Class CalendrierWU
 
         Catch ex As SqlException
             _messageLecture = If(ex.Number = ERREUR_TABLE_ABSENTE,
-                                 "La table T_JourFerieWU n'existe pas : exécutez Scripts\10_JoursFeries.sql.",
+                                 "La table T_JourFerieWU n'existe pas : exécutez Scripts\00_InstallationComplete.sql.",
                                  $"Lecture des jours fériés impossible : {ex.Message}")
         Catch ex As InvalidOperationException
             _messageLecture = $"Connexion SQL Server indisponible : {ex.Message}"

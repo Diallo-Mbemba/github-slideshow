@@ -230,7 +230,8 @@ Public NotInheritable Class PreparationBaseWU
 
         If rapport.RolesPresents < ROLES.Length Then
             lignes.AppendLine("Les trois rôles ne sont pas tous présents : exécutez " &
-                              "Scripts\08_RolesSQLServer.sql, ou le script complet.")
+                              "Scripts\00_InstallationComplete.sql. C'est le seul script à " &
+                              "exécuter, et il peut être rejoué sans risque.")
             tout = False
         End If
 

@@ -37,7 +37,7 @@ paramétrés ne sont pas comptabilisés.
 
 | | Étape | Qui |
 |---|---|---|
-| ☐ | Exécuter **`Scripts\00_InstallationComplete.sql`** sur le serveur de production | INFO |
+| ☐ | Exécuter **`Scripts\00_InstallationComplete.sql`** sur le serveur de production — **c'est le seul script à exécuter, et il est rejouable** | INFO |
 | ☐ | **Authentification Windows** : compléter la section 1 de **`Scripts\11_AccesUtilisateurs.sql`** avec les comptes ou groupes réels, puis l'exécuter | INFO |
 | ☐ | **Compte SQL Server fourni par la banque** : renseigner `@compte` dans **`Scripts\12_AccesCompteApplicatif.sql`**, puis l'exécuter | INFO |
 | ☐ | Lire le **compte rendu** en fin de script : tables créées, rôles, et ce qui reste à faire | INFO |
@@ -157,7 +157,7 @@ C'est le seul endroit où un défaut empêcherait l'application de s'ouvrir.
 
 | | Étape |
 |---|---|
-| ☐ | Exécuter `Scripts\20_ProduitsTransfert.sql`, puis `Scripts\19_BornerLeTaux.sql` s'il ne l'a pas été |
+| ☐ | Rejouer `Scripts\00_InstallationComplete.sql` : il contient les produits de transfert et les bornes du taux |
 | ☐ | Lancer : après l'identification, la **fenêtre de choix du produit** s'affiche |
 | ☐ | Western Union y est **Disponible**, Ria **En attente** |
 | ☐ | Ouvrir Western Union : le titre dit `Wincompense TCHAD — Western Union` |

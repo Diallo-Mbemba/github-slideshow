@@ -50,7 +50,7 @@ Public NotInheritable Class AnnulationRepository
 
     Public Const MESSAGE_TABLES_ABSENTES As String =
         "Les tables d'annulation n'existent pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\14_AnnulationComptabilisation.sql : il les crée et " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il les crée et " &
         "ouvre la file des demandes aux annulations." & vbCrLf &
         "Tant qu'elles sont absentes, une comptabilisation ne peut pas être retirée."
 

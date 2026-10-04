@@ -40,7 +40,7 @@ Public NotInheritable Class ProduitRepository
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_ProduitTransfert n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\25_ProduitsTransfert.sql : il la crée et l'amorce avec " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée et l'amorce avec " &
         "Western Union et Ria." & vbCrLf &
         "Tant qu'elle est absente, l'application emploie sa liste interne — les deux mêmes " &
         "produits — et l'écran d'administration ne peut rien enregistrer."
@@ -105,7 +105,7 @@ Public NotInheritable Class ProduitRepository
         If lus.Count = 0 Then
             messageErreur = $"La table {TABLE} est vide. La liste interne des produits est employée." &
                             Environment.NewLine &
-                            "Rejouez Scripts\25_ProduitsTransfert.sql pour l'amorcer."
+                            "Rejouez Scripts\00_InstallationComplete.sql pour l'amorcer."
 
             ProduitTransfert.Charger(ProduitTransfert.ListeDeSecours())
             Return False

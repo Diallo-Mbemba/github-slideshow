@@ -37,7 +37,9 @@ Public NotInheritable Class PieceRepository
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_PieceWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\13_PiecesComptables.sql : il la crée." & vbCrLf &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée." & vbCrLf &
+        "C'est le SEUL script à exécuter — il contient tous les autres — et il peut être " &
+        "rejoué sans risque : il ne crée que ce qui manque." & vbCrLf &
         "Tant qu'elle est absente, les pièces ne sont pas conservées et l'écran de consultation " &
         "reste vide. Les journées déjà comptabilisées, elles, ne pourront jamais être retrouvées " &
         "telles qu'elles ont été produites."

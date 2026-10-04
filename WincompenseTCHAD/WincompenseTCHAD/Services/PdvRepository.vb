@@ -188,7 +188,7 @@ Public NotInheritable Class PdvRepository
     ''' </summary>
     Public Const MESSAGE_TABLE_GROUPES_ABSENTE As String =
         "La table T_GroupeStatistique n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\04_GroupeStatistique.sql : il crée la table et y reprend " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il crée la table et y reprend " &
         "automatiquement les groupes déjà présents dans T_Pdv_SA."
 
     ''' <summary>

@@ -40,7 +40,9 @@ Public NotInheritable Class NarrativeRepository
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_NarrativeNatureWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\23_NarrativeParNature.sql : il la crée." & vbCrLf &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée." & vbCrLf &
+        "C'est le SEUL script à exécuter — il contient tous les autres — et il peut être " &
+        "rejoué sans risque : il ne crée que ce qui manque." & vbCrLf &
         "Tant qu'elle est absente, le mode « un libellé par nature » reste indisponible et " &
         "toutes les lignes portent le modèle global."
 

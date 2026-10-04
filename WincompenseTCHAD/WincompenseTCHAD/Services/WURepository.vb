@@ -376,7 +376,7 @@ Public NotInheritable Class WURepository
                     If nombreLignes = 0 Then
                         messageErreur = $"La table {TABLE_SYSTEME} est vide : aucune ligne de paramétrage à mettre à jour." &
                                         Environment.NewLine & Environment.NewLine &
-                                        "Créez-la au préalable en exécutant le script Scripts\03_SystemeWU.sql."
+                                        "Créez-la au préalable en exécutant le script Scripts\00_InstallationComplete.sql."
                         Return False
                     End If
 

@@ -47,7 +47,7 @@ Public NotInheritable Class ChangeRepository
 
     Public Const MESSAGE_TABLES_ABSENTES As String =
         "Les tables des écarts de change n'existent pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\21_EcartsDeChange.sql : il les crée, amorce la parité et " &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il les crée, amorce la parité et " &
         "accorde les droits." & vbCrLf & vbCrLf &
         "Tant qu'il n'a pas été exécuté, le calcul et la pièce restent consultables à l'écran, " &
         "mais rien ne peut être conservé."
@@ -286,7 +286,7 @@ Public NotInheritable Class ChangeRepository
 
             Case ERREUR_DROIT_REFUSE
                 Return "Droit refusé sur les tables des écarts de change." & Environment.NewLine & Environment.NewLine &
-                       "Faites exécuter Scripts\21_EcartsDeChange.sql par l'informatique : il accorde " &
+                       "Faites exécuter Scripts\00_InstallationComplete.sql par l'informatique : il accorde " &
                        "les droits en même temps qu'il crée les tables." & Environment.NewLine & Environment.NewLine &
                        $"Détail SQL Server : {ex.Message}"
 

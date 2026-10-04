@@ -1,46 +1,70 @@
 /*
 ================================================================================================
-    WINCOMPENSE TCHAD — INSTALLATION COMPLÈTE DE LA BASE DE DONNÉES
+    WINCOMPENSE TCHAD — LE SEUL SCRIPT À EXÉCUTER
 ================================================================================================
 
-    UN SEUL SCRIPT. Il crée la base, ses tables, ses rôles et ses droits, et rend compte de
-    ce qu'il a fait. Il remplace l'exécution des dix scripts 01 à 10 un par un.
+    IL N'Y EN A QU'UN. Celui-ci. Les vingt-trois autres fichiers du dossier Scripts sont la
+    DOCUMENTATION de ce qu'il fait, découpée par sujet — ils expliquent, ils ne s'exécutent
+    pas. Tout ce qu'ils créent est repris ici, dans le bon ordre.
+
+    À EXÉCUTER APRÈS CHAQUE LIVRAISON de l'application, et aussi souvent qu'on veut.
 
     ------------------------------------------------------------------------------------------
-    AVANT DE L'EXÉCUTER
+    COMMENT L'EXÉCUTER
     ------------------------------------------------------------------------------------------
 
       1. Ouvrir SQL Server Management Studio, connecté au serveur de PRODUCTION.
       2. Vérifier en haut de l'écran que c'est bien le bon serveur.
       3. Exécuter le script entier (F5).
+      4. Lire l'onglet « Messages », puis le compte rendu de la partie 6.
 
-    Aucune base n'est écrasée : chaque objet est protégé par un contrôle d'existence. Le script
-    est REJOUABLE — le relancer sur une base déjà installée ne détruit rien et ne crée que ce
-    qui manque. Il peut donc servir aussi à rattraper une installation incomplète.
+    IL EST REJOUABLE, ET C'EST SA RAISON D'ÊTRE. Chaque objet est protégé par un contrôle
+    d'existence : il crée ce qui manque, complète ce qui est incomplet, et ne touche à rien
+    d'autre. AUCUNE DONNÉE N'EST ÉCRASÉE — ni un compte comptable saisi par la Direction
+    Comptable, ni un libellé, ni une option. Le relancer sur une base déjà installée est sans
+    risque, et c'est la façon normale de rattraper une base en retard.
 
     ------------------------------------------------------------------------------------------
     CE QU'IL FAIT, DANS L'ORDRE
     ------------------------------------------------------------------------------------------
 
       Partie 1   La base GWC_WINCOMPENSE_ETD
-      Partie 2   Les douze tables et leurs index
+      Partie 2   Les tables et leurs index
       Partie 3   Les données de paramétrage de départ (comptes comptables, jours fériés)
-      Partie 4   Les trois rôles et leurs droits
+      Partie 4   Les rôles, leurs droits, et les RATTRAPAGES sur une base antérieure
       Partie 5   L'accès du compte applicatif à la base
-      Partie 6   Le compte rendu
+      Partie 6   Le compte rendu : ce qui a été fait, et ce qui reste à faire
 
-    L'ORDRE DIFFÈRE VOLONTAIREMENT de la numérotation des scripts d'origine : les droits sont
-    accordés EN DERNIER, une fois toutes les tables créées. Exécutés dans l'ordre numérique,
-    les scripts laissaient T_DemandeWU et T_JourFerieWU sans aucun droit, et l'application
+    L'ORDRE DIFFÈRE VOLONTAIREMENT de la numérotation des fichiers de documentation : les
+    droits sont accordés APRÈS la création des tables. Exécutés dans l'ordre numérique, les
+    scripts laissaient T_DemandeWU et T_JourFerieWU sans aucun droit, et l'application
     échouait là où on ne l'attendait pas — calendrier illisible au moment de dater le fichier
     core banking, file du double regard vide alors qu'elle contenait des demandes.
+
+    LES RATTRAPAGES (partie 4 decies) MÉRITENT UN MOT. Une table qui existe déjà n'est pas
+    recréée : son CREATE TABLE est ignoré, et les colonnes ajoutées depuis sa création ne
+    seraient donc jamais posées sur la base de production. Ces blocs-là les ajoutent une par
+    une, chacun gardé par sys.columns. C'est le genre d'oubli qui fait dire « le script est
+    passé sans erreur » et échouer l'application une semaine plus tard.
+
+    ------------------------------------------------------------------------------------------
+    LES DEUX SEULS AUTRES FICHIERS QUI S'EXÉCUTENT, ET POURQUOI ILS RESTENT À PART
+    ------------------------------------------------------------------------------------------
+
+    Ils demandent une valeur que ce script ne peut pas deviner, et qu'il ne faut pas inventer :
+
+      11_AccesUtilisateurs.sql     les comptes ou groupes Active Directory de la banque.
+      12_AccesCompteApplicatif.sql le nom du compte SQL Server fourni par la banque.
+
+    Tous deux sont des gestes D'INSTALLATION, faits une fois. Ils n'ont pas à être rejoués à
+    chaque livraison.
 
     ------------------------------------------------------------------------------------------
     CE QU'IL NE FAIT PAS
     ------------------------------------------------------------------------------------------
 
       - Il n'insère AUCUN sous-agent ni agence : le référentiel se charge depuis l'application,
-        ou par vos propres scripts. Les données d'exemple du script 02 sont volontairement
+        ou par vos propres scripts. Les données d'exemple du fichier 02 sont volontairement
         exclues : elles n'ont leur place que sur un environnement de test.
 
       - Il ne crée AUCUN compte utilisateur : le premier administrateur se crée au premier
@@ -57,13 +81,12 @@
     APRÈS L'EXÉCUTION
     ------------------------------------------------------------------------------------------
 
-      1. Lire l'onglet « Messages » : chaque objet créé y est annoncé.
+      1. Lire l'onglet « Messages » : chaque objet créé ou complété y est annoncé.
       2. Lire le compte rendu de la partie 6 : il dit ce qui manque, s'il manque quelque chose.
-      3. Compléter la PARTIE 5 avec vos groupes Active Directory, puis réexécuter cette partie.
-      4. Renseigner les neuf comptes comptables depuis l'application (écran Comptes systèmes),
-         ou par le script 03 si vous préférez les poser directement.
+      3. À la PREMIÈRE installation seulement : exécuter 11 et 12 après les avoir complétés.
+      4. Renseigner les comptes comptables depuis l'application (écran Comptes systèmes).
       5. Compléter T_JourFerieWU des fêtes musulmanes de l'année : elles ne se calculent pas
-         d'avance et le script ne sème que les fêtes à date fixe et les lundis de Pâques.
+         d'avance et ce script ne sème que les fêtes à date fixe et les lundis de Pâques.
 
 ================================================================================================
 */
@@ -2683,6 +2706,142 @@ BEGIN
 END
 GO
 
+
+-- =========================================================================
+-- 4 decies. RATTRAPAGES SUR UNE BASE ANTERIEURE
+--
+--    TOUT CE QUI PRECEDE CREE DES OBJETS ABSENTS. Cette section-ci rattrape des objets
+--    PRESENTS MAIS INCOMPLETS : des tables creees par une version anterieure de ce script,
+--    auxquelles il manque des colonnes ajoutees depuis.
+--
+--    POURQUOI C'EST INDISPENSABLE A UN SCRIPT REJOUABLE. Sur une base neuve, les colonnes
+--    ci-dessous font partie du CREATE TABLE plus haut : il n'y a rien a rattraper. Sur la
+--    base de production, qui a ete creee avant, le CREATE TABLE est ignore -- la table
+--    existe -- et les colonnes ne seraient donc JAMAIS ajoutees. C'est exactement le genre
+--    d'oubli qui fait dire « le script est passe sans erreur » et echouer l'application une
+--    semaine plus tard.
+--
+--    Chaque bloc est garde par sys.columns : il ne s'execute que si la colonne manque.
+-- =========================================================================
+
+-- ---- Les parts de commission revenant a la banque (origine : script 16) ----
+--
+-- Sans elles, l'etat des commissions encaissees par la banque est vide, et l'annulation
+-- d'une journee perd sa repartition en partant en archive.
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_HistoriqueWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_HistoriqueWU') AND name = N'CommissionEnvoiBanque')
+BEGIN
+    ALTER TABLE dbo.T_HistoriqueWU
+        ADD CommissionEnvoiBanque     DECIMAL(18, 2) NULL,
+            CommissionPaiementBanque  DECIMAL(18, 2) NULL,
+            CommissionTransfertBanque DECIMAL(18, 2) NULL,
+            TauxSA                    DECIMAL(4, 2)  NULL;
+
+    PRINT 'Colonnes de part bancaire ajoutées à T_HistoriqueWU.';
+END
+ELSE
+    PRINT 'T_HistoriqueWU : colonnes de part bancaire déjà présentes ou table absente.';
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_HistoriqueAnnuleWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_HistoriqueAnnuleWU') AND name = N'CommissionEnvoiBanque')
+BEGIN
+    ALTER TABLE dbo.T_HistoriqueAnnuleWU
+        ADD CommissionEnvoiBanque     DECIMAL(18, 2) NULL,
+            CommissionPaiementBanque  DECIMAL(18, 2) NULL,
+            CommissionTransfertBanque DECIMAL(18, 2) NULL,
+            TauxSA                    DECIMAL(4, 2)  NULL;
+
+    PRINT 'Colonnes de part bancaire ajoutées à T_HistoriqueAnnuleWU.';
+END
+ELSE
+    PRINT 'T_HistoriqueAnnuleWU : colonnes de part bancaire déjà présentes ou table absente.';
+GO
+
+-- ---- Les deux comptes de change sur SystemeWU (origine : script 21) ----
+--
+-- La section « 4 quater bis » plus haut AMORCE ces deux comptes, mais seulement si les
+-- colonnes existent -- ce qu'elle verifie, et c'est ce qui rendait l'amorcage silencieusement
+-- sans effet sur une base anterieure. Les colonnes sont donc ajoutees ICI, avant.
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'SystemeWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.SystemeWU') AND name = N'Cpte_Gainde_Change')
+BEGIN
+    ALTER TABLE dbo.SystemeWU ADD Cpte_Gainde_Change NVARCHAR(255) NULL;
+    PRINT 'Colonne Cpte_Gainde_Change ajoutée à SystemeWU.';
+END
+ELSE
+    PRINT 'SystemeWU : colonne Cpte_Gainde_Change déjà présente ou table absente.';
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'SystemeWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.SystemeWU') AND name = N'Cpte_Pertede_Change')
+BEGIN
+    ALTER TABLE dbo.SystemeWU ADD Cpte_Pertede_Change NVARCHAR(255) NULL;
+    PRINT 'Colonne Cpte_Pertede_Change ajoutée à SystemeWU.';
+END
+ELSE
+    PRINT 'SystemeWU : colonne Cpte_Pertede_Change déjà présente ou table absente.';
+GO
+
+-- =========================================================================
+-- 4 undecies. La vue des journees annulees (origine : script 14)
+--
+--    ELLE NE SERT PAS A L'APPLICATION, qui lit la table. Elle sert a l'audit et au controle
+--    interne, dans Management Studio : une journee annulee, son motif, si elle avait deja ete
+--    injectee au core banking -- et donc si une extourne reste a demander.
+--
+--    RECREEE A CHAQUE EXECUTION, contrairement a tout le reste de ce script. Une vue ne
+--    contient aucune donnee : la remplacer ne perd rien, et c'est la seule facon qu'une
+--    colonne ajoutee a T_AnnulationWU se retrouve dans la vue sans intervention.
+-- =========================================================================
+IF OBJECT_ID(N'dbo.T_AnnulationWU') IS NOT NULL
+BEGIN
+    IF OBJECT_ID(N'dbo.V_JourneesAnnulees', N'V') IS NOT NULL
+        EXEC('DROP VIEW dbo.V_JourneesAnnulees');
+
+    EXEC('
+    CREATE VIEW dbo.V_JourneesAnnulees
+    AS
+        SELECT  a.IdAnnulation,
+                a.DateActivite,
+                Motif             = a.Motif,
+                a.Commentaire,
+                CoreBanking       = CASE WHEN a.CoreBankingInjecte = 1
+                                         THEN N''INJECTÉ — extourne à demander''
+                                         ELSE N''non injecté'' END,
+                a.NombrePdv,
+                a.NombreTransactions,
+                a.NombreEcritures,
+                a.TotalDebit,
+                a.TotalCredit,
+                Equilibre         = CASE WHEN a.TotalDebit = a.TotalCredit
+                                         THEN N''oui'' ELSE N''NON'' END,
+                a.DemandeePar, a.DateDemande,
+                a.AutoriseePar, a.DateAutorisation
+        FROM    dbo.T_AnnulationWU AS a;');
+
+    PRINT 'Vue V_JourneesAnnulees (re)créée.';
+END
+ELSE
+    PRINT 'T_AnnulationWU absente : vue V_JourneesAnnulees non créée.';
+GO
+
+IF OBJECT_ID(N'dbo.V_JourneesAnnulees', N'V') IS NOT NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_compense')
+        EXEC('GRANT SELECT ON dbo.V_JourneesAnnulees TO wu_compense');
+    IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_commercial')
+        EXEC('GRANT SELECT ON dbo.V_JourneesAnnulees TO wu_commercial');
+    IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'wu_admin')
+        EXEC('GRANT SELECT ON dbo.V_JourneesAnnulees TO wu_admin');
+
+    PRINT 'Droits accordés sur V_JourneesAnnulees.';
+END
+GO
 
 -- =========================================================================
 -- 5. Accès du compte applicatif

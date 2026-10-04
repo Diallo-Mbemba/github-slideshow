@@ -385,7 +385,7 @@ Public NotInheritable Class PieceChangeService
                "    - " & liste & Environment.NewLine & Environment.NewLine &
                "Renseignez-les dans Paramétrage > Comptes systèmes." & Environment.NewLine &
                "Si les champs « Gain de change » et « Perte de change » n'y figurent pas, c'est que " &
-               "le script Scripts\21_EcartsDeChange.sql n'a pas encore été exécuté sur cette base." &
+               "le script Scripts\00_InstallationComplete.sql n'a pas encore été exécuté sur cette base." &
                Environment.NewLine & Environment.NewLine &
                "La pièce principale n'est pas concernée : elle continue de se produire normalement."
     End Function

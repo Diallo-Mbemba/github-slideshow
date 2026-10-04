@@ -35,7 +35,9 @@ Public NotInheritable Class CoreBankingRepository
 
     Public Const MESSAGE_TABLE_ABSENTE As String =
         "La table T_FichierCoreBankingWU n'existe pas encore dans la base." & vbCrLf & vbCrLf &
-        "Exécutez le script Scripts\15_FichierCoreBanking.sql : il la crée." & vbCrLf &
+        "Exécutez le script Scripts\00_InstallationComplete.sql : il la crée." & vbCrLf &
+        "C'est le SEUL script à exécuter — il contient tous les autres — et il peut être " &
+        "rejoué sans risque : il ne crée que ce qui manque." & vbCrLf &
         "Tant qu'elle est absente, l'application ne sait pas quelles journées sont déjà " &
         "parties vers le core banking, et ne peut donc pas en avertir."
 
