@@ -2201,6 +2201,36 @@ GO
 -- =========================================================================
 
 -- =========================================================================
+-- 4 quater bis. Les deux comptes de change, amorcés sans jamais écraser une saisie
+--
+--    371100102 gain de change, 671100102 perte de change : les comptes de la Direction
+--    Comptable. L'UPDATE ne touche que les lignes où la colonne est NULL ou vide — une
+--    valeur déjà saisie, fût-elle différente, est conservée. Le script reste donc rejouable
+--    sans jamais défaire un paramétrage.
+-- =========================================================================
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'dbo.SystemeWU') AND name = N'Cpte_Gainde_Change')
+BEGIN
+    EXEC('UPDATE dbo.SystemeWU
+             SET Cpte_Gainde_Change = N''371100102''
+           WHERE Cpte_Gainde_Change IS NULL OR LTRIM(RTRIM(Cpte_Gainde_Change)) = N''''');
+
+    PRINT 'Compte de gain de change amorcé à 371100102 sur les lignes qui n''en portaient aucun.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'dbo.SystemeWU') AND name = N'Cpte_Pertede_Change')
+BEGIN
+    EXEC('UPDATE dbo.SystemeWU
+             SET Cpte_Pertede_Change = N''671100102''
+           WHERE Cpte_Pertede_Change IS NULL OR LTRIM(RTRIM(Cpte_Pertede_Change)) = N''''');
+
+    PRINT 'Compte de perte de change amorcé à 671100102 sur les lignes qui n''en portaient aucun.';
+END
+GO
+
+-- =========================================================================
 -- 4 quinquies. Les écarts de change : la parité, historisée
 --
 --    POURQUOI UNE HISTORIQUE ET NON UNE VALEUR. La parité EUR/XAF est fixe depuis 1999 et

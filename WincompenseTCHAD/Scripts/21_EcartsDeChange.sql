@@ -26,16 +26,30 @@
     LA COLONNE Cpte_Gainde_Change EXISTAIT DÉJÀ, ET N'ÉTAIT LUE PAR PERSONNE
 
     La table SystemeWU la porte depuis l'origine, à NULL. La banque avait réservé la place.
-    Ce script ne la crée donc que si elle manque, et n'y écrit RIEN : c'est à la Direction
-    Comptable de la renseigner depuis l'écran « Comptes systèmes ». Il n'existait en revanche
-    aucune colonne pour la PERTE de change : celle-là est ajoutée.
+    Ce script ne la crée donc que si elle manque. Il n'existait en revanche aucune colonne
+    pour la PERTE de change : celle-là est ajoutée.
 
-    AUCUN COMPTE N'EST AMORCÉ, ET C'EST VOULU
+    LES DEUX COMPTES SONT AMORCÉS, PARCE QUE LA BANQUE LES A DONNÉS
 
-    Un numéro de compte inventé par un script d'installation est un numéro de compte qui
-    finira par être comptabilisé. Tant que les deux comptes ne sont pas saisis, l'application
-    REFUSE de produire la pièce de change et dit lequel manque. Elle continue en revanche de
-    produire la pièce principale comme avant : les deux paramétrages sont indépendants.
+        371100102   gain de change
+        671100102   perte de change
+
+    Ce script a d'abord été écrit SANS les amorcer, et la raison en était bonne : un numéro
+    de compte inventé par un script d'installation est un numéro de compte qui finira par
+    être comptabilisé. Elle ne vaut plus, parce que ces deux numéros ne sont plus inventés —
+    ils viennent de la Direction Comptable, au même titre que les neuf autres comptes amorcés
+    par le script 03.
+
+    IL NE LES ÉCRASE JAMAIS. L'amorçage ne touche que les colonnes VIDES : une base où la
+    Direction Comptable a déjà saisi autre chose garde sa saisie, aujourd'hui comme à chaque
+    réexécution. C'est la règle de tous les scripts du projet, et celui-ci ne l'enfreint pas
+    pour deux comptes de plus.
+
+    LE GARDE-FOU DU CODE RESTE EN PLACE. L'application, elle, n'a toujours AUCUNE valeur par
+    défaut pour ces deux comptes : si ce script n'a pas été exécuté — colonnes absentes, ou
+    base restaurée d'avant — elle refuse de produire la pièce de change et dit lequel manque.
+    Un compte lu vide ne devient jamais un compte deviné. La pièce principale n'est pas
+    concernée : les deux paramétrages sont indépendants.
 
     À exécuter APRÈS 00 (ou 01 à 20), sur la base GWC_WINCOMPENSE_ETD.
     Ce script est REJOUABLE : il crée ce qui manque et ne réécrit rien de ce qui est saisi.
@@ -81,6 +95,36 @@ BEGIN
 END
 ELSE
     PRINT 'Colonne Cpte_Pertede_Change déjà présente sur SystemeWU.';
+GO
+
+-- =========================================================================
+-- 1 bis. Les deux comptes de change, amorcés sans jamais écraser une saisie
+--
+--    371100102 gain de change, 671100102 perte de change : les comptes de la Direction
+--    Comptable. L'UPDATE ne touche que les lignes où la colonne est NULL ou vide — une
+--    valeur déjà saisie, fût-elle différente, est conservée. Le script reste donc rejouable
+--    sans jamais défaire un paramétrage.
+-- =========================================================================
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'dbo.SystemeWU') AND name = N'Cpte_Gainde_Change')
+BEGIN
+    EXEC('UPDATE dbo.SystemeWU
+             SET Cpte_Gainde_Change = N''371100102''
+           WHERE Cpte_Gainde_Change IS NULL OR LTRIM(RTRIM(Cpte_Gainde_Change)) = N''''');
+
+    PRINT 'Compte de gain de change amorcé à 371100102 sur les lignes qui n''en portaient aucun.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'dbo.SystemeWU') AND name = N'Cpte_Pertede_Change')
+BEGIN
+    EXEC('UPDATE dbo.SystemeWU
+             SET Cpte_Pertede_Change = N''671100102''
+           WHERE Cpte_Pertede_Change IS NULL OR LTRIM(RTRIM(Cpte_Pertede_Change)) = N''''');
+
+    PRINT 'Compte de perte de change amorcé à 671100102 sur les lignes qui n''en portaient aucun.';
+END
 GO
 
 -- =========================================================================
@@ -388,6 +432,23 @@ SELECT  N'Comptes de change' AS Objet,
              THEN N'colonne présente' ELSE N'COLONNE ABSENTE' END AS Perte;
 GO
 
+SELECT  [Compte]  = N'Gain de change',
+        [Colonne] = N'Cpte_Gainde_Change',
+        [Valeur]  = ISNULL(NULLIF(LTRIM(RTRIM(Cpte_Gainde_Change)), N''), N'*** VIDE ***'),
+        [Attendu] = N'371100102',
+        [Etat]    = CASE WHEN LTRIM(RTRIM(ISNULL(Cpte_Gainde_Change, N''))) = N'371100102'
+                         THEN N'conforme' ELSE N'valeur propre a cette base' END
+FROM    dbo.SystemeWU
+UNION ALL
+SELECT  N'Perte de change',
+        N'Cpte_Pertede_Change',
+        ISNULL(NULLIF(LTRIM(RTRIM(Cpte_Pertede_Change)), N''), N'*** VIDE ***'),
+        N'671100102',
+        CASE WHEN LTRIM(RTRIM(ISNULL(Cpte_Pertede_Change, N''))) = N'671100102'
+             THEN N'conforme' ELSE N'valeur propre a cette base' END
+FROM    dbo.SystemeWU;
+GO
+
 SELECT  DateEffet, DeviseSource, DeviseCible, Parite, CreePar, DateCreation
 FROM    dbo.T_PariteChangeWU
 ORDER BY DeviseSource, DeviseCible, DateEffet DESC;
@@ -395,14 +456,16 @@ GO
 
 PRINT '';
 PRINT '=========================================================================';
-PRINT 'Écarts de change : tables posées, parité amorcée, droits accordés.';
+PRINT 'Écarts de change : tables posées, parité amorcée, comptes amorcés,';
+PRINT 'droits accordés.';
 PRINT '';
-PRINT 'IL RESTE UNE CHOSE À FAIRE, ET ELLE N''EST PAS DANS CE SCRIPT :';
-PRINT 'saisir les deux comptes dans Paramétrage > Comptes systèmes —';
-PRINT '    « Gain de change »  et  « Perte de change ».';
+PRINT 'VÉRIFIEZ LE TABLEAU DES COMPTES CI-DESSUS avant de comptabiliser quoi que';
+PRINT 'ce soit : il montre ce que la base porte RÉELLEMENT, et non ce que ce';
+PRINT 'script a voulu y mettre. Une valeur déjà saisie n''a pas été écrasée.';
 PRINT '';
-PRINT 'Tant qu''ils sont vides, l''application refuse de produire la pièce de';
-PRINT 'change et dit lequel manque. La pièce principale, elle, n''est pas';
+PRINT 'Les deux comptes se modifient dans Paramétrage > Comptes systèmes.';
+PRINT 'S''ils étaient vides, l''application refuserait de produire la pièce de';
+PRINT 'change et dirait lequel manque. La pièce principale, elle, n''est pas';
 PRINT 'affectée : les deux paramétrages sont indépendants.';
 PRINT '=========================================================================';
 GO

@@ -86,19 +86,25 @@ Public Class ComptesSystemeWU
     ''' de change seraient comptabilisés. Ce jour est venu, et le paramétrage n'a donc pas
     ''' changé de forme — il s'est rempli.
     '''
-    ''' PAS DE VALEUR PAR DÉFAUT, contrairement à tous les comptes au-dessus. Les autres ont
-    ''' une constante de repli parce que leur numéro est connu, réconcilié et en service. Ce
-    ''' compte-ci, non : l'inventer reviendrait à comptabiliser un demi-million de francs sur
-    ''' un numéro choisi par le développeur. Vide, il bloque la pièce de change et ne bloque
-    ''' qu'elle.
+    ''' PAS DE VALEUR PAR DÉFAUT DANS LE CODE, contrairement à tous les comptes au-dessus.
+    ''' Les autres ont une constante de repli, employée quand la base est injoignable. Pas
+    ''' celui-ci : un compte de change lu vide ne doit jamais devenir un compte deviné, sous
+    ''' peine de comptabiliser un demi-million de francs sur un numéro que personne n'a
+    ''' confirmé. Vide, il bloque la pièce de change et ne bloque qu'elle.
+    '''
+    ''' LE SCRIPT 21, LUI, L'AMORCE À 371100102 — le compte donné par la Direction Comptable.
+    ''' La différence n'est pas un détail : un script s'exécute une fois, sous le regard de
+    ''' l'informatique, et son résultat se vérifie dans la base ; un repli dans le code
+    ''' s'applique en silence, sur un poste dont la base ne répond pas.
     ''' </summary>
     Public Property CompteGainDeChange As String = String.Empty
 
     ''' <summary>
     ''' Compte de PERTE de change (colonne Cpte_Pertede_Change).
     '''
-    ''' Celle-là n'existait pas : le script 21 l'ajoute. Même règle que le gain — aucune valeur
-    ''' par défaut, et son absence ne bloque que la pièce de change.
+    ''' Celle-là n'existait pas : le script 21 l'ajoute, et l'amorce à 671100102. Même règle
+    ''' que le gain — aucune valeur par défaut dans le code, et son absence ne bloque que la
+    ''' pièce de change.
     ''' </summary>
     Public Property ComptePerteDeChange As String = String.Empty
 
