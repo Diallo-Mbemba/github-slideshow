@@ -67,6 +67,7 @@ Public Class FrmComptesSysteme
 
         RemplirChamps()
         AfficherOrigine()
+        AppliquerLaDisponibiliteDuChange()
     End Sub
 
     ''' <summary>
@@ -84,6 +85,14 @@ Public Class FrmComptesSysteme
         RemplirListe(cboTVA, _comptes.TVACollectee, ConstantesWU.CPT_TVA_COLLECTEE)
         RemplirListe(cboTTAEnvoi, _comptes.TTAEnvoi, ConstantesWU.CPT_TTA_ENVOI)
         RemplirListe(cboTTAReception, _comptes.TTAReception, ConstantesWU.CPT_TTA_RECEPTION)
+
+        ' Les deux comptes de change n'ont PAS de valeur par défaut à proposer, et c'est
+        ' la seule différence de cet écran : les autres comptes ont une constante de repli
+        ' parce que leur numéro est connu et réconcilié. Proposer un numéro pour le change
+        ' reviendrait à faire comptabiliser un demi-million de francs sur un compte choisi
+        ' par le développeur.
+        RemplirListe(cboGainChange, _comptes.CompteGainDeChange, String.Empty)
+        RemplirListe(cboPerteChange, _comptes.ComptePerteDeChange, String.Empty)
     End Sub
 
     Private Shared Sub RemplirListe(liste As ComboBox, valeurParametree As String, valeurParDefaut As String)
@@ -117,6 +126,37 @@ Public Class FrmComptesSysteme
         End If
     End Sub
 
+
+    ''' <summary>
+    ''' Rend les deux comptes de change saisissables, ou dit pourquoi ils ne le sont pas.
+    '''
+    ''' LE CAS DU SCRIPT 21 NON EXÉCUTÉ DOIT SE VOIR, PAS S'ESSAYER. Sans ce script, les deux
+    ''' colonnes n'existent pas dans SystemeWU : une saisie serait acceptée à l'écran et
+    ''' perdue à l'enregistrement, en silence — car l'enregistrement ne nomme ces colonnes que
+    ''' si elles existent, et c'est ce qui protège le reste du paramétrage. Mieux vaut donc
+    ''' des champs grisés et une phrase qui dit quoi faire.
+    ''' </summary>
+    Private Sub AppliquerLaDisponibiliteDuChange()
+
+        Dim disponible As Boolean = WURepository.ColonnesDeChangePresentes
+
+        cboGainChange.Enabled = disponible
+        cboPerteChange.Enabled = disponible
+
+        If disponible Then
+            lblChange.ForeColor = Drawing.SystemColors.GrayText
+            lblChange.Text = "Les deux comptes de change n'ont pas de valeur par défaut : tant qu'ils " &
+                             "sont vides, seule la pièce de change est bloquée — la pièce principale " &
+                             "n'est pas concernée."
+            Return
+        End If
+
+        lblChange.ForeColor = Drawing.Color.FromArgb(183, 28, 28)
+        lblChange.Text = "Comptes de change indisponibles : le script Scripts\21_EcartsDeChange.sql " &
+                         "n'a pas encore été exécuté sur cette base. Faites-le exécuter par " &
+                         "l'informatique, puis rouvrez cet écran."
+    End Sub
+
 #End Region
 
 #Region "Enregistrement"
@@ -133,6 +173,8 @@ Public Class FrmComptesSysteme
             .TVACollectee = cboTVA.Text,
             .TTAEnvoi = cboTTAEnvoi.Text,
             .TTAReception = cboTTAReception.Text,
+            .CompteGainDeChange = cboGainChange.Text,
+            .ComptePerteDeChange = cboPerteChange.Text,
             .CodeParametrage = _comptes.CodeParametrage,
             .ChargeDepuisBase = _comptes.ChargeDepuisBase
         }
@@ -186,6 +228,7 @@ Public Class FrmComptesSysteme
 
             RemplirChamps()
             AfficherOrigine()
+            AppliquerLaDisponibiliteDuChange()
 
         Finally
             Cursor = Cursors.Default

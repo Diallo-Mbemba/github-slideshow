@@ -177,14 +177,79 @@ Public NotInheritable Class WURepository
 
     ''' <summary>
     ''' Colonnes de SystemeWU exploitées par l'application. Les autres colonnes de la table
-    ''' (Passif, Actif, Cpte_Charge_Publicitaire, Cpte_Gainde_Change, Cpte_Envoi_agence,
-    ''' Cpte_Paiement_agence) ne sont ni lues ni écrites : elles ne concernent pas la pièce
-    ''' comptable Western Union et un enregistrement ne doit jamais les altérer.
+    ''' (Passif, Actif, Cpte_Charge_Publicitaire, Cpte_Envoi_agence, Cpte_Paiement_agence)
+    ''' ne sont ni lues ni écrites : elles ne concernent pas la pièce comptable Western Union
+    ''' et un enregistrement ne doit jamais les altérer.
     ''' </summary>
     Private Const COLONNES_SYSTEME As String =
         "Cpte_PositionNette, Cpte_attenteDEBIT, Cpte_attenteCREDIT, " &
         "Cpte_Produit, Cpte_Produit_Envoi, Cpte_Produit_Paiement, " &
         "Tthu, Tob, Cpte_Envoi, Cpte_Paiement, code"
+
+    ''' <summary>Colonnes des comptes de change, ajoutées par le script 21.</summary>
+    Private Const COLONNE_GAIN_CHANGE As String = "Cpte_Gainde_Change"
+    Private Const COLONNE_PERTE_CHANGE As String = "Cpte_Pertede_Change"
+
+    ''' <summary>
+    ''' Les deux colonnes des comptes de change sont-elles présentes dans SystemeWU ?
+    '''
+    ''' CETTE DÉTECTION N'EST PAS UNE PRÉCAUTION DE STYLE : C'EST CE QUI PROTÈGE LA PRODUCTION.
+    ''' Cpte_Pertede_Change est ajoutée par le script 21, qui peut ne pas avoir été exécuté —
+    ''' c'est même le cas le plus probable le jour de la livraison. Si la requête de lecture ou
+    ''' d'écriture nommait inconditionnellement une colonne absente, SQL Server rejetterait
+    ''' TOUTE la requête : les comptes de la pièce principale deviendraient illisibles, et la
+    ''' Direction Comptable ne pourrait plus enregistrer AUCUN compte. Un chantier sur les
+    ''' écarts de change aurait alors cassé la compense du jour.
+    '''
+    ''' Les requêtes nomment donc ces deux colonnes seulement si elles existent. Si elles
+    ''' n'existent pas, les comptes de change restent vides — et la pièce de change refuse de
+    ''' se produire en disant quoi faire, ce qui est exactement le comportement voulu.
+    '''
+    ''' Le résultat est mis en cache : la structure d'une table ne change pas en cours de
+    ''' session, et l'interroger à chaque lecture de paramétrage serait du bruit sur le réseau.
+    ''' </summary>
+    Private Shared _colonnesDeChangePresentes As Boolean?
+
+    ''' <summary>
+    ''' Vrai si le script 21 a été exécuté sur cette base. Faux tant qu'il ne l'a pas été, ou
+    ''' si la structure n'a pas pu être interrogée. Voir <see cref="_colonnesDeChangePresentes"/>.
+    ''' </summary>
+    Public Shared ReadOnly Property ColonnesDeChangePresentes As Boolean
+        Get
+            Return _colonnesDeChangePresentes.GetValueOrDefault()
+        End Get
+    End Property
+
+    ''' <summary>Fait redétecter les colonnes de change. À appeler quand la connexion change de base.</summary>
+    Public Shared Sub OublierLaStructure()
+        _colonnesDeChangePresentes = Nothing
+    End Sub
+
+    Private Shared Function DetecterLesColonnesDeChange(connexion As SqlConnection) As Boolean
+
+        If _colonnesDeChangePresentes.HasValue Then Return _colonnesDeChangePresentes.Value
+
+        Const requete As String =
+            "SELECT COUNT(*) FROM sys.columns " &
+            "WHERE object_id = OBJECT_ID(N'dbo." & TABLE_SYSTEME & "') " &
+            "AND name IN (N'" & COLONNE_GAIN_CHANGE & "', N'" & COLONNE_PERTE_CHANGE & "')"
+
+        Try
+            Using commande As New SqlCommand(requete, connexion)
+                Dim trouvees As Integer = Convert.ToInt32(commande.ExecuteScalar())
+                _colonnesDeChangePresentes = (trouvees = 2)
+            End Using
+
+        Catch ex As SqlException
+            ' Structure non interrogeable : on se comporte comme si le script 21 n'était pas
+            ' passé. Le défaut est visible (comptes de change vides) et sans conséquence sur
+            ' le reste du paramétrage. On ne met PAS ce résultat en cache : un droit manquant
+            ' peut être accordé en cours de journée.
+            Return False
+        End Try
+
+        Return _colonnesDeChangePresentes.Value
+    End Function
 
     ''' <summary>
     ''' Charge les comptes comptables depuis la table SystemeWU.
@@ -210,7 +275,16 @@ Public NotInheritable Class WURepository
             Using connexion As SqlConnection = CreerConnexion()
                 connexion.Open()
 
-                Dim requete As String = $"SELECT TOP 1 {COLONNES_SYSTEME} FROM {TABLE_SYSTEME} ORDER BY code"
+                ' Les colonnes de change ne sont nommées que si elles existent : voir
+                ' DetecterLesColonnesDeChange, et ce qu'une colonne absente coûterait.
+                Dim colonnes As String = COLONNES_SYSTEME
+                Dim avecLeChange As Boolean = DetecterLesColonnesDeChange(connexion)
+
+                If avecLeChange Then
+                    colonnes &= ", " & COLONNE_GAIN_CHANGE & ", " & COLONNE_PERTE_CHANGE
+                End If
+
+                Dim requete As String = $"SELECT TOP 1 {colonnes} FROM {TABLE_SYSTEME} ORDER BY code"
 
                 Using commande As New SqlCommand(requete, connexion)
                     Using lecteur As SqlDataReader = commande.ExecuteReader()
@@ -241,6 +315,11 @@ Public NotInheritable Class WURepository
                         AffecterSiRenseigne(lecteur, "Tob", Sub(v) comptes.TVACollectee = v)
                         AffecterSiRenseigne(lecteur, "Cpte_Envoi", Sub(v) comptes.TTAEnvoi = v)
                         AffecterSiRenseigne(lecteur, "Cpte_Paiement", Sub(v) comptes.TTAReception = v)
+                        If avecLeChange Then
+                            AffecterSiRenseigne(lecteur, COLONNE_GAIN_CHANGE, Sub(v) comptes.CompteGainDeChange = v)
+                            AffecterSiRenseigne(lecteur, COLONNE_PERTE_CHANGE, Sub(v) comptes.ComptePerteDeChange = v)
+                        End If
+
                         AffecterSiRenseigne(lecteur, "code", Sub(v) comptes.CodeParametrage = v)
 
                         comptes.ChargeDepuisBase = True
@@ -310,6 +389,12 @@ Public NotInheritable Class WURepository
                     End If
                 End If
 
+                ' Même règle qu'à la lecture : les deux colonnes de change ne sont écrites que
+                ' si elles existent. Les nommer sans qu'elles existent ferait rejeter TOUT
+                ' l'enregistrement, et la Direction Comptable ne pourrait plus modifier un seul
+                ' compte de la pièce principale.
+                Dim avecLeChange As Boolean = DetecterLesColonnesDeChange(connexion)
+
                 Dim requete As String =
                     $"UPDATE {TABLE_SYSTEME} SET " &
                     "Cpte_PositionNette = @compteCourant, " &
@@ -322,6 +407,10 @@ Public NotInheritable Class WURepository
                     "Tob = @tva, " &
                     "Cpte_Envoi = @ttaEnvoi, " &
                     "Cpte_Paiement = @ttaReception, " &
+                    If(avecLeChange,
+                       COLONNE_GAIN_CHANGE & " = @gainDeChange, " &
+                       COLONNE_PERTE_CHANGE & " = @perteDeChange, ",
+                       String.Empty) &
                     "DateModification = GETDATE(), ModifiePar = @auteur" & filtre
 
                 Using commande As New SqlCommand(requete, connexion)
@@ -335,6 +424,11 @@ Public NotInheritable Class WURepository
                     commande.Parameters.Add("@tva", SqlDbType.NVarChar, 255).Value = comptes.TVACollectee
                     commande.Parameters.Add("@ttaEnvoi", SqlDbType.NVarChar, 255).Value = comptes.TTAEnvoi
                     commande.Parameters.Add("@ttaReception", SqlDbType.NVarChar, 255).Value = comptes.TTAReception
+                    If avecLeChange Then
+                        commande.Parameters.Add("@gainDeChange", SqlDbType.NVarChar, 255).Value = comptes.CompteGainDeChange
+                        commande.Parameters.Add("@perteDeChange", SqlDbType.NVarChar, 255).Value = comptes.ComptePerteDeChange
+                    End If
+
                     commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
 
                     If codeVise.Length > 0 Then

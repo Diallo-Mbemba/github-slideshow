@@ -40,6 +40,11 @@ Partial Class FrmComptesSysteme
         Me.cboTTAEnvoi = New System.Windows.Forms.ComboBox()
         Me.lblTTAReception = New System.Windows.Forms.Label()
         Me.cboTTAReception = New System.Windows.Forms.ComboBox()
+        Me.lblGainChange = New System.Windows.Forms.Label()
+        Me.cboGainChange = New System.Windows.Forms.ComboBox()
+        Me.lblPerteChange = New System.Windows.Forms.Label()
+        Me.cboPerteChange = New System.Windows.Forms.ComboBox()
+        Me.lblChange = New System.Windows.Forms.Label()
         Me.btnEnregistrer = New System.Windows.Forms.Button()
         Me.btnFermer = New System.Windows.Forms.Button()
         Me.lblInfo = New System.Windows.Forms.Label()
@@ -230,31 +235,79 @@ Partial Class FrmComptesSysteme
         Me.cboTTAReception.Size = New System.Drawing.Size(142, 24)
         Me.cboTTAReception.TabIndex = 18
         '
+        'lblGainChange
+        '
+        Me.lblGainChange.Location = New System.Drawing.Point(18, 471)
+        Me.lblGainChange.Name = "lblGainChange"
+        Me.lblGainChange.Size = New System.Drawing.Size(256, 30)
+        Me.lblGainChange.TabIndex = 19
+        Me.lblGainChange.Text = "COMPTE Gain de change"
+        Me.lblGainChange.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
+        '
+        'cboGainChange
+        '
+        Me.cboGainChange.FormattingEnabled = True
+        Me.cboGainChange.Location = New System.Drawing.Point(280, 467)
+        Me.cboGainChange.MaxLength = 255
+        Me.cboGainChange.Name = "cboGainChange"
+        Me.cboGainChange.Size = New System.Drawing.Size(142, 24)
+        Me.cboGainChange.TabIndex = 20
+        '
+        'lblPerteChange
+        '
+        Me.lblPerteChange.Location = New System.Drawing.Point(18, 509)
+        Me.lblPerteChange.Name = "lblPerteChange"
+        Me.lblPerteChange.Size = New System.Drawing.Size(256, 30)
+        Me.lblPerteChange.TabIndex = 21
+        Me.lblPerteChange.Text = "COMPTE Perte de change"
+        Me.lblPerteChange.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
+        '
+        'cboPerteChange
+        '
+        Me.cboPerteChange.FormattingEnabled = True
+        Me.cboPerteChange.Location = New System.Drawing.Point(280, 505)
+        Me.cboPerteChange.MaxLength = 255
+        Me.cboPerteChange.Name = "cboPerteChange"
+        Me.cboPerteChange.Size = New System.Drawing.Size(142, 24)
+        Me.cboPerteChange.TabIndex = 22
+        '
+        'lblChange
+        '
+        ' Le seul libellé explicatif du formulaire, et il n'est pas décoratif : ces deux
+        ' comptes sont les seuls à n'avoir AUCUNE valeur par défaut, et le seul moyen de le
+        ' savoir est de le lire.
+        Me.lblChange.ForeColor = System.Drawing.SystemColors.GrayText
+        Me.lblChange.Location = New System.Drawing.Point(18, 543)
+        Me.lblChange.Name = "lblChange"
+        Me.lblChange.Size = New System.Drawing.Size(404, 32)
+        Me.lblChange.TabIndex = 23
+        Me.lblChange.Text = "Les deux comptes de change n'ont pas de valeur par défaut : tant qu'ils sont vides, seule la pièce de change est bloquée."
+        '
         'btnEnregistrer
         '
-        Me.btnEnregistrer.Location = New System.Drawing.Point(18, 465)
+        Me.btnEnregistrer.Location = New System.Drawing.Point(18, 587)
         Me.btnEnregistrer.Name = "btnEnregistrer"
         Me.btnEnregistrer.Size = New System.Drawing.Size(296, 38)
-        Me.btnEnregistrer.TabIndex = 19
+        Me.btnEnregistrer.TabIndex = 24
         Me.btnEnregistrer.Text = "Enregistrer"
         Me.btnEnregistrer.UseVisualStyleBackColor = True
         '
         'btnFermer
         '
-        Me.btnFermer.Location = New System.Drawing.Point(322, 465)
+        Me.btnFermer.Location = New System.Drawing.Point(322, 587)
         Me.btnFermer.Name = "btnFermer"
         Me.btnFermer.Size = New System.Drawing.Size(100, 38)
-        Me.btnFermer.TabIndex = 20
+        Me.btnFermer.TabIndex = 25
         Me.btnFermer.Text = "Fermer"
         Me.btnFermer.UseVisualStyleBackColor = True
         '
         'lblInfo
         '
         Me.lblInfo.ForeColor = System.Drawing.SystemColors.GrayText
-        Me.lblInfo.Location = New System.Drawing.Point(18, 511)
+        Me.lblInfo.Location = New System.Drawing.Point(18, 633)
         Me.lblInfo.Name = "lblInfo"
         Me.lblInfo.Size = New System.Drawing.Size(404, 34)
-        Me.lblInfo.TabIndex = 21
+        Me.lblInfo.TabIndex = 26
         Me.lblInfo.Text = ""
         '
         'FrmComptesSysteme
@@ -263,7 +316,7 @@ Partial Class FrmComptesSysteme
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnFermer
-        Me.ClientSize = New System.Drawing.Size(434, 557)
+        Me.ClientSize = New System.Drawing.Size(434, 679)
         Me.Controls.Add(Me.panelTitre)
         Me.Controls.Add(Me.lblCompteCourant)
         Me.Controls.Add(Me.cboCompteCourant)
@@ -283,6 +336,11 @@ Partial Class FrmComptesSysteme
         Me.Controls.Add(Me.cboTTAEnvoi)
         Me.Controls.Add(Me.lblTTAReception)
         Me.Controls.Add(Me.cboTTAReception)
+        Me.Controls.Add(Me.lblGainChange)
+        Me.Controls.Add(Me.cboGainChange)
+        Me.Controls.Add(Me.lblPerteChange)
+        Me.Controls.Add(Me.cboPerteChange)
+        Me.Controls.Add(Me.lblChange)
         Me.Controls.Add(Me.btnEnregistrer)
         Me.Controls.Add(Me.btnFermer)
         Me.Controls.Add(Me.lblInfo)
@@ -316,6 +374,11 @@ Partial Class FrmComptesSysteme
     Friend WithEvents cboTTAEnvoi As System.Windows.Forms.ComboBox
     Friend WithEvents lblTTAReception As System.Windows.Forms.Label
     Friend WithEvents cboTTAReception As System.Windows.Forms.ComboBox
+    Friend WithEvents lblGainChange As System.Windows.Forms.Label
+    Friend WithEvents cboGainChange As System.Windows.Forms.ComboBox
+    Friend WithEvents lblPerteChange As System.Windows.Forms.Label
+    Friend WithEvents cboPerteChange As System.Windows.Forms.ComboBox
+    Friend WithEvents lblChange As System.Windows.Forms.Label
     Friend WithEvents btnEnregistrer As System.Windows.Forms.Button
     Friend WithEvents btnFermer As System.Windows.Forms.Button
     Friend WithEvents lblInfo As System.Windows.Forms.Label

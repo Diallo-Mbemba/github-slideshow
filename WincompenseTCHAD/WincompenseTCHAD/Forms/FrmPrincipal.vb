@@ -214,6 +214,7 @@ Public Class FrmPrincipal
             Case NameOf(FrmDemandes) : Return "Autorisations du référentiel"
             Case NameOf(FrmComptesSysteme) : Return "Comptes systèmes"
             Case NameOf(FrmTaxes) : Return "Taxes et barème"
+            Case NameOf(FrmEcartsChange) : Return "Pièce des écarts de change"
             Case NameOf(FrmControleChange) : Return "Contrôle des écarts de change"
             Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
             Case NameOf(FrmParametrageFichier) : Return "Paramétrage : fichier de secours"
@@ -339,6 +340,17 @@ Public Class FrmPrincipal
     ''' calcul qui sera comptabilisé ; c'est même tout l'intérêt de l'écran — voir
     ''' FrmControleChange.
     ''' </summary>
+    ''' <summary>
+    ''' La pièce comptable des écarts de change.
+    '''
+    ''' RANGÉE JUSTE AVANT LE CONTRÔLE, et les deux se lisent ensemble : celle-ci PRODUIT et
+    ''' conserve, l'autre vérifie sans rien écrire. Les séparer dans deux menus aurait laissé
+    ''' croire qu'il s'agit de deux calculs ; c'est le même, exercé de deux façons.
+    ''' </summary>
+    Private Sub mnuPieceChange_Click(sender As Object, e As EventArgs) Handles mnuPieceChange.Click
+        AfficherEnfant(Of FrmEcartsChange)()
+    End Sub
+
     Private Sub mnuControleChange_Click(sender As Object, e As EventArgs) Handles mnuControleChange.Click
         AfficherEnfant(Of FrmControleChange)()
     End Sub
@@ -424,6 +436,7 @@ Public Class FrmPrincipal
         mnuRapportAgences.Image = IconesWU.Obtenir(IconeWU.Batiment)
         mnuPiecesArchivees.Image = IconesWU.Obtenir(IconeWU.Archive)
         mnuCommissionsBanque.Image = IconesWU.Obtenir(IconeWU.Piece)
+        mnuPieceChange.Image = IconesWU.Obtenir(IconeWU.Piece)
         mnuControleChange.Image = IconesWU.Obtenir(IconeWU.Balance)
 
         ' Menu Paramétrage.

@@ -167,6 +167,12 @@ Public Class FrmParametresConnexion
         ConfigurationWU.ForcerPourCetteSession(chaine)
         CalendrierWU.Oublier()
 
+        ' La base change : ce qui avait été lu de l'ancienne ne vaut plus pour la nouvelle.
+        ' Les options de traitement et la structure de SystemeWU — le script 21 peut être
+        ' passé sur l'une et pas sur l'autre — sont relues à la première demande.
+        OptionsWU.Oublier()
+        WURepository.OublierLaStructure()
+
         MessageBox.Show(
             "Le réglage vaut pour cette session seulement." & Environment.NewLine & Environment.NewLine &
             "Rien n'a été écrit sur ce poste : en fermant l'application, ce réglage disparaît." &

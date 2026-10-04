@@ -29,6 +29,7 @@ Partial Class FrmPrincipal
         Me.mnuPiecesArchivees = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuCommissionsBanque = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP8 = New System.Windows.Forms.ToolStripSeparator()
+        Me.mnuPieceChange = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuControleChange = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuSousAgents = New System.Windows.Forms.ToolStripMenuItem()
@@ -86,7 +87,7 @@ Partial Class FrmPrincipal
         '
         'mnuCompensation
         '
-        Me.mnuCompensation.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuTraitement, Me.SEP1, Me.mnuRapport, Me.mnuRapportAgences, Me.mnuPiecesArchivees, Me.mnuCommissionsBanque, Me.SEP8, Me.mnuControleChange})
+        Me.mnuCompensation.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuTraitement, Me.SEP1, Me.mnuRapport, Me.mnuRapportAgences, Me.mnuPiecesArchivees, Me.mnuCommissionsBanque, Me.SEP8, Me.mnuPieceChange, Me.mnuControleChange})
         Me.mnuCompensation.Name = "mnuCompensation"
         Me.mnuCompensation.Size = New System.Drawing.Size(100, 20)
         Me.mnuCompensation.Text = "&Compensation"
@@ -131,11 +132,17 @@ Partial Class FrmPrincipal
         Me.SEP8.Name = "SEP8"
         Me.SEP8.Size = New System.Drawing.Size(277, 6)
         '
+        'mnuPieceChange
+        '
+        Me.mnuPieceChange.Name = "mnuPieceChange"
+        Me.mnuPieceChange.Size = New System.Drawing.Size(280, 22)
+        Me.mnuPieceChange.Text = "Pièce des écarts de c&hange..."
+        '
         'mnuControleChange
         '
         Me.mnuControleChange.Name = "mnuControleChange"
         Me.mnuControleChange.Size = New System.Drawing.Size(280, 22)
-        Me.mnuControleChange.Text = "Contrôle des écarts de c&hange..."
+        Me.mnuControleChange.Text = "Contrô&le des écarts de change..."
         '
         'mnuParametrage
         '
@@ -439,6 +446,7 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuPiecesArchivees As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuCommissionsBanque As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP8 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents mnuPieceChange As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuControleChange As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuSousAgents As System.Windows.Forms.ToolStripMenuItem

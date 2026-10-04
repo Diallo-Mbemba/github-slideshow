@@ -22,11 +22,18 @@ Option Explicit On
 '''   TVA .................................... Tob
 '''   TTA sur envoi WU ....................... Cpte_Envoi
 '''   TTA sur paiement WU .................... Cpte_Paiement
+'''   Gain de change ......................... Cpte_Gainde_Change
+'''   Perte de change ........................ Cpte_Pertede_Change
+'''
+''' CPTE_GAINDE_CHANGE A CHANGÉ DE STATUT. Jusqu'à la pièce de change, elle figurait parmi
+''' les colonnes que l'application ne lisait pas : la table la portait depuis l'origine, à
+''' NULL, la banque ayant réservé la place. Elle est désormais lue et écrite, et
+''' Cpte_Pertede_Change — ajoutée par le script 21 — l'accompagne.
 '''
 ''' Les autres colonnes de SystemeWU (Passif, Actif, Cpte_Charge_Publicitaire,
-''' Cpte_Gainde_Change, Cpte_Envoi_agence, Cpte_Paiement_agence) ne sont NI lues NI écrites :
-''' elles ne concernent pas la pièce comptable Western Union et restent la propriété de ce
-''' qui les utilise par ailleurs.
+''' Cpte_Envoi_agence, Cpte_Paiement_agence) ne sont toujours NI lues NI écrites : elles ne
+''' concernent pas la pièce comptable Western Union et restent la propriété de ce qui les
+''' utilise par ailleurs.
 ''' </summary>
 Public Class ComptesSystemeWU
 
@@ -71,6 +78,30 @@ Public Class ComptesSystemeWU
     ''' <summary>TTA sur réception / paiement de fonds (colonne Cpte_Paiement).</summary>
     Public Property TTAReception As String = ConstantesWU.CPT_TTA_RECEPTION
 
+    ''' <summary>
+    ''' Compte de GAIN de change (colonne Cpte_Gainde_Change).
+    '''
+    ''' CETTE COLONNE EXISTAIT DÉJÀ, ET N'ÉTAIT LUE PAR PERSONNE. La table SystemeWU la porte
+    ''' depuis l'origine, à NULL : la banque avait réservé la place pour le jour où les écarts
+    ''' de change seraient comptabilisés. Ce jour est venu, et le paramétrage n'a donc pas
+    ''' changé de forme — il s'est rempli.
+    '''
+    ''' PAS DE VALEUR PAR DÉFAUT, contrairement à tous les comptes au-dessus. Les autres ont
+    ''' une constante de repli parce que leur numéro est connu, réconcilié et en service. Ce
+    ''' compte-ci, non : l'inventer reviendrait à comptabiliser un demi-million de francs sur
+    ''' un numéro choisi par le développeur. Vide, il bloque la pièce de change et ne bloque
+    ''' qu'elle.
+    ''' </summary>
+    Public Property CompteGainDeChange As String = String.Empty
+
+    ''' <summary>
+    ''' Compte de PERTE de change (colonne Cpte_Pertede_Change).
+    '''
+    ''' Celle-là n'existait pas : le script 21 l'ajoute. Même règle que le gain — aucune valeur
+    ''' par défaut, et son absence ne bloque que la pièce de change.
+    ''' </summary>
+    Public Property ComptePerteDeChange As String = String.Empty
+
 #End Region
 
 #Region "Identification de la ligne de paramétrage"
@@ -113,6 +144,8 @@ Public Class ComptesSystemeWU
             .TVACollectee = TVACollectee,
             .TTAEnvoi = TTAEnvoi,
             .TTAReception = TTAReception,
+            .CompteGainDeChange = CompteGainDeChange,
+            .ComptePerteDeChange = ComptePerteDeChange,
             .CodeParametrage = CodeParametrage,
             .ChargeDepuisBase = ChargeDepuisBase
         }
@@ -140,6 +173,33 @@ Public Class ComptesSystemeWU
         Return manquants
     End Function
 
+    ''' <summary>
+    ''' Les comptes de CHANGE manquants, séparément des autres.
+    '''
+    ''' POURQUOI UNE SECONDE FONCTION, ET NON DEUX LIGNES DANS ComptesManquants. Parce que
+    ''' ComptesManquants BLOQUE LA PIÈCE PRINCIPALE, celle qui tourne en production depuis des
+    ''' mois. Y ajouter les deux comptes de change aurait arrêté la compense du jour au
+    ''' lendemain de la livraison, pour une pièce que la banque n'a pas encore paramétrée —
+    ''' et pour une fonctionnalité dont elle n'a pas encore besoin ce matin-là.
+    '''
+    ''' Les deux paramétrages sont donc indépendants, et chacun ne bloque que sa propre pièce.
+    ''' </summary>
+    Public Function ComptesDeChangeManquants() As List(Of String)
+
+        Dim manquants As New List(Of String)
+
+        If String.IsNullOrWhiteSpace(CompteGainDeChange) Then manquants.Add("Gain de change")
+        If String.IsNullOrWhiteSpace(ComptePerteDeChange) Then manquants.Add("Perte de change")
+
+        ' Le compte de liaison n'est pas un compte propre au change : c'est le compte courant
+        ' Western Union, déjà exigé par la pièce principale. Il est vérifié ici quand même,
+        ' parce que la pièce de change s'en sert et qu'un diagnostic doit nommer TOUT ce qui
+        ' lui manque, et non laisser découvrir le second défaut après avoir corrigé le premier.
+        If String.IsNullOrWhiteSpace(CompteCourant) Then manquants.Add("Compte courant Western Union ETD (compte de liaison)")
+
+        Return manquants
+    End Function
+
     ''' <summary>Retire les espaces parasites de tous les comptes (saisie manuelle).</summary>
     Public Sub Normaliser()
         CompteCourant = If(CompteCourant, String.Empty).Trim()
@@ -151,6 +211,8 @@ Public Class ComptesSystemeWU
         TVACollectee = If(TVACollectee, String.Empty).Trim()
         TTAEnvoi = If(TTAEnvoi, String.Empty).Trim()
         TTAReception = If(TTAReception, String.Empty).Trim()
+        CompteGainDeChange = If(CompteGainDeChange, String.Empty).Trim()
+        ComptePerteDeChange = If(ComptePerteDeChange, String.Empty).Trim()
     End Sub
 
     ''' <summary>
@@ -172,6 +234,8 @@ Public Class ComptesSystemeWU
         AjouterSiNonNumerique(suspects, "TVA", TVACollectee)
         AjouterSiNonNumerique(suspects, "TTA sur envoi WU", TTAEnvoi)
         AjouterSiNonNumerique(suspects, "TTA sur paiement WU", TTAReception)
+        AjouterSiNonNumerique(suspects, "Gain de change", CompteGainDeChange)
+        AjouterSiNonNumerique(suspects, "Perte de change", ComptePerteDeChange)
 
         Return suspects
     End Function

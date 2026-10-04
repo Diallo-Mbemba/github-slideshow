@@ -129,6 +129,8 @@
     <Compile Include="Services\CoreBankingService.vb" />
     <Compile Include="Services\CalendrierWU.vb" />
     <Compile Include="Services\ChangeService.vb" />
+    <Compile Include="Services\ChangeRepository.vb" />
+    <Compile Include="Services\PieceChangeService.vb" />
     <Compile Include="Services\ConfigurationWU.vb" />
     <Compile Include="Services\MiseAJourWU.vb" />
     <Compile Include="Services\DiagnosticSqlWU.vb" />
@@ -175,6 +177,12 @@
     </Compile>
     <Compile Include="Forms\FrmControleChange.Designer.vb">
       <DependentUpon>FrmControleChange.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmEcartsChange.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmEcartsChange.Designer.vb">
+      <DependentUpon>FrmEcartsChange.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\LogosProduits.vb" />
     <Compile Include="Forms\FrmChoixProduit.vb">
@@ -342,6 +350,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmControleChange.resx">
       <DependentUpon>FrmControleChange.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmEcartsChange.resx">
+      <DependentUpon>FrmEcartsChange.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmChoixProduit.resx">
       <DependentUpon>FrmChoixProduit.vb</DependentUpon>
