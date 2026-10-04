@@ -390,7 +390,8 @@ Public NotInheritable Class PieceExcelWU
             .AgenceEmettrice = If(String.IsNullOrWhiteSpace(agence),
                                   ConstantesWU.PIECE_AGENCE_DEFAUT, agence),
             .Raison = String.Format(ConstantesWU.PIECE_RAISON_GLOBALE_FORMAT,
-                                    PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee)).Trim()
+                                    PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee)).
+                             Trim().ToUpperInvariant()
         }
 
         Dim feuille As Object = classeur.Worksheets(1)
@@ -452,7 +453,8 @@ Public NotInheritable Class PieceExcelWU
                 .AgenceEmettrice = AgenceDe(calc, agences),
                 .Raison = String.Format(ConstantesWU.PIECE_RAISON_FORMAT,
                                         calc.Designation,
-                                        PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee)).Trim()
+                                        PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee)).
+                                 Trim().ToUpperInvariant()
             }
 
             ' Ajoutée APRÈS la dernière : sans cela les onglets sortiraient à l'envers, et

@@ -106,8 +106,6 @@ Public NotInheritable Class ConstantesWU
 
 #Region "Libellés comptables"
 
-    Public Const LIB_COMPTE_COURANT As String = "COMPTE COURANT WESTERN UNION ETD"
-
     ' ------------------------------------------------------------------------------------
     '  Libellés du formulaire de pièce comptable de la banque
     '
@@ -167,12 +165,11 @@ Public NotInheritable Class ConstantesWU
     ' le contenu en Century Schoolbook.
     Public Const PIECE_POLICE_TITRE As String = "Arial Black"
     Public Const PIECE_POLICE_CORPS As String = "Century Schoolbook"
+    ' LES LIBELLÉS DÉTAILLÉS DE LA PIÈCE ONT DISPARU, sur demande de la banque : toutes les
+    ' lignes portent désormais « LD WU ACTIVITE <point de vente> <période> ». Les deux qui
+    ' restent ici ne servent plus la pièce — ils NOMMENT LES TAXES dans l'écran du barème,
+    ' qui est un écran de lecture, et n'entrent dans aucune écriture.
     Public Const LIB_COMMISSION_TRANSFERT_BANQUE As String = "Commission sur Transfert_Ecobank"
-    Public Const LIB_COMMISSION_PAIEMENT_BANQUE As String = "Commission sur Paiement_Ecobank"
-    Public Const LIB_COMMISSION_ENVOI_BANQUE As String = "Commission sur Envoi_Ecobank"
-    Public Const LIB_COMMISSION_TRANSFERT_SA As String = "Commission sur Transfert_Sous-agence"
-    Public Const LIB_COMMISSION_PAIEMENT_SA As String = "Commission sur Paiement_Sous-agence"
-    Public Const LIB_COMMISSION_ENVOI_SA As String = "Commission sur Envoi_Sous-agence"
     Public Const LIB_IMPOTS_TAXE_ENVOI As String = "IMPOTS ET TAXE SUR ENVOI"
 
     ''' <summary>

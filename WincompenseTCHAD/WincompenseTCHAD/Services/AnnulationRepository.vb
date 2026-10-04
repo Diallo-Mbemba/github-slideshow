@@ -398,16 +398,8 @@ Public NotInheritable Class AnnulationRepository
     Private Shared Sub DeplacerPiece(idAnnulation As Long, jour As Date,
                                      connexion As SqlConnection, transaction As SqlTransaction)
 
-        ' LE NARRATIF SUIT LA PIÈCE DANS SON ARCHIVE, quand la base le porte. Il n'est nommé
-        ' que si les DEUX tables l'ont — PieceRepository s'en assure — car une colonne nommée
-        ' d'un côté et absente de l'autre ferait échouer le déplacement au milieu de la
-        ' transaction, et c'est la journée entière qui ne serait plus annulable.
-        Dim narratif As String = If(PieceRepository.NarratifConserve(connexion, transaction),
-                                    "Narratif, ", String.Empty)
-
-        Dim colonnes As String =
+        Const colonnes As String =
             "DateActivite, Ligne, Compte, Libelle, Debit, Credit, CodeAgence, " &
-            narratif &
             "DateEnregistrement, EnregistrePar"
 
         Deplacer(PIECE, PIECE_ARCHIVE, colonnes, idAnnulation, jour, connexion, transaction)

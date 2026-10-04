@@ -181,7 +181,7 @@ Public NotInheritable Class CoreBankingService
         For Each ligne As DataRow In dtPiece.Rows
 
             Dim compte As String = Convert.ToString(ligne("Compte"), CultureInfo.InvariantCulture)
-            Dim libelle As String = NarratifDe(ligne)
+            Dim libelle As String = Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
             Dim codeAgence As String = CodeAgenceDe(ligne)
 
             Dim debit As Long = Convert.ToInt64(ligne("Debit"), CultureInfo.InvariantCulture)
@@ -231,7 +231,7 @@ Public NotInheritable Class CoreBankingService
 
         For Each ligne As DataRow In dtPiece.Rows
 
-            Dim narratif As String = NarratifDe(ligne)
+            Dim narratif As String = Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
             If narratif Is Nothing OrElse narratif.Length <= ConstantesWU.CB_NARRATIF_LONGUEUR_MAX Then Continue For
 
             messageErreur =
@@ -275,30 +275,6 @@ Public NotInheritable Class CoreBankingService
     ''' version antérieure : on renvoie alors une chaîne vide, et la règle d'aiguillage
     ''' rattachera la ligne au siège.
     ''' </summary>
-    ''' <summary>
-    ''' Narratif de la ligne, c'est-à-dire ce qui partira dans ADDLTEXT.
-    '''
-    ''' LA BANQUE A DEMANDÉ UNE NARRATIVE DE FORME FIXE : « LD WU ACTIVITE <point de vente>
-    ''' <période> », sur chacune des douze lignes d'un point de vente. La pièce la porte dans
-    ''' une colonne à part, parce que ses LIBELLÉS, eux, continuent de dire ce que chaque
-    ''' ligne est — c'est un document que lit un comptable.
-    '''
-    ''' LE LIBELLÉ REPREND LA MAIN quand la colonne manque ou qu'elle est vide : c'est le cas
-    ''' d'une pièce ARCHIVÉE avant ce changement, que PieceRepository relit telle qu'elle a
-    ''' été conservée. Elle repart alors au core banking exactement comme elle en serait
-    ''' partie à l'époque, ce qui est la seule réponse juste.
-    ''' </summary>
-    Private Shared Function NarratifDe(ligne As DataRow) As String
-
-        If ligne.Table.Columns.Contains("Narratif") AndAlso Not ligne.IsNull("Narratif") Then
-
-            Dim narratif As String = Convert.ToString(ligne("Narratif"), CultureInfo.InvariantCulture)
-            If Not String.IsNullOrWhiteSpace(narratif) Then Return narratif
-        End If
-
-        Return Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
-    End Function
-
     Private Shared Function CodeAgenceDe(ligne As DataRow) As String
 
         If Not ligne.Table.Columns.Contains("CodeAgence") Then Return String.Empty

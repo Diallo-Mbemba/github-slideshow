@@ -160,20 +160,6 @@ Public NotInheritable Class PieceComptableService
         ' core banking, qui n'a aucun autre moyen de savoir à quelle agence rattacher l'écriture.
         dt.Columns.Add("CodeAgence", GetType(String))
 
-        ' NARRATIF DU CORE BANKING, colonne technique comme la précédente : elle ne s'affiche
-        ' pas dans la pièce, elle alimente la colonne ADDLTEXT du fichier d'interface.
-        '
-        ' POURQUOI ELLE EST SÉPARÉE DU LIBELLÉ. La banque a demandé que la NARRATIVE porte
-        ' toujours la même forme — « LD WU ACTIVITE <point de vente> <période> » — sur CHACUNE
-        ' des douze lignes d'un point de vente. La pièce comptable, elle, est lue et signée par
-        ' un comptable : ses douze libellés disent ce que chaque ligne EST — la TVA, la TTA, la
-        ' commission sur transfert — et douze fois la même phrase l'auraient privée de son seul
-        ' moyen de distinguer une ligne d'une autre à la lecture.
-        '
-        ' Les deux textes vivent donc côte à côte : le libellé pour l'œil, le narratif pour le
-        ' core banking. La pièce PORTE le narratif sans le montrer, exactement comme elle porte
-        ' le code agence.
-        dt.Columns.Add("Narratif", GetType(String))
 
         If listeCalculs Is Nothing Then Return dt
 
@@ -229,13 +215,18 @@ Public NotInheritable Class PieceComptableService
                 compteMouvement = comptes.CompteInterBancaire
             End If
 
-            Dim libelleMouvement As String = Narratif(LibelleDuMouvement(calc.Designation), periode)
-
-            ' LA NARRATIVE DE TOUTES LES LIGNES DE CE POINT DE VENTE. Elle a la forme du
-            ' libellé de mouvement, et c'est exactement ce que la banque a demandé : chaque
-            ' ligne du fichier doit porter « LD WU ACTIVITE <point de vente> <période> »,
-            ' qu'elle porte la commission, la TVA ou le mouvement lui-même.
-            Dim narratifPdv As String = libelleMouvement
+            ' LE LIBELLÉ DE TOUTES LES LIGNES DE CE POINT DE VENTE, le même pour les douze.
+            '
+            ' C'EST LA FORME DICTÉE PAR LA BANQUE : « LD WU ACTIVITE <point de vente>
+            ' <période> », sur la pièce comme dans la colonne ADDLTEXT du fichier core
+            ' banking, qu'il s'agisse du mouvement, d'une commission, de la TVA ou d'une TTA.
+            '
+            ' LES DOUZE LIBELLÉS DISTINCTS ONT DONC DISPARU — « Commission sur
+            ' Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… Ce que chaque ligne EST
+            ' se lit désormais dans son NUMÉRO DE COMPTE, qui est de toute façon ce que la
+            ' comptabilité impute. Les comptes, eux, restent nommés dans l'écran des comptes
+            ' systèmes et dans celui du barème.
+            Dim libellePdv As String = Narratif(LibelleDuMouvement(calc.Designation), periode)
 
             Dim totalCommissionsEtTaxes As Decimal =
                 calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
@@ -249,10 +240,10 @@ Public NotInheritable Class PieceComptableService
             CalculerEcartArrondi(calc)
 
             ' 1) Ligne de mouvement (compte de compensation du point de vente).
-            AjouterLigneSigneAuto(dt, compteMouvement, libelleMouvement, netMouvement, calc.CodeAgence, narratifPdv)
+            AjouterLigneSigneAuto(dt, compteMouvement, libellePdv, netMouvement, calc.CodeAgence)
 
             ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
-            AjouterLigneSigneAuto(dt, comptes.CompteCourant, Narratif(ConstantesWU.LIB_COMPTE_COURANT, periode), -netCompteCourant, calc.CodeAgence, narratifPdv)
+            AjouterLigneSigneAuto(dt, comptes.CompteCourant, libellePdv, -netCompteCourant, calc.CodeAgence)
 
             ' 3) Commissions part Banque (toujours créditées, quel que soit le type de PDV).
             ' Transfert et Envoi partagent le même compte dans le paramétrage actuel (728300148),
@@ -264,29 +255,29 @@ Public NotInheritable Class PieceComptableService
             ' envoi. Dans une comparaison ligne à ligne, deux ordres différents font perdre du
             ' temps au vérificateur, et lui font passer des écarts.
             AjouterLigneSiNonNul(dt, comptes.CommissionTransfertBanque,
-                                 Narratif(ConstantesWU.LIB_COMMISSION_TRANSFERT_BANQUE, periode), 0D, calc.CommissionTransfertBanque, calc.CodeAgence, narratifPdv)
+                                 libellePdv, 0D, calc.CommissionTransfertBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionPaiementBanque,
-                                 Narratif(ConstantesWU.LIB_COMMISSION_PAIEMENT_BANQUE, periode), 0D, calc.CommissionPaiementBanque, calc.CodeAgence, narratifPdv)
+                                 libellePdv, 0D, calc.CommissionPaiementBanque, calc.CodeAgence)
             AjouterLigneSiNonNul(dt, comptes.CommissionEnvoiBanque,
-                                 Narratif(ConstantesWU.LIB_COMMISSION_ENVOI_BANQUE, periode), 0D, calc.CommissionEnvoiBanque, calc.CodeAgence, narratifPdv)
+                                 libellePdv, 0D, calc.CommissionEnvoiBanque, calc.CodeAgence)
 
             ' 4) Commissions part Sous-agent (uniquement pour les SA disposant d'un CompteCommission).
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCommission) Then
 
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     Narratif($"{ConstantesWU.LIB_COMMISSION_TRANSFERT_SA} {calc.Designation}".Trim(), periode), 0D, calc.CommissionTransfertSA, calc.CodeAgence, narratifPdv)
+                                     libellePdv, 0D, calc.CommissionTransfertSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     Narratif($"{ConstantesWU.LIB_COMMISSION_PAIEMENT_SA} {calc.Designation}".Trim(), periode), 0D, calc.CommissionPaiementSA, calc.CodeAgence, narratifPdv)
+                                     libellePdv, 0D, calc.CommissionPaiementSA, calc.CodeAgence)
                 AjouterLigneSiNonNul(dt, calc.CompteCommission,
-                                     Narratif($"{ConstantesWU.LIB_COMMISSION_ENVOI_SA} {calc.Designation}".Trim(), periode), 0D, calc.CommissionEnvoiSA, calc.CodeAgence, narratifPdv)
+                                     libellePdv, 0D, calc.CommissionEnvoiSA, calc.CodeAgence)
             End If
 
             ' 5) Taxes (impôts, TVA, TTA) : toujours créditées, à la charge de la banque.
-            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, Narratif(ConstantesWU.LIB_IMPOTS_TAXE_ENVOI, periode), 0D, calc.TaxeEnvoi, calc.CodeAgence, narratifPdv)
-            AjouterLigneSiNonNul(dt, comptes.TVACollectee, Narratif(ConstantesWU.LIB_TVA, periode), 0D, calc.TVA, calc.CodeAgence, narratifPdv)
-            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, Narratif(ConstantesWU.LIB_TTA_ENVOI, periode), 0D, calc.TTAEnvoi, calc.CodeAgence, narratifPdv)
-            AjouterLigneSiNonNul(dt, comptes.TTAReception, Narratif(ConstantesWU.LIB_TTA_RECEPTION, periode), 0D, calc.TTAReception, calc.CodeAgence, narratifPdv)
+            AjouterLigneSiNonNul(dt, comptes.ImpotsTaxeEnvoi, libellePdv, 0D, calc.TaxeEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TVACollectee, libellePdv, 0D, calc.TVA, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAEnvoi, libellePdv, 0D, calc.TTAEnvoi, calc.CodeAgence)
+            AjouterLigneSiNonNul(dt, comptes.TTAReception, libellePdv, 0D, calc.TTAReception, calc.CodeAgence)
         Next
 
         Return dt
@@ -378,10 +369,17 @@ Public NotInheritable Class PieceComptableService
         Dim texte As String = Prefixer(If(libelle, String.Empty).Trim())
         Dim suffixe As String = If(periode, String.Empty).Trim()
 
-        If suffixe.Length = 0 Then Return texte
-        If texte.Length = 0 Then Return suffixe
+        If suffixe.Length > 0 AndAlso texte.Length > 0 Then texte &= " " & suffixe
+        If texte.Length = 0 Then texte = suffixe
 
-        Return texte & " " & suffixe
+        ' TOUT EN MAJUSCULES, demandé par la banque et garanti ICI plutôt qu'espéré des
+        ' données. « LD WU ACTIVITE » et la période le sont déjà ; la DÉSIGNATION du point
+        ' de vente vient du référentiel, où elle est saisie à la main. Une seule saisie en
+        ' minuscules suffirait à faire sortir une narrative qui ne ressemble pas aux autres.
+        '
+        ' Invariant, et non la culture du poste : le « i » turc deviendrait « İ », et un
+        ' poste réglé en turc produirait des narratives différentes de celles des autres.
+        Return texte.ToUpperInvariant()
     End Function
 
     ''' <summary>
@@ -495,50 +493,40 @@ Public NotInheritable Class PieceComptableService
     ''' montant arrondi est nul.
     ''' </summary>
     Private Shared Sub AjouterLigneSigneAuto(dt As DataTable, compte As String, libelle As String,
-                                             montant As Decimal, codeAgence As String,
-                                             narratif As String)
+                                             montant As Decimal, codeAgence As String)
         Dim montantArrondi As Long = WUCalculationService.ArrondiFCFA(montant)
         If montantArrondi = 0L Then Return
 
         If montantArrondi > 0L Then
-            AjouterLigne(dt, compte, libelle, montantArrondi, 0L, codeAgence, narratif)
+            AjouterLigne(dt, compte, libelle, montantArrondi, 0L, codeAgence)
         Else
-            AjouterLigne(dt, compte, libelle, 0L, -montantArrondi, codeAgence, narratif)
+            AjouterLigne(dt, compte, libelle, 0L, -montantArrondi, codeAgence)
         End If
     End Sub
 
     ''' <summary>Ajoute une ligne simple (Debit ou Credit) si le montant n'est pas nul une fois arrondi.</summary>
     Private Shared Sub AjouterLigneSiNonNul(dt As DataTable, compte As String, libelle As String,
-                                            debit As Decimal, credit As Decimal, codeAgence As String,
-                                            narratif As String)
+                                            debit As Decimal, credit As Decimal, codeAgence As String)
         Dim debitArrondi As Long = WUCalculationService.ArrondiFCFA(debit)
         Dim creditArrondi As Long = WUCalculationService.ArrondiFCFA(credit)
         If debitArrondi = 0L AndAlso creditArrondi = 0L Then Return
-        AjouterLigne(dt, compte, libelle, debitArrondi, creditArrondi, codeAgence, narratif)
+        AjouterLigne(dt, compte, libelle, debitArrondi, creditArrondi, codeAgence)
     End Sub
 
     Private Shared Sub AjouterLigne(dt As DataTable, compte As String, libelle As String,
-                                    debit As Long, credit As Long, codeAgence As String,
-                                    narratif As String)
+                                    debit As Long, credit As Long, codeAgence As String)
         Dim ligne As DataRow = dt.NewRow()
         ligne("Compte") = If(String.IsNullOrWhiteSpace(compte), ComptesSystemeWU.Actuels.CompteInterBancaire, compte)
         ligne("Libelle") = libelle
         ligne("Debit") = debit
         ligne("Credit") = credit
 
-        ' Ces deux colonnes peuvent manquer sur une pièce construite par une version
-        ' antérieure : on ne les renseigne que si elles existent, plutôt que de faire
-        ' échouer la génération.
+        ' La colonne peut manquer sur une pièce construite avant l'ajout du code agence : on ne
+        ' la renseigne que si elle existe, plutôt que de faire échouer la génération.
         If dt.Columns.Contains("CodeAgence") Then
             ligne("CodeAgence") = If(codeAgence, String.Empty).Trim()
         End If
 
-        ' Un narratif absent retombe sur le libellé : c'est ce que le fichier portait avant
-        ' que la banque ne demande une narrative de forme fixe, et le comportement reste
-        ' donc juste pour une pièce qui n'en porte pas.
-        If dt.Columns.Contains("Narratif") Then
-            ligne("Narratif") = If(String.IsNullOrWhiteSpace(narratif), libelle, narratif)
-        End If
 
         dt.Rows.Add(ligne)
     End Sub
@@ -584,15 +572,14 @@ Public NotInheritable Class PieceComptableService
             ' global, et ne se rattache à aucune période. Elle n'en reste pas moins un
             ' libellé de la pièce, et la banque les a demandés tous préfixés.
             AjouterLigne(dtPiece, compteEcart, LibelleEcartArrondi, 0L,
-                         CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE, LibelleEcartArrondi)
+                         CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE)
             messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte inter bancaire {compteEcart}."
             Return True
         End If
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
             AjouterLigne(dtPiece, compteEcart, LibelleEcartArrondi,
-                         CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE,
-                         LibelleEcartArrondi)
+                         CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE)
             messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte inter bancaire {compteEcart}."
             Return True
         End If

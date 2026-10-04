@@ -510,8 +510,6 @@ Public NotInheritable Class PieceChangeService
         ' d'eux ferait apparaître dans ses états un résultat qui n'est pas le sien.
         ligne("CodeAgence") = ConstantesWU.CB_AGENCE_SIEGE
 
-        ligne("Narratif") = libelle
-
         table.Rows.Add(ligne)
     End Sub
 
@@ -529,13 +527,6 @@ Public NotInheritable Class PieceChangeService
         table.Columns.Add("Debit", GetType(Long))
         table.Columns.Add("Credit", GetType(Long))
         table.Columns.Add("CodeAgence", GetType(String))
-
-        ' Le narratif, comme sur la pièce principale : c'est lui que le fichier core banking
-        ' recopie dans ADDLTEXT. Ici il vaut le libellé — la pièce de change n'a qu'une
-        ' phrase, et elle est déjà de la forme demandée — mais la colonne doit exister, sans
-        ' quoi le fichier retomberait sur le libellé par défaut et les deux pièces ne
-        ' seraient plus construites de la même façon.
-        table.Columns.Add("Narratif", GetType(String))
 
         Return table
     End Function

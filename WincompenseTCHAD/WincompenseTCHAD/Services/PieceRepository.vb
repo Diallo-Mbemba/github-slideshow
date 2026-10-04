@@ -30,52 +30,6 @@ Public NotInheritable Class PieceRepository
 
     Private Const TABLE_PIECE As String = "T_PieceWU"
     Private Const TABLE_PIECE_ARCHIVE As String = "T_PieceAnnuleeWU"
-
-    ''' <summary>
-    ''' La colonne Narratif est-elle présente sur LES DEUX tables de pièces ?
-    '''
-    ''' POURQUOI LES DEUX, ET PAS L'UNE OU L'AUTRE. Une annulation DÉPLACE les lignes de
-    ''' T_PieceWU vers T_PieceAnnuleeWU, colonne par colonne. Si la première portait le
-    ''' narratif et pas la seconde, l'annulation échouerait au milieu d'une transaction —
-    ''' et c'est la journée entière qui ne serait pas annulable. Exiger les deux fait que
-    ''' l'application se comporte comme avant le changement tant que le script n'est pas
-    ''' passé, plutôt qu'à moitié.
-    '''
-    ''' Le résultat est mis en cache : la structure d'une table ne change pas en cours de
-    ''' session. OublierLaStructure la fait redétecter quand la connexion change de base.
-    ''' </summary>
-    Private Shared _narratifConserve As Boolean?
-
-    Public Shared Function NarratifConserve(connexion As SqlConnection,
-                                            transaction As SqlTransaction) As Boolean
-
-        If _narratifConserve.HasValue Then Return _narratifConserve.Value
-
-        Const requete As String =
-            "SELECT COUNT(*) FROM sys.columns " &
-            "WHERE name = N'Narratif' " &
-            "AND object_id IN (OBJECT_ID(N'dbo." & TABLE_PIECE & "'), " &
-            "                  OBJECT_ID(N'dbo." & TABLE_PIECE_ARCHIVE & "'))"
-
-        Try
-            Using commande As New SqlCommand(requete, connexion, transaction)
-                _narratifConserve = (Convert.ToInt32(commande.ExecuteScalar()) = 2)
-            End Using
-
-        Catch ex As SqlException
-            ' Structure non interrogeable : on se comporte comme si le script n'était pas
-            ' passé. On ne met PAS ce résultat en cache — un droit manquant peut être accordé
-            ' en cours de journée.
-            Return False
-        End Try
-
-        Return _narratifConserve.Value
-    End Function
-
-    ''' <summary>Fait redétecter la colonne Narratif. À appeler quand la connexion change de base.</summary>
-    Public Shared Sub OublierLaStructure()
-        _narratifConserve = Nothing
-    End Sub
     Private Const TABLE_ANNULATION As String = "T_AnnulationWU"
 
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
@@ -169,14 +123,10 @@ Public NotInheritable Class PieceRepository
 
         Const suppression As String = "DELETE FROM " & TABLE_PIECE & " WHERE DateActivite = @jour"
 
-        Dim avecNarratif As Boolean = NarratifConserve(connexion, transaction)
-
-        Dim insertion As String =
+        Const insertion As String =
             "INSERT INTO " & TABLE_PIECE & " (DateActivite, Ligne, Compte, Libelle, Debit, Credit, " &
-            "CodeAgence, " & If(avecNarratif, "Narratif, ", String.Empty) &
-            "DateEnregistrement, EnregistrePar) " &
-            "VALUES (@jour, @ligne, @compte, @libelle, @debit, @credit, @codeAgence, " &
-            If(avecNarratif, "@narratif, ", String.Empty) & "GETDATE(), @auteur)"
+            "CodeAgence, DateEnregistrement, EnregistrePar) " &
+            "VALUES (@jour, @ligne, @compte, @libelle, @debit, @credit, @codeAgence, GETDATE(), @auteur)"
 
         Using commande As New SqlCommand(suppression, connexion, transaction)
             commande.Parameters.Add("@jour", SqlDbType.Date).Value = jour.Date
@@ -185,7 +135,6 @@ Public NotInheritable Class PieceRepository
 
         Dim rang As Integer = 0
         Dim porteLeCodeAgence As Boolean = dtPiece.Columns.Contains("CodeAgence")
-        Dim porteLeNarratif As Boolean = dtPiece.Columns.Contains("Narratif")
 
         For Each ligne As DataRow In dtPiece.Rows
 
@@ -212,18 +161,6 @@ Public NotInheritable Class PieceRepository
                 commande.Parameters.Add("@credit", SqlDbType.BigInt).Value = credit
                 commande.Parameters.Add("@codeAgence", SqlDbType.NVarChar, 50).Value =
                     If(porteLeCodeAgence, Convert.ToString(ligne("CodeAgence")), String.Empty)
-
-                If avecNarratif Then
-                    ' Un narratif absent retombe sur le libellé : c'est ce que le fichier
-                    ' core banking portait avant que la banque n'en demande un de forme fixe.
-                    Dim narratif As String = If(porteLeNarratif,
-                                                Convert.ToString(ligne("Narratif")),
-                                                String.Empty)
-
-                    commande.Parameters.Add("@narratif", SqlDbType.NVarChar, 255).Value =
-                        If(String.IsNullOrWhiteSpace(narratif), Convert.ToString(ligne("Libelle")), narratif)
-                End If
-
                 commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 100).Value = SessionWU.Auteur
 
                 commande.ExecuteNonQuery()
@@ -405,19 +342,15 @@ Public NotInheritable Class PieceRepository
 
         Dim dt As DataTable = TableVide()
 
+        Const lecture As String =
+            "SELECT Compte, Libelle, Debit, Credit, CodeAgence " &
+            "FROM   " & TABLE_PIECE & " " &
+            "WHERE  DateActivite = @jour " &
+            "ORDER BY Ligne"
+
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
-
-                ' La colonne du narratif ne se nomme que si elle existe : sur une base où le
-                ' script n'a pas été rejoué, la nommer ferait rejeter TOUTE la requête, et la
-                ' pièce conservée deviendrait illisible.
-                Dim lecture As String =
-                    "SELECT Compte, Libelle, Debit, Credit, CodeAgence" &
-                    If(NarratifConserve(connexion, Nothing), ", Narratif", String.Empty) & " " &
-                    "FROM   " & TABLE_PIECE & " " &
-                    "WHERE  DateActivite = @jour " &
-                    "ORDER BY Ligne"
 
                 Using commande As New SqlCommand(lecture, connexion)
                     commande.Parameters.Add("@jour", SqlDbType.Date).Value = jour.Date
@@ -426,9 +359,7 @@ Public NotInheritable Class PieceRepository
                         While lecteur.Read()
                             dt.Rows.Add(LireChaine(lecteur, 0), LireChaine(lecteur, 1),
                                         LireEntier(lecteur, 2), LireEntier(lecteur, 3),
-                                        LireChaine(lecteur, 4),
-                                        If(lecteur.FieldCount > 5, LireChaine(lecteur, 5),
-                                           LireChaine(lecteur, 1)))
+                                        LireChaine(lecteur, 4))
                         End While
                     End Using
                 End Using
@@ -462,16 +393,15 @@ Public NotInheritable Class PieceRepository
 
         Dim dt As DataTable = TableVide()
 
+        Const lecture As String =
+            "SELECT Compte, Libelle, Debit, Credit, CodeAgence " &
+            "FROM   " & TABLE_PIECE_ARCHIVE & " " &
+            "WHERE  IdAnnulation = @id " &
+            "ORDER BY Ligne"
+
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
                 connexion.Open()
-
-                Dim lecture As String =
-                    "SELECT Compte, Libelle, Debit, Credit, CodeAgence" &
-                    If(NarratifConserve(connexion, Nothing), ", Narratif", String.Empty) & " " &
-                    "FROM   " & TABLE_PIECE_ARCHIVE & " " &
-                    "WHERE  IdAnnulation = @id " &
-                    "ORDER BY Ligne"
 
                 Using commande As New SqlCommand(lecture, connexion)
                     commande.Parameters.Add("@id", SqlDbType.BigInt).Value = idAnnulation
@@ -480,9 +410,7 @@ Public NotInheritable Class PieceRepository
                         While lecteur.Read()
                             dt.Rows.Add(LireChaine(lecteur, 0), LireChaine(lecteur, 1),
                                         LireEntier(lecteur, 2), LireEntier(lecteur, 3),
-                                        LireChaine(lecteur, 4),
-                                        If(lecteur.FieldCount > 5, LireChaine(lecteur, 5),
-                                           LireChaine(lecteur, 1)))
+                                        LireChaine(lecteur, 4))
                         End While
                     End Using
                 End Using
@@ -512,11 +440,6 @@ Public NotInheritable Class PieceRepository
         dt.Columns.Add("Debit", GetType(Long))
         dt.Columns.Add("Credit", GetType(Long))
         dt.Columns.Add("CodeAgence", GetType(String))
-
-        ' Le narratif du core banking, comme sur la pièce fraîchement produite : une pièce
-        ' relue doit être la MÊME qu'à sa génération, sans quoi le fichier reproduit depuis
-        ' l'archive ne serait pas celui qui a été chargé.
-        dt.Columns.Add("Narratif", GetType(String))
         Return dt
     End Function
 
