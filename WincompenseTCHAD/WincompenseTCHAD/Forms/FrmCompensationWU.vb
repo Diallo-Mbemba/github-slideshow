@@ -935,7 +935,7 @@ Public Class FrmCompensationWU
 
 
     ''' <summary>
-    ''' Produit le fichier à treize colonnes chargé dans le core banking.
+    ''' Produit le fichier à douze colonnes chargé dans le core banking.
     '''
     ''' Il dérive de la pièce déjà générée, et non d'un nouveau calcul : ce qui est chargé doit
     ''' être exactement ce que le comptable a vu et validé à l'écran.

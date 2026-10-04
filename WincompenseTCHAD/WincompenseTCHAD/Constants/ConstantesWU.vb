@@ -500,20 +500,44 @@ Public NotInheritable Class ConstantesWU
 
 #Region "Fichier d'interface vers le core banking"
 
-    ' Le fichier chargé dans le core banking compte treize colonnes, dont neuf sont constantes
+    ' Le fichier chargé dans le core banking compte DOUZE colonnes, dont huit sont constantes
     ' ou déduites. Les valeurs ci-dessous sont celles de la banque : elles ne se devinent pas et
     ' ne doivent pas être modifiées sans son accord.
+    '
+    ' CE BLOC A ÉTÉ CORRIGÉ SUR DEMANDE ÉCRITE DE LA BANQUE, pendant sa production, et les
+    ' quatre changements sont confirmés par elle :
+    '
+    '     BRN ............ N01  ->  S51
+    '     TXNCD débit .... U24  ->  F03
+    '     TXNCD crédit ... F15  ->  F57
+    '     COST_CENTER .... supprimée du fichier
+    '     BATCHNO ........ désormais en majuscules (voir CoreBankingService)
+    '
+    ' Les fichiers DÉJÀ chargés portent les anciennes valeurs. Ce n'est pas rattrapable et n'a
+    ' pas à l'être : un lot chargé l'a été sous les codes en vigueur ce jour-là.
 
     Public Const CB_DETBSJRNL As String = "BBR"
-    Public Const CB_BRN As String = "N01"
+
+    ''' <summary>
+    ''' Agence du LOT (colonne BRN). Corrigée de N01 en S51 sur demande de la banque.
+    '''
+    ''' ATTENTION, ELLE N'EST PAS LA MÊME CHOSE QUE CB_AGENCE_SIEGE. BRN désigne l'agence du
+    ''' LOT, portée à l'identique par toutes ses lignes ; ACBRN désigne l'agence de CHAQUE
+    ''' ÉCRITURE, et vaut CB_AGENCE_SIEGE pour les comptes internes. La demande de la banque
+    ''' ne nomme que BRN : CB_AGENCE_SIEGE reste donc à N01, et un fichier porte aujourd'hui
+    ''' S51 en tête de chaque ligne et N01 dans sa colonne ACBRN pour les comptes du siège.
+    ''' Si la banque voulait aussi changer celui-là, c'est CB_AGENCE_SIEGE qu'il faut
+    ''' modifier, et lui seul.
+    ''' </summary>
+    Public Const CB_BRN As String = "S51"
+
     Public Const CB_SRCCODE As String = "ECOSOURCE"
-    Public Const CB_COST_CENTER As String = "10000"
 
-    ''' <summary>Code transaction d'un débit.</summary>
-    Public Const CB_TXNCD_DEBIT As String = "U24"
+    ''' <summary>Code transaction d'un débit. U24 jusqu'au correctif demandé par la banque.</summary>
+    Public Const CB_TXNCD_DEBIT As String = "F03"
 
-    ''' <summary>Code transaction d'un crédit.</summary>
-    Public Const CB_TXNCD_CREDIT As String = "F15"
+    ''' <summary>Code transaction d'un crédit. F15 jusqu'au correctif demandé par la banque.</summary>
+    Public Const CB_TXNCD_CREDIT As String = "F57"
 
     ''' <summary>Sens débit, tel qu'attendu dans la colonne DRCR.</summary>
     Public Const CB_SENS_DEBIT As String = "D"
@@ -567,7 +591,7 @@ Public NotInheritable Class ConstantesWU
     ''' MÊME journée et produirait sans cela le même numéro. Voir
     ''' CoreBankingService.NumeroDeLotDeChange, qui démontre qu'aucune collision n'est possible.
     ''' </summary>
-    Public Const CB_LOT_PREFIXE_CHANGE As String = "c"
+    Public Const CB_LOT_PREFIXE_CHANGE As String = "C"
 
 #End Region
 

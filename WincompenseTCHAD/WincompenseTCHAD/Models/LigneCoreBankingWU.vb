@@ -6,7 +6,7 @@ Option Explicit On
 '''
 ''' Ce fichier n'est pas une pièce comptable de plus : c'est la forme sous laquelle le core
 ''' banking accepte d'impacter réellement les comptes des sous-agents et les comptes internes
-''' de la banque. Il compte treize colonnes, dont neuf sont constantes ou déduites — seuls le
+''' de la banque. Il compte douze colonnes, dont huit sont constantes ou déduites — seuls le
 ''' montant, le compte, le sens et le libellé viennent vraiment de la pièce, plus la date.
 '''
 ''' Les noms des propriétés reprennent exactement ceux des colonnes attendues, en majuscules :
@@ -15,7 +15,7 @@ Option Explicit On
 ''' </summary>
 Public Class LigneCoreBankingWU
 
-#Region "Les treize colonnes, dans l'ordre du fichier"
+#Region "Les douze colonnes, dans l'ordre du fichier"
 
     Public Property DETBSJRNL As String = ConstantesWU.CB_DETBSJRNL
     Public Property BRN As String = ConstantesWU.CB_BRN
@@ -29,7 +29,9 @@ Public Class LigneCoreBankingWU
     Public Property VALDT As Date
     Public Property INSTR_NO As String = String.Empty
     Public Property ADDLTEXT As String = String.Empty
-    Public Property COST_CENTER As String = ConstantesWU.CB_COST_CENTER
+    ' COST_CENTER A ÉTÉ RETIRÉE, sur demande écrite de la banque. Elle portait la valeur
+    ' constante 10000 sur toutes les lignes depuis l'origine. Ni la propriété ni la colonne
+    ' ne subsistent : une colonne conservée « au cas où » finit par être réalimentée.
 
 #End Region
 

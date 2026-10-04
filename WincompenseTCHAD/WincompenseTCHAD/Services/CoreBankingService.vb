@@ -16,14 +16,32 @@ Public NotInheritable Class CoreBankingService
     Private Sub New()
     End Sub
 
-    ''' <summary>Les treize en-têtes, dans l'ordre exact attendu par le core banking.</summary>
+    ''' <summary>
+    ''' Les douze en-têtes, dans l'ordre exact attendu par le core banking.
+    '''
+    ''' ELLES ÉTAIENT TREIZE. COST_CENTER, qui portait 10000 sur toutes les lignes, a été
+    ''' retirée sur demande écrite de la banque. L'ordre des douze restantes est inchangé.
+    ''' </summary>
     Public Shared ReadOnly COLONNES As String() = New String() {
         "DETBSJRNL", "BRN", "BATCHNO", "SRCCODE", "AMOUNT", "ACNO", "DRCR",
-        "ACBRN", "TXNCD", "VALDT", "INSTR_NO", "ADDLTEXT", "COST_CENTER"
+        "ACBRN", "TXNCD", "VALDT", "INSTR_NO", "ADDLTEXT"
     }
 
-    ''' <summary>Alphabet du numéro de lot : chiffres puis minuscules, comme « 07p1 ».</summary>
-    Private Const ALPHABET_LOT As String = "0123456789abcdefghijklmnopqrstuvwxyz"
+    ''' <summary>
+    ''' Alphabet du numéro de lot : chiffres puis MAJUSCULES, comme « 07P1 ».
+    '''
+    ''' IL ÉTAIT EN MINUSCULES, et la banque a demandé par écrit que le numéro de lot passe
+    ''' en majuscules. La conséquence doit être connue : le numéro de lot est le SEUL élément
+    ''' par lequel le core banking reconnaît un lot déjà chargé. Une journée chargée hier
+    ''' sous « 07ob » se présentera désormais sous « 07OB » — si leur système distingue la
+    ''' casse, il ne la reconnaîtra pas comme la même, et acceptera un second chargement.
+    ''' La banque a confirmé le changement en connaissance de ce risque.
+    '''
+    ''' Le numéro de PIÈCE en hérite, lui aussi : PieceExcelWU.NumeroDePiece le compose à
+    ''' partir du lot, et une pièce du 27/03 réimprimée portera « 07OB-001 » là où l'original
+    ''' porte « 07ob-001 ». Même journée, même pièce, deux écritures du même numéro.
+    ''' </summary>
+    Private Const ALPHABET_LOT As String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 #Region "Numéro de lot"
 
@@ -68,18 +86,18 @@ Public NotInheritable Class CoreBankingService
     ''' Numéro de lot de la pièce des ÉCARTS DE CHANGE d'une journée.
     '''
     ''' LE PROBLÈME QU'IL RÉSOUT. Le numéro de lot d'une journée de compensation est dérivé de
-    ''' cette journée : le 27/03/2026 donne « 07ob », toujours. La pièce de change porte sur la
-    ''' MÊME journée ; produite avec la même règle, elle arriverait au core banking sous « 07ob »
+    ''' cette journée : le 27/03/2026 donne « 07OB », toujours. La pièce de change porte sur la
+    ''' MÊME journée ; produite avec la même règle, elle arriverait au core banking sous « 07OB »
     ''' elle aussi. Le core banking n'a que ce numéro pour reconnaître un lot déjà chargé : il
     ''' rejetterait le second fichier comme un doublon du premier, ou les confondrait.
     '''
-    ''' LA RÈGLE. Le numéro garde la journée, mais dans un ESPACE DISTINCT : la lettre « c »
+    ''' LA RÈGLE. Le numéro garde la journée, mais dans un ESPACE DISTINCT : la lettre « C »
     ''' pour change, suivie de la journée sur trois caractères en base 36. Le 27/03/2026 donne
-    ''' donc « c7ob » là où la compensation donne « 07ob » : même journée reconnaissable, deux
+    ''' donc « C7OB » là où la compensation donne « 07OB » : même journée reconnaissable, deux
     ''' lots qui ne peuvent pas se confondre.
     '''
     ''' POURQUOI AUCUNE COLLISION N'EST POSSIBLE. Un lot de compensation commence par le
-    ''' quotient de la journée par 46 656 : il vaut « 0 » aujourd'hui et n'atteindrait « c »
+    ''' quotient de la journée par 46 656 : il vaut « 0 » aujourd'hui et n'atteindrait « C »
     ''' qu'au bout de 559 872 jours, soit en 3531. Les trois caractères du lot de change
     ''' couvrent de leur côté 46 656 jours à partir de 1999, c'est-à-dire jusqu'en 2126.
     '''
@@ -112,7 +130,7 @@ Public NotInheritable Class CoreBankingService
 #Region "Construction du fichier"
 
     ''' <summary>
-    ''' Transforme la pièce comptable en table à treize colonnes, sous le numéro de lot de sa
+    ''' Transforme la pièce comptable en table à douze colonnes, sous le numéro de lot de sa
     ''' journée.
     ''' </summary>
     ''' <param name="dtPiece">Pièce comptable produite par PieceComptableService.</param>
@@ -294,8 +312,7 @@ Public NotInheritable Class CoreBankingService
                        ligne.TXNCD,
                        ligne.VALDT.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
                        ligne.INSTR_NO,
-                       ligne.ADDLTEXT,
-                       ligne.COST_CENTER)
+                       ligne.ADDLTEXT)
     End Sub
 
 #End Region

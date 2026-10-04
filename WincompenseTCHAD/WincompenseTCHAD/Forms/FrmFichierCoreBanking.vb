@@ -9,7 +9,7 @@ Imports System.Windows.Forms
 ''' Consultation du fichier destiné au core banking, avant de le produire.
 '''
 ''' Ce fichier impacte réellement les comptes : il ne doit pas sortir sans qu'on ait pu le
-''' regarder. L'écran présente les treize colonnes telles qu'elles seront écrites — pas une
+''' regarder. L'écran présente les douze colonnes telles qu'elles seront écrites — pas une
 ''' version arrangée pour la lecture — et n'écrit rien tant que l'export n'est pas demandé.
 ''' </summary>
 Public Class FrmFichierCoreBanking

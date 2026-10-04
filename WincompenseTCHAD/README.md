@@ -126,7 +126,7 @@ WincompenseTCHAD/
     │   ├── TransactionWU.vb                ' Une transaction identifiée par son MTCN
     │   ├── UtilisateurWU.vb                ' Un compte utilisateur, son rôle et ses droits
     │   ├── DemandeWU.vb                    ' Une écriture proposée sur le référentiel
-    │   └── LigneCoreBankingWU.vb           ' Une ligne du fichier d'interface (13 colonnes)
+    │   └── LigneCoreBankingWU.vb           ' Une ligne du fichier d'interface (12 colonnes)
     ├── Services/
     │   ├── WUFichierService.vb             ' Contrôles de sécurité : type de rapport, concordance des périodes
 │   ├── WUReportService.vb              ' Lecture fichiers (ZIP ou texte), parsing, agrégation, dates
@@ -860,29 +860,38 @@ comptes des sous-agents et les comptes internes de la banque.
 Bouton **« 5. Fichier core banking… »** sur l'écran de traitement, actif une fois la pièce
 générée : ce qui est chargé doit être exactement ce que le comptable a vu et validé à l'écran.
 
-**Le fichier est présenté avant d'être écrit.** Un écran de consultation montre les treize
+**Le fichier est présenté avant d'être écrit.** Un écran de consultation montre les douze
 colonnes telles qu'elles seront produites — pas une version arrangée pour la lecture — avec le
 nombre de lignes, la date de valeur et le contrôle d'équilibre sous les yeux. L'export n'écrit
 rien tant qu'il n'est pas demandé, et **refuse de s'activer sur un fichier déséquilibré**. Une
 fois produit, le classeur s'ouvre aussitôt, comme la pièce comptable.
 
-### Les treize colonnes
+### Les douze colonnes
 
 | # | Colonne | Valeur |
 |---|---|---|
 | 1 | `DETBSJRNL` | `BBR` |
-| 2 | `BRN` | `N01` |
-| 3 | `BATCHNO` | numéro de lot, 4 caractères |
+| 2 | `BRN` | `S51` |
+| 3 | `BATCHNO` | numéro de lot, 4 caractères **en majuscules** |
 | 4 | `SRCCODE` | `ECOSOURCE` |
 | 5 | `AMOUNT` | montant, **toujours positif**, entier FCFA |
 | 6 | `ACNO` | compte mouvementé |
 | 7 | `DRCR` | `D` ou `C` |
 | 8 | `ACBRN` | voir ci-dessous |
-| 9 | `TXNCD` | `U24` au débit, `F15` au crédit |
+| 9 | `TXNCD` | `F03` au débit, `F57` au crédit |
 | 10 | `VALDT` | jour de la compense, c'est-à-dire la date du jour, au format `jj/mm/aaaa` |
 | 11 | `INSTR_NO` | vide |
 | 12 | `ADDLTEXT` | libellé de l'écriture |
-| 13 | `COST_CENTER` | `10000` |
+
+**Quatre de ces valeurs ont été corrigées sur demande écrite de la banque**, pendant sa
+production : `BRN` passe de `N01` à `S51`, `TXNCD` de `U24`/`F15` à `F03`/`F57`, le numéro de
+lot passe en majuscules, et la treizième colonne `COST_CENTER` — qui portait `10000` sur
+toutes les lignes — a été retirée. Les fichiers déjà chargés portent les anciennes valeurs :
+un lot chargé l'a été sous les codes en vigueur ce jour-là.
+
+`BRN` et `ACBRN` ne sont pas la même chose : `BRN` est l'agence du **lot**, `ACBRN` celle de
+**chaque écriture**. La demande ne nommait que `BRN` ; l'agence du siège employée par `ACBRN`
+reste donc `N01`.
 
 Une ligne de pièce portant un débit **ou** un crédit donne une ligne de fichier ; le sens part
 dans `DRCR` et le montant devient positif.

@@ -201,7 +201,7 @@ C'est ici que le déploiement se joue.
 | ☐ | Comparer la pièce produite et la pièce manuelle, **ligne à ligne** | COMPTA |
 | ☐ | Vérifier l'écart d'arrondi global et son affectation au compte d'attente | COMPTA |
 | ☐ | Vérifier la liste des Accounts écartés, et que chacun s'explique | COMPTA |
-| ☐ | Produire le fichier core banking : treize colonnes, numéro de lot, date de valeur | COMPTA |
+| ☐ | Produire le fichier core banking : douze colonnes, numéro de lot, date de valeur | COMPTA |
 | ☐ | **Charger ce fichier dans l'environnement de TEST du core banking** | INFO |
 | ☐ | Faire confirmer le format de `VALDT` par le retour du chargement de test | INFO |
 | ☐ | Rejouer une journée **atypique** : un lundi rattrapant le week-end | COMPTA |

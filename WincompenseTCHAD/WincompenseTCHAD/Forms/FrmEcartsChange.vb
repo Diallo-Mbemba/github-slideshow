@@ -680,8 +680,8 @@ Public Class FrmEcartsChange
     ''' numéro de lot est dérivé de la journée : les deux fichiers d'un même jour seraient
     ''' arrivés sous le même numéro, et le core banking n'a que ce numéro pour reconnaître un
     ''' lot déjà chargé — il aurait rejeté le second comme doublon du premier. Le lot de change
-    ''' porte donc la lettre « c » : « c7ob » là où la compensation du 27/03/2026 donne
-    ''' « 07ob ». Voir CoreBankingService.NumeroDeLotDeChange.
+    ''' porte donc la lettre « C » : « C7OB » là où la compensation du 27/03/2026 donne
+    ''' « 07OB ». Voir CoreBankingService.NumeroDeLotDeChange.
     '''
     ''' LE FICHIER COUVRE UNE JOURNÉE, ET NON UNE PIÈCE. Un lot du core banking est une
     ''' journée ; si le découpage produit plusieurs pièces pour le 27/03 — par sens, par
@@ -735,7 +735,7 @@ Public Class FrmEcartsChange
         Cursor = Cursors.WaitCursor
         Try
             ' Seul AMOUNT est écrit en nombre : tout le reste est du texte, sans quoi Excel
-            ' réinterpréterait les numéros de compte et le numéro de lot — « c7ob » resterait
+            ' réinterpréterait les numéros de compte et le numéro de lot — « C7OB » resterait
             ' du texte quand un lot tout en chiffres deviendrait un nombre.
             ExcelExportService.ExporterTableBrute(fichier, New String() {"AMOUNT"},
                                                   "CoreBanking", sfdExport.FileName, True)
