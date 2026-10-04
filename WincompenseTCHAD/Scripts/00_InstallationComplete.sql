@@ -48,16 +48,36 @@
     passé sans erreur » et échouer l'application une semaine plus tard.
 
     ------------------------------------------------------------------------------------------
-    LES DEUX SEULS AUTRES FICHIERS QUI S'EXÉCUTENT, ET POURQUOI ILS RESTENT À PART
+    LA SEULE LIGNE À VÉRIFIER AVANT DE L'EXÉCUTER — ET SEULEMENT À LA PREMIÈRE INSTALLATION
     ------------------------------------------------------------------------------------------
 
-    Ils demandent une valeur que ce script ne peut pas deviner, et qu'il ne faut pas inventer :
+    Dans la PARTIE 5, en bas de ce fichier :
 
-      11_AccesUtilisateurs.sql     les comptes ou groupes Active Directory de la banque.
-      12_AccesCompteApplicatif.sql le nom du compte SQL Server fourni par la banque.
+        DECLARE @compteApplicatif SYSNAME = N'etdwincompense';
 
-    Tous deux sont des gestes D'INSTALLATION, faits une fois. Ils n'ont pas à être rejoués à
-    chaque livraison.
+    C'est le nom du compte SQL Server avec lequel l'application se connecte. S'il porte un
+    autre nom chez la banque, remplacer celui-là — et c'est tout. La partie 5 crée alors
+    l'utilisateur dans la base et lui accorde son rôle.
+
+    ELLE NE CRÉE PAS LE LOGIN, et ne le peut pas : il faudrait son mot de passe, qui n'a pas
+    sa place dans un fichier qui circule. Le login est créé par la banque. S'il manque, la
+    partie 5 s'arrête proprement et affiche la commande CREATE LOGIN à passer.
+
+    ------------------------------------------------------------------------------------------
+    LE SEUL CAS OÙ UN DEUXIÈME FICHIER EST NÉCESSAIRE
+    ------------------------------------------------------------------------------------------
+
+    L'AUTHENTIFICATION WINDOWS. Si les postes se connectent avec leur compte de domaine au
+    lieu d'un compte SQL Server, il faut en plus :
+
+      11_AccesUtilisateurs.sql   les comptes ou groupes Active Directory de la banque, que ce
+                                 script-ci ne peut pas deviner. À compléter, puis exécuter.
+                                 UNE FOIS, à l'installation — jamais à une livraison.
+
+    12_AccesCompteApplicatif.sql NE SERT À RIEN DE PLUS : c'est la partie 5 ci-dessus sous
+    forme autonome. Il reste utile dans un seul cas — rattacher PLUSIEURS comptes, un par
+    agent, avec des rôles différents (wu_compense, wu_commercial) : on l'exécute alors une
+    fois par compte, et les trois rôles retrouvent leur utilité.
 
     ------------------------------------------------------------------------------------------
     CE QU'IL NE FAIT PAS
@@ -83,7 +103,8 @@
 
       1. Lire l'onglet « Messages » : chaque objet créé ou complété y est annoncé.
       2. Lire le compte rendu de la partie 6 : il dit ce qui manque, s'il manque quelque chose.
-      3. À la PREMIÈRE installation seulement : exécuter 11 et 12 après les avoir complétés.
+      3. À la PREMIÈRE installation, et SEULEMENT en authentification Windows : compléter
+         puis exécuter 11_AccesUtilisateurs.sql. Avec un compte SQL Server, rien à faire.
       4. Renseigner les comptes comptables depuis l'application (écran Comptes systèmes).
       5. Compléter T_JourFerieWU des fêtes musulmanes de l'année : elles ne se calculent pas
          d'avance et ce script ne sème que les fêtes à date fixe et les lundis de Pâques.

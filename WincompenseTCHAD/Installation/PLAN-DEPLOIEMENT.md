@@ -38,10 +38,9 @@ paramétrés ne sont pas comptabilisés.
 | | Étape | Qui |
 |---|---|---|
 | ☐ | Exécuter **`Scripts\00_InstallationComplete.sql`** sur le serveur de production — **c'est le seul script à exécuter, et il est rejouable** | INFO |
-| ☐ | **Authentification Windows** : compléter la section 1 de **`Scripts\11_AccesUtilisateurs.sql`** avec les comptes ou groupes réels, puis l'exécuter | INFO |
-| ☐ | **Compte SQL Server fourni par la banque** : renseigner `@compte` dans **`Scripts\12_AccesCompteApplicatif.sql`**, puis l'exécuter | INFO |
+| ☐ | **Compte SQL Server fourni par la banque** : vérifier `@compteApplicatif` dans la **PARTIE 5 de `00`** — si le compte porte un autre nom que `etdwincompense`, remplacer cette ligne. Rien d'autre à exécuter | INFO |
+| ☐ | **Authentification Windows SEULEMENT** : compléter la section 1 de **`Scripts\11_AccesUtilisateurs.sql`** avec les comptes ou groupes réels, puis l'exécuter — une fois, à l'installation | INFO |
 | ☐ | Lire le **compte rendu** en fin de script : tables créées, rôles, et ce qui reste à faire | INFO |
-| ☐ | Compléter la **PARTIE 5** du script avec vos groupes Active Directory, puis réexécuter cette partie | INFO |
 | ☐ | Vérifier le **mode de récupération** de la base | INFO |
 | ☐ | Si le mode est `FULL` : mettre en place une sauvegarde régulière du **journal de transactions** | INFO |
 | ☐ | Mettre en place la **sauvegarde complète quotidienne** | INFO |

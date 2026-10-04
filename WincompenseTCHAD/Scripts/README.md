@@ -15,15 +15,45 @@ dit ce qui a été fait et ce qui reste à faire.
 
 ---
 
-## Les deux exceptions, à l'installation seulement
+## À la première installation : une ligne à vérifier, dans `00`
 
-Ils demandent une valeur que `00` ne peut pas deviner, et qu'il ne faut pas inventer.
-Ce sont des gestes d'installation, faits **une fois** :
+Dans la **partie 5**, en bas du fichier :
 
-| Fichier | À compléter avant de l'exécuter |
+```sql
+DECLARE @compteApplicatif SYSNAME = N'etdwincompense';
+```
+
+C'est le nom du compte SQL Server avec lequel l'application se connecte. S'il porte un
+autre nom chez la banque, **on remplace celui-là, et c'est tout** : la partie 5 crée
+l'utilisateur dans la base et lui accorde son rôle.
+
+Elle ne crée pas le **login**, et ne le peut pas : il faudrait son mot de passe, qui n'a
+pas sa place dans un fichier qui circule. Le login est créé par la banque. S'il manque, la
+partie 5 s'arrête proprement et affiche la commande `CREATE LOGIN` à passer.
+
+---
+
+## Le seul cas où un deuxième fichier est nécessaire
+
+**L'authentification Windows.** Si les postes se connectent avec leur compte de domaine au
+lieu d'un compte SQL Server, il faut en plus `11_AccesUtilisateurs.sql` : il porte les
+comptes ou groupes **Active Directory** de la banque, que `00` ne peut pas deviner. À
+compléter, puis exécuter — **une fois**, à l'installation, jamais à une livraison.
+
+`12_AccesCompteApplicatif.sql` ne sert à rien de plus : c'est la partie 5 de `00` sous
+forme autonome. Il reste utile dans un seul cas — rattacher **plusieurs** comptes, un par
+agent, avec des rôles différents (`wu_compense`, `wu_commercial`) : on l'exécute alors une
+fois par compte.
+
+---
+
+## En résumé
+
+| Situation | À exécuter |
 |---|---|
-| `11_AccesUtilisateurs.sql` | les comptes ou groupes **Active Directory** de la banque |
-| `12_AccesCompteApplicatif.sql` | le nom du **compte SQL Server** fourni par la banque |
+| Chaque livraison | `00` |
+| Première installation, compte SQL Server | `00` (vérifier la ligne `@compteApplicatif`) |
+| Première installation, authentification Windows | `00`, puis `11` complété |
 
 ---
 

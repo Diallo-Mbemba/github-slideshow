@@ -17,9 +17,13 @@ en VB.NET (.NET Framework 4.8 / Visual Studio 2019 / SQL Server Express).
    `.\SQLEXPRESS`. Il contient tous les autres fichiers du dossier, qui sont la documentation
    de ce qu'il fait — découpée par sujet — et non des scripts à lancer un par un. Il est
    **rejouable** : à relancer après chaque livraison, il crée ce qui manque et ne touche à
-   rien d'autre. Seuls `11_AccesUtilisateurs.sql` et `12_AccesCompteApplicatif.sql` restent à
-   part, parce qu'ils demandent une valeur propre à la banque — comptes Active Directory, nom
-   du compte SQL Server — que `00` ne peut pas deviner.
+   rien d'autre.
+   À la première installation, une seule ligne est à vérifier dans sa **partie 5** :
+   `@compteApplicatif`, le nom du compte SQL Server avec lequel l'application se connecte.
+   Et **si — et seulement si — les postes se connectent en authentification Windows**, il
+   faut en plus compléter puis exécuter `11_AccesUtilisateurs.sql`, qui porte les comptes ou
+   groupes Active Directory de la banque, que `00` ne peut pas deviner. Voir
+   `Scripts\README.md`.
 5. Compiler et lancer (F5). Au premier lancement, l'application propose de créer le premier
    compte administrateur : c'est lui qui créera ensuite les autres.
 
