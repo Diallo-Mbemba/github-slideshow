@@ -214,6 +214,7 @@ Public Class FrmPrincipal
             Case NameOf(FrmDemandes) : Return "Autorisations du référentiel"
             Case NameOf(FrmComptesSysteme) : Return "Comptes systèmes"
             Case NameOf(FrmTaxes) : Return "Taxes et barème"
+            Case NameOf(FrmControleChange) : Return "Contrôle des écarts de change"
             Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
             Case NameOf(FrmParametrageFichier) : Return "Paramétrage : fichier de secours"
             Case NameOf(FrmProduits) : Return "Produits de transfert"
@@ -328,6 +329,21 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
+    ''' Le contrôle des gains et pertes de change.
+    '''
+    ''' RANGÉ DANS LE MENU COMPENSATION, et non dans Paramétrage, parce qu'il parle de la
+    ''' JOURNÉE et non du référentiel : il rejoue sur un rapport de règlement le calcul qui
+    ''' alimentera la pièce de change.
+    '''
+    ''' IL N'ÉCRIT RIEN ET N'EST RÉSERVÉ À PERSONNE. Un agent a le droit de vérifier le
+    ''' calcul qui sera comptabilisé ; c'est même tout l'intérêt de l'écran — voir
+    ''' FrmControleChange.
+    ''' </summary>
+    Private Sub mnuControleChange_Click(sender As Object, e As EventArgs) Handles mnuControleChange.Click
+        AfficherEnfant(Of FrmControleChange)()
+    End Sub
+
+    ''' <summary>
     ''' Le barème des taxes du produit en service.
     '''
     ''' Rangé juste après les comptes systèmes parce qu'on lit les deux ensemble : les
@@ -408,6 +424,7 @@ Public Class FrmPrincipal
         mnuRapportAgences.Image = IconesWU.Obtenir(IconeWU.Batiment)
         mnuPiecesArchivees.Image = IconesWU.Obtenir(IconeWU.Archive)
         mnuCommissionsBanque.Image = IconesWU.Obtenir(IconeWU.Piece)
+        mnuControleChange.Image = IconesWU.Obtenir(IconeWU.Balance)
 
         ' Menu Paramétrage.
         mnuSousAgents.Image = IconesWU.Obtenir(IconeWU.Silhouette)

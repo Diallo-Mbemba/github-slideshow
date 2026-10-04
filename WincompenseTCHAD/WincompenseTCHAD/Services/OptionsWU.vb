@@ -39,6 +39,23 @@ Public NotInheritable Class OptionsWU
         "OUI : le fichier core banking ne peut pas être produit tant que la journée n'est pas " &
         "visée. NON : l'application avertit seulement."
 
+    ''' <summary>
+    ''' Les envois non encore réglés (TxnStatus = "W") entrent-ils dans le calcul des écarts
+    ''' de change ?
+    '''
+    ''' PAR DÉFAUT OUI, ET CETTE OPTION EST LA SEULE DU PROJET DONT L'ABSENCE VAUT « OUI ».
+    ''' Les autres options commandent un BLOCAGE, et une absence ne doit jamais bloquer. Celle-ci
+    ''' commande une EXCLUSION de lignes : une absence qui vaudrait « non » ferait disparaître
+    ''' silencieusement 290 transactions et la moitié du gain de change. Le défaut le moins
+    ''' dangereux n'est donc pas le même, et c'est pourquoi la lecture passe par EstNon et non
+    ''' par EstOui.
+    ''' </summary>
+    Public Const CLE_CHANGE_ENVOIS_EN_ATTENTE As String = "CHANGE_ENVOIS_EN_ATTENTE"
+
+    Public Const LIBELLE_CHANGE_ENVOIS_EN_ATTENTE As String =
+        "OUI : les envois encore en attente de règlement (statut W) entrent dans le calcul des " &
+        "écarts de change. NON : ils en sont écartés et leur change sera constaté plus tard."
+
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208
 
@@ -119,6 +136,16 @@ Public NotInheritable Class OptionsWU
         End Get
     End Property
 
+    ''' <summary>
+    ''' Vrai si les envois en attente de règlement entrent dans le calcul des écarts de change.
+    ''' VRAI par défaut, et vrai en cas de doute : voir CLE_CHANGE_ENVOIS_EN_ATTENTE.
+    ''' </summary>
+    Public Shared ReadOnly Property ChangeInclureEnvoisEnAttente As Boolean
+        Get
+            Return Not EstNon(Lire(CLE_CHANGE_ENVOIS_EN_ATTENTE))
+        End Get
+    End Property
+
     ''' <summary>La valeur brute d'une option, ou une chaîne vide.</summary>
     Public Shared Function Lire(cle As String) As String
 
@@ -135,6 +162,23 @@ Public NotInheritable Class OptionsWU
 
         Select Case If(valeur, String.Empty).Trim().ToUpperInvariant()
             Case "OUI", "O", "VRAI", "TRUE", "1" : Return True
+            Case Else : Return False
+        End Select
+    End Function
+
+    ''' <summary>
+    ''' Interprète une valeur en NON franc. Tout le reste — vide, inconnu, mal orthographié —
+    ''' n'est pas un refus.
+    '''
+    ''' CE N'EST PAS LA NÉGATION D'EstOui, et la différence est le but. EstOui range l'inconnu
+    ''' du côté du NON ; EstNon le range du côté du OUI. Chaque option choisit alors celle des
+    ''' deux lectures dont le défaut est le moins dangereux pour elle : refuser de bloquer, ou
+    ''' refuser d'exclure.
+    ''' </summary>
+    Public Shared Function EstNon(valeur As String) As Boolean
+
+        Select Case If(valeur, String.Empty).Trim().ToUpperInvariant()
+            Case "NON", "N", "FAUX", "FALSE", "0" : Return True
             Case Else : Return False
         End Select
     End Function

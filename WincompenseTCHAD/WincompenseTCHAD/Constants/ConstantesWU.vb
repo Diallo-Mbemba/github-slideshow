@@ -321,6 +321,93 @@ Public NotInheritable Class ConstantesWU
 
 #End Region
 
+#Region "Écarts de change : colonnes et valeurs du rapport de règlement"
+
+    ' CE QUE CETTE SECTION AJOUTE, ET POURQUOI ELLE EST À PART. Le calcul des écarts de change
+    ' lit le rapport de règlement COLONNE PAR COLONNE, là où l'agrégation de la compensation
+    ' n'en lit que six. Les noms sont donc nommés ici une fois, plutôt que recopiés dans le
+    ' service : une faute de frappe sur « ClearPrincipalPAY » ne lèverait aucune erreur — la
+    ' colonne serait simplement introuvable, la valeur lue 0, et l'écart égal au montant local
+    ' tout entier. C'est la faute la plus coûteuse que ce calcul puisse commettre, et la seule
+    ' que le compilateur ne voit pas.
+
+    ''' <summary>Numéro de contrôle du transfert : la référence citée par la banque et par le client.</summary>
+    Public Const COLONNE_MTCN As String = "MTCN"
+
+    ''' <summary>Nature de la ligne : "T" transaction, "A" ajustement.</summary>
+    Public Const COLONNE_TYPE_TRANSACTION As String = "TransactionType"
+
+    ''' <summary>Libellé de l'ajustement porté par une ligne "A" (ex. "FOR FULL REFUND").</summary>
+    Public Const COLONNE_TYPE_AJUSTEMENT As String = "AdjustmentType"
+
+    ''' <summary>MTCN de la transaction d'origine que l'ajustement corrige, quand il le désigne.</summary>
+    Public Const COLONNE_MTCN_AJUSTE As String = "AdjustmentMTCN"
+
+    ''' <summary>Sens de l'opération : "S" envoi, "P" paiement.</summary>
+    Public Const COLONNE_SENS As String = "SendPayIndicator"
+
+    ''' <summary>Statut de règlement de la ligne : "S" réglée, "W" en attente.</summary>
+    Public Const COLONNE_STATUT_REGLEMENT As String = "TxnStatus"
+
+    ''' <summary>Code produit Western Union de la ligne (IMTR, FTSS, AVSS…).</summary>
+    Public Const COLONNE_CODE_PRODUIT As String = "ProductCode"
+
+    ''' <summary>Principal d'un ENVOI en monnaie locale : le montant encaissé au guichet.</summary>
+    Public Const COLONNE_PRINCIPAL_ENVOI_LOCAL As String = "RecPrincipalREC"
+
+    ''' <summary>Principal d'un PAIEMENT en monnaie locale : le montant décaissé au guichet.</summary>
+    Public Const COLONNE_PRINCIPAL_PAYE_LOCAL As String = "ClearPrincipalPAY"
+
+    ''' <summary>Principal de la transaction dans la devise de règlement (colonnes LOC).</summary>
+    Public Const COLONNE_PRINCIPAL_DEVISE As String = "ClearPrincipalLOC"
+
+    ''' <summary>
+    ''' Part de change de la transaction dans la devise de règlement.
+    '''
+    ''' ELLE N'ENTRE DANS LE CALCUL QUE POUR LES ENVOIS. Pour un paiement, sa valeur absolue est
+    ''' DÉJÀ comptabilisée en commission de paiement par WUReportService.CalculerReglement :
+    ''' l'ajouter au montant en devise la compterait deux fois, une fois en commission et une
+    ''' fois en écart de change. Voir ChangeService.
+    ''' </summary>
+    Public Const COLONNE_CHANGE_DEVISE As String = "ClearFXLOC"
+
+    ''' <summary>Les colonnes sans lesquelles aucun écart de change ne peut être calculé.</summary>
+    Public Shared ReadOnly ColonnesEcartsDeChange As String() = {
+        COLONNE_MTCN, COLONNE_TYPE_TRANSACTION, COLONNE_SENS, COLONNE_DEVISE_LOC,
+        COLONNE_PRINCIPAL_ENVOI_LOCAL, COLONNE_PRINCIPAL_PAYE_LOCAL,
+        COLONNE_PRINCIPAL_DEVISE, COLONNE_CHANGE_DEVISE
+    }
+
+    ''' <summary>Valeur de COLONNE_TYPE_TRANSACTION désignant une transaction réelle.</summary>
+    Public Const TYPE_TRANSACTION_NORMALE As String = "T"
+
+    ''' <summary>
+    ''' Valeur de COLONNE_TYPE_TRANSACTION désignant un AJUSTEMENT : remboursement, reprise,
+    ''' retraitement. Ces lignes ne portent aucun change propre et sont toutes écartées.
+    ''' </summary>
+    Public Const TYPE_TRANSACTION_AJUSTEMENT As String = "A"
+
+    ''' <summary>
+    ''' Libellé d'ajustement signalant un remboursement TOTAL. La transaction d'origine n'a
+    ''' alors produit aucun change définitif : elle est écartée avec son remboursement.
+    ''' Comparaison insensible à la casse et aux espaces de bordure.
+    ''' </summary>
+    Public Const AJUSTEMENT_REMBOURSEMENT_TOTAL As String = "FOR FULL REFUND"
+
+    ''' <summary>Valeur de COLONNE_SENS désignant un envoi.</summary>
+    Public Const SENS_ENVOI As String = "S"
+
+    ''' <summary>Valeur de COLONNE_SENS désignant un paiement.</summary>
+    Public Const SENS_PAIEMENT As String = "P"
+
+    ''' <summary>
+    ''' Valeur de COLONNE_STATUT_REGLEMENT désignant une transaction NON ENCORE RÉGLÉE.
+    ''' Leur sort est décidé par une option : voir OptionsChangeWU.InclureEnvoisEnAttente.
+    ''' </summary>
+    Public Const STATUT_REGLEMENT_EN_ATTENTE As String = "W"
+
+#End Region
+
 #Region "Contrôles de sécurité sur les fichiers chargés"
 
     ''' <summary>

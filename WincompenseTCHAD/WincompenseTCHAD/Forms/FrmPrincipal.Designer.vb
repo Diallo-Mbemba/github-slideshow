@@ -28,6 +28,8 @@ Partial Class FrmPrincipal
         Me.mnuRapportAgences = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuPiecesArchivees = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuCommissionsBanque = New System.Windows.Forms.ToolStripMenuItem()
+        Me.SEP8 = New System.Windows.Forms.ToolStripSeparator()
+        Me.mnuControleChange = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuSousAgents = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuAgences = New System.Windows.Forms.ToolStripMenuItem()
@@ -84,7 +86,7 @@ Partial Class FrmPrincipal
         '
         'mnuCompensation
         '
-        Me.mnuCompensation.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuTraitement, Me.SEP1, Me.mnuRapport, Me.mnuRapportAgences, Me.mnuPiecesArchivees, Me.mnuCommissionsBanque})
+        Me.mnuCompensation.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuTraitement, Me.SEP1, Me.mnuRapport, Me.mnuRapportAgences, Me.mnuPiecesArchivees, Me.mnuCommissionsBanque, Me.SEP8, Me.mnuControleChange})
         Me.mnuCompensation.Name = "mnuCompensation"
         Me.mnuCompensation.Size = New System.Drawing.Size(100, 20)
         Me.mnuCompensation.Text = "&Compensation"
@@ -123,6 +125,17 @@ Partial Class FrmPrincipal
         Me.mnuCommissionsBanque.Name = "mnuCommissionsBanque"
         Me.mnuCommissionsBanque.Size = New System.Drawing.Size(280, 22)
         Me.mnuCommissionsBanque.Text = "Commissions encaissées par la &banque"
+        '
+        'SEP8
+        '
+        Me.SEP8.Name = "SEP8"
+        Me.SEP8.Size = New System.Drawing.Size(277, 6)
+        '
+        'mnuControleChange
+        '
+        Me.mnuControleChange.Name = "mnuControleChange"
+        Me.mnuControleChange.Size = New System.Drawing.Size(280, 22)
+        Me.mnuControleChange.Text = "Contrôle des écarts de c&hange..."
         '
         'mnuParametrage
         '
@@ -425,6 +438,8 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuRapportAgences As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuPiecesArchivees As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuCommissionsBanque As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents SEP8 As System.Windows.Forms.ToolStripSeparator
+    Friend WithEvents mnuControleChange As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuSousAgents As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuAgences As System.Windows.Forms.ToolStripMenuItem
