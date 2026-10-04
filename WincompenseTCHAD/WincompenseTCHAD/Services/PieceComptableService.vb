@@ -358,14 +358,19 @@ Public NotInheritable Class PieceComptableService
     ''' <summary>
     ''' Libellé de la ligne d'écart d'arrondi, préfixe compris.
     '''
-    ''' IL EST PUBLIC PARCE QU'IL EST RELU. L'écran de traitement reconnaît cette ligne dans
-    ''' la pièce EN COMPARANT SON LIBELLÉ, pour en isoler l'écart dans son en-tête. Tant que
-    ''' le libellé était une constante, les deux côtés lisaient la même ; depuis que le
-    ''' préfixe LD s'y ajoute, la constante seule ne suffit plus — et la comparaison aurait
-    ''' échoué en silence, l'écart d'arrondi disparaissant de l'en-tête sans que rien ne le
-    ''' dise. Une seule vérité, posée ici, relue ici.
+    ''' IL EST REDEVENU PRIVÉ, ET C'EST TOUT L'OBJET DE CETTE ÉTAPE. Il a été public le temps
+    ''' que l'écran de traitement reconnaisse cette ligne EN COMPARANT SON LIBELLÉ, pour en
+    ''' isoler l'écart dans son en-tête. C'était la dernière comparaison de texte du projet,
+    ''' et elle avait un coût caché : elle interdisait de rendre ce libellé paramétrable comme
+    ''' les autres. La banque aurait changé un mot, la comparaison aurait échoué, et l'écart
+    ''' aurait disparu du bordereau sans qu'aucun message ne le dise.
+    '''
+    ''' DÉSORMAIS VerifierEquilibrePiece DIT CE QU'ELLE A POSÉ — le montant signé et le compte
+    ''' — et l'écran le retient. Ce texte n'est plus qu'un texte : personne ne s'appuie dessus
+    ''' pour retrouver quoi que ce soit, et il pourra rejoindre le paramétrage sans rien
+    ''' casser.
     ''' </summary>
-    Public Shared ReadOnly Property LibelleEcartArrondi As String
+    Private Shared ReadOnly Property LibelleEcartArrondi As String
         Get
             Return Prefixer(ConstantesWU.LIB_ECART_ATTENTE)
         End Get
@@ -496,8 +501,33 @@ Public NotInheritable Class PieceComptableService
     ''' </summary>
     ''' <param name="dtPiece">Pièce comptable générée par GenererPieceComptable (modifiée en place si un écart tolérable est absorbé).</param>
     ''' <param name="messageControle">Message explicite décrivant le résultat du contrôle.</param>
+    ''' <param name="ecartAbsorbe">
+    ''' L'écart effectivement POSÉ dans la pièce, signé : positif au crédit du compte d'attente,
+    ''' négatif à son débit, zéro si la pièce s'équilibrait d'elle-même. C'est exactement
+    ''' Débit − Crédit de la pièce avant absorption.
+    '''
+    ''' POURQUOI CETTE FONCTION LE DIT, AU LIEU DE LAISSER L'APPELANT LE RETROUVER. L'écran de
+    ''' traitement en a besoin pour les deux chiffres du bordereau, et il les tirait jusqu'ici
+    ''' de la pièce elle-même, EN RECONNAISSANT LA LIGNE À SON LIBELLÉ. C'était la dernière
+    ''' comparaison de texte du projet, et elle interdisait de rendre ce libellé paramétrable :
+    ''' la banque aurait changé un mot, la comparaison aurait échoué, et l'écart aurait disparu
+    ''' du bordereau sans qu'aucun message ne le dise. Celui qui POSE la ligne est celui qui
+    ''' sait ce qu'il a posé ; il le dit, et plus personne ne le devine.
+    ''' </param>
+    ''' <param name="compteEcart">
+    ''' Le compte qui a absorbé l'écart, ou une chaîne vide si rien n'a été posé. C'est le
+    ''' compte inter bancaire de SystemeWU, mais c'est à la pièce de le dire et non à
+    ''' l'appelant de le relire.
+    ''' </param>
     ''' <returns>True si la pièce est utilisable (équilibrée ou écart absorbé), False si l'anomalie bloque la génération.</returns>
-    Public Shared Function VerifierEquilibrePiece(dtPiece As DataTable, ByRef messageControle As String) As Boolean
+    Public Shared Function VerifierEquilibrePiece(dtPiece As DataTable, ByRef messageControle As String,
+                                                  ByRef ecartAbsorbe As Long,
+                                                  ByRef compteEcart As String) As Boolean
+
+        ' Posés AVANT tout contrôle : une pièce vide, ou un écart hors seuil, ne doit pas
+        ' laisser l'appelant avec les valeurs d'une génération précédente.
+        ecartAbsorbe = 0L
+        compteEcart = String.Empty
 
         If dtPiece Is Nothing OrElse dtPiece.Rows.Count = 0 Then
             messageControle = "La pièce comptable est vide : aucun contrôle d'équilibre possible."
@@ -515,23 +545,34 @@ Public NotInheritable Class PieceComptableService
 
         ' Compte encaissant l'écart d'arrondi résiduel : le compte inter bancaire paramétré
         ' dans SystemeWU (colonnes Cpte_attenteDEBIT / Cpte_attenteCREDIT).
-        Dim compteEcart As String = ComptesSystemeWU.Actuels.CompteInterBancaire
+        Dim compteDAttente As String = ComptesSystemeWU.Actuels.CompteInterBancaire
 
         If differenceGlobale > 0D AndAlso differenceGlobale <= ConstantesWU.SEUIL_ECART_TOLERE Then
-            ' PRÉFIXÉE COMME LES AUTRES. Cette ligne est la seule à ne pas passer par
-            ' Narratif : elle est posée après la pièce, pour absorber l'écart d'arrondi
-            ' global, et ne se rattache à aucune période. Elle n'en reste pas moins un
-            ' libellé de la pièce, et la banque les a demandés tous préfixés.
-            AjouterLigne(dtPiece, compteEcart, LibelleEcartArrondi, 0L,
+            ' PRÉFIXÉE COMME LES AUTRES. Cette ligne est la seule à ne pas sortir du modèle
+            ' de narrative : elle est posée APRÈS la pièce, pour absorber l'écart d'arrondi
+            ' global, et ne se rattache ni à un point de vente ni à une période — les deux
+            ' repères que le modèle emploie. Elle n'en reste pas moins un libellé de la pièce,
+            ' et la banque les a demandés tous préfixés.
+            AjouterLigne(dtPiece, compteDAttente, LibelleEcartArrondi, 0L,
                          CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE)
-            messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte inter bancaire {compteEcart}."
+
+            ecartAbsorbe = CLng(differenceGlobale)
+            compteEcart = compteDAttente
+
+            messageControle = $"Écart de {differenceGlobale:N0} FCFA affecté au CRÉDIT du compte inter bancaire {compteDAttente}."
             Return True
         End If
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
-            AjouterLigne(dtPiece, compteEcart, LibelleEcartArrondi,
+            AjouterLigne(dtPiece, compteDAttente, LibelleEcartArrondi,
                          CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE)
-            messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte inter bancaire {compteEcart}."
+
+            ' SIGNÉ, et négatif ici : un écart au débit et un écart au crédit ne se compensent
+            ' pas dans la tête de celui qui relit le bordereau.
+            ecartAbsorbe = CLng(differenceGlobale)
+            compteEcart = compteDAttente
+
+            messageControle = $"Écart de {Math.Abs(differenceGlobale):N0} FCFA affecté au DÉBIT du compte inter bancaire {compteDAttente}."
             Return True
         End If
 

@@ -63,6 +63,23 @@ Public Class FrmCompensationWU
     Private _dtPieceGeneree As DataTable
 
     ''' <summary>
+    ''' L'écart d'arrondi POSÉ dans la pièce, tel que VerifierEquilibrePiece l'annonce : signé,
+    ''' positif au crédit du compte d'attente, négatif à son débit, zéro si la pièce
+    ''' s'équilibrait d'elle-même. Et le compte qui l'a absorbé.
+    '''
+    ''' POURQUOI DEUX CHAMPS, ET NON UNE RELECTURE DE LA PIÈCE. Ces deux chiffres étaient
+    ''' retrouvés en PARCOURANT la pièce et en reconnaissant la ligne À SON LIBELLÉ. C'était la
+    ''' dernière comparaison de texte du projet, et elle interdisait de rendre ce libellé
+    ''' paramétrable comme les autres : la banque aurait changé un mot, la comparaison aurait
+    ''' échoué, et l'écart aurait disparu du bordereau sans qu'aucun message ne le dise — un
+    ''' bordereau annonçant un écart nul là où la pièce en porte un.
+    '''
+    ''' Celui qui POSE la ligne est celui qui sait ce qu'il a posé. Il le dit maintenant.
+    ''' </summary>
+    Private _ecartArrondiPose As Long = 0L
+    Private _compteEcartPose As String = String.Empty
+
+    ''' <summary>
     ''' Message technique du dernier échec de connexion à SQL Server, vide si la connexion a
     ''' abouti. Mémorisé pour être présenté à l'utilisateur : sans ce détail, un « base SQL
     ''' inaccessible » ne permet pas de distinguer un service arrêté d'une base absente.
@@ -169,8 +186,13 @@ Public Class FrmCompensationWU
     ''' Relit la pièce pour en tirer les trois chiffres du bordereau : les deux totaux et
     ''' l'écart d'arrondi.
     '''
-    ''' L'écart est repéré par son libellé et non recalculé : c'est celui qui a été POSÉ
-    ''' dans la pièce qui compte, pas celui qu'un second calcul retrouverait.
+    ''' LES DEUX TOTAUX SE COMPTENT, L'ÉCART SE RETIENT. Les totaux sont la somme des lignes,
+    ''' et rien ne les identifie : le parcours reste. L'écart, lui, n'est plus CHERCHÉ dans la
+    ''' pièce : il est celui que VerifierEquilibrePiece a annoncé avoir posé, au moment où elle
+    ''' le posait. Aucun libellé n'est comparé.
+    '''
+    ''' CE N'EST PAS UNE SIMPLIFICATION, C'EST UN DÉCOUPLAGE. Le libellé de cette ligne pourra
+    ''' rejoindre le paramétrage de la banque sans que cet écran s'en aperçoive.
     ''' </summary>
     Private Sub RelireLaPiece(entete As TraitementJourneeWU)
 
@@ -178,23 +200,12 @@ Public Class FrmCompensationWU
 
         For Each ligne As DataRow In _dtPieceGeneree.Rows
 
-            Dim debit As Long = Convert.ToInt64(ligne("Debit"), Globalization.CultureInfo.InvariantCulture)
-            Dim credit As Long = Convert.ToInt64(ligne("Credit"), Globalization.CultureInfo.InvariantCulture)
-
-            entete.TotalDebit += debit
-            entete.TotalCredit += credit
-
-            ' LE LIBELLÉ EST DEMANDÉ À CELUI QUI LE POSE, et non recopié depuis la constante :
-            ' il porte désormais le préfixe LD, et la constante seule ne lui correspond plus.
-            If Not String.Equals(Convert.ToString(ligne("Libelle")),
-                                 PieceComptableService.LibelleEcartArrondi,
-                                 StringComparison.Ordinal) Then Continue For
-
-            ' Signé : un écart au crédit et un écart au débit ne se compensent pas dans la
-            ' tête de celui qui relit.
-            entete.EcartArrondi += credit - debit
-            entete.CompteEcart = Convert.ToString(ligne("Compte"))
+            entete.TotalDebit += Convert.ToInt64(ligne("Debit"), Globalization.CultureInfo.InvariantCulture)
+            entete.TotalCredit += Convert.ToInt64(ligne("Credit"), Globalization.CultureInfo.InvariantCulture)
         Next
+
+        entete.EcartArrondi = _ecartArrondiPose
+        entete.CompteEcart = _compteEcartPose
     End Sub
 
     Private Sub HistoriserLaJournee()
@@ -395,6 +406,11 @@ Public Class FrmCompensationWU
     Private Sub ReinitialiserResultats()
         _listeCalculs = Nothing
         _dtPieceGeneree = Nothing
+
+        ' Remis à zéro AVEC la pièce : un écart retenu d'une génération précédente partirait
+        ' sinon dans le bordereau de la suivante.
+        _ecartArrondiPose = 0L
+        _compteEcartPose = String.Empty
         _dateActivite = Nothing
         _transactions = New List(Of TransactionWU)
         btnPieceAccount.Enabled = False
@@ -1064,7 +1080,11 @@ Public Class FrmCompensationWU
             Dim dtPiece As DataTable = PieceComptableService.GenererPieceComptable(
                 _listeCalculs, _dateActivite, DerniereJournee)
             Dim messageControle As String = String.Empty
-            Dim pieceUtilisable As Boolean = PieceComptableService.VerifierEquilibrePiece(dtPiece, messageControle)
+            Dim ecartPose As Long = 0L
+            Dim comptePose As String = String.Empty
+
+            Dim pieceUtilisable As Boolean = PieceComptableService.VerifierEquilibrePiece(
+                dtPiece, messageControle, ecartPose, comptePose)
 
             If Not pieceUtilisable Then
                 MessageBox.Show(messageControle, "Anomalie d'équilibrage", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -1073,6 +1093,12 @@ Public Class FrmCompensationWU
             End If
 
             _dtPieceGeneree = dtPiece
+
+            ' RETENUS ICI, et nulle part ailleurs : le bordereau et l'historisation les
+            ' reprendront de ces deux champs plutôt que de les rechercher dans la pièce.
+            _ecartArrondiPose = ecartPose
+            _compteEcartPose = comptePose
+
             tsslStatut.Text = messageControle
 
             ' La journée est comptabilisée : c'est le moment de l'historiser, et pas avant.

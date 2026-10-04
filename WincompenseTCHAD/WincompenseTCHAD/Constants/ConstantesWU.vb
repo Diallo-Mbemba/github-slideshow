@@ -205,10 +205,15 @@ Public NotInheritable Class ConstantesWU
     '''
     ''' IL NE SERT PLUS QU'À LA LIGNE D'ÉCART D'ARRONDI. Les douze libellés d'un point de
     ''' vente le portent désormais parce que le MODÈLE DE NARRATIVE commence par lui — et la
-    ''' banque peut le retirer de ce modèle si elle le décide un jour. L'écart d'arrondi, lui,
-    ''' garde un libellé tenu par le code : l'écran de traitement reconnaît cette ligne EN
-    ''' COMPARANT SON TEXTE, et un texte paramétrable casserait cette reconnaissance en
-    ''' silence. Voir PieceComptableService.LibelleEcartArrondi, seul lecteur de ce préfixe.
+    ''' banque peut le retirer de ce modèle si elle le décide un jour.
+    '''
+    ''' CE LIBELLÉ-LÀ RESTE TENU PAR LE CODE, mais plus par nécessité : l'écran de traitement
+    ''' reconnaissait cette ligne EN COMPARANT SON TEXTE, et c'est fini — celle qui pose la
+    ''' ligne annonce désormais ce qu'elle a posé. Rien ne s'appuie plus sur ces mots, et ils
+    ''' pourront rejoindre le paramétrage sans rien casser.
+    '''
+    ''' Voir PieceComptableService.LibelleEcartArrondi, redevenu PRIVÉ, seul lecteur de ce
+    ''' préfixe.
     ''' </summary>
     Public Const LIB_PREFIXE As String = "LD"
 
