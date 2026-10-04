@@ -1406,6 +1406,35 @@ BEGIN
 END
 GO
 
+-- LE MODELE DE NARRATIVE : le libelle que portera chaque ligne des pieces comptables, et qui
+-- part tel quel dans la colonne ADDLTEXT du fichier charge au core banking.
+--
+-- Ce texte a change quatre fois en quatre livraisons, et il n'entre dans aucun calcul : ce
+-- qui se LIT dans le grand livre appartient a la Direction Comptable. Elle le modifie depuis
+-- l'ecran « Narrative comptable », et la valeur existante n'est jamais ecrasee.
+--
+-- Reperes reconnus, et il n'y en a pas d'autres : {AGENCE} la designation du point de vente,
+-- {ACCOUNT} son Account, {CODE_AGENCE} le code qui part en ACBRN, {PERIODE} la periode.
+-- Un repere inconnu est refuse par l'ecran ; saisi ici en SQL direct, il partirait au grand
+-- livre avec ses accolades.
+--
+-- CETTE LIGNE N'EST PAS INDISPENSABLE : sans elle l'application applique le modele par
+-- defaut de son code, qui est la forme ci-dessous au caractere pres.
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'NARRATIVE_MODELE')
+BEGIN
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'NARRATIVE_MODELE', N'LD WU ACTIVITE {AGENCE} {PERIODE}',
+            N'Modèle de la narrative des lignes de la pièce comptable et de la colonne ADDLTEXT du fichier core banking. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}.',
+            GETDATE(), N'installation');
+
+    PRINT 'Option NARRATIVE_MODELE créée : LD WU ACTIVITE {AGENCE} {PERIODE}.';
+END
+ELSE
+BEGIN
+    PRINT 'Option NARRATIVE_MODELE déjà présente : valeur conservée.';
+END
+GO
+
 -- =========================================================================
 -- T_TraitementWU — l'en-tête du traitement d'une journée, et son visa
 --

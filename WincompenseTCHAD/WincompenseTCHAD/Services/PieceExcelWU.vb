@@ -255,13 +255,18 @@ Public NotInheritable Class PieceExcelWU
             ' qui ne change pas pendant l'export.
             Dim agences As Dictionary(Of String, String) = ChargerLesAgences()
 
+            ' LE MODÈLE DE NARRATIVE, lu lui aussi UNE FOIS : la ligne RAISON de chaque feuille
+            ' en sort, et les cinquante feuilles d'un classeur doivent annoncer la même phrase
+            ' que les lignes qu'elles portent.
+            Dim modeleNarrative As String = OptionsWU.NarrativeModele
+
             Annoncer(progression, $"Pièce globale — journée du {dateActivite:dd/MM/yyyy}")
 
             EcrireLaPremiereFeuille(classeur, dtGlobale, dateActivite, derniereJournee,
                                     nomPremiereFeuille, intitulePremiereFeuille,
-                                    agencePremiereFeuille)
+                                    agencePremiereFeuille, modeleNarrative)
             EcrireLesPiecesIndividuelles(classeur, aDetailler, dateActivite, derniereJournee,
-                                         agences, progression)
+                                         agences, progression, modeleNarrative)
 
             ' La première feuille est celle qu'on veut voir en ouvrant le classeur.
             classeur.Worksheets(1).Activate()
@@ -373,12 +378,16 @@ Public NotInheritable Class PieceExcelWU
     Private Shared Sub EcrireLaPremiereFeuille(classeur As Object, dtGlobale As DataTable,
                                                dateActivite As Date, derniereJournee As Date?,
                                                nomFeuille As String, intitule As String,
-                                               agence As String)
+                                               agence As String, modeleNarrative As String)
 
         ' LA PÉRIODE DE LA RAISON EST CELLE DES LIBELLÉS, et non celle des intitulés. Les
         ' deux existent : « activité du 08/09/2026 au 14/09/2026 » pour un titre de feuille,
         ' « DU 08 AU 14 09 2026 » pour un narratif comptable. La RAISON est un narratif, et
         ' « LD WU ACTIVITE … activité du … » aurait dit deux fois le même mot.
+        '
+        ' LA PIÈCE GLOBALE NE NOMME AUCUN POINT DE VENTE, puisqu'elle les rassemble tous : le
+        ' modèle reçoit donc trois valeurs vides, et les repères correspondants s'effacent
+        ' sans laisser de trou dans la phrase.
         Dim contexte As New ContexteFeuille() With {
             .NomFeuille = If(String.IsNullOrWhiteSpace(nomFeuille), "PIECE GLOBALE", nomFeuille),
             .Intitule = If(String.IsNullOrWhiteSpace(intitule),
@@ -389,9 +398,9 @@ Public NotInheritable Class PieceExcelWU
             .TientSurUnePage = False,
             .AgenceEmettrice = If(String.IsNullOrWhiteSpace(agence),
                                   ConstantesWU.PIECE_AGENCE_DEFAUT, agence),
-            .Raison = String.Format(ConstantesWU.PIECE_RAISON_GLOBALE_FORMAT,
-                                    PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee)).
-                             Trim().ToUpperInvariant()
+            .Raison = ModeleNarrativeWU.Appliquer(
+                          modeleNarrative, String.Empty, String.Empty, String.Empty,
+                          PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee))
         }
 
         Dim feuille As Object = classeur.Worksheets(1)
@@ -412,7 +421,8 @@ Public NotInheritable Class PieceExcelWU
                                                     dateActivite As Date,
                                                     derniereJournee As Date?,
                                                     agences As Dictionary(Of String, String),
-                                                    progression As ProgressionWU)
+                                                    progression As ProgressionWU,
+                                                    modeleNarrative As String)
 
         If aDetailler Is Nothing Then Return
 
@@ -439,22 +449,23 @@ Public NotInheritable Class PieceExcelWU
 
             numero += 1
 
-            ' LA RAISON DE CHAQUE SOUS-AGENT, dans la forme dictée par la banque : LD WU
-            ' ACTIVITE, le point de vente, la période. Elle portait jusqu'ici « Compensation
-            ' Western Union — <désignation> (<Account>) — <période> ».
+            ' LA RAISON DE CHAQUE SOUS-AGENT SORT DU MÊME MODÈLE QUE SES DOUZE LIGNES. Elle
+            ' était jusqu'ici un gabarit à part, figé dans ConstantesWU : la banque aurait pu
+            ' changer la narrative de ses écritures et voir l'en-tête de la feuille continuer
+            ' d'annoncer l'ancienne phrase, sur un seul et même document.
             '
-            ' L'ACCOUNT N'Y FIGURE PLUS. Il reste à deux pas, dans l'intitulé de la feuille
-            ' et dans son nom d'onglet, et la forme demandée ne le nomme pas.
+            ' L'ACCOUNT ET LE CODE AGENCE SONT FOURNIS, même si le modèle par défaut ne les
+            ' emploie pas : si la banque les ajoute à son modèle, la RAISON les porte sans
+            ' qu'on revienne ici.
             Dim contexte As New ContexteFeuille() With {
                 .NomFeuille = NomDOnglet(calc, nomsPris),
                 .Intitule = IntituleDe(calc),
                 .DateActivite = dateActivite,
                 .Numero = NumeroDePiece(dateActivite, numero),
                 .AgenceEmettrice = AgenceDe(calc, agences),
-                .Raison = String.Format(ConstantesWU.PIECE_RAISON_FORMAT,
-                                        calc.Designation,
-                                        PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee)).
-                                 Trim().ToUpperInvariant()
+                .Raison = ModeleNarrativeWU.Appliquer(
+                              modeleNarrative, calc.Designation, calc.Account, calc.CodeAgence,
+                              PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee))
             }
 
             ' Ajoutée APRÈS la dernière : sans cela les onglets sortiraient à l'envers, et

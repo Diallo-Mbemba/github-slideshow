@@ -174,6 +174,12 @@ Public NotInheritable Class PieceComptableService
         ' la même période — et c'est précisément ce qu'un narratif est censé rendre impossible.
         Dim periode As String = SuffixeDePeriode(debutPeriode, finPeriode)
 
+        ' LE MODÈLE DE NARRATIVE, lu UNE FOIS pour toute la pièce, et pour la même raison que
+        ' les comptes juste au-dessus : une pièce ne doit jamais mélanger deux paramétrages si
+        ' quelqu'un enregistrait un nouveau modèle pendant sa génération. La lecture elle-même
+        ' ne coûte rien — OptionsWU garde ses valeurs le temps de la session.
+        Dim modeleNarrative As String = OptionsWU.NarrativeModele
+
         For Each calc As CalculWU In listeCalculs
 
             ' Un Account dont la banque ne connaît pas les comptes n'est pas comptabilisé : il
@@ -217,16 +223,20 @@ Public NotInheritable Class PieceComptableService
 
             ' LE LIBELLÉ DE TOUTES LES LIGNES DE CE POINT DE VENTE, le même pour les douze.
             '
-            ' C'EST LA FORME DICTÉE PAR LA BANQUE : « LD WU ACTIVITE <point de vente>
-            ' <période> », sur la pièce comme dans la colonne ADDLTEXT du fichier core
-            ' banking, qu'il s'agisse du mouvement, d'une commission, de la TVA ou d'une TTA.
+            ' IL EST DÉSORMAIS DICTÉ PAR LE MODÈLE PARAMÉTRÉ PAR LA BANQUE, et non plus par un
+            ' gabarit figé dans le code. Par défaut le modèle vaut « LD WU ACTIVITE {AGENCE}
+            ' {PERIODE} », c'est-à-dire la forme exacte qu'elle avait dictée : rien ne change
+            ' tant qu'elle n'édite rien. Le jour où elle veut d'autres mots, elle les saisit
+            ' dans l'écran « Narrative comptable » et la pièce suivante les porte — sans
+            ' livraison, sans recompilation, sans pull sur les postes.
             '
-            ' LES DOUZE LIBELLÉS DISTINCTS ONT DONC DISPARU — « Commission sur
-            ' Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… Ce que chaque ligne EST
-            ' se lit désormais dans son NUMÉRO DE COMPTE, qui est de toute façon ce que la
-            ' comptabilité impute. Les comptes, eux, restent nommés dans l'écran des comptes
+            ' CE QUE CHAQUE LIGNE EST se lit dans son NUMÉRO DE COMPTE, qui est de toute façon
+            ' ce que la comptabilité impute. Les douze libellés distincts — « Commission sur
+            ' Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… — avaient disparu à la
+            ' demande de la banque ; les comptes, eux, restent nommés dans l'écran des comptes
             ' systèmes et dans celui du barème.
-            Dim libellePdv As String = Narratif(LibelleDuMouvement(calc.Designation), periode)
+            Dim libellePdv As String = ModeleNarrativeWU.Appliquer(modeleNarrative, calc.Designation,
+                                                                   calc.Account, calc.CodeAgence, periode)
 
             Dim totalCommissionsEtTaxes As Decimal =
                 calc.CommissionTransfertBanque + calc.CommissionEnvoiBanque + calc.CommissionPaiementBanque +
@@ -346,58 +356,6 @@ Public NotInheritable Class PieceComptableService
     End Function
 
     ''' <summary>
-    ''' Colle la période au libellé d'une écriture.
-    '''
-    ''' POURQUOI CETTE FONCTION EXISTE, ALORS QU'UNE CONCATÉNATION SUFFIRAIT.
-    ''' Le libellé d'une ligne de pièce n'est pas décoratif : CoreBankingService le recopie
-    ''' tel quel dans la colonne ADDLTEXT du fichier chargé au core banking. C'est donc lui
-    ''' que le comptable de la banque relira dans son système, des mois plus tard, sans
-    ''' avoir la pièce sous les yeux. « TVA COLLECTEES WESTERN UNION » ne lui dit pas quelle
-    ''' semaine elle couvre ; « TVA COLLECTEES WESTERN UNION DU 08 AU 14 09 2026 », si.
-    '''
-    ''' ET SURTOUT : C'EST LE SEUL ENDROIT QUI DÉCIDE DE L'ORDRE. La longueur maximale
-    ''' d'ADDLTEXT n'est pas connue de nous, et la question est posée à la banque. Si elle
-    ''' répond que le champ tronque, il faudra mettre la période EN TÊTE plutôt qu'en queue,
-    ''' pour que la coupe morde sur la désignation et non sur la date. Cette bascule est
-    ''' alors une seule ligne, ici, et douze appels n'ont pas à être revus.
-    '''
-    ''' Une période vide rend le libellé inchangé, sans espace en trop : une pièce dont on
-    ''' ignore la période doit sortir comme avant, et non avec un narratif estropié.
-    ''' </summary>
-    Private Shared Function Narratif(libelle As String, periode As String) As String
-
-        Dim texte As String = Prefixer(If(libelle, String.Empty).Trim())
-        Dim suffixe As String = If(periode, String.Empty).Trim()
-
-        If suffixe.Length > 0 AndAlso texte.Length > 0 Then texte &= " " & suffixe
-        If texte.Length = 0 Then texte = suffixe
-
-        ' TOUT EN MAJUSCULES, demandé par la banque et garanti ICI plutôt qu'espéré des
-        ' données. « LD WU ACTIVITE » et la période le sont déjà ; la DÉSIGNATION du point
-        ' de vente vient du référentiel, où elle est saisie à la main. Une seule saisie en
-        ' minuscules suffirait à faire sortir une narrative qui ne ressemble pas aux autres.
-        '
-        ' Invariant, et non la culture du poste : le « i » turc deviendrait « İ », et un
-        ' poste réglé en turc produirait des narratives différentes de celles des autres.
-        Return texte.ToUpperInvariant()
-    End Function
-
-    ''' <summary>
-    ''' Pose le préfixe LD devant un libellé, s'il ne le porte pas déjà.
-    '''
-    ''' LA BANQUE L'A DEMANDÉ DEVANT TOUS LES LIBELLÉS, et c'est ici qu'il se pose — en un seul
-    ''' endroit, par lequel passent les douze libellés de la pièce. Les écrire préfixés un par
-    ''' un dans ConstantesWU aurait marché aussi, et aurait laissé douze occasions d'en oublier
-    ''' un, plus une à chaque libellé ajouté.
-    '''
-    ''' LE LIBELLÉ QUI LE PORTE DÉJÀ N'EST PAS DOUBLÉ : celui de la ligne de mouvement commence
-    ''' par « LD WU ACTIVITE », et « LD LD WU ACTIVITE » serait exactement la faute que l'ancien
-    ''' préfixe CCS commettait avant d'être corrigé.
-    '''
-    ''' Un libellé vide le reste : préfixer le vide donnerait un narratif réduit à « LD », qui
-    ''' ne dit rien et occupe une ligne de pièce.
-    ''' </summary>
-    ''' <summary>
     ''' Libellé de la ligne d'écart d'arrondi, préfixe compris.
     '''
     ''' IL EST PUBLIC PARCE QU'IL EST RELU. L'écran de traitement reconnaît cette ligne dans
@@ -413,6 +371,21 @@ Public NotInheritable Class PieceComptableService
         End Get
     End Property
 
+    ''' <summary>
+    ''' Pose le préfixe LD devant un libellé, s'il ne le porte pas déjà.
+    '''
+    ''' IL N'A PLUS QU'UN SEUL LECTEUR : la ligne d'écart d'arrondi ci-dessus. Les douze
+    ''' libellés d'un point de vente le portent parce que le MODÈLE DE NARRATIVE paramétré par
+    ''' la banque commence par lui, et c'est à elle de décider s'il y reste.
+    '''
+    ''' LE LIBELLÉ QUI LE PORTE DÉJÀ N'EST PAS DOUBLÉ : « LD LD ECART D'ARRONDI » serait
+    ''' exactement la faute que l'ancien préfixe CCS commettait avant d'être corrigé. Le cas ne
+    ''' se présente pas aujourd'hui — LIB_ECART_ATTENTE ne commence pas par LD — et la
+    ''' précaution reste, parce que ce libellé-là est une constante qu'on peut rééditer.
+    '''
+    ''' Un libellé vide le reste : préfixer le vide donnerait un narratif réduit à « LD », qui
+    ''' ne dit rien et occupe une ligne de pièce.
+    ''' </summary>
     Private Shared Function Prefixer(libelle As String) As String
 
         If libelle.Length = 0 Then Return libelle
@@ -463,28 +436,6 @@ Public NotInheritable Class PieceComptableService
 
         Return String.Format(CultureInfo.InvariantCulture, ConstantesWU.PIECE_PERIODE_LONGUE_FORMAT,
                              premier, dernier)
-    End Function
-
-    ''' <summary>
-    ''' Libellé de la ligne de mouvement d'un point de vente : « LD WU ACTIVITE <désignation> ».
-    '''
-    ''' LE DOUBLE PRÉFIXE A DISPARU AVEC LE PRÉFIXE, et cette fonction a fondu de moitié. Le
-    ''' gabarit commençait par « CCS_ » ; la plupart des désignations de la banque commençant
-    ''' elles-mêmes par CCS, il fallait constater le préfixe avant de le poser, sous peine de
-    ''' lire « CCS_CCS NGARTA RUE DE 40M ACTIVITE WU ». Le nouveau gabarit commence par
-    ''' LD WU ACTIVITE, qu'aucune désignation ne porte : il se pose sans précaution.
-    '''
-    ''' CE QUE CE CHANGEMENT NE FAIT PAS, et il faut le savoir : il retire le CCS QUE NOUS
-    ''' AJOUTIONS, pas celui que portent les désignations elles-mêmes. Un point de vente nommé
-    ''' « CCS NGARTA RUE DE 40M » continuera de le voir dans ses narratifs, parce que c'est son
-    ''' nom. Le faire disparaître tout à fait demanderait soit de renommer ces points de vente
-    ''' dans le référentiel, soit de porter ici l'Account plutôt que la désignation — et c'est
-    ''' une décision de la banque, pas une correction de code.
-    ''' </summary>
-    Private Shared Function LibelleDuMouvement(designation As String) As String
-
-        Return String.Format(ConstantesWU.LIB_MOUVEMENT_ACTIVITE_FORMAT,
-                             If(designation, String.Empty).Trim()).Trim()
     End Function
 
     ''' <summary>

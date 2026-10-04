@@ -335,6 +335,10 @@ Public NotInheritable Class IconesWU
         table("btnActualiserJournal") = IconeWU.Actualiser
         table("btnSynchroniser") = IconeWU.Actualiser
 
+        ' Rétablir le modèle de narrative par défaut : c'est une remise en état, pas une
+        ' annulation — la valeur revient à celle du code, et rien n'est encore enregistré.
+        table("btnDefaut") = IconeWU.Actualiser
+
         ' --- Les deux rapports de la journée, et les fichiers en général ---------------------
         ' btnReglement est PROPRE AU TCHAD : la compensation y part de deux rapports, activité
         ' et règlement. L'application centrafricaine en charge deux autres, et sa table ne

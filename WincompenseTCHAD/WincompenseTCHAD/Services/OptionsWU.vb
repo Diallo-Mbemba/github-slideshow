@@ -56,6 +56,25 @@ Public NotInheritable Class OptionsWU
         "OUI : les envois encore en attente de règlement (statut W) entrent dans le calcul des " &
         "écarts de change. NON : ils en sont écartés et leur change sera constaté plus tard."
 
+    ''' <summary>
+    ''' LE MODÈLE DE NARRATIVE : la phrase que porte chaque ligne de la pièce comptable, et
+    ''' que le core banking reçoit dans sa colonne ADDLTEXT.
+    '''
+    ''' CE N'EST PAS UNE OPTION OUI/NON, et c'est la première de cette table qui ne l'est pas.
+    ''' La valeur est le GABARIT lui-même, avec ses repères — « LD WU ACTIVITE {AGENCE}
+    ''' {PERIODE} ». Elle est lue par ModeleNarrativeWU, qui seul sait la rendre ; cette classe
+    ''' ne fait que l'apporter.
+    '''
+    ''' ELLE VIT ICI PLUTÔT QUE DANS UNE TABLE À ELLE, parce que T_ParametreWU est faite pour
+    ''' ça : une clé, une valeur, son libellé, qui l'a changée et quand. Une table de plus
+    ''' aurait demandé un script, un référentiel, des droits et un dépôt — pour une ligne.
+    ''' </summary>
+    Public Const CLE_NARRATIVE_MODELE As String = "NARRATIVE_MODELE"
+
+    Public Const LIBELLE_NARRATIVE_MODELE As String =
+        "Modèle de la narrative des lignes de la pièce comptable et de la colonne ADDLTEXT du " &
+        "fichier core banking. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}."
+
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208
 
@@ -146,6 +165,23 @@ Public NotInheritable Class OptionsWU
         End Get
     End Property
 
+    ''' <summary>
+    ''' Le modèle de narrative en vigueur, ou celui du code si la banque n'en a saisi aucun.
+    '''
+    ''' UNE ABSENCE REND LE COMPORTEMENT ACTUEL, et non une phrase vide : table absente, clé
+    ''' jamais créée, base injoignable, valeur effacée à la main — dans tous ces cas la pièce
+    ''' sort avec les narratives d'aujourd'hui. C'est la règle de ce fichier, et elle compte
+    ''' doublement ici : une narrative vide ne bloquerait pas la compense, elle produirait
+    ''' douze écritures sans libellé, qui partiraient au grand livre sans que rien n'avertisse.
+    ''' </summary>
+    Public Shared ReadOnly Property NarrativeModele As String
+        Get
+            Dim saisi As String = Lire(CLE_NARRATIVE_MODELE)
+            If String.IsNullOrWhiteSpace(saisi) Then Return ModeleNarrativeWU.ModeleParDefaut
+            Return saisi
+        End Get
+    End Property
+
     ''' <summary>La valeur brute d'une option, ou une chaîne vide.</summary>
     Public Shared Function Lire(cle As String) As String
 
@@ -186,6 +222,60 @@ Public NotInheritable Class OptionsWU
     ''' <summary>La valeur telle qu'elle s'écrit en base.</summary>
     Public Shared Function Texte(actif As Boolean) As String
         Return If(actif, "OUI", "NON")
+    End Function
+
+    ''' <summary>
+    ''' Qui a changé cette option, et quand — tel que la base le porte, en une phrase prête à
+    ''' afficher. Chaîne vide si la clé n'a jamais été enregistrée, ou si la lecture échoue.
+    '''
+    ''' POURQUOI C'EST LU ET NON DÉDUIT. L'écran pourrait annoncer « modifié par vous, à
+    ''' l'instant » après un enregistrement, et c'est ce que fait l'écran des options. Mais le
+    ''' modèle de narrative part dans le grand livre de la banque : celui qui l'ouvre doit
+    ''' pouvoir constater si quelqu'un d'autre l'a changé avant lui, et non le supposer.
+    '''
+    ''' CETTE LECTURE NE PASSE PAS PAR LE CACHE : le cache ne retient que les valeurs, et ce
+    ''' sont justement les deux colonnes qui n'y sont pas.
+    ''' </summary>
+    Public Shared Function DerniereModification(cle As String) As String
+
+        If String.IsNullOrWhiteSpace(cle) Then Return String.Empty
+
+        Const lecture As String =
+            "SELECT ModifiePar, DateModification FROM " & TABLE & " WHERE Cle = @cle"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(lecture, connexion)
+                    commande.Parameters.Add("@cle", SqlDbType.NVarChar, 50).Value = cle.Trim()
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+
+                        If Not lecteur.Read() Then Return String.Empty
+
+                        Dim auteur As String = If(lecteur.IsDBNull(0), String.Empty,
+                                                  Convert.ToString(lecteur.GetValue(0)).Trim())
+
+                        If lecteur.IsDBNull(1) Then
+                            If auteur.Length = 0 Then Return String.Empty
+                            Return $"Enregistré par {auteur}."
+                        End If
+
+                        Dim quand As Date = lecteur.GetDateTime(1)
+
+                        If auteur.Length = 0 Then Return $"Enregistré le {quand:dd/MM/yyyy à HH:mm}."
+                        Return $"Enregistré le {quand:dd/MM/yyyy à HH:mm} par {auteur}."
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            Return String.Empty
+
+        Catch ex As InvalidOperationException
+            Return String.Empty
+        End Try
     End Function
 
 #End Region

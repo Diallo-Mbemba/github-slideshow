@@ -201,34 +201,49 @@ Public NotInheritable Class ConstantesWU
     Public Const LIB_ECART_ATTENTE As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE"
 
     ''' <summary>
-    ''' PRÉFIXE PORTÉ PAR TOUS LES LIBELLÉS DE LA PIÈCE, sur demande écrite de la banque.
+    ''' PRÉFIXE DEMANDÉ PAR LA BANQUE DEVANT SES LIBELLÉS, sur demande écrite.
     '''
-    ''' Il part dans la colonne ADDLTEXT du fichier core banking, où leur système l'attend en
-    ''' tête de chaque narratif. Posé une fois ici, il suit les douze libellés de la pièce sans
-    ''' qu'aucun d'eux ait à le connaître : voir PieceComptableService.Narratif, qui l'ajoute à
-    ''' celui qui ne le porte pas déjà.
+    ''' IL NE SERT PLUS QU'À LA LIGNE D'ÉCART D'ARRONDI. Les douze libellés d'un point de
+    ''' vente le portent désormais parce que le MODÈLE DE NARRATIVE commence par lui — et la
+    ''' banque peut le retirer de ce modèle si elle le décide un jour. L'écart d'arrondi, lui,
+    ''' garde un libellé tenu par le code : l'écran de traitement reconnaît cette ligne EN
+    ''' COMPARANT SON TEXTE, et un texte paramétrable casserait cette reconnaissance en
+    ''' silence. Voir PieceComptableService.LibelleEcartArrondi, seul lecteur de ce préfixe.
     ''' </summary>
     Public Const LIB_PREFIXE As String = "LD"
 
     ''' <summary>
-    ''' Gabarit du libellé de la ligne de mouvement (activité) du point de vente.
-    ''' {0} est remplacé par la Designation de l'Account.
+    ''' LE MODÈLE DE NARRATIVE APPLIQUÉ TANT QUE LA BANQUE N'EN A SAISI AUCUN.
     '''
-    ''' IL A CHANGÉ SUR DEMANDE ÉCRITE DE LA BANQUE. Il valait « CCS_{0} ACTIVITE WU », et
-    ''' c'est ce gabarit — notre propre préfixe, et non une donnée du référentiel — qui faisait
-    ''' apparaître CCS « partout dans la narrative » du core banking, comme la banque l'a
-    ''' relevé : chaque ligne de mouvement de chaque point de vente le portait.
+    ''' C'est la forme qu'elle a dictée, au caractère près : LD WU ACTIVITE, le point de vente,
+    ''' la période. Elle n'est plus figée dans le code — l'écran « Narrative comptable » la
+    ''' remplace, et la valeur retenue vit dans T_ParametreWU. Cette constante reste la VALEUR
+    ''' DE REPLI : base sans le script 22, clé supprimée à la main, base injoignable. Une
+    ''' absence de paramétrage rend donc exactement les narratives d'aujourd'hui, et jamais
+    ''' une phrase vide.
     '''
-    ''' La nouvelle forme est celle qu'elle a dictée : LD WU ACTIVITE, puis le point de vente,
-    ''' puis la période — cette dernière ajoutée par Narratif, comme pour tous les autres
-    ''' libellés.
+    ''' LES REPÈRES SONT CEUX DE ModeleNarrativeWU, et la liste en est fermée : {AGENCE},
+    ''' {ACCOUNT}, {CODE_AGENCE}, {PERIODE}.
     '''
-    ''' « AGENCE OU SOUS-AGENT » EST LA DÉSIGNATION, et non le code Account. C'est elle que la
-    ''' pièce portait déjà, c'est elle qu'un comptable lit, et la demande ne nommait pas de
-    ''' code. Si la banque voulait l'Account, c'est l'appel de LibelleDuMouvement qu'il faut
-    ''' changer, et lui seul.
+    ''' CE GABARIT A REMPLACÉ « CCS_{0} ACTIVITE WU ». C'est lui — notre propre préfixe, et non
+    ''' une donnée du référentiel — qui faisait apparaître CCS « partout dans la narrative » du
+    ''' core banking, comme la banque l'a relevé. Le nouveau commence par LD WU ACTIVITE,
+    ''' qu'aucune désignation ne porte.
+    '''
+    ''' UN POINT DE VENTE NOMMÉ « CCS … » LE PORTE TOUJOURS, parce que c'est son nom et non
+    ''' notre ajout. La banque peut désormais s'en défaire SANS CODE, en saisissant
+    ''' « LD WU ACTIVITE {ACCOUNT} {PERIODE} » : c'est tout l'objet du paramétrage.
     ''' </summary>
-    Public Const LIB_MOUVEMENT_ACTIVITE_FORMAT As String = "LD WU ACTIVITE {0}"
+    Public Const NARRATIVE_MODELE_DEFAUT As String = "LD WU ACTIVITE {AGENCE} {PERIODE}"
+
+    ''' <summary>
+    ''' Longueur maximale du MODÈLE lui-même — la largeur de T_ParametreWU.Valeur.
+    '''
+    ''' À ne pas confondre avec CB_NARRATIF_LONGUEUR_MAX, qui borne la phrase RENDUE à ce que
+    ''' le core banking accepte. Un modèle de deux cents caractères tiendrait ici et serait
+    ''' refusé là : les deux contrôles sont distincts, et l'écran les pose tous les deux.
+    ''' </summary>
+    Public Const NARRATIVE_MODELE_LONGUEUR_MAX As Integer = 255
 
     ''' <summary>
     ''' Groupe d'un point de vente qui n'en porte aucun — une agence propre, ou un
@@ -238,24 +253,6 @@ Public NotInheritable Class ConstantesWU
     ''' défaut d'affichage, « Groupe (sans groupe) » se lit comme un état des lieux.
     ''' </summary>
     Public Const PIECE_GROUPE_SANS As String = "(sans groupe)"
-
-    ''' <summary>
-    ''' Gabarit de la ligne RAISON, en bas de chaque pièce.
-    '''
-    ''' LA BANQUE L'A DEMANDÉE « POUR CHAQUE SOUS-AGENT », et c'est ce que le classeur produit :
-    ''' une pièce par point de vente, chacune portant en bas la raison de ses écritures. La
-    ''' pièce GLOBALE, qui les rassemble toutes, ne peut en nommer aucun : elle emploie le
-    ''' gabarit ci-dessous.
-    '''
-    ''' {0} est le point de vente, {1} la période.
-    ''' </summary>
-    Public Const PIECE_RAISON_FORMAT As String = "LD WU ACTIVITE {0} {1}"
-
-    ''' <summary>
-    ''' Raison de la pièce GLOBALE, qui ne se rattache à aucun point de vente en particulier.
-    ''' {0} est la période.
-    ''' </summary>
-    Public Const PIECE_RAISON_GLOBALE_FORMAT As String = "LD WU ACTIVITE {0}"
 
 #End Region
 

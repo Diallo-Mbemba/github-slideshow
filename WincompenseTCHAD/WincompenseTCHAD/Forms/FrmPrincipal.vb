@@ -216,6 +216,7 @@ Public Class FrmPrincipal
             Case NameOf(FrmTaxes) : Return "Taxes et barème"
             Case NameOf(FrmEcartsChange) : Return "Pièce des écarts de change"
             Case NameOf(FrmControleChange) : Return "Contrôle des écarts de change"
+            Case NameOf(FrmNarrative) : Return "Narrative comptable"
             Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
             Case NameOf(FrmParametrageFichier) : Return "Paramétrage : fichier de secours"
             Case NameOf(FrmProduits) : Return "Produits de transfert"
@@ -382,6 +383,17 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
+    ''' La narrative comptable : le texte que la banque veut lire dans son grand livre.
+    '''
+    ''' Rangée juste après le barème, et non près du traitement : c'est un paramétrage, et le
+    ''' même administrateur en répond. Ce qu'on y saisit ne change aucun montant — mais il
+    ''' s'imprime sur toutes les écritures de toutes les journées à venir.
+    ''' </summary>
+    Private Sub mnuNarrative_Click(sender As Object, e As EventArgs) Handles mnuNarrative.Click
+        AfficherEnfant(Of FrmNarrative)()
+    End Sub
+
+    ''' <summary>
     ''' Les options de traitement : la façon de travailler que la banque a choisie.
     '''
     ''' Rangées à côté des comptes systèmes parce qu'elles ont le même propriétaire —
@@ -447,6 +459,7 @@ Public Class FrmPrincipal
         mnuComptes.Image = IconesWU.Obtenir(IconeWU.Registre)
         mnuTaxes.Image = IconesWU.Obtenir(IconeWU.Pourcentage)
         mnuProduits.Image = IconesWU.Obtenir(IconeWU.Groupe)
+        mnuNarrative.Image = IconesWU.Obtenir(IconeWU.Registre)
         mnuOptions.Image = IconesWU.Obtenir(IconeWU.Curseurs)
         mnuFichierParametrage.Image = IconesWU.Obtenir(IconeWU.Dossier)
 
@@ -620,6 +633,7 @@ Public Class FrmPrincipal
         mnuAgences.Available = pointsDeVente
         mnuGroupes.Available = pointsDeVente
         mnuComptes.Available = comptes
+        mnuNarrative.Available = comptes
         mnuOptions.Available = comptes
         mnuDemandes.Available = pointsDeVente
         SEP5.Available = pointsDeVente

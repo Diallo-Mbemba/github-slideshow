@@ -99,6 +99,7 @@
     <Compile Include="Models\UtilisateurWU.vb" />
     <Compile Include="Models\DemandeWU.vb" />
     <Compile Include="Models\LigneCoreBankingWU.vb" />
+    <Compile Include="Models\ModeleNarrativeWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
@@ -278,6 +279,12 @@
     <Compile Include="Forms\FrmBordereauJournee.Designer.vb">
       <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmNarrative.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmNarrative.Designer.vb">
+      <DependentUpon>FrmNarrative.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmOptionsTraitement.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -395,6 +402,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmBordereauJournee.resx">
       <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmNarrative.resx">
+      <DependentUpon>FrmNarrative.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmOptionsTraitement.resx">
       <DependentUpon>FrmOptionsTraitement.vb</DependentUpon>
