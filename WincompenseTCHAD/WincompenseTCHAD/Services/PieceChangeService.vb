@@ -240,20 +240,23 @@ Public NotInheritable Class PieceChangeService
         Dim sensLisible As String = LibelleDuSens(sens)
         If sensLisible.Length > 0 Then entete.Add(sensLisible)
 
-        Dim narratif As String = $"{String.Join(" ", entete)} - {MENTION} - {jour:dd/MM/yyyy}"
+        ' La variable ne s'appelle PAS « narratif » : Visual Basic réserve le nom de la
+        ' fonction à sa valeur de retour implicite, et une locale qui le porte est refusée
+        ' (BC30290). Le compilateur l'a dit ; verif_bc30290.py aurait dû le dire avant lui.
+        Dim phrase As String = $"{String.Join(" ", entete)} - {MENTION} - {jour:dd/MM/yyyy}"
 
         Dim reference As String = If(mtcn, String.Empty).Trim()
 
         If reference.Length > 0 Then
-            narratif &= $" - MTCN {reference}"
+            phrase &= $" - MTCN {reference}"
         Else
-            narratif &= $" - {nombreTransactions} trx"
+            phrase &= $" - {nombreTransactions} trx"
         End If
 
         Dim pointDeVente As String = If(account, String.Empty).Trim()
-        If pointDeVente.Length > 0 Then narratif &= $" - Account {pointDeVente}"
+        If pointDeVente.Length > 0 Then phrase &= $" - Account {pointDeVente}"
 
-        Return narratif
+        Return phrase
     End Function
 
     ''' <summary>
