@@ -92,7 +92,7 @@ BEGIN
         IF DATABASE_PRINCIPAL_ID(@role) IS NULL
         BEGIN
             PRINT N'ARRÊT : le rôle ' + @role + N' n''existe pas.';
-            PRINT N'        Exécutez Scripts\08_RolesSQLServer.sql, ou le script complet 00.';
+            PRINT N'        Exécutez Scripts\00_InstallationComplete.sql : il crée les trois rôles.';
         END
         -- ISNULL : si la création de l'utilisateur a échoué, IS_ROLEMEMBER rend NULL,
         -- et un NULL = 0 vaut « inconnu », donc faux : on passerait dans la branche

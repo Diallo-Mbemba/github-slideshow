@@ -66,7 +66,7 @@ GO
 -- =========================================================================
 IF OBJECT_ID(N'dbo.T_ParametreWU') IS NULL
 BEGIN
-    RAISERROR(N'La table T_ParametreWU est absente : exécutez d''abord Scripts\18_OptionsTraitement.sql.', 16, 1);
+    RAISERROR(N'La table T_ParametreWU est absente : exécutez Scripts\00_InstallationComplete.sql, qui crée tout.', 16, 1);
 END
 GO
 

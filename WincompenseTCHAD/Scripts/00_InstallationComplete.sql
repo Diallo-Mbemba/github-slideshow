@@ -3,9 +3,12 @@
     WINCOMPENSE TCHAD — LE SEUL SCRIPT À EXÉCUTER
 ================================================================================================
 
-    IL N'Y EN A QU'UN. Celui-ci. Les vingt-trois autres fichiers du dossier Scripts sont la
-    DOCUMENTATION de ce qu'il fait, découpée par sujet — ils expliquent, ils ne s'exécutent
-    pas. Tout ce qu'ils créent est repris ici, dans le bon ordre.
+    IL N'Y EN A QU'UN. Celui-ci. Les vingt-deux fichiers du sous-dossier Scripts\Documentation
+    sont la DOCUMENTATION de ce qu'il fait, découpée par sujet — ils expliquent, ils ne
+    s'exécutent pas. Tout ce qu'ils créent est repris ici, dans le bon ordre.
+
+    LE DOSSIER Scripts NE CONTIENT DONC QUE CE QUI S'EXÉCUTE : ce fichier-ci, et
+    11_AccesUtilisateurs.sql pour le seul cas de l'authentification Windows.
 
     À EXÉCUTER APRÈS CHAQUE LIVRAISON de l'application, et aussi souvent qu'on veut.
 
@@ -74,10 +77,11 @@
                                  script-ci ne peut pas deviner. À compléter, puis exécuter.
                                  UNE FOIS, à l'installation — jamais à une livraison.
 
-    12_AccesCompteApplicatif.sql NE SERT À RIEN DE PLUS : c'est la partie 5 ci-dessus sous
-    forme autonome. Il reste utile dans un seul cas — rattacher PLUSIEURS comptes, un par
-    agent, avec des rôles différents (wu_compense, wu_commercial) : on l'exécute alors une
-    fois par compte, et les trois rôles retrouvent leur utilité.
+    Documentation\12_AccesCompteApplicatif.sql NE SERT À RIEN DE PLUS : c'est la partie 5
+    ci-dessus sous forme autonome, et c'est pourquoi il est rangé avec la documentation. Il
+    reste utile dans un seul cas — rattacher PLUSIEURS comptes, un par agent, avec des rôles
+    différents (wu_compense, wu_commercial) : on l'exécute alors une fois par compte, et les
+    trois rôles retrouvent leur utilité.
 
     ------------------------------------------------------------------------------------------
     CE QU'IL NE FAIT PAS
@@ -119,7 +123,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.1 — Points de vente : sous-agents et agences propres
-    (source : Scripts\01_CreateTables_GWC_WINCOMPENSE_ETD.sql)
+    (source : Scripts\Documentation\01_CreateTables_GWC_WINCOMPENSE_ETD.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -185,7 +189,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.2 — Comptes comptables paramétrés (SystemeWU)
-    (source : Scripts\03_SystemeWU.sql)
+    (source : Scripts\Documentation\03_SystemeWU.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -288,7 +292,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.3 — Groupes statistiques
-    (source : Scripts\04_GroupeStatistique.sql)
+    (source : Scripts\Documentation\04_GroupeStatistique.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -541,7 +545,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.4 — Historique des journées comptabilisées
-    (source : Scripts\05_HistoriqueWU.sql)
+    (source : Scripts\Documentation\05_HistoriqueWU.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -648,7 +652,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.5 — Historique détaillé, MTCN par MTCN
-    (source : Scripts\06_HistoriqueMTCN.sql)
+    (source : Scripts\Documentation\06_HistoriqueMTCN.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -730,7 +734,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.6 — Utilisateurs et journal des connexions
-    (source : Scripts\07_Utilisateurs.sql)
+    (source : Scripts\Documentation\07_Utilisateurs.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -915,7 +919,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 2.7 — Double regard : file des demandes
-    (source : Scripts\09_Demandes.sql)
+    (source : Scripts\Documentation\09_Demandes.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -1135,7 +1139,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 3.1 — Jours fériés de la banque
-    (source : Scripts\10_JoursFeries.sql)
+    (source : Scripts\Documentation\10_JoursFeries.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -1917,7 +1921,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 4 — Rôles de base de données et droits
-    (source : Scripts\08_RolesSQLServer.sql)
+    (source : Scripts\Documentation\08_RolesSQLServer.sql)
 ----------------------------------------------------------------------------------------------*/
 
 /*
@@ -2230,7 +2234,7 @@ GO
 --    une ligne posée à la main dans T_DemandeWU — l'autorisation écrit le taux SANS le
 --    revalider — et les reprises de données.
 --
---    Détail et diagnostic des valeurs déjà hors bornes : Scripts\19_BornerLeTaux.sql.
+--    Détail et diagnostic des valeurs déjà hors bornes : Scripts\Documentation\19_BornerLeTaux.sql.
 -- =========================================================================
 IF OBJECT_ID(N'dbo.T_Pdv_SA') IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_T_Pdv_SA_Taux')
@@ -2278,7 +2282,7 @@ GO
 --    dans ce fichier, avant que la table n'existe. Un GRANT sur une table absente échoue,
 --    et la table serait restée sans aucun droit — illisible par l'application, alors que
 --    tout le reste aurait paru installé.
---    Détail et commentaires : Scripts\20_ProduitsTransfert.sql.
+--    Détail et commentaires : Scripts\Documentation\20_ProduitsTransfert.sql.
 -- =========================================================================
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_ProduitTransfert' AND schema_id = SCHEMA_ID(N'dbo'))
@@ -2946,7 +2950,7 @@ GO
 
 /*----------------------------------------------------------------------------------------------
     PARTIE 5.1 — Vue d'audit : ce que la banque a garde sur les commissions
-    (source : Scripts\16_CommissionsBanque.sql)
+    (source : Scripts\Documentation\16_CommissionsBanque.sql)
 ----------------------------------------------------------------------------------------------*/
 
 IF OBJECT_ID(N'dbo.V_CommissionsBanque', N'V') IS NOT NULL DROP VIEW dbo.V_CommissionsBanque;

@@ -149,5 +149,5 @@ Il faut les trois — et la page *User Mapping* donne les deux derniers d'un seu
 
 ## Pour qui préfère le T-SQL
 
-La même chose, en trois ordres : `Scripts\12_AccesCompteApplicatif.sql`. Une seule ligne à
+La même chose, en trois ordres : `Scripts\Documentation\12_AccesCompteApplicatif.sql`. Une seule ligne à
 renseigner, celle du nom du compte.

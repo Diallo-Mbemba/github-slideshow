@@ -42,7 +42,7 @@ End Enum
 ''' désignation, un groupe, un taux, deux comptes, un code de rattachement. Ils tiennent donc
 ''' dans une seule classe, dont les propriétés portent le nom du concept et non celui de la
 ''' colonne de telle ou telle table. La correspondance est documentée dans
-''' Scripts\09_Demandes.sql et rendue par les vues V_Demande_*.
+''' Scripts\Documentation\09_Demandes.sql et rendue par les vues V_Demande_*.
 ''' </summary>
 Public Class DemandeWU
 

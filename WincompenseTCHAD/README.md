@@ -181,21 +181,33 @@ WincompenseTCHAD/
         ├── FrmFichierCoreBanking.vb        ' Consultation du fichier d'interface avant export
         └── FrmParametresConnexion.vb       ' Changement de serveur, pour ce poste ou pour toute la banque
 
-Scripts/
+Scripts/                                   ' CE DOSSIER NE CONTIENT QUE CE QUI S'EXÉCUTE
 ├── 00_InstallationComplete.sql            ' LE SEUL À EXÉCUTER — il contient tous les autres
-├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
-├── 02_DonneesExemple.sql
-├── 03_SystemeWU.sql                       ' Comptes comptables paramétrés
-├── 04_GroupeStatistique.sql               ' Table des groupes + migration depuis T_Pdv_SA
-├── 05_HistoriqueWU.sql                    ' Historique des journées comptabilisées
-├── 06_HistoriqueMTCN.sql                  ' Détail des transactions, MTCN par MTCN
-├── 07_Utilisateurs.sql                    ' Utilisateurs, journal des connexions, traçabilité
-├── 08_RolesSQLServer.sql                  ' Rôles de base de données wu_compense / wu_commercial / wu_admin
-├── 09_Demandes.sql                        ' Double regard : file des demandes et fonction des utilisateurs
-├── 10_JoursFeries.sql                     ' Jours fériés : contrôle de la date de valeur
-├── 11_AccesUtilisateurs.sql               ' Rattachement des comptes Windows aux rôles
-├── 12_AccesCompteApplicatif.sql           ' LE SCRIPT À REMETTRE À LA BANQUE : un compte, un rôle
-└── 13_PiecesComptables.sql                ' Table T_PieceWU : les pièces conservées
+├── 11_AccesUtilisateurs.sql               ' Comptes Windows : uniquement en authentification AD
+├── README.md                              ' Quel script exécuter, et quand
+└── Documentation/                         ' Les 22 autres : ils expliquent, ils ne s'exécutent pas
+    ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
+    ├── 02_DonneesExemple.sql              ' Jeu de test — jamais en production
+    ├── 03_SystemeWU.sql                   ' Comptes comptables paramétrés
+    ├── 04_GroupeStatistique.sql           ' Table des groupes + migration depuis T_Pdv_SA
+    ├── 05_HistoriqueWU.sql                ' Historique des journées comptabilisées
+    ├── 06_HistoriqueMTCN.sql              ' Détail des transactions, MTCN par MTCN
+    ├── 07_Utilisateurs.sql                ' Utilisateurs, journal des connexions, traçabilité
+    ├── 08_RolesSQLServer.sql              ' Rôles wu_compense / wu_commercial / wu_admin
+    ├── 09_Demandes.sql                    ' Double regard : file des demandes, fonction des utilisateurs
+    ├── 10_JoursFeries.sql                 ' Jours fériés : contrôle de la date de valeur
+    ├── 12_AccesCompteApplicatif.sql       ' La partie 5 de 00, autonome : plusieurs comptes
+    ├── 13_PiecesComptables.sql            ' T_PieceWU : les pièces conservées
+    ├── 14_AnnulationComptabilisation.sql  ' Annulation d'une journée, archives, vue d'audit
+    ├── 15_FichierCoreBanking.sql          ' Traçabilité des fichiers produits
+    ├── 16_CommissionsBanque.sql           ' Part bancaire des commissions, par journée
+    ├── 17_BordereauJournee.sql            ' En-tête de journée et son visa
+    ├── 18_OptionsTraitement.sql           ' T_ParametreWU : les options de la banque
+    ├── 19_BornerLeTaux.sql                ' Contrainte : un taux entre 0 et 1
+    ├── 20_ProduitsTransfert.sql           ' Western Union, Ria, et les suivants
+    ├── 21_EcartsDeChange.sql              ' Parité historisée, écarts, pièce de change
+    ├── 22_NarrativeComptable.sql          ' Le modèle de narrative, dans T_ParametreWU
+    └── 23_NarrativeParNature.sql          ' Libellés par nature + journal des modifications
 
 Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe
@@ -489,7 +501,7 @@ ci-dessus.
 - **Prise en compte immédiate.** Les nouveaux comptes s'appliquent dès l'enregistrement. Si un
   calcul est déjà affiché, l'application invite à le relancer avant de générer la pièce.
 
-Le script `Scripts\03_SystemeWU.sql` crée la table et sa ligne de paramétrage **si elles
+Le script `Scripts\Documentation\03_SystemeWU.sql` crée la table et sa ligne de paramétrage **si elles
 n'existent pas** ; il ne modifie jamais un paramétrage en place.
 
 ### Commission Transfert et Commission Envoi désormais dissociables
@@ -575,7 +587,7 @@ Ces trois règles ne sont plus seulement vérifiées par l'application : la tabl
 
 ### Migration
 
-Le script `Scripts\04_GroupeStatistique.sql` crée la table et y reprend les groupes déjà
+Le script `Scripts\Documentation\04_GroupeStatistique.sql` crée la table et y reprend les groupes déjà
 présents dans `T_Pdv_SA`. Il est **partiel et répétable** : il migre tous les groupes sains et
 laisse de côté ceux qui demandent un arbitrage, en disant lesquels et pourquoi.
 
@@ -794,12 +806,12 @@ de vente.
 > Cause la plus fréquente : ces journées ont été comptabilisées **avant** la mise en place du
 > suivi des MTCN. L'application le dit explicitement à l'ouverture du rapport, et la barre
 > d'état indique en permanence le nombre de transactions détaillées. Pour l'obtenir : exécuter
-> `Scripts\06_HistoriqueMTCN.sql`, puis recharger les rapports de ces journées et regénérer
+> `Scripts\Documentation\06_HistoriqueMTCN.sql`, puis recharger les rapports de ces journées et regénérer
 > leur pièce comptable — une journée regénérée remplace proprement la précédente.
 
 `T_HistoriqueWU` agrège la journée par point de vente : elle ne peut pas porter le MTCN, qui
 identifie **une** transaction. La table **`T_HistoriqueMTCN`** (script
-`Scripts\06_HistoriqueMTCN.sql`) conserve donc le détail, une ligne par transaction.
+`Scripts\Documentation\06_HistoriqueMTCN.sql`) conserve donc le détail, une ligne par transaction.
 
 - Alimentée **dans la même transaction** que l'agrégat : les deux tables ne peuvent pas diverger.
 - Le filtre par groupe statistique est appliqué **par la base**, plutôt que de rapatrier toute
@@ -828,7 +840,7 @@ n'appartient à aucun groupe, ceux-ci ne concernant que les sous-agents.
 ### La source : l'historique des journées comptabilisées
 
 L'application traite une journée à la fois et ne conservait rien. La table
-**`T_HistoriqueWU`** (script `Scripts\05_HistoriqueWU.sql`) enregistre désormais le résultat de
+**`T_HistoriqueWU`** (script `Scripts\Documentation\05_HistoriqueWU.sql`) enregistre désormais le résultat de
 chaque journée — une ligne par point de vente — et sert de source à ces rapports.
 
 - **Alimentée à la génération de la pièce comptable**, jamais à un simple affichage : seule une
@@ -937,7 +949,7 @@ d'elle-même — c'est la banque qui décide.
 
 Les samedis et dimanches se déduisent du calendrier. Les jours fériés, non : ils changent chaque
 année, et les fêtes musulmanes suivent le calendrier lunaire. Ils sont donc tenus dans la table
-`T_JourFerieWU`, créée par `Scripts\10_JoursFeries.sql` et complétée par la banque sans
+`T_JourFerieWU`, créée par `Scripts\Documentation\10_JoursFeries.sql` et complétée par la banque sans
 recompiler l'application.
 
 **Le script sème les fêtes à date fixe et les lundis de Pâques jusqu'en 2030 — 35 dates — et
@@ -1082,7 +1094,7 @@ signale.
 
 ### Mise en service
 
-Après `Scripts\09_Demandes.sql`, **aucun utilisateur n'a de fonction** — pas même
+Après `Scripts\Documentation\09_Demandes.sql`, **aucun utilisateur n'a de fonction** — pas même
 l'administrateur. Personne ne peut donc créer de sous-agent tant que les fonctions ne sont pas
 attribuées, dans l'écran « Utilisateurs et connexions ».
 
@@ -1538,7 +1550,7 @@ pour créer l'accès, il faut déjà l'avoir. Mieux vaut donc un script juste et
 exécuter qu'une tentative qui échoue en laissant l'agent deviner.
 
 Le même script existe en fichier, pour qui préfère l'envoyer sans ouvrir l'application :
-`Scripts\12_AccesCompteApplicatif.sql`, une seule ligne à modifier.
+`Scripts\Documentation\12_AccesCompteApplicatif.sql`, une seule ligne à modifier.
 
 Et pour une informatique qui préfère l'interface au T-SQL, la même chose clic par clic :
 `Installation\PROCEDURE-SSMS-Acces.md`. Tout y tient dans une seule fenêtre de SSMS — la page
@@ -1876,8 +1888,8 @@ par défaut.
 
 | Script | Ce qu'il crée |
 |---|---|
-| `Scripts\14_AnnulationComptabilisation.sql` | Les quatre tables d'annulation, les deux colonnes ajoutées à `T_DemandeWU`, les contraintes rouvertes, la vue `V_JourneesAnnulees` |
-| `Scripts\15_FichierCoreBanking.sql` | `T_FichierCoreBankingWU` |
+| `Scripts\Documentation\14_AnnulationComptabilisation.sql` | Les quatre tables d'annulation, les deux colonnes ajoutées à `T_DemandeWU`, les contraintes rouvertes, la vue `V_JourneesAnnulees` |
+| `Scripts\Documentation\15_FichierCoreBanking.sql` | `T_FichierCoreBankingWU` |
 
 `00_InstallationComplete.sql` les contient déjà pour une installation neuve. Sur une base
 existante, **le script 14 est obligatoire avant toute nouvelle demande** : il ajoute deux
@@ -2079,7 +2091,7 @@ sont partis en archive, ce qui est précisément ce qu'on attend d'une journée 
 
 ### Ce que l'état ne sait pas, il le dit
 
-Les journées comptabilisées **avant** l'exécution de `Scripts\16_CommissionsBanque.sql` n'ont
+Les journées comptabilisées **avant** l'exécution de `Scripts\Documentation\16_CommissionsBanque.sql` n'ont
 pas de répartition conservée. Pour elles :
 
 - la part des **agences propres reste exacte** — leur taux vaut zéro par construction, et le
@@ -2126,7 +2138,7 @@ d'abord qu'elles existent (`WURepository.ColonneExiste`) :
 - le **déplacement** d'une journée annulée vers l'archive — une journée resterait en place
   faute d'une colonne qu'elle n'a jamais eue.
 
-`Scripts\16_CommissionsBanque.sql` ajoute les colonnes à `T_HistoriqueWU` **et** à
+`Scripts\Documentation\16_CommissionsBanque.sql` ajoute les colonnes à `T_HistoriqueWU` **et** à
 `T_HistoriqueAnnuleWU`, et crée la vue d'audit `V_CommissionsBanque`.
 
 ## Le bordereau de fin de journée, et son visa
@@ -2214,7 +2226,7 @@ c'est ce que l'on relira pour comprendre qui avait vu quoi.
 
 ### Pour les journées antérieures
 
-Celles comptabilisées avant l'exécution de `Scripts\17_BordereauJournee.sql` n'ont pas
+Celles comptabilisées avant l'exécution de `Scripts\Documentation\17_BordereauJournee.sql` n'ont pas
 d'en-tête. Leur bordereau s'affiche quand même : volumes, montants et totaux de la pièce se
 relisent. Mais le **nom des rapports Western Union** n'était conservé nulle part — l'écran écrit
 « NON CONSERVÉ pour cette journée » plutôt que de laisser des cases vides qui se liraient comme
@@ -2653,7 +2665,7 @@ SELECT DateActivite, TauxSA FROM T_HistoriqueWU
 WHERE  Account = 'AHB020211' ORDER BY DateActivite DESC;
 ```
 
-La colonne `TauxSA` de l'historique n'existe que depuis `Scripts\16_CommissionsBanque.sql` :
+La colonne `TauxSA` de l'historique n'existe que depuis `Scripts\Documentation\16_CommissionsBanque.sql` :
 les journées antérieures à cette migration ne la portent pas.
 
 > **La base dit ce qui est appliqué, pas ce qui est juste.** `T_Pdv_SA.Taux` est une saisie,
@@ -2679,7 +2691,7 @@ fichier de paramétrage.
    pas chez celui qui autorise ;
 3. une reprise de données, une restauration, un script de migration.
 
-`Scripts\19_BornerLeTaux.sql` pose `CK_T_Pdv_SA_Taux`, `CK_T_GroupeStatistique_Taux` et
+`Scripts\Documentation\19_BornerLeTaux.sql` pose `CK_T_Pdv_SA_Taux`, `CK_T_GroupeStatistique_Taux` et
 `CK_T_DemandeWU_Taux`. Elles valent **quelle que soit la version de l'application** installée
 sur les postes.
 
@@ -3202,7 +3214,7 @@ fenêtre à créer ni menu à ajouter — seulement le métier à écrire, et `R
   complet ? Elles ne proposent aujourd'hui que le compte paramétré et le compte par défaut, la
   saisie libre restant possible.
 - Sous-agents restant sans groupe statistique après la migration : quel groupe leur attribuer ?
-  Tant qu'il en subsiste, la clé étrangère proposée en fin de `Scripts\04_GroupeStatistique.sql`
+  Tant qu'il en subsiste, la clé étrangère proposée en fin de `Scripts\Documentation\04_GroupeStatistique.sql`
   ne peut pas être posée.
 - Règle définitive de traitement des lignes `TransactionType = "A"` du rapport de règlement.
 - Annulation d'une comptabilisation : les fonctions INPUTER / AUTHORIZER du référentiel
@@ -3222,12 +3234,12 @@ fenêtre à créer ni menu à ajouter — seulement le métier à écrire, et `R
   `msdb` ? C'est le jour où le travail de sauvegarde s'arrête en silence que cela sert.
   Proposé, non retenu pour l'instant.
 - Le fichier de secours doit-il aussi porter les jours fériés (`T_JourFerieWU`) ? Ils sont
-  regénérés pour 2026-2030 par `Scripts\10_JoursFeries.sql` sur une installation neuve,
+  regénérés pour 2026-2030 par `Scripts\Documentation\10_JoursFeries.sql` sur une installation neuve,
   d'où leur absence ; les corrections apportées par la banque, elles, ne s'exportent pas.
 
 ## Test de référence (section 17)
 
-Les scripts `Scripts\02_DonneesExemple.sql` paramètrent :
+Les scripts `Scripts\Documentation\02_DonneesExemple.sql` paramètrent :
 
 - `AHB020200` comme sous-agent (`T_Pdv_SA`, `Taux = 0.70`) ;
 - `AHB020057` comme agence propre Ecobank (`T_Pdv_EC`).

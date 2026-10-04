@@ -145,7 +145,7 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = @role_wu AND type = 'R')
         BEGIN
             PRINT N'MANQUANT : le rôle ' + @role_wu + N' n''existe pas. ' +
-                  N'Exécutez d''abord Scripts\08_RolesSQLServer.sql.';
+                  N'Exécutez d''abord Scripts\00_InstallationComplete.sql : il crée les trois rôles.';
         END
         ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = @compte)
         BEGIN

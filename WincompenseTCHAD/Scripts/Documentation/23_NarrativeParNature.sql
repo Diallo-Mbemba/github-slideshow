@@ -194,7 +194,7 @@ BEGIN
     PRINT 'Option NARRATIVE_MODE créée à GLOBAL.';
 END
 ELSE IF OBJECT_ID(N'dbo.T_ParametreWU') IS NULL
-    PRINT 'T_ParametreWU absente : exécutez Scripts\18_OptionsTraitement.sql, puis rejouez celui-ci.';
+    PRINT 'T_ParametreWU absente : exécutez Scripts\00_InstallationComplete.sql, qui crée tout.';
 ELSE
     PRINT 'Option NARRATIVE_MODE déjà présente : valeur conservée.';
 GO

@@ -201,7 +201,16 @@ Source: "{#DossierRelease}\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 
 ; Les scripts SQL accompagnent l'installation : l'informatique les a sous la main
 ; le jour ou elle monte la base sur un nouveau serveur.
+;
+; DEUX LIGNES, PARCE QUE *.sql NE DESCEND PAS DANS LES SOUS-DOSSIERS. La premiere porte
+; ce qui s'EXECUTE -- 00 et 11 -- la seconde la documentation. Les melanger reviendrait a
+; reconstituer dans Program Files le dossier a vingt-quatre fichiers qu'on vient de ranger.
 Source: "..\Scripts\*.sql"; DestDir: "{app}\Scripts"; Flags: ignoreversion
+Source: "..\Scripts\Documentation\*.sql"; DestDir: "{app}\Scripts\Documentation"; Flags: ignoreversion
+
+; Le mode d'emploi du dossier : quel script executer, et quand. Il n'etait pas livre --
+; seuls les *.sql l'etaient -- et c'est precisement la question que la banque se posait.
+Source: "..\Scripts\README.md"; DestDir: "{app}\Scripts"; Flags: ignoreversion
 
 ; Le modele du fichier partage et le script de changement de serveur.
 Source: "connexion.config.modele"; DestDir: "{app}\Installation"; Flags: ignoreversion
@@ -217,6 +226,15 @@ Source: "LISEZMOI-Installation.md"; DestDir: "{app}\Installation"; Flags: ignore
 Type: files; Name: "{app}\WincompenseTCHAD.exe"
 Type: files; Name: "{app}\WincompenseTCHAD.exe.config"
 Type: files; Name: "{app}\WincompenseTCHAD.pdb"
+
+; LES ANCIENS SCRIPTS, A LA RACINE DE Scripts. Une installation precedente y a depose les
+; vingt-quatre fichiers numerotes. Les laisser la, a cote du nouveau sous-dossier
+; Documentation, reconstituerait exactement la confusion qu'on vient de retirer : deux
+; exemplaires de chaque script, et l'informatique devant deviner lequel fait foi.
+;
+; Cette ligne tourne AVANT la copie : les deux fichiers qui restent a la racine -- 00 et
+; 11 -- sont effaces puis redeposes a neuf dans la foulee.
+Type: files; Name: "{app}\Scripts\*.sql"
 
 [Dirs]
 ; LE POINT IMPORTANT. Sans "users-modify", l'application ne pourrait pas

@@ -44,7 +44,7 @@ deux : le partage reçoit le serveur, la base et le **nom** du compte ; le mot d
 sur le poste, chiffré par Windows. Changer de serveur vaut toujours pour toute la banque —
 mais **chaque poste doit recevoir le mot de passe une fois**, à son installation. Sans quoi il
 affichera « Login failed for user ».
-Les droits d'accès à la base sont donnés par `Scripts\08_RolesSQLServer.sql` (les rôles) et
+Les droits d'accès à la base sont donnés par `Scripts\Documentation\08_RolesSQLServer.sql` (les rôles) et
 `Scripts\11_AccesUtilisateurs.sql` (les comptes).
 
 ---
