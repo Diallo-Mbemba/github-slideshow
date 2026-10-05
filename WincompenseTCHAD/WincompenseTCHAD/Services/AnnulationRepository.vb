@@ -430,7 +430,17 @@ Public NotInheritable Class AnnulationRepository
         If Not WURepository.ColonneExiste(connexion, transaction, TRAITEMENT, "DateActivite") Then Return
         If Not WURepository.ColonneExiste(connexion, transaction, TRAITEMENT_ARCHIVE, "DateActivite") Then Return
 
-        Deplacer(TRAITEMENT, TRAITEMENT_ARCHIVE, colonnes, idAnnulation, jour,
+        ' LA PÉRIODE SUIT LA JOURNÉE EN ARCHIVE, et seulement si LES DEUX tables la portent.
+        ' Une archive qui perd une partie de ce qu'elle archive ne prouve plus grand-chose :
+        ' c'est la période qui dira, des mois plus tard, ce que l'annulation a retiré au juste.
+        Dim avecPeriode As Boolean =
+            WURepository.ColonneExiste(connexion, transaction, TRAITEMENT, "DebutPeriode") AndAlso
+            WURepository.ColonneExiste(connexion, transaction, TRAITEMENT_ARCHIVE, "DebutPeriode")
+
+        Dim colonnesDeplacees As String =
+            colonnes & If(avecPeriode, ", DebutPeriode, FinPeriode", String.Empty)
+
+        Deplacer(TRAITEMENT, TRAITEMENT_ARCHIVE, colonnesDeplacees, idAnnulation, jour,
                  connexion, transaction)
     End Sub
 

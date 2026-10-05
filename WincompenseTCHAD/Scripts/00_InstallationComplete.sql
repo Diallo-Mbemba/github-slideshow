@@ -1631,6 +1631,8 @@ BEGIN
     (
         DateActivite        DATE            NOT NULL,
         DateValeur          DATE            NULL,
+        DebutPeriode        DATE            NULL,       -- Premier jour couvert par les rapports
+        FinPeriode          DATE            NULL,       -- Dernier jour couvert
         NumeroLot           NVARCHAR(10)    NULL,
 
         -- Les deux rapports traites, et leur empreinte SHA-256. Elle ne protege de rien,
@@ -1690,6 +1692,8 @@ BEGIN
 
         DateActivite        DATE            NOT NULL,
         DateValeur          DATE            NULL,
+        DebutPeriode        DATE            NULL,       -- Premier jour couvert par les rapports
+        FinPeriode          DATE            NULL,       -- Dernier jour couvert
         NumeroLot           NVARCHAR(10)    NULL,
 
         FichierActivite     NVARCHAR(255)   NULL,
@@ -2810,6 +2814,51 @@ BEGIN
 END
 ELSE
     PRINT 'SystemeWU : colonne Cpte_Pertede_Change déjà présente ou table absente.';
+GO
+
+-- ---- La periode couverte par les rapports (origine : script 17) ----
+--
+-- La banque liquide a la semaine : un rapport porte six journees, et l'en-tete n'en gardait
+-- qu'une. L'avertissement affiche avant de comptabiliser -- « ne chargez pas ensuite un
+-- rapport d'une journee deja comprise dans cette periode » -- etait donc une promesse que le
+-- code ne pouvait pas tenir : recharger le 24/09 seul apres une semaine du 24 au 30 ne
+-- trouvait rien, et passait sans un mot.
+--
+-- CES COLONNES NE SONT PAS CLE. DateActivite reste la cle primaire de T_TraitementWU, de
+-- T_HistoriqueWU et de T_PieceWU : une periode est designee sans ambiguite par son premier
+-- jour, des lors que deux periodes qui se chevauchent ne peuvent plus passer l'une apres
+-- l'autre sans avertissement.
+--
+-- NULL sur les journees deja comptabilisees : rien ne les reconstitue, et le controle les
+-- ramene alors a leur seule date d'activite, c'est-a-dire a une periode d'un jour.
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_TraitementWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_TraitementWU') AND name = N'DebutPeriode')
+BEGIN
+    ALTER TABLE dbo.T_TraitementWU
+        ADD DebutPeriode DATE NULL,
+            FinPeriode   DATE NULL;
+
+    PRINT 'Colonnes DebutPeriode et FinPeriode ajoutées à T_TraitementWU.';
+END
+ELSE
+    PRINT 'T_TraitementWU : colonnes de période déjà présentes ou table absente.';
+GO
+
+-- L'ARCHIVE LES PORTE AUSSI : une journee annulee emporte la facon dont elle avait ete
+-- traitee, et sans elles elle perdrait en chemin ce qu'elle couvrait au juste.
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_TraitementAnnuleWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_TraitementAnnuleWU') AND name = N'DebutPeriode')
+BEGIN
+    ALTER TABLE dbo.T_TraitementAnnuleWU
+        ADD DebutPeriode DATE NULL,
+            FinPeriode   DATE NULL;
+
+    PRINT 'Colonnes DebutPeriode et FinPeriode ajoutées à T_TraitementAnnuleWU.';
+END
+ELSE
+    PRINT 'T_TraitementAnnuleWU : colonnes de période déjà présentes ou table absente.';
 GO
 
 -- =========================================================================

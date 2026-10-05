@@ -601,27 +601,6 @@ Public NotInheritable Class WUReportService
 #Region "Validation des dates (section 16)"
 
     ''' <summary>
-    ''' Extrait, si possible, la date unique du rapport d'activité (colonne txnDateLOC).
-    ''' Retourne Nothing si la colonne est absente ou si aucune date exploitable n'est trouvée.
-    ''' </summary>
-    Public Shared Function ObtenirDateRapport(table As DataTable, nomColonneDate As String) As Date?
-
-        If table Is Nothing OrElse Not table.Columns.Contains(nomColonneDate) Then
-            Return Nothing
-        End If
-
-        For Each row As DataRow In table.Rows
-
-            Dim dateValeur As Date
-            If EssayerLireDate(ObtenirValeurTexte(row, nomColonneDate), dateValeur) Then
-                Return dateValeur
-            End If
-        Next
-
-        Return Nothing
-    End Function
-
-    ''' <summary>
     ''' Lit une date telle que Western Union l'écrit. Rend Faux si le texte n'en porte pas.
     '''
     ''' Isolée pour que la lecture d'UNE date et l'inventaire de TOUTES les journées du rapport
@@ -652,78 +631,50 @@ Public NotInheritable Class WUReportService
     End Function
 
     ''' <summary>
-    ''' Reconstitue une date à partir d'un triplet de colonnes Année/Mois/Jour préfixées
-    ''' (ex. SetDateLOCYear / SetDateLOCMonth / SetDateLOCDay). Retourne Nothing si les trois
-    ''' colonnes ne sont pas toutes présentes, ou si aucune ligne ne porte une date valide
-    ''' (les rapports contiennent des triplets neutres "0/0/0" pour les transactions non encore
-    ''' payées : ces lignes sont ignorées).
-    ''' </summary>
-    Public Shared Function ObtenirDateDepuisComposants(table As DataTable, prefixe As String) As Date?
-
-        If table Is Nothing Then Return Nothing
-
-        Dim colAnnee As String = prefixe & ConstantesWU.SUFFIXE_DATE_ANNEE
-        Dim colMois As String = prefixe & ConstantesWU.SUFFIXE_DATE_MOIS
-        Dim colJour As String = prefixe & ConstantesWU.SUFFIXE_DATE_JOUR
-
-        If Not (table.Columns.Contains(colAnnee) AndAlso
-                table.Columns.Contains(colMois) AndAlso
-                table.Columns.Contains(colJour)) Then
-            Return Nothing
-        End If
-
-        For Each row As DataRow In table.Rows
-            Dim annee, mois, jour As Integer
-            If Integer.TryParse(ObtenirValeurTexte(row, colAnnee), annee) AndAlso
-               Integer.TryParse(ObtenirValeurTexte(row, colMois), mois) AndAlso
-               Integer.TryParse(ObtenirValeurTexte(row, colJour), jour) Then
-
-                If annee > 0 AndAlso mois >= 1 AndAlso mois <= 12 AndAlso jour >= 1 AndAlso jour <= 31 Then
-                    Try
-                        Return New Date(annee, mois, jour)
-                    Catch ex As ArgumentOutOfRangeException
-                        ' Triplet incohérent (ex. 31 février) : on poursuit avec les lignes suivantes.
-                    End Try
-                End If
-            End If
-        Next
-
-        Return Nothing
-    End Function
-
-    ''' <summary>
-    ''' Toutes les journées présentes dans le rapport d'activité, dédoublonnées et triées.
+    ''' Toutes les journées présentes dans un rapport, dédoublonnées et TRIÉES.
     '''
-    ''' POURQUOI CETTE FONCTION EXISTE. ObtenirDateActivite rend la date de la PREMIÈRE ligne
-    ''' exploitable, et rien ne vérifiait que les suivantes portaient le même jour. Un rapport
-    ''' hebdomadaire — c'est ainsi que la banque liquide, « DU 08 AU 14/09 » — était donc agrégé
-    ''' en entier puis étiqueté d'une seule journée : celle de sa première ligne. Les montants
-    ''' étaient justes, l'intitulé faux, et rien ne le disait.
+    ''' POURQUOI CETTE FONCTION EXISTE, ET POURQUOI ELLE EST DEVENUE LA SEULE. Les dates
+    ''' étaient lues de DEUX façons dans ce fichier : celle-ci, qui parcourt tout le rapport,
+    ''' et une autre qui rendait la date de la PREMIÈRE LIGNE EXPLOITABLE. Or le rapport de
+    ''' Western Union N'EST PAS TRIÉ PAR DATE : sur la semaine du 24 au 30/09/2026, sa
+    ''' première ligne portait le 26/09, et la pièce s'est intitulée « DU 26 AU 30 09 2026 »
+    ''' pour six journées qui commençaient le 24. Les montants étaient justes, l'étiquette
+    ''' fausse, et la journée s'historisait sous une date qui ne désignait rien.
+    '''
+    ''' Il n'y a plus qu'une lecture. Le premier jour d'un rapport est le PLUS ANCIEN, pas le
+    ''' premier rencontré.
     '''
     ''' Rend une liste vide si aucune date n'est lisible : l'appelant décide, comme partout
     ''' ailleurs, plutôt que de se voir imposer une journée inventée.
     ''' </summary>
-    Public Shared Function JourneesDuRapport(table As DataTable) As List(Of Date)
+    ''' <param name="colonneSimple">Colonne portant la date entière (txnDateLOC), si le rapport en a une.</param>
+    ''' <param name="prefixes">Préfixes des triplets Année/Mois/Jour à essayer, dans l'ordre.</param>
+    Private Shared Function Journees(table As DataTable, colonneSimple As String,
+                                     prefixes As IEnumerable(Of String)) As List(Of Date)
 
-        Dim journees As New SortedSet(Of Date)()
-        If table Is Nothing Then Return journees.ToList()
+        ' La locale ne s'appelle PAS « journees » : Visual Basic réserve le nom de la
+        ' fonction à sa valeur de retour implicite, et une locale qui le porte est
+        ' refusée (BC30290). C'est verif_bc30290.py qui l'a vu, pas moi.
+        Dim trouvees As New SortedSet(Of Date)()
+        If table Is Nothing Then Return trouvees.ToList()
 
-        ' Colonne de date simple d'abord, puis reconstitution depuis Année/Mois/Jour : le même
-        ' ordre de préférence qu'ObtenirDateActivite, pour que les deux ne puissent pas lire
-        ' deux choses différentes du même fichier.
-        If table.Columns.Contains(ConstantesWU.COLONNE_DATE_ACTIVITE) Then
+        ' Colonne de date simple d'abord, puis reconstitution depuis Année/Mois/Jour : un
+        ' rapport qui porte les deux doit être lu de la même façon par tous ses lecteurs.
+        If Not String.IsNullOrEmpty(colonneSimple) AndAlso table.Columns.Contains(colonneSimple) Then
 
             For Each ligne As DataRow In table.Rows
                 Dim lue As Date
-                If EssayerLireDate(ObtenirValeurTexte(ligne, ConstantesWU.COLONNE_DATE_ACTIVITE), lue) Then
-                    journees.Add(lue.Date)
+                If EssayerLireDate(ObtenirValeurTexte(ligne, colonneSimple), lue) Then
+                    trouvees.Add(lue.Date)
                 End If
             Next
 
-            If journees.Count > 0 Then Return journees.ToList()
+            If trouvees.Count > 0 Then Return trouvees.ToList()
         End If
 
-        For Each prefixe As String In ConstantesWU.PrefixesDateActivite
+        If prefixes Is Nothing Then Return trouvees.ToList()
+
+        For Each prefixe As String In prefixes
 
             Dim colAnnee As String = prefixe & ConstantesWU.SUFFIXE_DATE_ANNEE
             Dim colMois As String = prefixe & ConstantesWU.SUFFIXE_DATE_MOIS
@@ -743,50 +694,56 @@ Public NotInheritable Class WUReportService
                 If annee <= 0 OrElse mois < 1 OrElse mois > 12 OrElse jour < 1 OrElse jour > 31 Then Continue For
 
                 Try
-                    journees.Add(New Date(annee, mois, jour))
+                    trouvees.Add(New Date(annee, mois, jour))
                 Catch ex As ArgumentOutOfRangeException
                     ' Triplet incohérent (31 février) : la ligne est ignorée, pas le rapport.
                 End Try
             Next
 
-            If journees.Count > 0 Then Return journees.ToList()
+            If trouvees.Count > 0 Then Return trouvees.ToList()
         Next
 
-        Return journees.ToList()
+        Return trouvees.ToList()
+    End Function
+
+    ''' <summary>Toutes les journées du rapport d'ACTIVITÉ, dédoublonnées et triées.</summary>
+    Public Shared Function JourneesDuRapport(table As DataTable) As List(Of Date)
+        Return Journees(table, ConstantesWU.COLONNE_DATE_ACTIVITE, ConstantesWU.PrefixesDateActivite)
+    End Function
+
+    ''' <summary>Toutes les journées du rapport de RÈGLEMENT, dédoublonnées et triées.</summary>
+    Public Shared Function JourneesDuReglement(table As DataTable) As List(Of Date)
+        Return Journees(table, ConstantesWU.COLONNE_DATE_REGLEMENT, ConstantesWU.PrefixesDateReglement)
     End Function
 
     ''' <summary>
-    ''' Détermine la date du rapport d'activité : colonne de date simple (txnDateLOC) en priorité,
-    ''' puis reconstitution depuis les colonnes Année/Mois/Jour. Retourne Nothing si aucune date
-    ''' exploitable n'a pu être trouvée.
+    ''' LE PREMIER JOUR du rapport d'activité, c'est-à-dire LE PLUS ANCIEN — et non celui de
+    ''' sa première ligne, que le fichier n'ordonne pas. Nothing si aucune date n'est lisible.
+    '''
+    ''' C'est lui qui intitule la pièce, qui compose le libellé de ses écritures, qui part dans
+    ''' la colonne ADDLTEXT du core banking, et sous lequel la journée s'historise. Une date
+    ''' prise au hasard des lignes se serait donc retrouvée aux quatre endroits à la fois.
     ''' </summary>
     Public Shared Function ObtenirDateActivite(table As DataTable) As Date?
-        Dim resultat As Date? = ObtenirDateRapport(table, ConstantesWU.COLONNE_DATE_ACTIVITE)
-        If resultat.HasValue Then Return resultat
 
-        For Each prefixe As String In ConstantesWU.PrefixesDateActivite
-            resultat = ObtenirDateDepuisComposants(table, prefixe)
-            If resultat.HasValue Then Return resultat
-        Next
+        Dim journees As List(Of Date) = JourneesDuRapport(table)
+        If journees.Count = 0 Then Return Nothing
 
-        Return Nothing
+        Return journees(0)
     End Function
 
     ''' <summary>
-    ''' Détermine la date du rapport de règlement. Ce rapport ne comportant pas de colonne de date
-    ''' simple, la date est reconstituée depuis les colonnes Année/Mois/Jour de la date de règlement
-    ''' locale (SetDateLOC), puis à défaut de la date d'édition du rapport (RepDate).
+    ''' LE PREMIER JOUR du rapport de règlement, le plus ancien lui aussi. Ce rapport ne porte
+    ''' pas de colonne de date entière : la date se reconstitue depuis les colonnes
+    ''' Année/Mois/Jour du règlement local (SetDateLOC), puis à défaut de la date d'édition
+    ''' du rapport (RepDate).
     ''' </summary>
     Public Shared Function ObtenirDateReglement(table As DataTable) As Date?
-        Dim resultat As Date? = ObtenirDateRapport(table, ConstantesWU.COLONNE_DATE_REGLEMENT)
-        If resultat.HasValue Then Return resultat
 
-        For Each prefixe As String In ConstantesWU.PrefixesDateReglement
-            resultat = ObtenirDateDepuisComposants(table, prefixe)
-            If resultat.HasValue Then Return resultat
-        Next
+        Dim journees As List(Of Date) = JourneesDuReglement(table)
+        If journees.Count = 0 Then Return Nothing
 
-        Return Nothing
+        Return journees(0)
     End Function
 
     ''' <summary>

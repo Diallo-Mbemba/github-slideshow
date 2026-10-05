@@ -31,9 +31,56 @@ Public Class TraitementJourneeWU
 
 #Region "La journée"
 
+    ''' <summary>
+    ''' La journée sous laquelle la pièce est classée : LE PREMIER JOUR COUVERT par le rapport,
+    ''' c'est-à-dire le plus ancien. Elle est la clé de l'historique, de la pièce et de cet
+    ''' en-tête.
+    ''' </summary>
     Public Property DateActivite As Date
+
     Public Property DateValeur As Date?
     Public Property NumeroLot As String = String.Empty
+
+    ''' <summary>
+    ''' LA PÉRIODE RÉELLEMENT COUVERTE par les rapports chargés — premier et dernier jour.
+    '''
+    ''' POURQUOI ELLE EST CONSERVÉE, ALORS QUE DateActivite SUFFIT À CLASSER LA PIÈCE. La
+    ''' banque liquide à la semaine : un rapport porte six journées, et l'en-tête n'en gardait
+    ''' qu'une. L'avertissement affiché avant de comptabiliser — « ne chargez pas ensuite un
+    ''' rapport d'une journée déjà comprise dans cette période » — était donc une promesse que
+    ''' le code ne pouvait pas tenir : recharger le 24 seul après une semaine du 24 au 30 ne
+    ''' trouvait rien et passait sans un mot.
+    '''
+    ''' ELLES NE SONT PAS CLÉ PRIMAIRE, et ne le deviendront pas. DateActivite l'est pour
+    ''' T_HistoriqueWU, T_PieceWU et T_TraitementWU, plus leurs archives : changer cela
+    ''' demanderait une reprise de toute la base en production pour un gain nul — une période
+    ''' est désignée sans ambiguïté par son premier jour, dès lors que deux périodes qui se
+    ''' chevauchent ne peuvent plus être comptabilisées l'une après l'autre sans avertissement.
+    '''
+    ''' VIDES POUR UNE JOURNÉE DÉJÀ COMPTABILISÉE avant cette version : rien ne les reconstitue
+    ''' rétroactivement, et le contrôle de chevauchement retombe alors sur la seule DateActivite.
+    ''' </summary>
+    Public Property DebutPeriode As Date?
+    Public Property FinPeriode As Date?
+
+    ''' <summary>
+    ''' Le premier et le dernier jour couverts, pour qui veut les lire sans se demander si la
+    ''' période a été enregistrée. Sur un en-tête d'avant cette version, les deux valent la
+    ''' date d'activité : une journée seule est une période d'un jour.
+    ''' </summary>
+    Public ReadOnly Property PremierJour As Date
+        Get
+            If DebutPeriode.HasValue Then Return DebutPeriode.Value.Date
+            Return DateActivite.Date
+        End Get
+    End Property
+
+    Public ReadOnly Property DernierJour As Date
+        Get
+            If FinPeriode.HasValue Then Return FinPeriode.Value.Date
+            Return PremierJour
+        End Get
+    End Property
 
 #End Region
 

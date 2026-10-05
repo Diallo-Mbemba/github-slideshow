@@ -46,6 +46,59 @@ Public NotInheritable Class TraitementRepository
         "TotalDebit, TotalCredit, EcartArrondi, CompteEcart, " &
         "ComptabilisePar, DateComptabilisation, VisePar, DateVisa, CommentaireVisa"
 
+    ''' <summary>
+    ''' Vrai si la table porte les deux colonnes de période. Nothing tant que la question n'a
+    ''' pas été posée : la distinction compte, Faux signifierait « vérifié, elles n'y sont pas ».
+    ''' </summary>
+    Private Shared _periodeDisponible As Boolean?
+
+    ''' <summary>Fait reposer la question. À appeler quand la connexion change de base.</summary>
+    Public Shared Sub Oublier()
+        _periodeDisponible = Nothing
+    End Sub
+
+    ''' <summary>
+    ''' La table porte-t-elle DebutPeriode et FinPeriode ?
+    '''
+    ''' LA QUESTION SE POSE PARCE QUE LA TABLE EXISTE DÉJÀ EN PRODUCTION. Son CREATE TABLE est
+    ''' ignoré au profit de celle qui est là, et les deux colonnes ne sont posées que par
+    ''' l'ALTER de rattrapage du script d'installation. Tant qu'il n'a pas été joué,
+    ''' l'application doit continuer à travailler sans la période — elle ne doit pas refuser
+    ''' d'enregistrer une journée parce qu'un script d'évolution est en retard.
+    '''
+    ''' UN ÉCHEC DE LECTURE N'EST PAS MIS EN CACHE : base injoignable au démarrage puis
+    ''' joignable ensuite, une réponse « non » retenue priverait de période toute la session.
+    ''' </summary>
+    Public Shared Function PeriodeDisponible() As Boolean
+
+        If _periodeDisponible.HasValue Then Return _periodeDisponible.Value
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+                _periodeDisponible = WURepository.ColonneExiste(connexion, Nothing, TABLE, "DebutPeriode")
+            End Using
+
+        Catch ex As SqlException
+            Return False
+
+        Catch ex As InvalidOperationException
+            Return False
+        End Try
+
+        Return _periodeDisponible.Value
+    End Function
+
+    ''' <summary>
+    ''' Les colonnes à lire : les fixes, plus celles de période quand la base les porte.
+    ''' Les demander à une base qui ne les a pas ferait échouer la lecture entière.
+    ''' </summary>
+    Private Shared Function ColonnesLues() As String
+
+        If PeriodeDisponible() Then Return COLONNES & ", DebutPeriode, FinPeriode"
+        Return COLONNES
+    End Function
+
 #Region "Écriture"
 
     ''' <summary>
@@ -67,16 +120,26 @@ Public NotInheritable Class TraitementRepository
 
         Const suppression As String = "DELETE FROM " & TABLE & " WHERE DateActivite = @jour"
 
-        Const insertion As String =
+        ' LA PÉRIODE N'EST ÉCRITE QUE SI LA BASE LA PORTE. La table existe en production : son
+        ' CREATE TABLE est ignoré, et les deux colonnes ne viennent que de l'ALTER de
+        ' rattrapage du script d'installation. Tant qu'il n'a pas été joué, la journée
+        ' s'enregistre sans sa période plutôt que pas du tout — c'est l'opération du jour,
+        ' elle ne s'arrête pas parce qu'un script d'évolution est en retard.
+        Dim avecPeriode As Boolean =
+            WURepository.ColonneExiste(connexion, transaction, TABLE, "DebutPeriode")
+
+        Dim insertion As String =
             "INSERT INTO " & TABLE & " (DateActivite, DateValeur, NumeroLot, " &
             "FichierActivite, EmpreinteActivite, FichierReglement, EmpreinteReglement, " &
             "NombrePdv, NombreSousAgents, NombreAgences, NombreEcartes, " &
             "NombreEnvois, NombrePaiements, NombreAnnulations, " &
             "TotalDebit, TotalCredit, EcartArrondi, CompteEcart, " &
-            "ComptabilisePar, DateComptabilisation) " &
+            "ComptabilisePar, DateComptabilisation" &
+            If(avecPeriode, ", DebutPeriode, FinPeriode", String.Empty) & ") " &
             "VALUES (@jour, @valeur, @lot, @fichierA, @empreinteA, @fichierR, @empreinteR, " &
             "@pdv, @sousAgents, @agences, @ecartes, @envois, @paiements, @annulations, " &
-            "@debit, @credit, @ecart, @compteEcart, @auteur, GETDATE())"
+            "@debit, @credit, @ecart, @compteEcart, @auteur, GETDATE()" &
+            If(avecPeriode, ", @debutPeriode, @finPeriode", String.Empty) & ")"
 
         ' Le visa n'est PAS repris : recomptabiliser une journée l'efface, et c'est voulu.
         Using commande As New SqlCommand(suppression, connexion, transaction)
@@ -113,6 +176,17 @@ Public NotInheritable Class TraitementRepository
             commande.Parameters.Add("@compteEcart", SqlDbType.NVarChar, 50).Value = Texte(traitement.CompteEcart)
 
             commande.Parameters.Add("@auteur", SqlDbType.NVarChar, 50).Value = SessionWU.Auteur
+
+            If avecPeriode Then
+
+                commande.Parameters.Add("@debutPeriode", SqlDbType.Date).Value =
+                    If(traitement.DebutPeriode.HasValue,
+                       CType(traitement.DebutPeriode.Value.Date, Object), DBNull.Value)
+
+                commande.Parameters.Add("@finPeriode", SqlDbType.Date).Value =
+                    If(traitement.FinPeriode.HasValue,
+                       CType(traitement.FinPeriode.Value.Date, Object), DBNull.Value)
+            End If
 
             commande.ExecuteNonQuery()
         End Using
@@ -227,7 +301,7 @@ Public NotInheritable Class TraitementRepository
         messageErreur = String.Empty
 
         Dim requete As String =
-            "SELECT " & COLONNES & " FROM " & TABLE & " WHERE DateActivite = @jour"
+            "SELECT " & ColonnesLues() & " FROM " & TABLE & " WHERE DateActivite = @jour"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -270,7 +344,7 @@ Public NotInheritable Class TraitementRepository
         Dim resultat As New List(Of TraitementJourneeWU)()
 
         Dim requete As String =
-            "SELECT " & COLONNES & " FROM " & TABLE & " WHERE VisePar IS NULL ORDER BY DateActivite"
+            "SELECT " & ColonnesLues() & " FROM " & TABLE & " WHERE VisePar IS NULL ORDER BY DateActivite"
 
         Try
             Using connexion As SqlConnection = WURepository.CreerConnexion()
@@ -293,6 +367,77 @@ Public NotInheritable Class TraitementRepository
             messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
                                MESSAGE_TABLE_ABSENTE,
                                $"Lecture des journées à viser impossible : {ex.Message}")
+
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return resultat
+    End Function
+
+    ''' <summary>
+    ''' Les journées déjà comptabilisées dont la période CHEVAUCHE celle qu'on s'apprête à
+    ''' comptabiliser. Liste vide s'il n'y en a aucune.
+    '''
+    ''' CE CONTRÔLE N'EXISTAIT PAS, ET L'ÉCRAN LE PROMETTAIT DÉJÀ. Avant de comptabiliser, il
+    ''' avertit : « ne chargez pas ensuite un rapport d'une journée déjà comprise dans cette
+    ''' période, elle serait comptabilisée deux fois ». Mais il ne cherchait qu'une
+    ''' comptabilisation à la DATE D'ACTIVITÉ. Recharger le 24/09 seul après une semaine
+    ''' comptabilisée du 24 au 30 ne trouvait rien, et passait sans un mot : les six journées
+    ''' étaient enregistrées sous la seule date du premier jour, et les cinq autres restaient
+    ''' invisibles à toute recherche.
+    '''
+    ''' DEUX PÉRIODES SE CHEVAUCHENT quand chacune commence avant que l'autre ne finisse. Les
+    ''' bornes sont incluses : une semaine qui finit le 30 et une autre qui commence le 30
+    ''' partagent bien une journée.
+    '''
+    ''' UNE JOURNÉE ENREGISTRÉE AVANT CETTE VERSION n'a pas de période : ISNULL la ramène à sa
+    ''' date d'activité, c'est-à-dire à une période d'un seul jour. Le contrôle reste donc
+    ''' exact pour les journées simples, et seulement aveugle aux anciennes semaines — qu'il
+    ''' n'aurait de toute façon pas pu voir.
+    ''' </summary>
+    Public Shared Function PeriodesQuiChevauchent(debut As Date, fin As Date,
+                                                  ByRef messageErreur As String) As List(Of TraitementJourneeWU)
+
+        messageErreur = String.Empty
+        Dim resultat As New List(Of TraitementJourneeWU)()
+
+        Dim premier As Date = If(debut <= fin, debut.Date, fin.Date)
+        Dim dernier As Date = If(debut <= fin, fin.Date, debut.Date)
+
+        Dim filtre As String =
+            If(PeriodeDisponible(),
+               "ISNULL(FinPeriode, DateActivite) >= @debut AND ISNULL(DebutPeriode, DateActivite) <= @fin",
+               "DateActivite >= @debut AND DateActivite <= @fin")
+
+        Dim requete As String =
+            "SELECT " & ColonnesLues() & " FROM " & TABLE & " WHERE " & filtre & " ORDER BY DateActivite"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                If Not WURepository.ColonneExiste(connexion, Nothing, TABLE, "DateActivite") Then
+                    Return resultat
+                End If
+
+                Using commande As New SqlCommand(requete, connexion)
+
+                    commande.Parameters.Add("@debut", SqlDbType.Date).Value = premier
+                    commande.Parameters.Add("@fin", SqlDbType.Date).Value = dernier
+
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+                            resultat.Add(Construire(lecteur))
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = If(ex.Number = ERREUR_TABLE_ABSENTE,
+                               MESSAGE_TABLE_ABSENTE,
+                               $"Recherche des journées déjà comptabilisées impossible : {ex.Message}")
 
         Catch ex As InvalidOperationException
             messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
@@ -327,6 +472,8 @@ Public NotInheritable Class TraitementRepository
             .VisePar = LireChaine(lecteur, "VisePar"),
             .DateVisa = LireDate(lecteur, "DateVisa"),
             .CommentaireVisa = LireChaine(lecteur, "CommentaireVisa"),
+            .DebutPeriode = LireDateSiPresente(lecteur, "DebutPeriode"),
+            .FinPeriode = LireDateSiPresente(lecteur, "FinPeriode"),
             .Enregistre = True
         }
     End Function
@@ -334,6 +481,32 @@ Public NotInheritable Class TraitementRepository
 #End Region
 
 #Region "Utilitaires de lecture"
+
+    ''' <summary>
+    ''' Une date que le lecteur ne porte pas forcément : Nothing si la colonne est absente du
+    ''' jeu de résultats, et non une exception.
+    '''
+    ''' GetOrdinal LÈVE une IndexOutOfRangeException sur une colonne inconnue. Comme la liste
+    ''' des colonnes lues dépend de ce que la base porte, demander la période sans vérifier
+    ''' ferait échouer la lecture de toutes les journées sur une base en retard d'un script.
+    ''' </summary>
+    Private Shared Function LireDateSiPresente(lecteur As SqlDataReader, colonne As String) As Date?
+
+        If Not ColonneDansLecteur(lecteur, colonne) Then Return Nothing
+        Return LireDate(lecteur, colonne)
+    End Function
+
+    ''' <summary>Vrai si le jeu de résultats porte cette colonne, quelle que soit la casse.</summary>
+    Private Shared Function ColonneDansLecteur(lecteur As SqlDataReader, colonne As String) As Boolean
+
+        For index As Integer = 0 To lecteur.FieldCount - 1
+            If String.Equals(lecteur.GetName(index), colonne, StringComparison.OrdinalIgnoreCase) Then
+                Return True
+            End If
+        Next
+
+        Return False
+    End Function
 
     Private Shared Function LireChaine(lecteur As SqlDataReader, colonne As String) As String
         Dim index As Integer = lecteur.GetOrdinal(colonne)

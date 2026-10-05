@@ -142,6 +142,13 @@ Public Class FrmCompensationWU
 
         Dim entete As New TraitementJourneeWU() With {
             .DateActivite = jour,
+
+            ' LA PÉRIODE RÉELLEMENT COUVERTE, et non la seule journée qui classe la pièce.
+            ' C'est elle qui rendra vrai l'avertissement affiché avant de comptabiliser : sans
+            ' elle, recharger une journée déjà comprise dans une semaine passait sans un mot.
+            .DebutPeriode = PremierJourDuRapport(),
+            .FinPeriode = DernierJourDuRapport(),
+
             .DateValeur = CalendrierWU.ProchainJourOuvre(jour),
             .NumeroLot = CoreBankingService.NumeroDeLot(jour),
             .FichierActivite = NomDuRapport(_infosActivite, _cheminActivite),
@@ -716,6 +723,48 @@ Public Class FrmCompensationWU
     End Function
 
     ''' <summary>
+    ''' Les journées déjà comptabilisées dont la période recouvre celle qu'on s'apprête à
+    ''' comptabiliser — hors celle qui porte la même date de classement, qui est un simple
+    ''' remplacement et que l'écran annonce déjà par ailleurs.
+    '''
+    ''' Une erreur de lecture rend une liste vide : on ne bloque pas la compense du jour parce
+    ''' que la base n'a pas pu répondre, et les trois autres contrôles restent en place.
+    ''' </summary>
+    Private Function PeriodesChevauchantes(jour As Date) As List(Of TraitementJourneeWU)
+
+        Dim debut As Date? = PremierJourDuRapport()
+        Dim fin As Date? = DernierJourDuRapport()
+
+        If Not debut.HasValue OrElse Not fin.HasValue Then Return New List(Of TraitementJourneeWU)()
+
+        Dim messageErreur As String = String.Empty
+        Dim trouvees As List(Of TraitementJourneeWU) =
+            TraitementRepository.PeriodesQuiChevauchent(debut.Value, fin.Value, messageErreur)
+
+        Return trouvees.Where(Function(t) t.DateActivite.Date <> jour.Date).ToList()
+    End Function
+
+    ''' <summary>
+    ''' Premier et dernier jour RÉELLEMENT couverts par le rapport chargé — les bornes de la
+    ''' période, pas l'étiquette de la pièce.
+    '''
+    ''' Ils sortent de _journeesDuRapport, qui est trié : la même source que la liste affichée
+    ''' dans la boîte de dialogue. Nothing si aucune date n'a pu être lue, auquel cas la
+    ''' période n'est pas enregistrée plutôt qu'inventée.
+    ''' </summary>
+    Private Function PremierJourDuRapport() As Date?
+
+        If _journeesDuRapport Is Nothing OrElse _journeesDuRapport.Count = 0 Then Return Nothing
+        Return _journeesDuRapport(0)
+    End Function
+
+    Private Function DernierJourDuRapport() As Date?
+
+        If _journeesDuRapport Is Nothing OrElse _journeesDuRapport.Count = 0 Then Return Nothing
+        Return _journeesDuRapport(_journeesDuRapport.Count - 1)
+    End Function
+
+    ''' <summary>
     ''' Dernière journée du rapport, quand il en couvre plusieurs. Nothing sinon : la pièce
     ''' d'une seule journée n'a pas à s'intituler « du X au X ».
     ''' </summary>
@@ -1173,11 +1222,39 @@ Public Class FrmCompensationWU
 
         Dim attente As DemandeWU = AnnulationRepository.DemandeEnAttente(jour)
 
-        If existante Is Nothing AndAlso production Is Nothing AndAlso attente Is Nothing Then
+        ' LE CHEVAUCHEMENT EST D'UNE AUTRE NATURE QUE LES TROIS AU-DESSUS. Ceux-là annoncent
+        ' qu'on REMPLACE la même journée — l'ancienne version disparaît proprement. Celui-ci
+        ' annonce qu'on va comptabiliser une SECONDE FOIS des journées déjà passées sous une
+        ' autre date de classement : rien ne les remplace, elles s'ajoutent.
+        Dim chevauchements As List(Of TraitementJourneeWU) = PeriodesChevauchantes(jour)
+
+        If existante Is Nothing AndAlso production Is Nothing AndAlso attente Is Nothing AndAlso
+           chevauchements.Count = 0 Then
             Return True
         End If
 
         Dim texte As New System.Text.StringBuilder()
+
+        If chevauchements.Count > 0 Then
+
+            texte.AppendLine("ATTENTION — DOUBLE COMPTABILISATION.")
+            texte.AppendLine()
+            texte.AppendLine($"La période chargée ({PremierJourDuRapport():dd/MM/yyyy} au " &
+                             $"{DernierJourDuRapport():dd/MM/yyyy}) recouvre des journées DÉJÀ " &
+                             "comptabilisées sous une autre date :")
+            texte.AppendLine()
+
+            For Each deja As TraitementJourneeWU In chevauchements
+                texte.AppendLine($"     classée au {deja.DateActivite:dd/MM/yyyy} — période du " &
+                                 $"{deja.PremierJour:dd/MM/yyyy} au {deja.DernierJour:dd/MM/yyyy}" &
+                                 If(deja.ComptabilisePar.Length > 0, $", par {deja.ComptabilisePar}", String.Empty))
+            Next
+
+            texte.AppendLine()
+            texte.AppendLine("Ces journées-là ne seront PAS remplacées : elles s'ajouteront. " &
+                             "Les montants partiraient deux fois au core banking.")
+            texte.AppendLine()
+        End If
 
         If existante IsNot Nothing Then
             texte.AppendLine(existante.Avertissement)
@@ -1199,12 +1276,21 @@ Public Class FrmCompensationWU
             texte.AppendLine()
         End If
 
-        texte.AppendLine("Générer de nouveau REMPLACE intégralement la version précédente : " &
-                         "historique, détail des transactions et pièce comptable.")
-        texte.AppendLine()
+        ' Le remplacement n'est annoncé QUE s'il y a quelque chose à remplacer. Un
+        ' chevauchement seul ne remplace rien — le dire ici rassurerait à tort.
+        If existante IsNot Nothing Then
+            texte.AppendLine("Générer de nouveau REMPLACE intégralement la version précédente : " &
+                             "historique, détail des transactions et pièce comptable.")
+            texte.AppendLine()
+        End If
+
         texte.Append("Continuer ?")
 
-        Return MessageBox.Show(Me, texte.ToString(), "Journée déjà comptabilisée",
+        Dim titre As String = If(chevauchements.Count > 0,
+                                 "Période déjà comptabilisée — risque de double comptabilisation",
+                                 "Journée déjà comptabilisée")
+
+        Return MessageBox.Show(Me, texte.ToString(), titre,
                                MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                                MessageBoxDefaultButton.Button2) = DialogResult.Yes
     End Function

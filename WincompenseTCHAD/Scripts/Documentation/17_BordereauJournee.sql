@@ -55,6 +55,8 @@ BEGIN
     (
         DateActivite        DATE            NOT NULL,   -- Journée comptabilisée
         DateValeur          DATE            NULL,       -- Jour où les écritures sont passées
+        DebutPeriode        DATE            NULL,       -- Premier jour couvert par les rapports
+        FinPeriode          DATE            NULL,       -- Dernier jour couvert
         NumeroLot           NVARCHAR(10)    NULL,
 
         /*
@@ -127,6 +129,8 @@ BEGIN
 
         DateActivite        DATE            NOT NULL,
         DateValeur          DATE            NULL,
+        DebutPeriode        DATE            NULL,       -- Premier jour couvert par les rapports
+        FinPeriode          DATE            NULL,       -- Dernier jour couvert
         NumeroLot           NVARCHAR(10)    NULL,
 
         FichierActivite     NVARCHAR(255)   NULL,
@@ -228,8 +232,60 @@ BEGIN
 END
 GO
 
+
 -- =========================================================================
--- 5. Contrôle
+-- 5. La période couverte, sur une base antérieure
+--
+--    La table existe déjà en production : son CREATE TABLE ci-dessus est ignoré, et ces deux
+--    colonnes ne seraient donc JAMAIS posées. Elles le sont ici, chacune gardée par
+--    sys.columns.
+--
+--    POURQUOI ELLES EXISTENT. La banque liquide à la semaine : un rapport porte six journées,
+--    et l'en-tête n'en gardait qu'une. L'avertissement affiché avant de comptabiliser — « ne
+--    chargez pas ensuite un rapport d'une journée déjà comprise dans cette période » — était
+--    une promesse que le code ne pouvait pas tenir : recharger le 24/09 seul après une semaine
+--    du 24 au 30 ne trouvait rien, et passait sans un mot.
+--
+--    ELLES NE SONT PAS CLÉ. DateActivite reste la clé primaire — ici, dans T_HistoriqueWU et
+--    dans T_PieceWU. Une période est désignée sans ambiguïté par son premier jour, dès lors
+--    que deux périodes qui se chevauchent ne peuvent plus passer l'une après l'autre sans
+--    avertissement.
+--
+--    NULL SUR LES JOURNÉES DÉJÀ COMPTABILISÉES : rien ne les reconstitue rétroactivement, et
+--    le contrôle de chevauchement les ramène alors à leur seule date d'activité, c'est-à-dire
+--    à une période d'un jour.
+-- =========================================================================
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_TraitementWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_TraitementWU') AND name = N'DebutPeriode')
+BEGIN
+    ALTER TABLE dbo.T_TraitementWU
+        ADD DebutPeriode DATE NULL,
+            FinPeriode   DATE NULL;
+
+    PRINT 'Colonnes DebutPeriode et FinPeriode ajoutées à T_TraitementWU.';
+END
+ELSE
+    PRINT 'T_TraitementWU : colonnes de période déjà présentes ou table absente.';
+GO
+
+-- L'ARCHIVE LES PORTE AUSSI. Une journée annulée emporte la façon dont elle avait été
+-- traitée ; sans ces deux colonnes, elle perdrait en chemin ce qu'elle couvrait au juste.
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_TraitementAnnuleWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_TraitementAnnuleWU') AND name = N'DebutPeriode')
+BEGIN
+    ALTER TABLE dbo.T_TraitementAnnuleWU
+        ADD DebutPeriode DATE NULL,
+            FinPeriode   DATE NULL;
+
+    PRINT 'Colonnes DebutPeriode et FinPeriode ajoutées à T_TraitementAnnuleWU.';
+END
+ELSE
+    PRINT 'T_TraitementAnnuleWU : colonnes de période déjà présentes ou table absente.';
+GO
+-- =========================================================================
+-- 6. Contrôle
 -- =========================================================================
 SELECT  journees    = COUNT(*),
         visees      = SUM(CASE WHEN VisePar IS NOT NULL THEN 1 ELSE 0 END),
