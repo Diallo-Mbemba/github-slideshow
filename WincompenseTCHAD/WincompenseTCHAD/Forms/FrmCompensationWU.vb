@@ -140,15 +140,20 @@ Public Class FrmCompensationWU
 
         Dim jour As Date = _dateActivite.Value
 
+        ' LA PÉRIODE RÉELLEMENT COUVERTE part avec l'en-tête, et non la seule journée qui
+        ' classe la pièce. C'est elle qui rend vrai l'avertissement affiché avant de
+        ' comptabiliser : sans elle, recharger une journée déjà comprise dans une semaine
+        ' passait sans un mot.
+        '
+        ' CES DEUX LIGNES SONT COMMENTÉES ICI, ET NON DANS L'INITIALISEUR CI-DESSOUS. Visual
+        ' Basic refuse un commentaire à l'intérieur d'un With { } : la ligne suivante n'est
+        ' plus lue comme une affectation de membre, et le compilateur rend BC30985 — « le nom
+        ' du champ initialisé doit commencer par un point » — puis une quinzaine d'erreurs en
+        ' cascade sur tout le reste du bloc.
         Dim entete As New TraitementJourneeWU() With {
             .DateActivite = jour,
-
-            ' LA PÉRIODE RÉELLEMENT COUVERTE, et non la seule journée qui classe la pièce.
-            ' C'est elle qui rendra vrai l'avertissement affiché avant de comptabiliser : sans
-            ' elle, recharger une journée déjà comprise dans une semaine passait sans un mot.
             .DebutPeriode = PremierJourDuRapport(),
             .FinPeriode = DernierJourDuRapport(),
-
             .DateValeur = CalendrierWU.ProchainJourOuvre(jour),
             .NumeroLot = CoreBankingService.NumeroDeLot(jour),
             .FichierActivite = NomDuRapport(_infosActivite, _cheminActivite),
