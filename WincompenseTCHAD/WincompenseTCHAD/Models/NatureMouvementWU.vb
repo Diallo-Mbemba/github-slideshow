@@ -2,7 +2,7 @@ Option Strict On
 Option Explicit On
 
 ''' <summary>
-''' LES TREIZE NATURES DE MOUVEMENT D'UNE PIÈCE COMPTABLE.
+''' LES QUATORZE NATURES DE MOUVEMENT D'UNE PIÈCE COMPTABLE.
 '''
 ''' Une pièce porte douze lignes par point de vente, plus une treizième posée en fin de pièce
 ''' pour absorber l'écart d'arrondi global. Ce que chaque ligne EST se lit aujourd'hui dans
@@ -59,12 +59,26 @@ Public Enum NatureMouvementWU
     ''' <summary>
     ''' Écart d'arrondi, posé en fin de pièce sur le compte inter bancaire.
     '''
-    ''' ELLE N'EST PAS COMME LES DOUZE AUTRES, et c'est écrit dans NarrativesWU : elle ne se
-    ''' rattache à aucun point de vente, le repère principal du modèle global — sa période,
-    ''' elle, est bien celle de la pièce.
-    ''' Elle garde donc TOUJOURS son libellé propre, dans les deux modes.
+    ''' ELLE N'EST PAS COMME LES AUTRES, et c'est écrit dans NarrativesWU : elle ne se
+    ''' rattache à aucun point de vente, le repère principal du modèle global. Elle garde donc
+    ''' TOUJOURS son libellé propre, dans les deux modes.
     ''' </summary>
     EcartArrondi = 13
+
+    ''' <summary>
+    ''' Ligne de mouvement d'une AGENCE PROPRE, posée sur le compte inter bancaire.
+    '''
+    ''' POURQUOI ELLE EST DISTINCTE DE Mouvement. Une agence propre n'a pas de compte de
+    ''' compensation dans les livres de la banque : sa ligne va sur le compte inter bancaire,
+    ''' que TOUTES les agences propres partagent. Le libellé de ce compte est celui du compte
+    ''' — « VIREMENTS INTER-BANCAIRES EMIS » — et non le nom de l'agence, qui ferait croire à
+    ''' un compte qui lui serait propre. La banque l'a relevé le 07/10/2026.
+    '''
+    ''' AJOUTÉE À LA FIN, ET NON INSÉRÉE : renuméroter l'énumération réaffecterait les
+    ''' libellés déjà saisis par la banque à d'autres lignes de la pièce. Son rang dans
+    ''' Toutes(), lui, la place à côté de Mouvement, où l'écran la lit.
+    ''' </summary>
+    MouvementInterBancaire = 14
 End Enum
 
 ''' <summary>
@@ -80,12 +94,13 @@ Public NotInheritable Class NaturesMouvementWU
     Private Sub New()
     End Sub
 
-    ''' <summary>Les treize natures, dans l'ordre où elles apparaissent sur la pièce.</summary>
+    ''' <summary>Les quatorze natures, dans l'ordre où elles apparaissent sur la pièce.</summary>
     Public Shared Function Toutes() As List(Of NatureMouvementWU)
 
         Dim liste As New List(Of NatureMouvementWU)
 
         liste.Add(NatureMouvementWU.Mouvement)
+        liste.Add(NatureMouvementWU.MouvementInterBancaire)
         liste.Add(NatureMouvementWU.CompteCourant)
         liste.Add(NatureMouvementWU.CommissionTransfertBanque)
         liste.Add(NatureMouvementWU.CommissionPaiementBanque)
@@ -107,6 +122,7 @@ Public NotInheritable Class NaturesMouvementWU
 
         Select Case nature
             Case NatureMouvementWU.Mouvement : Return "MOUVEMENT"
+            Case NatureMouvementWU.MouvementInterBancaire : Return "MOUVEMENT_INTER_BANCAIRE"
             Case NatureMouvementWU.CompteCourant : Return "COMPTE_COURANT"
             Case NatureMouvementWU.CommissionTransfertBanque : Return "COMMISSION_TRANSFERT_BANQUE"
             Case NatureMouvementWU.CommissionPaiementBanque : Return "COMMISSION_PAIEMENT_BANQUE"
@@ -148,7 +164,8 @@ Public NotInheritable Class NaturesMouvementWU
     Public Shared Function Intitule(nature As NatureMouvementWU) As String
 
         Select Case nature
-            Case NatureMouvementWU.Mouvement : Return "Mouvement du point de vente"
+            Case NatureMouvementWU.Mouvement : Return "Mouvement d'un sous-agent"
+            Case NatureMouvementWU.MouvementInterBancaire : Return "Mouvement d'une agence propre (compte inter bancaire)"
             Case NatureMouvementWU.CompteCourant : Return "Contrepartie compte courant WU"
             Case NatureMouvementWU.CommissionTransfertBanque : Return "Commission transfert — part banque"
             Case NatureMouvementWU.CommissionPaiementBanque : Return "Commission paiement — part banque"
@@ -183,6 +200,7 @@ Public NotInheritable Class NaturesMouvementWU
 
         Select Case nature
             Case NatureMouvementWU.Mouvement : Return ConstantesWU.NARRATIVE_MOUVEMENT_DEFAUT
+            Case NatureMouvementWU.MouvementInterBancaire : Return ConstantesWU.NARRATIVE_MOUVEMENT_INTER_BANCAIRE_DEFAUT
             Case NatureMouvementWU.CompteCourant : Return ConstantesWU.NARRATIVE_COMPTE_COURANT_DEFAUT
             Case NatureMouvementWU.CommissionTransfertBanque : Return ConstantesWU.NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT
             Case NatureMouvementWU.CommissionPaiementBanque : Return ConstantesWU.NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT
@@ -211,7 +229,7 @@ Public NotInheritable Class NaturesMouvementWU
     ''' La clé sous laquelle le journal enregistre le changement d'un libellé par nature.
     '''
     ''' Le journal est UNIQUE pour tout le paramétrage de narrative : le modèle global, le
-    ''' mode, et les treize natures. Préfixer évite qu'une nature nommée « TVA » entre en
+    ''' mode, et les quatorze natures. Préfixer évite qu'une nature nommée « TVA » entre en
     ''' collision avec une option qui s'appellerait ainsi un jour.
     ''' </summary>
     Public Shared Function CleDeJournal(nature As NatureMouvementWU) As String

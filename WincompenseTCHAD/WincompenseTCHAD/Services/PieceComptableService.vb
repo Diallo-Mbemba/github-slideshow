@@ -188,7 +188,7 @@ Public NotInheritable Class PieceComptableService
         ' LE PARAMÉTRAGE DE NARRATIVE, lu UNE FOIS pour toute la pièce, et pour la même raison
         ' que les comptes juste au-dessus : une pièce ne doit jamais mélanger deux paramétrages
         ' si quelqu'un enregistrait un libellé pendant sa génération. L'objet rendu est
-        ' immuable, et la lecture ne coûte rien — le mode, le modèle global et les treize
+        ' immuable, et la lecture ne coûte rien — le mode, le modèle global et les quatorze
         ' libellés par nature sont gardés le temps de la session.
         Dim narratives As NarrativesWU = NarrativeRepository.EnVigueur()
 
@@ -225,12 +225,22 @@ Public NotInheritable Class PieceComptableService
             ' La branche Else n'est atteinte QUE par une agence propre : un sous-agent sans
             ' compte de compensation n'est pas comptabilisable et a déjà été écarté plus haut
             ' par EstComptabilisable, tout comme un Account absent du paramétrage.
+            ' SA NATURE SUIT SON COMPTE, et non le type du point de vente : c'est le COMPTE
+            ' qui donne son libellé à la ligne. Sur un compte de compensation, qui n'appartient
+            ' qu'à ce sous-agent, la ligne porte son nom ; sur le compte inter bancaire, que
+            ' toutes les agences propres partagent, elle porte le nom DU COMPTE — « VIREMENTS
+            ' INTER-BANCAIRES EMIS ». La banque l'a relevé le 07/10/2026 : nommer ce compte
+            ' d'après l'agence ferait croire à un compte qui lui serait propre.
             Dim compteMouvement As String
+            Dim natureMouvement As NatureMouvementWU
+
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCompense) Then
                 compteMouvement = calc.CompteCompense
+                natureMouvement = NatureMouvementWU.Mouvement
             Else
                 compteMouvement = comptes.CompteInterBancaire
+                natureMouvement = NatureMouvementWU.MouvementInterBancaire
             End If
 
             ' LES LIBELLÉS DES LIGNES DE CE POINT DE VENTE, un par nature de mouvement.
@@ -245,7 +255,7 @@ Public NotInheritable Class PieceComptableService
             ' que la RAISON reprend en bas de pièce. Les libellés, eux, ne la voient pas.
             '
             ' La banque garde la main : dans l'écran « Narrative comptable » elle personnalise
-            ' chacun des treize libellés, et peut au besoin basculer la pièce elle aussi sur un
+            ' chacun des quatorze libellés, et peut au besoin basculer la pièce elle aussi sur un
             ' seul modèle. Le code n'en sait rien et n'a pas à le savoir — il demande le
             ' libellé de la nature qu'il pose.
             '
@@ -274,7 +284,7 @@ Public NotInheritable Class PieceComptableService
             CalculerEcartArrondi(calc)
 
             ' 1) Ligne de mouvement (compte de compensation du point de vente).
-            AjouterLigneSigneAuto(dt, compteMouvement, libelles(NatureMouvementWU.Mouvement),
+            AjouterLigneSigneAuto(dt, compteMouvement, libelles(natureMouvement),
                                   netMouvement, calc.CodeAgence, narratifPdv)
 
             ' 2) Contrepartie sur le compte courant WU (part nette revenant à la banque).
@@ -556,13 +566,10 @@ Public NotInheritable Class PieceComptableService
         ' point de vente : le modèle global la réduirait à « LD WU ACTIVITE ». La banque peut
         ' l'éditer, dans l'onglet des libellés par nature.
         '
-        ' ELLE PORTE LA PÉRIODE, COMME LES DOUZE AUTRES. Elle n'appartient à aucun point de
-        ' vente, mais elle appartient bien à CETTE pièce-ci, et une ligne d'écart sans date
-        ' serait la seule du bordereau à ne pas dire ce qu'elle couvre.
-        '
-        ' LES TROIS AUTRES REPÈRES SONT VIDES, et c'est exact : il n'y a ici ni désignation,
-        ' ni Account, ni code agence. Un repère vide ne laisse pas de trou dans la phrase — il
-        ' emporte un espace avec lui.
+        ' LA PÉRIODE LUI EST PASSÉE, bien qu'aucun libellé ne la porte par défaut : le repère
+        ' {PERIODE} reste OFFERT à la banque dans l'écran de paramétrage, et un repère qu'on
+        ' propose mais que la pièce rendrait vide serait un piège silencieux. Les trois autres
+        ' sont vides, et c'est exact : il n'y a ici ni désignation, ni Account, ni code agence.
         '
         ' PÉRIODE ABSENTE : l'appelant qui ne la fournit pas obtient le libellé sans elle,
         ' plutôt qu'une pièce qui ne sort pas. C'est le cas des deux écrans qui n'appellent

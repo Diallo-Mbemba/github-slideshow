@@ -1060,10 +1060,24 @@ Public NotInheritable Class PieceExcelWU
     ''' Le code retenu est celui de l'agence de rattachement, celui-là même qui alimente la
     ''' colonne ACBRN du fichier destiné au core banking : une pièce et l'écriture qu'elle
     ''' justifie doivent porter la même agence, sans quoi le rapprochement est à refaire.
+    '''
+    ''' UNE AGENCE PROPRE NE PORTE QUE SON CODE — « Agence  S51 ». Elle EST l'agence : écrire
+    ''' « Agence  S51: ECOBANK TCHAD: AGP » redit en toutes lettres ce que le code désigne
+    ''' déjà, et la banque l'a demandé retiré le 07/10/2026.
+    '''
+    ''' UN SOUS-AGENT GARDE SA DÉSIGNATION, et il le faut : le code est celui de l'agence qui
+    ''' le PORTE, pas le sien. Sans son nom, deux sous-agents d'une même agence auraient la
+    ''' même ligne d'identification, et la banque a validé cette forme-là sur sa pièce du
+    ''' 08 au 14/09/2026.
     ''' </summary>
     Public Shared Function IntituleDe(calc As CalculWU) As String
 
         Dim code As String = If(String.IsNullOrWhiteSpace(calc.CodeAgence), calc.Account, calc.CodeAgence)
+
+        If Not String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) Then
+            Return $"Agence  {code}".Trim()
+        End If
+
         Return $"Agence  {code}: {calc.Designation}".Trim()
     End Function
 

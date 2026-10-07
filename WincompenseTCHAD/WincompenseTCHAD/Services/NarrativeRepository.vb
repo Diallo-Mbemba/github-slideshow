@@ -10,7 +10,7 @@ Imports System.Data.SqlClient
 '''
 ''' POURQUOI UNE TABLE, ALORS QUE LE MODÈLE GLOBAL TIENT DANS T_ParametreWU
 '''
-''' Treize natures feraient treize clés dans une table conçue pour des options, et personne
+''' Quatorze natures feraient quatorze clés dans une table conçue pour des options, et personne
 ''' ouvrant T_ParametreWU dans Management Studio ne verrait plus où sont les réglages de
 ''' procédure. Surtout : une table à elle permet de dire ce qu'une clé/valeur ne dit pas —
 ''' qui a saisi ce libellé-là, et quand.
@@ -80,7 +80,7 @@ Public NotInheritable Class NarrativeRepository
 
     ''' <summary>
     ''' Le paramétrage en vigueur : le mode et le modèle global viennent de T_ParametreWU, les
-    ''' treize modèles de cette table.
+    ''' quatorze modèles de cette table.
     '''
     ''' C'EST LUI QU'UNE PIÈCE LIT, UNE FOIS, À SA GÉNÉRATION. L'objet rendu est immuable :
     ''' une pièce ne mélange jamais deux paramétrages parce que quelqu'un a enregistré un

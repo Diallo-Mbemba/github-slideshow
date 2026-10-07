@@ -1564,9 +1564,15 @@ GO
 -- que ce qu'elle veut changer.
 --
 -- La cle est le CODE de la nature, une chaine (NaturesMouvementWU.Code) : MOUVEMENT,
--- COMPTE_COURANT, COMMISSION_TRANSFERT_BANQUE, COMMISSION_PAIEMENT_BANQUE,
--- COMMISSION_ENVOI_BANQUE, COMMISSION_TRANSFERT_SA, COMMISSION_PAIEMENT_SA,
--- COMMISSION_ENVOI_SA, IMPOTS_TAXE_ENVOI, TVA, TTA_ENVOI, TTA_RECEPTION, ECART_ARRONDI.
+-- MOUVEMENT_INTER_BANCAIRE, COMPTE_COURANT, COMMISSION_TRANSFERT_BANQUE,
+-- COMMISSION_PAIEMENT_BANQUE, COMMISSION_ENVOI_BANQUE, COMMISSION_TRANSFERT_SA,
+-- COMMISSION_PAIEMENT_SA, COMMISSION_ENVOI_SA, IMPOTS_TAXE_ENVOI, TVA, TTA_ENVOI,
+-- TTA_RECEPTION, ECART_ARRONDI.
+--
+-- MOUVEMENT et MOUVEMENT_INTER_BANCAIRE sont la MEME ligne de piece, selon le compte ou elle
+-- tombe : le compte de compensation d'un sous-agent, qui n'est qu'a lui, ou le compte inter
+-- bancaire que toutes les agences propres partagent. Le second porte le nom DU COMPTE --
+-- « VIREMENTS INTER-BANCAIRES EMIS » -- et non celui du point de vente.
 -- Un entier aurait rendu la table illisible, et renumeroter l'enumeration du code aurait
 -- reaffecte silencieusement les libelles saisis a d'autres lignes de la piece.
 --

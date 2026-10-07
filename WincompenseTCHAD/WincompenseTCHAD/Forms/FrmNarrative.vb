@@ -33,10 +33,10 @@ Imports System.Windows.Forms
 ''' de compte. Le fichier core banking, lui, ne change pas : il porte ce modèle dans les deux
 ''' cas.
 '''
-''' RIEN À SAISIR POUR RETROUVER LA PIÈCE HABITUELLE. Les treize natures s'affichent avec le
+''' RIEN À SAISIR POUR RETROUVER LA PIÈCE HABITUELLE. Les quatorze natures s'affichent avec le
 ''' modèle qu'elles appliquent réellement — leur libellé historique tant qu'elles n'ont pas
 ''' été touchées — et seules celles que la banque modifie sont conservées. Une bascule qui
-''' réécrirait treize libellés d'un coup serait un piège : on ne découvre pas au grand livre
+''' réécrirait quatorze libellés d'un coup serait un piège : on ne découvre pas au grand livre
 ''' ce qu'un bouton radio a décidé.
 '''
 ''' L'ÉCRAN NE SE CONTENTE PAS DE RECUEILLIR UNE SAISIE
@@ -167,8 +167,8 @@ Public Class FrmNarrative
 
     ''' <summary>
     ''' Les modèles effectifs au chargement, nature par nature. Ils servent à n'écrire que ce
-    ''' qui a CHANGÉ : réenregistrer treize natures identiques ferait treize transactions pour
-    ''' rien, et l'écran est ouvert pour changer une ligne, pas treize.
+    ''' qui a CHANGÉ : réenregistrer quatorze natures identiques ferait quatorze transactions
+    ''' pour rien, et l'écran est ouvert pour changer une ligne, pas quatorze.
     ''' </summary>
     Private ReadOnly _naturesChargees As New Dictionary(Of NatureMouvementWU, String)
 
@@ -811,9 +811,9 @@ Public Class FrmNarrative
     End Sub
 
     ''' <summary>
-    ''' Contrôle les treize libellés, et nomme celui qui ne passe pas.
+    ''' Contrôle les quatorze libellés, et nomme celui qui ne passe pas.
     '''
-    ''' « Un modèle dépasse » ne serait pas une information : il y en a treize, et l'agent
+    ''' « Un modèle dépasse » ne serait pas une information : il y en a quatorze, et l'agent
     ''' chercherait lequel case par case.
     ''' </summary>
     Private Function ControlerLesNatures(ByRef messageErreur As String) As Boolean

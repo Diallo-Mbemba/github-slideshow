@@ -1137,9 +1137,9 @@ Public Class FrmCompensationWU
             Dim ecartPose As Long = 0L
             Dim comptePose As String = String.Empty
 
-            ' LA PÉRIODE EST PASSÉE, et c'est la MÊME que celle des douze autres lignes : la
-            ' ligne d'écart d'arrondi appartient à cette pièce-ci, et doit dire ce qu'elle
-            ' couvre comme les autres.
+            ' LA PÉRIODE EST PASSÉE, bien que le libellé de l'écart ne la porte pas par
+            ' défaut : le repère {PERIODE} reste offert à la banque dans l'écran de narrative,
+            ' et il doit alors rendre quelque chose.
             Dim pieceUtilisable As Boolean = PieceComptableService.VerifierEquilibrePiece(
                 dtPiece, messageControle, ecartPose, comptePose, _dateActivite, DerniereJournee)
 

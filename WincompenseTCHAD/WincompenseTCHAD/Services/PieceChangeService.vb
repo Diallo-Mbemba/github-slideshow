@@ -512,7 +512,7 @@ Public NotInheritable Class PieceChangeService
 
         ' LE NARRATIF VAUT LE LIBELLÉ, et ce n'est pas un remplissage : la pièce de change
         ' n'a qu'une phrase, la même pour ses lignes, et elle est déjà de la forme que la
-        ' banque veut lire. Les treize natures de la pièce Western Union ne la concernent pas.
+        ' banque veut lire. Les quatorze natures de la pièce Western Union ne la concernent pas.
         ligne("Narratif") = libelle
 
         table.Rows.Add(ligne)

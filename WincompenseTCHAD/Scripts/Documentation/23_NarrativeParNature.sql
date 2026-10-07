@@ -77,10 +77,15 @@ GO
 --    pièce. Les codes attendus sont ceux de NaturesMouvementWU.Code :
 --
 --        MOUVEMENT                     COMMISSION_TRANSFERT_SA     TVA
---        COMPTE_COURANT                COMMISSION_PAIEMENT_SA      TTA_ENVOI
---        COMMISSION_TRANSFERT_BANQUE   COMMISSION_ENVOI_SA         TTA_RECEPTION
---        COMMISSION_PAIEMENT_BANQUE    IMPOTS_TAXE_ENVOI           ECART_ARRONDI
+--        MOUVEMENT_INTER_BANCAIRE      COMMISSION_PAIEMENT_SA      TTA_ENVOI
+--        COMPTE_COURANT                COMMISSION_ENVOI_SA         TTA_RECEPTION
+--        COMMISSION_TRANSFERT_BANQUE   IMPOTS_TAXE_ENVOI           ECART_ARRONDI
+--        COMMISSION_PAIEMENT_BANQUE
 --        COMMISSION_ENVOI_BANQUE
+--
+--    MOUVEMENT et MOUVEMENT_INTER_BANCAIRE sont la MÊME ligne de pièce, selon le compte où
+--    elle tombe : le compte de compensation d'un sous-agent, ou le compte inter bancaire que
+--    toutes les agences propres partagent — lequel porte le nom DU COMPTE.
 --
 --    Un code que l'application ne connaît pas est IGNORÉ à la lecture, et la ligne concernée
 --    reprend le modèle global : une saisie à la main ne doit pas empêcher la pièce de sortir.

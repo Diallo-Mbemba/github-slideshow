@@ -18,15 +18,15 @@ Public Enum ModeNarrativeWU
     ''' <summary>
     ''' UN LIBELLÉ PAR NATURE DE MOUVEMENT : « COMPTE COURANT WESTERN UNION ETD »,
     ''' « Commission sur Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… C'EST LE MODE
-    ''' PAR DÉFAUT, celui de la pièce manuelle de la banque, suivi de la période. Pas de
-    ''' préfixe « LD » : il appartient à la narrative. Une nature laissée vide retombe sur ce
-    ''' libellé-là.
+    ''' PAR DÉFAUT, celui de la pièce manuelle de la banque. Ni préfixe « LD » ni période :
+    ''' tous deux appartiennent à la narrative, en bas de pièce et dans ADDLTEXT. Une nature
+    ''' laissée vide retombe sur ce libellé-là.
     ''' </summary>
     ParNature = 2
 End Enum
 
 ''' <summary>
-''' LE PARAMÉTRAGE DE NARRATIVE EN VIGUEUR : le mode, le modèle global, et les treize modèles
+''' LE PARAMÉTRAGE DE NARRATIVE EN VIGUEUR : le mode, le modèle global, et les quatorze modèles
 ''' par nature. C'est lui qui répond à la seule question qui compte au moment de poser une
 ''' écriture : quel texte cette ligne-ci doit-elle porter ?
 '''
@@ -178,7 +178,7 @@ Public NotInheritable Class NarrativesWU
     End Function
 
     ''' <summary>
-    ''' Les treize libellés d'un point de vente, en un seul appel.
+    ''' Les quatorze libellés d'un point de vente, en un seul appel.
     '''
     ''' POURQUOI TOUS D'UN COUP. Les douze lignes d'un même point de vente se posent à la
     ''' suite, et chacune a besoin du sien : les calculer ensemble évite douze résolutions de
