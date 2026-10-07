@@ -7,20 +7,26 @@
 
       1. T_NarrativeNatureWU    : le libellé de chaque nature de mouvement.
       2. T_JournalParametreWU   : qui a changé quoi, quand, et ce qu'il y avait avant.
-      3. L'option NARRATIVE_MODE, dans T_ParametreWU : laquelle des deux façons s'applique.
+      3. L'option NARRATIVE_MODE, dans T_ParametreWU : laquelle des deux façons s'applique
+         À LA PIÈCE — le fichier core banking, lui, ne dépend pas de ce mode.
 
     LE MODE, ET CE QU'IL CHANGE
 
+      PAR_NATURE  — chaque ligne de la PIÈCE porte le libellé de sa nature : mouvement,
+                    contrepartie, commissions, taxes, écart d'arrondi. C'est la forme de la
+                    pièce manuelle de la banque, et c'est le DÉFAUT.
       GLOBAL      — les douze lignes d'un point de vente portent LE MÊME libellé, celui du
-                    modèle global (option NARRATIVE_MODELE). C'est la forme dictée par la
-                    banque, et c'est le DÉFAUT.
-      PAR_NATURE  — chaque ligne porte le libellé de sa nature : mouvement, contrepartie,
-                    commissions, taxes, écart d'arrondi.
+                    modèle global (option NARRATIVE_MODELE).
 
-    BASCULER NE CHANGE RIEN TANT QUE RIEN N'EST SAISI. Une nature ABSENTE de
-    T_NarrativeNatureWU suit le modèle global : la table est donc créée VIDE, et une base
-    basculée en PAR_NATURE sans saisie rend exactement la pièce d'avant. La bascule est un
-    choix de la banque, pas une réécriture de treize libellés.
+    LE FICHIER CORE BANKING NE DÉPEND PAS DE CE MODE. Sa colonne ADDLTEXT porte TOUJOURS la
+    narrative unique du point de vente, celle du modèle global — rectificatif de la banque du
+    06/10/2026. La pièce conservée transporte donc les deux textes : son libellé par nature
+    dans la colonne Libelle, et la narrative du point de vente dans la colonne Narratif.
+
+    BASCULER NE DEMANDE AUCUNE SAISIE. Une nature ABSENTE de T_NarrativeNatureWU suit SON
+    LIBELLÉ HISTORIQUE, celui que le code porte en constante : la table est donc créée VIDE,
+    et une base installée et laissée telle quelle rend exactement la pièce que la banque
+    connaît. Elle n'écrit dans cette table que ce qu'elle veut changer.
 
     L'ÉCART D'ARRONDI FAIT EXCEPTION, ET DANS LES DEUX MODES
 
@@ -178,20 +184,24 @@ IF EXISTS (SELECT 1 FROM sys.database_principals WHERE type = 'R' AND name = N'w
 GO
 
 -- =========================================================================
--- 3. L'option : laquelle des deux façons s'applique
+-- 3. L'option : laquelle des deux façons s'applique à la pièce
 --
---    GLOBAL par défaut, c'est-à-dire le comportement actuel. La valeur existante n'est
---    JAMAIS écrasée : rejouer ce script ne fait pas rebasculer la banque.
+--    PAR_NATURE par défaut, c'est-à-dire la pièce telle que la banque la connaît. La valeur
+--    existante n'est JAMAIS écrasée ici : rejouer ce script ne fait pas rebasculer la banque.
+--
+--    LE RECTIFICATIF DU 06/10/2026 — qui ramène de GLOBAL à PAR_NATURE les bases où personne
+--    n'a touché au paramètre — est dans Scripts\00_InstallationComplete.sql, le seul script
+--    qui s'exécute. Il ne figure pas ici : ce fichier documente la création des objets.
 -- =========================================================================
 IF OBJECT_ID(N'dbo.T_ParametreWU') IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'NARRATIVE_MODE')
 BEGIN
     INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
-    VALUES (N'NARRATIVE_MODE', N'GLOBAL',
-            N'GLOBAL : les douze lignes d''un point de vente portent le même libellé. PAR_NATURE : chaque ligne porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU).',
+    VALUES (N'NARRATIVE_MODE', N'PAR_NATURE',
+            N'PAR_NATURE : chaque ligne de la pièce porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU). GLOBAL : les douze lignes d''un point de vente portent le même libellé. Le fichier core banking porte toujours la narrative unique du point de vente, quel que soit ce mode.',
             GETDATE(), N'installation');
 
-    PRINT 'Option NARRATIVE_MODE créée à GLOBAL.';
+    PRINT 'Option NARRATIVE_MODE créée à PAR_NATURE.';
 END
 ELSE IF OBJECT_ID(N'dbo.T_ParametreWU') IS NULL
     PRINT 'T_ParametreWU absente : exécutez Scripts\00_InstallationComplete.sql, qui crée tout.';

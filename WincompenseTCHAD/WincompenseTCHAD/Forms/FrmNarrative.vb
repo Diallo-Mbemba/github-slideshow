@@ -6,7 +6,8 @@ Imports System.Windows.Forms
 
 ''' <summary>
 ''' LA NARRATIVE COMPTABLE : l'écran où la banque écrit elle-même les libellés que porteront
-''' ses écritures, et que son core banking recevra dans la colonne ADDLTEXT.
+''' ses écritures sur la pièce comptable, et le texte que son core banking recevra dans la
+''' colonne ADDLTEXT.
 '''
 ''' POURQUOI CET ÉCRAN EXISTE
 '''
@@ -15,19 +16,26 @@ Imports System.Windows.Forms
 ''' postes de la banque — pour un texte qui n'entre dans aucun calcul. Ce qui se lit dans le
 ''' grand livre appartient à la Direction Comptable ; ce qui s'y calcule reste au code.
 '''
-''' DEUX PARAMÉTRAGES, ET UNE BASCULE ENTRE LES DEUX
+''' DEUX TEXTES, ET ILS NE VONT PAS AU MÊME ENDROIT
 '''
-'''   — UN SEUL LIBELLÉ pour les douze lignes d'un point de vente. C'est la forme dictée par
-'''     la banque, et le mode par défaut : ce que chaque ligne EST se lit dans son numéro de
-'''     compte, ce qu'elle COUVRE se lit dans son libellé.
-'''   — UN LIBELLÉ PAR NATURE de mouvement, pour qui veut distinguer la TVA de la TTA et des
-'''     commissions dans son grand livre.
+'''   — LE MODÈLE DU POINT DE VENTE, premier onglet : « LD WU ACTIVITE <point de vente>
+'''     <période> ». C'est TOUJOURS lui que le core banking reçoit dans ADDLTEXT, pour les
+'''     douze lignes du point de vente.
+'''   — LES LIBELLÉS PAR NATURE, deuxième onglet : « LD COMPTE COURANT WESTERN UNION ETD »,
+'''     « LD TVA SUR COMMISSION WU »… C'est ce que porte LA PIÈCE COMPTABLE, ligne à ligne,
+'''     et c'est le mode par défaut — celui de la pièce manuelle de la banque, rétabli par
+'''     son rectificatif du 06/10/2026.
 '''
-''' BASCULER NE CHANGE RIEN TANT QUE RIEN N'EST SAISI. Les treize natures s'affichent avec le
-''' modèle qu'elles appliquent réellement — le modèle global pour douze d'entre elles — et
-''' seules celles que la banque modifie sont conservées. Une bascule qui réécrirait treize
-''' libellés d'un coup serait un piège : on ne découvre pas au grand livre ce qu'un bouton
-''' radio a décidé.
+''' LA BASCULE NE CONCERNE QUE LA PIÈCE. « Un seul libellé » étend le modèle du point de vente
+''' aux douze lignes de la pièce, où ce que chaque ligne EST se lit alors dans son seul numéro
+''' de compte. Le fichier core banking, lui, ne change pas : il porte ce modèle dans les deux
+''' cas.
+'''
+''' RIEN À SAISIR POUR RETROUVER LA PIÈCE HABITUELLE. Les treize natures s'affichent avec le
+''' modèle qu'elles appliquent réellement — leur libellé historique tant qu'elles n'ont pas
+''' été touchées — et seules celles que la banque modifie sont conservées. Une bascule qui
+''' réécrirait treize libellés d'un coup serait un piège : on ne découvre pas au grand livre
+''' ce qu'un bouton radio a décidé.
 '''
 ''' L'ÉCRAN NE SE CONTENTE PAS DE RECUEILLIR UNE SAISIE
 '''
@@ -227,17 +235,20 @@ Public Class FrmNarrative
     End Sub
 
     ''' <summary>
-    ''' Coche le mode en vigueur, et ferme le mode « par nature » si sa table est absente.
+    ''' Coche le mode en vigueur, et dit ce que l'absence de la table des natures empêche.
     '''
-    ''' LE MODE N'EST PAS SEULEMENT GRISÉ : L'ÉCRAN DIT POURQUOI. Un bouton radio inactif sans
-    ''' explication se lit comme un défaut de l'application, et l'informatique de la banque
-    ''' n'a aucun moyen de deviner qu'il lui manque un script.
+    ''' LES DEUX MODES RESTENT OFFERTS, MÊME SANS LA TABLE. Le mode « par nature » ne dépend
+    ''' plus d'elle : une nature absente retombe sur son libellé historique, que le code porte
+    ''' en constante. La table ne sert qu'à PERSONNALISER un libellé — c'est donc la grille
+    ''' qui se ferme, pas le mode.
+    '''
+    ''' ET L'ÉCRAN DIT POURQUOI. Une grille inerte sans explication se lit comme un défaut de
+    ''' l'application, et l'informatique de la banque n'a aucun moyen de deviner qu'il lui
+    ''' manque un script.
     ''' </summary>
     Private Sub AfficherLeMode(mode As ModeNarrativeWU)
 
-        rdoModeParNature.Enabled = _naturesDisponibles
-
-        Dim parNature As Boolean = _naturesDisponibles AndAlso mode = ModeNarrativeWU.ParNature
+        Dim parNature As Boolean = (mode = ModeNarrativeWU.ParNature)
 
         rdoModeParNature.Checked = parNature
         rdoModeUnique.Checked = Not parNature
@@ -249,9 +260,10 @@ Public Class FrmNarrative
 
         lblModeIndisponible.Visible = True
         lblModeIndisponible.Text =
-            "Mode indisponible : la table T_NarrativeNatureWU est absente de la base. " &
-            "Faites exécuter Scripts\00_InstallationComplete.sql par l'informatique — il la crée, " &
-            "et crée aussi le journal des modifications."
+            "Les libellés par nature s'appliquent, mais ne sont pas modifiables : la table " &
+            "T_NarrativeNatureWU est absente de la base. Faites exécuter " &
+            "Scripts\00_InstallationComplete.sql par l'informatique — il la crée, et crée aussi " &
+            "le journal des modifications."
     End Sub
 
     ''' <summary>
@@ -394,23 +406,30 @@ Public Class FrmNarrative
     ''' Ouvre ou ferme la grille des natures selon le mode choisi, et redit ce que le mode fait.
     '''
     ''' LA GRILLE RESTE VISIBLE EN MODE UNIQUE, mais en lecture seule : la banque doit pouvoir
-    ''' REGARDER ce que la bascule produirait avant de basculer. Un onglet qui disparaît ne se
-    ''' consulte pas.
+    ''' REGARDER ce qu'elle abandonne avant de basculer. Un onglet qui disparaît ne se consulte
+    ''' pas.
+    '''
+    ''' ELLE EST AUSSI EN LECTURE SEULE SANS LA TABLE DES NATURES : les libellés s'appliquent,
+    ''' mais rien ne pourrait retenir une modification. Une case qu'on peut remplir et qui
+    ''' perd la saisie à la fermeture est pire qu'une case grisée.
     ''' </summary>
     Private Sub AppliquerLeMode()
 
         Dim parNature As Boolean = rdoModeParNature.Checked
+        Dim modifiable As Boolean = parNature AndAlso _naturesDisponibles
 
-        dgvNatures.ReadOnly = Not parNature
-        dgvNatures.DefaultCellStyle.BackColor = If(parNature, Drawing.SystemColors.Window,
+        dgvNatures.ReadOnly = Not modifiable
+        dgvNatures.DefaultCellStyle.BackColor = If(modifiable, Drawing.SystemColors.Window,
                                                    Drawing.SystemColors.Control)
 
         lblAideNatures.Text =
             If(parNature,
-               "Chaque ligne de la pièce portera le libellé de sa nature. Une case laissée au " &
-               "modèle global le suit : seules les natures que vous modifiez sont conservées.",
-               "Mode « un seul libellé » : ces libellés ne sont PAS appliqués. Ils sont " &
-               "affichés pour que vous voyiez ce que la bascule produirait. L'écart d'arrondi " &
+               "Chaque ligne de la pièce portera le libellé de sa nature. Une case laissée " &
+               "telle quelle garde son libellé historique : seules les natures que vous " &
+               "modifiez sont conservées.",
+               "Mode « un seul libellé » : ces libellés ne sont PAS appliqués à la pièce, qui " &
+               "portera le modèle du premier onglet sur ses douze lignes. Ils sont conservés " &
+               "et redeviennent actifs si vous revenez au mode par nature. L'écart d'arrondi " &
                "fait exception — il garde toujours son libellé propre, dans les deux modes.")
 
         If _enChargement Then Return
@@ -430,10 +449,9 @@ Public Class FrmNarrative
     ''' le mode « par nature » était actif.
     '''
     ''' POURQUOI L'EFFECTIF, ET NON LA SEULE SAISIE. Une case vide pour la TVA signifierait
-    ''' « suit le modèle global », ce qui est vrai mais illisible : la banque ne verrait pas ce
-    ''' que la ligne porterait. Et pour l'écart d'arrondi, ce serait FAUX — il ne suit pas le
-    ''' modèle global, il a son texte propre. Montrer l'effectif dit la vérité dans les deux
-    ''' cas, et l'enregistrement ne garde que ce qui s'en écarte.
+    ''' « suit son libellé historique », ce qui est vrai mais illisible : la banque ne verrait
+    ''' pas ce que la ligne porterait, ni qu'elle peut le reprendre à son compte. Montrer
+    ''' l'effectif dit la vérité, et l'enregistrement ne garde que ce qui s'en écarte.
     ''' </summary>
     Private Sub ChargerLesNatures()
 
@@ -542,12 +560,20 @@ Public Class FrmNarrative
     ''' Fait suivre la saisie du modèle global aux natures qui le reprennent, c'est-à-dire
     ''' celles dont la case montre encore le modèle chargé.
     '''
+    ''' EN MODE « PAR NATURE », IL N'Y A RIEN À FAIRE SUIVRE : une nature non personnalisée y
+    ''' montre son libellé historique, et non le modèle global. La frappe du premier onglet ne
+    ''' concerne alors que le fichier core banking, et la grille n'a pas à bouger.
+    '''
     ''' L'ÉCART D'ARRONDI N'EST JAMAIS TOUCHÉ : il ne suit pas le modèle global, et le faire
     ''' suivre ici le remplacerait par « LD WU ACTIVITE » dès la première frappe.
     ''' </summary>
     Private Sub RafraichirLesNaturesSuivantLeGlobal()
 
         If dgvNatures.DataSource Is Nothing Then Return
+        If rdoModeParNature.Checked Then
+            _modeleGlobalCharge = txtModele.Text
+            Return
+        End If
 
         Dim ancienGlobal As String = _modeleGlobalCharge
         Dim nouveauGlobal As String = txtModele.Text
@@ -729,7 +755,7 @@ Public Class FrmNarrative
                                                  ModeNarrativeWU.ModeleUnique)))
 
         ' Tout est relu plutôt que supposé : le journal vient de gagner des lignes, et la
-        ' grille des natures a pu perdre celles qui ont rejoint le modèle global.
+        ' grille des natures a pu perdre celles qui ont rejoint leur libellé historique.
         Charger()
 
         lblStatut.ForeColor = Drawing.Color.DarkGreen
@@ -778,23 +804,38 @@ Public Class FrmNarrative
     ''' <summary>
     ''' Enregistre les natures qui ont CHANGÉ, et seulement elles.
     '''
-    ''' UNE NATURE REVENUE AU MODÈLE GLOBAL EST EFFACÉE, pas enregistrée à l'identique : c'est
-    ''' ce qui garde vivant son repli, et ce qui fait qu'un futur changement du modèle global
-    ''' la suivra au lieu de la laisser sur l'ancienne phrase. L'écart d'arrondi, lui, se
-    ''' compare à SA valeur par défaut, puisqu'il ne suit jamais le modèle global.
+    ''' UNE NATURE REVENUE À SON REPLI EST EFFACÉE, pas enregistrée à l'identique : c'est ce
+    ''' qui garde vivant ce repli, et ce qui fait qu'un futur changement le lui fera suivre au
+    ''' lieu de la laisser sur l'ancienne phrase.
+    '''
+    ''' LE REPLI D'UNE NATURE DÉPEND DU MODE, exactement comme dans NarrativesWU.Modele : son
+    ''' LIBELLÉ HISTORIQUE en mode « par nature », le MODÈLE GLOBAL en mode « un seul
+    ''' libellé ». L'écart d'arrondi fait exception dans les deux modes — il ne suit jamais le
+    ''' modèle global, qui le réduirait à « LD WU ACTIVITE ».
+    '''
+    ''' LES DEUX DOIVENT S'ACCORDER, sans quoi l'écran effacerait une ligne que la pièce
+    ''' rendrait ensuite autrement : la banque verrait son libellé disparaître à la
+    ''' réouverture de l'écran, ou pire, le verrait rester et la pièce en porter un autre.
     ''' </summary>
     Private Function EnregistrerLesNatures(ByRef messageErreur As String) As Boolean
 
         messageErreur = String.Empty
 
         Dim modeleGlobal As String = txtModele.Text.Trim()
+        Dim parNature As Boolean = rdoModeParNature.Checked
 
         For Each nature As NatureMouvementWU In NaturesMouvementWU.Toutes()
 
             Dim saisi As String = ModeleSaisi(nature).Trim()
 
-            Dim repli As String = If(nature = NatureMouvementWU.EcartArrondi,
-                                     ConstantesWU.NARRATIVE_ECART_DEFAUT, modeleGlobal)
+            Dim repli As String
+            If nature = NatureMouvementWU.EcartArrondi Then
+                repli = ConstantesWU.NARRATIVE_ECART_DEFAUT
+            ElseIf parNature Then
+                repli = NaturesMouvementWU.ModeleParDefaut(nature)
+            Else
+                repli = modeleGlobal
+            End If
 
             Dim aEcrire As String = If(String.Equals(saisi, repli, StringComparison.Ordinal),
                                        String.Empty, saisi)
@@ -827,25 +868,26 @@ Public Class FrmNarrative
         Dim detail As String
 
         If parNature Then
-            detail = "Chaque ligne portera le libellé de sa nature. Les natures laissées au " &
-                     "modèle global le suivront :" & Environment.NewLine & Environment.NewLine &
-                     RenduPireCas(modele)
+            detail = "Chaque ligne de la pièce portera le libellé de sa nature. Le fichier " &
+                     "core banking, lui, portera celui-ci :" & Environment.NewLine &
+                     Environment.NewLine & RenduPireCas(modele)
         Else
-            detail = "Les écritures sortiront ainsi :" & Environment.NewLine & Environment.NewLine &
-                     RenduPireCas(modele)
+            detail = "Les lignes de la pièce et le fichier core banking porteront tous ce " &
+                     "texte :" & Environment.NewLine & Environment.NewLine & RenduPireCas(modele)
         End If
 
         Return MessageBox.Show(Me,
             "Enregistrer ce paramétrage de narrative ?" & Environment.NewLine & Environment.NewLine &
             "Mode : " & NarrativesWU.IntituleDeMode(mode) & "." & Environment.NewLine & Environment.NewLine &
             detail & Environment.NewLine & Environment.NewLine &
-            "Ces textes partent sur toutes les lignes de toutes les pièces à venir, et dans la " &
-            "colonne ADDLTEXT du fichier core banking. Les pièces déjà produites gardent le " &
-            "leur : elles ne sont pas réécrites." &
+            "Ces textes partent sur toutes les pièces à venir, et dans la colonne ADDLTEXT du " &
+            "fichier core banking. Les pièces déjà produites gardent le leur : elles ne sont " &
+            "pas réécrites." &
             If(ModeleNarrativeWU.EmploieUnRepere(modele), String.Empty,
                Environment.NewLine & Environment.NewLine &
-               "ATTENTION : le modèle global n'emploie aucun repère. Les écritures qui le " &
-               "suivent porteront le même texte, sans nommer le point de vente ni la période."),
+               "ATTENTION : le modèle du point de vente n'emploie aucun repère. Le fichier " &
+               "core banking portera le même texte sur toutes ses lignes, sans nommer le " &
+               "point de vente ni la période."),
             "Confirmer la narrative", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
             MessageBoxDefaultButton.Button2) = DialogResult.Yes
     End Function

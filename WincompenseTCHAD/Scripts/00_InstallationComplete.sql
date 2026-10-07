@@ -1214,6 +1214,11 @@ BEGIN
         -- Alimente la colonne ACBRN du fichier destiné au core banking.
         CodeAgence          NVARCHAR(50)    NULL,
 
+        -- Narrative que le SEUL fichier core banking recopie dans ADDLTEXT : la meme pour
+        -- les douze lignes d'un point de vente. Le LIBELLE ci-dessus dit ce que la ligne
+        -- EST, nature par nature ; celui-ci dit ce que le core banking en lira.
+        Narratif            NVARCHAR(255)   NULL,
+
         DateEnregistrement  DATETIME        NOT NULL DEFAULT (GETDATE()),
         EnregistrePar       NVARCHAR(100)   NULL,
 
@@ -1392,6 +1397,11 @@ BEGIN
         Credit              BIGINT          NOT NULL DEFAULT (0),
         CodeAgence          NVARCHAR(50)    NULL,
 
+        -- Narrative que le SEUL fichier core banking recopie dans ADDLTEXT : la meme pour
+        -- les douze lignes d'un point de vente. Le LIBELLE ci-dessus dit ce que la ligne
+        -- EST, nature par nature ; celui-ci dit ce que le core banking en lira.
+        Narratif            NVARCHAR(255)   NULL,
+
         DateEnregistrement  DATETIME        NULL,
         EnregistrePar       NVARCHAR(100)   NULL,
 
@@ -1483,23 +1493,28 @@ BEGIN
 END
 GO
 
--- LE MODE : laquelle des deux facons de choisir les libelles s'applique.
+-- LE MODE : laquelle des deux facons de choisir les libelles de LA PIECE s'applique.
 --
---   GLOBAL      les douze lignes d'un point de vente portent LE MEME libelle, celui du
---               modele global ci-dessus. C'est la forme dictee par la banque, et le DEFAUT.
 --   PAR_NATURE  chaque ligne porte le libelle de sa nature : mouvement, contrepartie,
 --               commissions, taxes, ecart d'arrondi (table T_NarrativeNatureWU plus bas).
+--               C'est la forme de la piece manuelle de la banque, et c'est LE DEFAUT.
+--   GLOBAL      les douze lignes d'un point de vente portent LE MEME libelle, celui du
+--               modele global ci-dessus.
 --
--- BASCULER NE CHANGE RIEN TANT QUE RIEN N'EST SAISI : une nature absente de
--- T_NarrativeNatureWU suit le modele global, et cette table est creee vide.
+-- LE FICHIER CORE BANKING NE DEPEND PAS DE CE MODE. Sa colonne ADDLTEXT porte TOUJOURS la
+-- narrative unique du point de vente, celle du modele global : c'est le rectificatif de la
+-- banque du 06/10/2026. Le mode ne decide que de ce qu'on lit sur la PIECE.
+--
+-- BASCULER NE DEMANDE AUCUNE SAISIE : une nature absente de T_NarrativeNatureWU suit son
+-- libelle historique, celui que le code porte en constante, et cette table est creee vide.
 IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'NARRATIVE_MODE')
 BEGIN
     INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
-    VALUES (N'NARRATIVE_MODE', N'GLOBAL',
-            N'GLOBAL : les douze lignes d''un point de vente portent le même libellé. PAR_NATURE : chaque ligne porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU).',
+    VALUES (N'NARRATIVE_MODE', N'PAR_NATURE',
+            N'PAR_NATURE : chaque ligne de la pièce porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU). GLOBAL : les douze lignes d''un point de vente portent le même libellé. Le fichier core banking porte toujours la narrative unique du point de vente, quel que soit ce mode.',
             GETDATE(), N'installation');
 
-    PRINT 'Option NARRATIVE_MODE créée à GLOBAL.';
+    PRINT 'Option NARRATIVE_MODE créée à PAR_NATURE.';
 END
 ELSE
 BEGIN
@@ -1507,12 +1522,40 @@ BEGIN
 END
 GO
 
+-- ---- RECTIFICATIF DU 06/10/2026, applique UNE SEULE FOIS ----
+--
+-- La livraison precedente avait pose ce parametre a GLOBAL : les douze lignes de la piece
+-- portaient la narrative unique. La banque a rectifie -- SEUL le fichier core banking la
+-- garde -- et le defaut repasse donc a PAR_NATURE.
+--
+-- LA CONDITION « ModifiePar = installation » EST L'ESSENTIEL DE CE BLOC. Elle ne corrige que
+-- les bases ou PERSONNE n'a touche au parametre depuis l'ecran « Narrative comptable »,
+-- c'est-a-dire celles qui portent encore le defaut de la livraison precedente. Une banque qui
+-- aurait DELIBEREMENT choisi GLOBAL garde son choix : son nom figure dans ModifiePar, et ce
+-- script n'a pas a defaire ce qu'elle a decide.
+--
+-- Rejouable : la deuxieme execution ne trouve plus de ligne a corriger.
+IF EXISTS (SELECT 1 FROM dbo.T_ParametreWU
+           WHERE Cle = N'NARRATIVE_MODE' AND Valeur = N'GLOBAL' AND ModifiePar = N'installation')
+BEGIN
+    UPDATE dbo.T_ParametreWU
+       SET Valeur           = N'PAR_NATURE',
+           DateModification = GETDATE()
+     WHERE Cle = N'NARRATIVE_MODE' AND Valeur = N'GLOBAL' AND ModifiePar = N'installation';
+
+    PRINT 'Option NARRATIVE_MODE ramenée de GLOBAL à PAR_NATURE (rectificatif du 06/10/2026).';
+END
+ELSE
+    PRINT 'Option NARRATIVE_MODE : rien à rectifier (valeur déjà PAR_NATURE, ou choisie par la banque).';
+GO
+
 -- =========================================================================
 -- T_NarrativeNatureWU — le libelle de chaque nature de mouvement
 --
--- CREEE VIDE, ET C'EST VOULU. Une nature absente suit le modele global : une base basculee
--- en PAR_NATURE sans saisie rend donc exactement la piece d'avant. La bascule est un choix
--- de la banque, pas une reecriture de treize libelles.
+-- CREEE VIDE, ET C'EST VOULU. Une nature absente suit SON LIBELLE HISTORIQUE, celui que le
+-- code porte en constante : une base installee et laissee telle quelle rend donc exactement
+-- la piece que la banque connait, sans qu'elle ait un seul libelle a saisir. Elle n'ecrit ici
+-- que ce qu'elle veut changer.
 --
 -- La cle est le CODE de la nature, une chaine (NaturesMouvementWU.Code) : MOUVEMENT,
 -- COMPTE_COURANT, COMMISSION_TRANSFERT_BANQUE, COMMISSION_PAIEMENT_BANQUE,
@@ -2814,6 +2857,44 @@ BEGIN
 END
 ELSE
     PRINT 'SystemeWU : colonne Cpte_Pertede_Change déjà présente ou table absente.';
+GO
+
+-- ---- La narrative du core banking, conservee avec la piece (origine : script 13) ----
+--
+-- LA PIECE ET LE FICHIER NE DISENT PAS LA MEME CHOSE, et la banque l'a voulu ainsi : sur la
+-- piece, chaque ligne porte le libelle de SA NATURE ; dans le fichier, les douze lignes d'un
+-- meme point de vente portent UNE SEULE narrative, celle du point de vente. Les deux textes
+-- doivent donc etre conserves cote a cote.
+--
+-- Sans cette colonne, une journee archivee aujourd'hui et dont on reproduirait le fichier
+-- core banking demain repartirait avec le LIBELLE en guise de narrative -- sans erreur, sans
+-- message, et avec la mauvaise forme.
+--
+-- LES DEUX TABLES OU AUCUNE : l'annulation DEPLACE les lignes de T_PieceWU vers
+-- T_PieceAnnuleeWU, colonne par colonne. Si la premiere portait le narratif et pas la
+-- seconde, l'annulation echouerait au milieu de sa transaction, et c'est la journee entiere
+-- qui ne serait plus annulable. L'application n'ecrit donc la colonne que lorsque LES DEUX
+-- l'ont ; les deux blocs ci-dessous sont a executer ensemble, ce que ce script fait.
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_PieceWU') AND name = N'Narratif')
+BEGIN
+    ALTER TABLE dbo.T_PieceWU ADD Narratif NVARCHAR(255) NULL;
+    PRINT 'Colonne Narratif ajoutée à T_PieceWU.';
+END
+ELSE
+    PRINT 'T_PieceWU : colonne Narratif déjà présente ou table absente.';
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceAnnuleeWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_PieceAnnuleeWU') AND name = N'Narratif')
+BEGIN
+    ALTER TABLE dbo.T_PieceAnnuleeWU ADD Narratif NVARCHAR(255) NULL;
+    PRINT 'Colonne Narratif ajoutée à T_PieceAnnuleeWU.';
+END
+ELSE
+    PRINT 'T_PieceAnnuleeWU : colonne Narratif déjà présente ou table absente.';
 GO
 
 -- ---- La periode couverte par les rapports (origine : script 17) ----

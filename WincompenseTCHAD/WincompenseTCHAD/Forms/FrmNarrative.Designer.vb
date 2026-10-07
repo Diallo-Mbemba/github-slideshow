@@ -76,10 +76,10 @@ Partial Class FrmNarrative
         Me.lblSousTitre.Name = "lblSousTitre"
         Me.lblSousTitre.Size = New System.Drawing.Size(896, 34)
         Me.lblSousTitre.TabIndex = 1
-        Me.lblSousTitre.Text = "Ces textes sont les libellés des lignes de la pièce comptable, et ils partent tels" &
-            " quels dans la colonne ADDLTEXT du fichier chargé au core banking. Ils valent pou" &
-            "r tous les postes et pour toutes les journées à venir ; les pièces déjà produites" &
-            " gardent les leurs."
+        Me.lblSousTitre.Text = "Deux textes : les LIBELLÉS DES LIGNES de la pièce comptable, et le MODÈLE DU POIN" &
+            "T DE VENTE que le core banking reçoit dans ADDLTEXT. Ils valent pour tous les pos" &
+            "tes et pour toutes les journées à venir ; les pièces déjà produites gardent les l" &
+            "eurs."
         '
         'grpMode
         '
@@ -91,28 +91,29 @@ Partial Class FrmNarrative
         Me.grpMode.Size = New System.Drawing.Size(896, 100)
         Me.grpMode.TabIndex = 2
         Me.grpMode.TabStop = False
-        Me.grpMode.Text = "Comment les libellés de la pièce sont choisis"
+        Me.grpMode.Text = "Comment les libellés de la PIÈCE sont choisis (le fichier core banking, lui, port" &
+            "e toujours le modèle du point de vente)"
         '
         'rdoModeUnique
         '
-        Me.rdoModeUnique.Checked = True
         Me.rdoModeUnique.Location = New System.Drawing.Point(18, 24)
         Me.rdoModeUnique.Name = "rdoModeUnique"
         Me.rdoModeUnique.Size = New System.Drawing.Size(860, 22)
         Me.rdoModeUnique.TabIndex = 0
-        Me.rdoModeUnique.TabStop = True
-        Me.rdoModeUnique.Text = "UN SEUL LIBELLÉ pour les douze lignes d'un point de vente — la forme dictée par l" &
-            "a banque."
+        Me.rdoModeUnique.Text = "UN SEUL LIBELLÉ pour les douze lignes d'un point de vente — celui du modèle du po" &
+            "int de vente, ci-dessous."
         Me.rdoModeUnique.UseVisualStyleBackColor = True
         '
         'rdoModeParNature
         '
+        Me.rdoModeParNature.Checked = True
         Me.rdoModeParNature.Location = New System.Drawing.Point(18, 48)
         Me.rdoModeParNature.Name = "rdoModeParNature"
         Me.rdoModeParNature.Size = New System.Drawing.Size(860, 22)
         Me.rdoModeParNature.TabIndex = 1
+        Me.rdoModeParNature.TabStop = True
         Me.rdoModeParNature.Text = "UN LIBELLÉ PAR NATURE de mouvement — mouvement, contrepartie, commissions, taxes," &
-            " écart d'arrondi."
+            " écart d'arrondi. C'est la forme habituelle de la pièce de la banque."
         Me.rdoModeParNature.UseVisualStyleBackColor = True
         '
         'lblModeIndisponible
@@ -150,7 +151,7 @@ Partial Class FrmNarrative
         Me.ongModele.Padding = New System.Windows.Forms.Padding(3)
         Me.ongModele.Size = New System.Drawing.Size(888, 354)
         Me.ongModele.TabIndex = 0
-        Me.ongModele.Text = "Le modèle global"
+        Me.ongModele.Text = "Le modèle du point de vente"
         Me.ongModele.UseVisualStyleBackColor = True
         '
         'txtModele

@@ -8,15 +8,18 @@ Option Explicit On
 Public Enum ModeNarrativeWU
 
     ''' <summary>
-    ''' UN SEUL MODÈLE pour les douze lignes d'un point de vente. C'est le mode par défaut, et
-    ''' c'est la forme que la banque avait dictée : ce que chaque ligne EST se lit dans son
-    ''' numéro de compte, ce qu'elle COUVRE se lit dans le libellé.
+    ''' UN SEUL MODÈLE pour les douze lignes d'un point de vente — « LD WU ACTIVITE <point de
+    ''' vente> <période> ». C'est la forme que le FICHIER CORE BANKING porte toujours, quel
+    ''' que soit le mode ; ce mode-ci l'étend à la PIÈCE COMPTABLE, où ce que chaque ligne EST
+    ''' se lit alors dans son seul numéro de compte.
     ''' </summary>
     ModeleUnique = 1
 
     ''' <summary>
-    ''' UN MODÈLE PAR NATURE DE MOUVEMENT. Chaque ligne porte le libellé de sa nature, avec
-    ''' les mêmes repères — une nature laissée vide retombe sur le modèle global.
+    ''' UN LIBELLÉ PAR NATURE DE MOUVEMENT : « LD COMPTE COURANT WESTERN UNION ETD », « LD
+    ''' COMMISSION TRANSFERT WU », « LD TVA SUR COMMISSION WU »… C'EST LE MODE PAR DÉFAUT,
+    ''' celui de la pièce manuelle de la banque, rétabli par son rectificatif du 06/10/2026.
+    ''' Une nature laissée vide retombe sur son libellé historique.
     ''' </summary>
     ParNature = 2
 End Enum
@@ -33,10 +36,10 @@ End Enum
 ''' IL NE TOUCHE NI LA BASE NI L'ÉCRAN. C'est NarrativeRepository qui va le chercher ; cette
 ''' classe se contente de trancher, et se rejoue donc hors de l'application.
 '''
-''' BASCULER DE MODE NE CHANGE RIEN, ET C'EST VOULU. Les treize natures sont amorcées avec le
-''' modèle global : la banque ne voit une différence qu'après avoir édité une nature. Une
-''' bascule qui réécrirait treize libellés d'un coup serait un piège — on ne découvre pas au
-''' grand livre ce qu'une case à cocher a décidé.
+''' LE MODE NE CONCERNE QUE LA PIÈCE. Le fichier core banking porte toujours la narrative
+''' UNIQUE du point de vente, celle du modèle global : c'est le rectificatif de la banque du
+''' 06/10/2026, et c'est pourquoi la pièce transporte DEUX textes par ligne — son libellé, et
+''' la narrative du point de vente dans sa colonne Narratif.
 ''' </summary>
 Public NotInheritable Class NarrativesWU
 
@@ -85,24 +88,24 @@ Public NotInheritable Class NarrativesWU
 
     ''' <summary>
     ''' Le paramétrage appliqué quand rien n'a pu être lu : table absente, base injoignable,
-    ''' script jamais exécuté. C'est le comportement ACTUEL au caractère près — mode unique,
-    ''' modèle par défaut du code — et jamais une pièce sans libellés.
+    ''' script jamais exécuté. La pièce sort alors avec ses libellés historiques, c'est-à-dire
+    ''' telle que la banque la connaît — et jamais une pièce sans libellés.
     ''' </summary>
     Public Shared Function ParDefaut() As NarrativesWU
-        Return New NarrativesWU(ModeNarrativeWU.ModeleUnique, ModeleNarrativeWU.ModeleParDefaut, Nothing)
+        Return New NarrativesWU(ModeNarrativeWU.ParNature, ModeleNarrativeWU.ModeleParDefaut, Nothing)
     End Function
 
     ''' <summary>Le mode que désigne la valeur lue en base. Tout ce qui n'est pas franchement
-    ''' « par nature » vaut MODE UNIQUE : une valeur mal orthographiée ne doit pas faire
-    ''' basculer treize libellés sans que personne ne l'ait demandé.</summary>
+    ''' « GLOBAL » vaut PAR NATURE : une valeur mal orthographiée ne doit pas effacer les
+    ''' douze libellés de la pièce sans que personne ne l'ait demandé.</summary>
     Public Shared Function ModeDepuisCode(valeur As String) As ModeNarrativeWU
 
-        If String.Equals(If(valeur, String.Empty).Trim(), CODE_MODE_PAR_NATURE,
+        If String.Equals(If(valeur, String.Empty).Trim(), CODE_MODE_UNIQUE,
                          StringComparison.OrdinalIgnoreCase) Then
-            Return ModeNarrativeWU.ParNature
+            Return ModeNarrativeWU.ModeleUnique
         End If
 
-        Return ModeNarrativeWU.ModeleUnique
+        Return ModeNarrativeWU.ParNature
     End Function
 
     ''' <summary>La valeur à écrire en base pour un mode.</summary>
@@ -133,20 +136,25 @@ Public NotInheritable Class NarrativesWU
     ''' « LD WU ACTIVITE », c'est-à-dire à une ligne qui ne dit plus ce qu'elle est. Il garde
     ''' donc son texte propre, que la banque peut éditer comme les autres.
     '''
-    ''' UNE NATURE LAISSÉE VIDE RETOMBE SUR LE MODÈLE GLOBAL, et non sur rien : basculer en
-    ''' mode « par nature » sans avoir rien saisi doit rendre exactement la pièce d'avant.
+    ''' UNE NATURE LAISSÉE VIDE RETOMBE SUR SON LIBELLÉ HISTORIQUE, et non sur le modèle
+    ''' global. C'est le rectificatif de la banque du 06/10/2026 : la narrative unique ne vaut
+    ''' que pour la colonne ADDLTEXT du fichier core banking ; la pièce comptable reprend les
+    ''' libellés détaillés, et la banque n'a rien à saisir pour les retrouver.
     ''' </summary>
     Public Function Modele(nature As NatureMouvementWU) As String
 
-        If nature = NatureMouvementWU.EcartArrondi Then
-            If _modeles.ContainsKey(nature) Then Return _modeles(nature)
-            Return ConstantesWU.NARRATIVE_ECART_DEFAUT
-        End If
+        ' Une nature que la banque a personnalisée l'emporte toujours, quel que soit le mode :
+        ' elle a saisi ce texte-là pour cette ligne-là.
+        If _modeles.ContainsKey(nature) Then Return _modeles(nature)
+
+        ' L'ÉCART D'ARRONDI NE SUIT JAMAIS LE MODÈLE GLOBAL. Posé après la pièce, il ne se
+        ' rattache ni à un point de vente ni à une période : le modèle global le réduirait à
+        ' « LD WU ACTIVITE ».
+        If nature = NatureMouvementWU.EcartArrondi Then Return ConstantesWU.NARRATIVE_ECART_DEFAUT
 
         If _mode = ModeNarrativeWU.ModeleUnique Then Return _modeleGlobal
 
-        If _modeles.ContainsKey(nature) Then Return _modeles(nature)
-        Return _modeleGlobal
+        Return NaturesMouvementWU.ModeleParDefaut(nature)
     End Function
 
     ''' <summary>Vrai si cette nature porte un modèle qui lui est propre, saisi par la banque.</summary>

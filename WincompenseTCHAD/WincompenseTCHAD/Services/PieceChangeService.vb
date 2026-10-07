@@ -510,6 +510,11 @@ Public NotInheritable Class PieceChangeService
         ' d'eux ferait apparaître dans ses états un résultat qui n'est pas le sien.
         ligne("CodeAgence") = ConstantesWU.CB_AGENCE_SIEGE
 
+        ' LE NARRATIF VAUT LE LIBELLÉ, et ce n'est pas un remplissage : la pièce de change
+        ' n'a qu'une phrase, la même pour ses lignes, et elle est déjà de la forme que la
+        ' banque veut lire. Les treize natures de la pièce Western Union ne la concernent pas.
+        ligne("Narratif") = libelle
+
         table.Rows.Add(ligne)
     End Sub
 
@@ -527,6 +532,12 @@ Public NotInheritable Class PieceChangeService
         table.Columns.Add("Debit", GetType(Long))
         table.Columns.Add("Credit", GetType(Long))
         table.Columns.Add("CodeAgence", GetType(String))
+
+        ' Le narratif, comme sur la pièce principale : c'est lui que le fichier core banking
+        ' recopie dans ADDLTEXT. La colonne doit exister ici aussi, sans quoi les deux pièces
+        ' ne seraient plus construites de la même façon — et CoreBankingService, qui les
+        ' traite indifféremment, devrait savoir laquelle il a devant lui.
+        table.Columns.Add("Narratif", GetType(String))
 
         Return table
     End Function

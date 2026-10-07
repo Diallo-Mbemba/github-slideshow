@@ -143,12 +143,16 @@ Public Class FrmPieceComptable
             dgvPiece.Columns("Libelle").HeaderText = "Libellé"
         End If
 
-        ' Le code agence ne fait pas partie de la pièce comptable : il ne sert qu'à alimenter la
-        ' colonne ACBRN du fichier destiné au core banking. L'afficher ici ferait croire à une
-        ' colonne comptable de plus.
-        If dgvPiece.Columns.Contains("CodeAgence") Then
-            dgvPiece.Columns("CodeAgence").Visible = False
-        End If
+        ' NI LE CODE AGENCE NI LE NARRATIF NE FONT PARTIE DE LA PIÈCE COMPTABLE. Le premier
+        ' alimente la colonne ACBRN du fichier destiné au core banking, le second sa colonne
+        ' ADDLTEXT ; les afficher ici ferait croire à deux colonnes comptables de plus, et une
+        ' pièce qui porterait DEUX textes par ligne ne se relirait plus. Le narratif se
+        ' vérifie là où il sert, dans l'écran du fichier core banking.
+        For Each nomColonne As String In {"CodeAgence", "Narratif"}
+            If dgvPiece.Columns.Contains(nomColonne) Then
+                dgvPiece.Columns(nomColonne).Visible = False
+            End If
+        Next
     End Sub
 
     Private Sub AfficherTotaux()

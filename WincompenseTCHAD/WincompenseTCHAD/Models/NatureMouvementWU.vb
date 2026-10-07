@@ -165,6 +165,42 @@ Public NotInheritable Class NaturesMouvementWU
         Return Code(nature)
     End Function
 
+    ''' <summary>
+    ''' LE LIBELLÉ PAR DÉFAUT D'UNE NATURE, tel qu'il figurait sur la pièce avant que la
+    ''' banque ne demande un texte unique — et tel qu'elle le redemande depuis son
+    ''' rectificatif du 06/10/2026.
+    '''
+    ''' C'EST UN GABARIT, avec les mêmes repères que le modèle global. Une nature que la
+    ''' banque n'a pas personnalisée porte celui-ci : elle n'a donc rien à saisir pour
+    ''' retrouver la pièce d'avant.
+    '''
+    ''' CE N'EST PAS LE MODÈLE GLOBAL, et c'est tout le rectificatif. Le modèle global ne vaut
+    ''' plus que pour la colonne ADDLTEXT du fichier core banking, où la banque veut une seule
+    ''' phrase par point de vente ; la pièce comptable, elle, redit ce que chaque ligne est.
+    ''' </summary>
+    Public Shared Function ModeleParDefaut(nature As NatureMouvementWU) As String
+
+        Select Case nature
+            Case NatureMouvementWU.Mouvement : Return ConstantesWU.NARRATIVE_MOUVEMENT_DEFAUT
+            Case NatureMouvementWU.CompteCourant : Return ConstantesWU.NARRATIVE_COMPTE_COURANT_DEFAUT
+            Case NatureMouvementWU.CommissionTransfertBanque : Return ConstantesWU.NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT
+            Case NatureMouvementWU.CommissionPaiementBanque : Return ConstantesWU.NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT
+            Case NatureMouvementWU.CommissionEnvoiBanque : Return ConstantesWU.NARRATIVE_COMMISSION_ENVOI_BANQUE_DEFAUT
+            Case NatureMouvementWU.CommissionTransfertSousAgent : Return ConstantesWU.NARRATIVE_COMMISSION_TRANSFERT_SA_DEFAUT
+            Case NatureMouvementWU.CommissionPaiementSousAgent : Return ConstantesWU.NARRATIVE_COMMISSION_PAIEMENT_SA_DEFAUT
+            Case NatureMouvementWU.CommissionEnvoiSousAgent : Return ConstantesWU.NARRATIVE_COMMISSION_ENVOI_SA_DEFAUT
+            Case NatureMouvementWU.ImpotsTaxeEnvoi : Return ConstantesWU.NARRATIVE_IMPOTS_TAXE_ENVOI_DEFAUT
+            Case NatureMouvementWU.TVA : Return ConstantesWU.NARRATIVE_TVA_DEFAUT
+            Case NatureMouvementWU.TTAEnvoi : Return ConstantesWU.NARRATIVE_TTA_ENVOI_DEFAUT
+            Case NatureMouvementWU.TTAReception : Return ConstantesWU.NARRATIVE_TTA_RECEPTION_DEFAUT
+            Case NatureMouvementWU.EcartArrondi : Return ConstantesWU.NARRATIVE_ECART_DEFAUT
+        End Select
+
+        ' Une nature ajoutée à l'énumération et oubliée ici n'aurait pas de libellé : le modèle
+        ' global est un repli acceptable, une ligne de pièce sans texte ne l'est pas.
+        Return ConstantesWU.NARRATIVE_MODELE_DEFAUT
+    End Function
+
 #Region "Pour le journal"
 
     ''' <summary>Préfixe des clés de journal portant un libellé par nature.</summary>

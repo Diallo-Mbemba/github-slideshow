@@ -72,22 +72,29 @@ Public NotInheritable Class OptionsWU
     Public Const CLE_NARRATIVE_MODELE As String = "NARRATIVE_MODELE"
 
     Public Const LIBELLE_NARRATIVE_MODELE As String =
-        "Modèle de la narrative des lignes de la pièce comptable et de la colonne ADDLTEXT du " &
-        "fichier core banking. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}."
+        "Modèle de la narrative du point de vente : TOUJOURS celle de la colonne ADDLTEXT du " &
+        "fichier core banking, et celle des lignes de la pièce comptable lorsque le mode est " &
+        "GLOBAL. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}."
 
     ''' <summary>
-    ''' COMMENT LES LIBELLÉS SONT CHOISIS : un seul modèle pour les douze lignes d'un point de
-    ''' vente (GLOBAL), ou un modèle par nature de mouvement (PAR_NATURE).
+    ''' COMMENT LES LIBELLÉS DE LA PIÈCE SONT CHOISIS : un libellé par nature de mouvement
+    ''' (PAR_NATURE), ou un seul modèle pour les douze lignes d'un point de vente (GLOBAL).
     '''
-    ''' GLOBAL PAR DÉFAUT, et par défaut en cas de doute : une valeur mal orthographiée, une
-    ''' table absente, une base injoignable laissent le mode actuel. Basculer treize libellés
-    ''' d'un coup sur un malentendu de lecture n'est pas une option.
+    ''' CE MODE NE TOUCHE PAS LE FICHIER CORE BANKING, dont la colonne ADDLTEXT porte toujours
+    ''' la narrative unique du point de vente — rectificatif de la banque du 06/10/2026.
+    '''
+    ''' PAR_NATURE PAR DÉFAUT, et par défaut en cas de doute : une valeur mal orthographiée,
+    ''' une table absente, une base injoignable rendent la pièce telle que la banque la
+    ''' connaît. Effacer les douze libellés d'un coup sur un malentendu de lecture n'est pas
+    ''' une option.
     ''' </summary>
     Public Const CLE_NARRATIVE_MODE As String = "NARRATIVE_MODE"
 
     Public Const LIBELLE_NARRATIVE_MODE As String =
-        "GLOBAL : les douze lignes d'un point de vente portent le même libellé. PAR_NATURE : " &
-        "chaque ligne porte le libellé de sa nature de mouvement (table T_NarrativeNatureWU)."
+        "PAR_NATURE : chaque ligne de la pièce porte le libellé de sa nature de mouvement " &
+        "(table T_NarrativeNatureWU). GLOBAL : les douze lignes d'un point de vente portent " &
+        "le même libellé. Le fichier core banking porte toujours la narrative unique du point " &
+        "de vente, quel que soit ce mode."
 
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208

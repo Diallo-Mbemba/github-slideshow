@@ -232,6 +232,11 @@ BEGIN
         Credit              BIGINT          NOT NULL DEFAULT (0),
         CodeAgence          NVARCHAR(50)    NULL,
 
+        -- Narrative du fichier core banking : « LD WU ACTIVITE <point de vente>
+        -- <période> », demandée par la banque. Le LIBELLÉ ci-dessus dit ce que la ligne
+        -- EST ; celui-ci dit ce que le core banking en lira.
+        Narratif            NVARCHAR(255)   NULL,
+
         DateEnregistrement  DATETIME        NULL,
         EnregistrePar       NVARCHAR(100)   NULL,
 
@@ -406,4 +411,35 @@ PRINT N'';
 PRINT N'Annulation : une journee retiree sort des rapports d''activite, pas des livres';
 PRINT N'de la banque. Si le fichier core banking a ete injecte, l''extourne se demande';
 PRINT N'en comptabilite — Wincompense ne la fait pas.';
+GO
+
+-- =========================================================================
+-- La narrative du core banking, conservée avec la pièce
+--
+--    La banque a demandé que la colonne ADDLTEXT du fichier d'interface porte toujours
+--    « LD WU ACTIVITE <point de vente> <période> ». Les LIBELLÉS de la pièce, eux, continuent
+--    de dire ce que chaque ligne est : c'est un document que lit un comptable.
+--
+--    Les deux textes doivent donc être conservés. Sans cette colonne, une journée archivée
+--    aujourd'hui et dont on reproduirait le fichier core banking demain repartirait avec le
+--    LIBELLÉ en guise de narrative — sans erreur, sans message, et avec la mauvaise forme.
+--
+--    Idempotent : la colonne n'est ajoutée que si elle manque.
+-- =========================================================================
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceWU' AND schema_id = SCHEMA_ID(N'dbo'))
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_PieceWU') AND name = N'Narratif')
+BEGIN
+    ALTER TABLE dbo.T_PieceWU ADD Narratif NVARCHAR(255) NULL;
+    PRINT 'Colonne Narratif ajoutée à T_PieceWU.';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_PieceAnnuleeWU' AND schema_id = SCHEMA_ID(N'dbo'))
+   AND NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID(N'dbo.T_PieceAnnuleeWU') AND name = N'Narratif')
+BEGIN
+    ALTER TABLE dbo.T_PieceAnnuleeWU ADD Narratif NVARCHAR(255) NULL;
+    PRINT 'Colonne Narratif ajoutée à T_PieceAnnuleeWU.';
+END
 GO

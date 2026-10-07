@@ -181,7 +181,7 @@ Public NotInheritable Class CoreBankingService
         For Each ligne As DataRow In dtPiece.Rows
 
             Dim compte As String = Convert.ToString(ligne("Compte"), CultureInfo.InvariantCulture)
-            Dim libelle As String = Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
+            Dim narratif As String = NarratifDe(ligne)
             Dim codeAgence As String = CodeAgenceDe(ligne)
 
             Dim debit As Long = Convert.ToInt64(ligne("Debit"), CultureInfo.InvariantCulture)
@@ -191,11 +191,11 @@ Public NotInheritable Class CoreBankingService
             ' les auxiliaires de la pièce écartent déjà ce cas — mais une telle ligne n'aurait
             ' rien à impacter et n'a pas à encombrer le fichier.
             If debit <> 0L Then
-                Ajouter(table, compte, libelle, debit, True, codeAgence, dateValeur, numeroLot)
+                Ajouter(table, compte, narratif, debit, True, codeAgence, dateValeur, numeroLot)
             End If
 
             If credit <> 0L Then
-                Ajouter(table, compte, libelle, credit, False, codeAgence, dateValeur, numeroLot)
+                Ajouter(table, compte, narratif, credit, False, codeAgence, dateValeur, numeroLot)
             End If
         Next
 
@@ -208,13 +208,6 @@ Public NotInheritable Class CoreBankingService
     End Function
 
     ''' <summary>
-    ''' Refuse une pièce déséquilibrée.
-    '''
-    ''' Le contrôle est refait ici alors que la pièce a déjà été équilibrée à sa génération :
-    ''' ce fichier impacte des comptes réels, et rien ne garantit qu'il soit produit dans la
-    ''' foulée de la génération.
-    ''' </summary>
-    ''' <summary>
     ''' Refuse une pièce dont un narratif dépasse ce que le core banking accepte.
     '''
     ''' La banque a confirmé 150 caractères pour ADDLTEXT. Un narratif plus long serait
@@ -223,31 +216,45 @@ Public NotInheritable Class CoreBankingService
     ''' c'est-à-dire chez eux.
     '''
     ''' LE FICHIER N'EST PAS PRODUIT, ET ON NE TRONQUE PAS. Couper à 150 laisserait partir
-    ''' un libellé amputé à mi-mot, qui ne dirait plus de quel sous-agent il s'agit — un
+    ''' un narratif amputé à mi-mot, qui ne dirait plus de quel sous-agent il s'agit — un
     ''' défaut silencieux là où l'arrêt est bruyant. Le message nomme la ligne fautive et sa
-    ''' longueur, pour que la désignation soit raccourcie dans le référentiel.
+    ''' longueur, pour que le modèle de narrative, ou la désignation du point de vente, soit
+    ''' raccourci.
+    '''
+    ''' LE CONTRÔLE PORTE SUR CE QUI PART RÉELLEMENT, c'est-à-dire sur NarratifDe — la
+    ''' narrative du point de vente, et non le libellé de la pièce, qui lui n'est contraint
+    ''' que par les 255 caractères de la colonne.
     ''' </summary>
     Private Shared Function ControlerLesNarratifs(dtPiece As DataTable, ByRef messageErreur As String) As Boolean
 
         For Each ligne As DataRow In dtPiece.Rows
 
-            Dim narratif As String = Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
+            Dim narratif As String = NarratifDe(ligne)
             If narratif Is Nothing OrElse narratif.Length <= ConstantesWU.CB_NARRATIF_LONGUEUR_MAX Then Continue For
 
             messageErreur =
-                $"Un libellé dépasse ce que le core banking accepte : {narratif.Length} caractères " &
+                $"Un narratif dépasse ce que le core banking accepte : {narratif.Length} caractères " &
                 $"pour un maximum de {ConstantesWU.CB_NARRATIF_LONGUEUR_MAX}." &
                 Environment.NewLine & Environment.NewLine &
                 narratif & Environment.NewLine & Environment.NewLine &
-                "Le fichier n'est pas produit. Le libellé n'est pas tronqué non plus : coupé, il ne " &
-                "dirait plus de quel point de vente il s'agit. Raccourcissez la désignation de ce " &
-                "point de vente dans le référentiel, puis régénérez la pièce."
+                "Le fichier n'est pas produit. Le narratif n'est pas tronqué non plus : coupé, il ne " &
+                "dirait plus de quel point de vente il s'agit. Raccourcissez le modèle dans l'écran " &
+                "« Narrative comptable », ou la désignation de ce point de vente dans le référentiel, " &
+                "puis régénérez la pièce."
 
             Return False
         Next
 
         Return True
     End Function
+
+    ''' <summary>
+    ''' Refuse une pièce déséquilibrée.
+    '''
+    ''' Le contrôle est refait ici alors que la pièce a déjà été équilibrée à sa génération :
+    ''' ce fichier impacte des comptes réels, et rien ne garantit qu'il soit produit dans la
+    ''' foulée de la génération.
+    ''' </summary>
     Private Shared Function ControlerEquilibre(dtPiece As DataTable, ByRef messageErreur As String) As Boolean
 
         Dim totalDebit As Long = 0L
@@ -268,6 +275,31 @@ Public NotInheritable Class CoreBankingService
             "de la banque. Régénérez la pièce comptable."
 
         Return False
+    End Function
+
+    ''' <summary>
+    ''' LE NARRATIF QUE LE CORE BANKING VERRA, pour cette ligne de pièce.
+    '''
+    ''' LA PIÈCE COMPTABLE ET LE FICHIER CORE BANKING NE DISENT PAS LA MÊME CHOSE, et c'est
+    ''' la banque qui l'a voulu ainsi : sur la pièce, chaque ligne porte le libellé de SA
+    ''' NATURE (« LD COMPTE COURANT WESTERN UNION ETD », « LD TVA SUR COMMISSION WU »…) ;
+    ''' dans le fichier, les douze lignes d'un même point de vente portent UNE SEULE ET MÊME
+    ''' narrative, celle du point de vente. La pièce transporte les deux : son libellé dans
+    ''' la colonne Libelle, et la narrative du point de vente dans la colonne Narratif.
+    '''
+    ''' LA COLONNE PEUT MANQUER — pièce rechargée depuis une base antérieure à cette
+    ''' colonne, ou ligne d'écart d'arrondi, qui n'appartient à aucun point de vente et n'a
+    ''' donc pas de narrative à elle. On retombe alors sur le libellé, qui dit déjà ce que
+    ''' la ligne est : le fichier reste produisible dans tous les cas.
+    ''' </summary>
+    Private Shared Function NarratifDe(ligne As DataRow) As String
+
+        If ligne.Table.Columns.Contains("Narratif") AndAlso Not ligne.IsNull("Narratif") Then
+            Dim narratif As String = Convert.ToString(ligne("Narratif"), CultureInfo.InvariantCulture)
+            If Not String.IsNullOrWhiteSpace(narratif) Then Return narratif
+        End If
+
+        Return Convert.ToString(ligne("Libelle"), CultureInfo.InvariantCulture)
     End Function
 
     ''' <summary>

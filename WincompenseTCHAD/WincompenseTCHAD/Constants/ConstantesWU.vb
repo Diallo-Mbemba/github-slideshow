@@ -193,6 +193,56 @@ Public NotInheritable Class ConstantesWU
     ''' où l'abrégé serait ambigu, et les compensations de fin de mois y tombent.
     ''' </summary>
     Public Const PIECE_PERIODE_LONGUE_FORMAT As String = "DU {0:dd/MM/yyyy} AU {1:dd/MM/yyyy}"
+    ''' <summary>
+    ''' LES DOUZE LIBELLÉS DE LA PIÈCE, rendus à la banque le 06/10/2026 sur son rectificatif.
+    '''
+    ''' CE SONT DES GABARITS, et non plus des textes figés : ils emploient les mêmes repères
+    ''' que le modèle global — {AGENCE}, {PERIODE} — et servent de VALEUR PAR DÉFAUT à chaque
+    ''' nature de mouvement. La banque les édite dans l'écran « Narrative comptable », onglet
+    ''' des libellés par nature.
+    '''
+    ''' CE QUI A CHANGÉ, ET POURQUOI C'EST REVENU. La banque avait demandé UN SEUL texte sur
+    ''' les douze lignes, sur la pièce comme dans le fichier. Elle a rectifié : la narrative
+    ''' unique ne vaut que pour LE FICHIER CORE BANKING, colonne ADDLTEXT. La pièce comptable
+    ''' et son export Excel reprennent les libellés détaillés — ce que chaque ligne EST s'y
+    ''' lit de nouveau, sans avoir à déchiffrer un numéro de compte.
+    '''
+    ''' LES TEXTES SONT CEUX D'AVANT, À DEUX DÉTAILS PRÈS, ET LES VOICI.
+    '''
+    ''' LA CASSE RESTE EN MAJUSCULES. « Mettre les termes en majuscules » était une demande
+    ''' distincte de l'unification, et la banque ne l'a pas retirée — elle l'a confirmée.
+    ''' Elles sont posées par ModeleNarrativeWU.Appliquer, pas ici : écrire ces gabarits dans
+    ''' leur casse d'origine les laisse lisibles à l'écran de paramétrage, où la banque les
+    ''' relit.
+    '''
+    ''' LE DOUBLE ESPACE DE LA TTA SUR RÉCEPTION NE SURVIT PAS. Le référentiel de la banque
+    ''' porte « RECEPTION  DE FONDS », avec deux espaces ; il est écrit tel quel ci-dessous,
+    ''' mais ResorberLesEspaces les ramène à un — c'est elle qui empêche un repère vide de
+    ''' laisser un trou dans la phrase, et elle ne sait pas distinguer les deux cas. Le
+    ''' libellé sort donc « RECEPTION DE FONDS ». Si la banque tient au double espace, c'est
+    ''' ResorberLesEspaces qu'il faut revoir, et les trous reviendront avec.
+    ''' </summary>
+    Public Const NARRATIVE_MOUVEMENT_DEFAUT As String = "LD WU ACTIVITE {AGENCE} {PERIODE}"
+    Public Const NARRATIVE_COMPTE_COURANT_DEFAUT As String = "LD COMPTE COURANT WESTERN UNION ETD {PERIODE}"
+
+    Public Const NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT As String = "LD Commission sur Transfert_Ecobank {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT As String = "LD Commission sur Paiement_Ecobank {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_ENVOI_BANQUE_DEFAUT As String = "LD Commission sur Envoi_Ecobank {PERIODE}"
+
+    ' Les trois commissions d'un sous-agent nommaient le point de vente : le libellé seul ne
+    ' dirait pas DE QUI est la commission, trois sous-agents partageant la même pièce.
+    Public Const NARRATIVE_COMMISSION_TRANSFERT_SA_DEFAUT As String = "LD Commission sur Transfert_Sous-agence {AGENCE} {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_PAIEMENT_SA_DEFAUT As String = "LD Commission sur Paiement_Sous-agence {AGENCE} {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_ENVOI_SA_DEFAUT As String = "LD Commission sur Envoi_Sous-agence {AGENCE} {PERIODE}"
+
+    Public Const NARRATIVE_IMPOTS_TAXE_ENVOI_DEFAUT As String = "LD IMPOTS ET TAXE SUR ENVOI {PERIODE}"
+    Public Const NARRATIVE_TVA_DEFAUT As String = "LD TVA COLLECTEES WESTERN UNION {PERIODE}"
+    Public Const NARRATIVE_TTA_ENVOI_DEFAUT As String = "LD TTA (TAXE SUR TRANSFER DE FONDS WU) {PERIODE}"
+
+    ' Double espace avant « DE » : reproduit fidèlement le libellé du classeur de référence
+    ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception).
+    Public Const NARRATIVE_TTA_RECEPTION_DEFAUT As String = "LD TTA (TAXE SUR RECEPTION  DE FONDS WU) {PERIODE}"
+
     Public Const LIB_TVA As String = "TVA COLLECTEES WESTERN UNION"
     Public Const LIB_TTA_ENVOI As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
     ' Double espace avant "DE" : reproduit fidèlement le libellé du classeur de référence
