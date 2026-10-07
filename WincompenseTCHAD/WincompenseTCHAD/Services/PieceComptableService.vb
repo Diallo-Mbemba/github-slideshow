@@ -225,23 +225,29 @@ Public NotInheritable Class PieceComptableService
             ' La branche Else n'est atteinte QUE par une agence propre : un sous-agent sans
             ' compte de compensation n'est pas comptabilisable et a déjà été écarté plus haut
             ' par EstComptabilisable, tout comme un Account absent du paramétrage.
-            ' SA NATURE SUIT SON COMPTE, et non le type du point de vente : c'est le COMPTE
-            ' qui donne son libellé à la ligne. Sur un compte de compensation, qui n'appartient
-            ' qu'à ce sous-agent, la ligne porte son nom ; sur le compte inter bancaire, que
-            ' toutes les agences propres partagent, elle porte le nom DU COMPTE — « VIREMENTS
-            ' INTER-BANCAIRES EMIS ». La banque l'a relevé le 07/10/2026 : nommer ce compte
-            ' d'après l'agence ferait croire à un compte qui lui serait propre.
             Dim compteMouvement As String
-            Dim natureMouvement As NatureMouvementWU
-
             If String.Equals(calc.TypePdv, "SA", StringComparison.OrdinalIgnoreCase) AndAlso
                Not String.IsNullOrWhiteSpace(calc.CompteCompense) Then
                 compteMouvement = calc.CompteCompense
-                natureMouvement = NatureMouvementWU.Mouvement
             Else
                 compteMouvement = comptes.CompteInterBancaire
-                natureMouvement = NatureMouvementWU.MouvementInterBancaire
             End If
+
+            ' SA NATURE SUIT SON COMPTE, ET RIEN D'AUTRE. C'est le COMPTE qui donne son libellé
+            ' à la ligne : un compte de compensation n'appartient qu'à son sous-agent, et porte
+            ' donc son nom ; le compte inter bancaire est partagé, et porte le nom DU COMPTE —
+            ' « VIREMENTS INTER-BANCAIRES EMIS ». La banque l'a relevé le 07/10/2026, puis
+            ' précisé le lendemain : CHEZ LES SOUS-AGENTS AUSSI.
+            '
+            ' D'OÙ UNE COMPARAISON DE COMPTES, et non une reprise du If ci-dessus. Le type du
+            ' point de vente n'est pas la question : un sous-agent dont le référentiel porterait
+            ' le compte inter bancaire comme compte de compensation tomberait dans la première
+            ' branche, et sortirait avec son nom sur un compte qui n'est pas le sien. En lisant
+            ' le compte RETENU, la règle tient quel que soit le chemin qui y a mené.
+            Dim natureMouvement As NatureMouvementWU =
+                If(String.Equals(compteMouvement, comptes.CompteInterBancaire,
+                                 StringComparison.OrdinalIgnoreCase),
+                   NatureMouvementWU.MouvementInterBancaire, NatureMouvementWU.Mouvement)
 
             ' LES LIBELLÉS DES LIGNES DE CE POINT DE VENTE, un par nature de mouvement.
             '
@@ -647,6 +653,11 @@ Public NotInheritable Class PieceComptableService
     ''' <param name="cheminFichier">Chemin complet du .xlsx.</param>
     ''' <param name="nomPremiereFeuille">Onglet de la première feuille.</param>
     ''' <param name="intitulePremiereFeuille">Ligne d'identification de la première feuille.</param>
+    ''' <param name="pointDeVente">
+    ''' Le point de vente que porte la PREMIÈRE feuille, quand elle n'en porte qu'un. Sa RAISON
+    ''' le nomme alors, comme les douze lignes qu'elle résume. Nothing pour une pièce globale,
+    ''' qui les rassemble tous et n'en nomme aucun.
+    ''' </param>
     ''' <param name="derniereJournee">
     ''' Dernière journée couverte, quand le rapport en portait plusieurs. La pièce s'intitule
     ''' alors « activité du X au Y » au lieu d'annoncer une seule journée pour une semaine.
@@ -660,11 +671,12 @@ Public NotInheritable Class PieceComptableService
                                                       Optional intitulePremiereFeuille As String = "",
                                                       Optional agencePremiereFeuille As String = "",
                                                       Optional progression As ProgressionWU = Nothing,
-                                                      Optional derniereJournee As Date? = Nothing) As String
+                                                      Optional derniereJournee As Date? = Nothing,
+                                                      Optional pointDeVente As CalculWU = Nothing) As String
 
         Return PieceExcelWU.Ecrire(dtPiece, listeCalculs, dateActivite, cheminFichier,
                                    nomPremiereFeuille, intitulePremiereFeuille, agencePremiereFeuille,
-                                   progression, derniereJournee)
+                                   progression, derniereJournee, pointDeVente)
     End Function
 
     ''' <summary>

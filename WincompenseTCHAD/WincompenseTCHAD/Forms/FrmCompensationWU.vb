@@ -1509,6 +1509,10 @@ Public Class FrmCompensationWU
                 formulaire.IntitulePiece = PieceExcelWU.IntituleDe(calc)
                 formulaire.AgencePiece = PieceExcelWU.AgenceDe(calc)
 
+                ' SANS LUI, LA RAISON DE CETTE FEUILLE NE NOMMERAIT PERSONNE : elle passe par
+                ' le chemin de la pièce globale, qui ne nomme aucun point de vente.
+                formulaire.PointDeVente = calc
+
                 formulaire.ShowDialog(Me)
             End Using
 

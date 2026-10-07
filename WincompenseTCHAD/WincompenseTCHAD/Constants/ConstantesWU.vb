@@ -155,10 +155,14 @@ Public NotInheritable Class ConstantesWU
 
     ' Agence émettrice portée par l'en-tête, en face de « AGENCE: ».
     '
-    ' Elle VARIE d'une pièce à l'autre : chaque pièce de point de vente porte l'agence de
-    ' rattachement de ce point de vente. Cette constante n'est que le dernier recours — la
-    ' pièce globale, qui n'appartient à aucune agence, et le point de vente dont l'agence
-    ' n'est pas retrouvée dans le référentiel.
+    ' C'EST LE CODE DE L'AGENCE QUI S'Y ÉCRIT, et non son nom — demande de la banque du
+    ' 08/10/2026. Il VARIE d'une pièce à l'autre : chaque pièce de point de vente porte le
+    ' code de rattachement de ce point de vente, celui-là même qui alimente la colonne ACBRN
+    ' du fichier core banking.
+    '
+    ' Cette constante n'est que le dernier recours : la pièce globale, qui n'appartient à
+    ' aucune agence, et le point de vente dont ni le code agence ni l'Account ne sont
+    ' renseignés.
     Public Const PIECE_AGENCE_DEFAUT As String = "N'Djamena"
 
     ' Police du formulaire. Deux polices, comme le modèle : les intitulés en Arial Black,

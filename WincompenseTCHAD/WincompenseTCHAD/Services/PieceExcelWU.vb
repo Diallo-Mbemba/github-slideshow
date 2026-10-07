@@ -207,7 +207,8 @@ Public NotInheritable Class PieceExcelWU
                                   Optional intitulePremiereFeuille As String = "",
                                   Optional agencePremiereFeuille As String = "",
                                   Optional progression As ProgressionWU = Nothing,
-                                  Optional derniereJournee As Date? = Nothing) As String
+                                  Optional derniereJournee As Date? = Nothing,
+                                  Optional pointDeVente As CalculWU = Nothing) As String
 
         If dtGlobale Is Nothing OrElse dtGlobale.Rows.Count = 0 Then
             Throw New InvalidOperationException(
@@ -250,11 +251,6 @@ Public NotInheritable Class PieceExcelWU
             classeur = excelApp.Workbooks.Add()
             NeGarderQueLaPremiereFeuille(classeur)
 
-            ' Le référentiel des agences est lu UNE FOIS pour tout le classeur : une lecture
-            ' par feuille ferait cinquante allers-retours vers SQL Server pour une information
-            ' qui ne change pas pendant l'export.
-            Dim agences As Dictionary(Of String, String) = ChargerLesAgences()
-
             ' LE MODÈLE DE NARRATIVE, lu lui aussi UNE FOIS : la ligne RAISON de chaque feuille
             ' en sort, et les cinquante feuilles d'un classeur doivent annoncer la même phrase
             ' que les lignes qu'elles portent.
@@ -269,9 +265,9 @@ Public NotInheritable Class PieceExcelWU
 
             EcrireLaPremiereFeuille(classeur, dtGlobale, dateActivite, derniereJournee,
                                     nomPremiereFeuille, intitulePremiereFeuille,
-                                    agencePremiereFeuille, modeleNarrative)
+                                    agencePremiereFeuille, modeleNarrative, pointDeVente)
             EcrireLesPiecesIndividuelles(classeur, aDetailler, dateActivite, derniereJournee,
-                                         agences, progression, modeleNarrative)
+                                         progression, modeleNarrative)
 
             ' La première feuille est celle qu'on veut voir en ouvrant le classeur.
             classeur.Worksheets(1).Activate()
@@ -383,7 +379,8 @@ Public NotInheritable Class PieceExcelWU
     Private Shared Sub EcrireLaPremiereFeuille(classeur As Object, dtGlobale As DataTable,
                                                dateActivite As Date, derniereJournee As Date?,
                                                nomFeuille As String, intitule As String,
-                                               agence As String, modeleNarrative As String)
+                                               agence As String, modeleNarrative As String,
+                                               pointDeVente As CalculWU)
 
         ' LA PÉRIODE DE LA RAISON EST CELLE DES LIBELLÉS, et non celle des intitulés. Les
         ' deux existent : « activité du 08/09/2026 au 14/09/2026 » pour un titre de feuille,
@@ -391,8 +388,18 @@ Public NotInheritable Class PieceExcelWU
         ' « LD WU ACTIVITE … activité du … » aurait dit deux fois le même mot.
         '
         ' LA PIÈCE GLOBALE NE NOMME AUCUN POINT DE VENTE, puisqu'elle les rassemble tous : le
-        ' modèle reçoit donc trois valeurs vides, et les repères correspondants s'effacent
+        ' modèle reçoit alors trois valeurs vides, et les repères correspondants s'effacent
         ' sans laisser de trou dans la phrase.
+        '
+        ' MAIS CETTE FEUILLE N'EST PAS TOUJOURS GLOBALE. L'écran de contrôle exporte aussi la
+        ' pièce d'UN SEUL point de vente, et elle passe par ici : sa RAISON sortait alors sans
+        ' nom — « LD WU ACTIVITE DU 08 AU 14/09/2026 » — là où ses douze lignes nommaient leur
+        ' point de vente. La banque l'a relevé le 08/10/2026. Quand l'appelant fournit le point
+        ' de vente, la RAISON le nomme ; quand il ne le fournit pas, la feuille EST globale.
+        Dim designation As String = If(pointDeVente Is Nothing, String.Empty, pointDeVente.Designation)
+        Dim account As String = If(pointDeVente Is Nothing, String.Empty, pointDeVente.Account)
+        Dim codeAgence As String = If(pointDeVente Is Nothing, String.Empty, pointDeVente.CodeAgence)
+
         Dim contexte As New ContexteFeuille() With {
             .NomFeuille = If(String.IsNullOrWhiteSpace(nomFeuille), "PIECE GLOBALE", nomFeuille),
             .Intitule = If(String.IsNullOrWhiteSpace(intitule),
@@ -404,7 +411,7 @@ Public NotInheritable Class PieceExcelWU
             .AgenceEmettrice = If(String.IsNullOrWhiteSpace(agence),
                                   ConstantesWU.PIECE_AGENCE_DEFAUT, agence),
             .Raison = ModeleNarrativeWU.Appliquer(
-                          modeleNarrative, String.Empty, String.Empty, String.Empty,
+                          modeleNarrative, designation, account, codeAgence,
                           PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee))
         }
 
@@ -425,7 +432,6 @@ Public NotInheritable Class PieceExcelWU
                                                     aDetailler As List(Of CalculWU),
                                                     dateActivite As Date,
                                                     derniereJournee As Date?,
-                                                    agences As Dictionary(Of String, String),
                                                     progression As ProgressionWU,
                                                     modeleNarrative As String)
 
@@ -467,7 +473,7 @@ Public NotInheritable Class PieceExcelWU
                 .Intitule = IntituleDe(calc),
                 .DateActivite = dateActivite,
                 .Numero = NumeroDePiece(dateActivite, numero),
-                .AgenceEmettrice = AgenceDe(calc, agences),
+                .AgenceEmettrice = AgenceDe(calc),
                 .Raison = ModeleNarrativeWU.Appliquer(
                               modeleNarrative, calc.Designation, calc.Account, calc.CodeAgence,
                               PieceComptableService.SuffixeDePeriode(dateActivite, derniereJournee))
@@ -979,76 +985,26 @@ Public NotInheritable Class PieceExcelWU
     End Function
 
     ''' <summary>
-    ''' Le référentiel des agences, indexé par tout ce qui peut servir à les retrouver : leur
-    ''' Account (Codesite) ET leur code agence Voyager.
-    ''' 
-    ''' Un sous-agent porte le code agence de son rattachement ; une agence propre porte le sien.
-    ''' Les deux tombent dans le même dictionnaire, et une seule recherche suffit ensuite.
-    ''' 
-    ''' Une erreur SQL rend un dictionnaire vide plutôt que de faire échouer l'export : une pièce
-    ''' qui porte un code d'agence au lieu de son nom reste une pièce juste. Une pièce qu'on n'a
-    ''' pas pu produire, non.
+    ''' LE CODE DE L'AGENCE ÉMETTRICE, celui qui s'écrit en face de « AGENCE: ».
+    '''
+    ''' LE CODE, ET NON LE NOM. La banque l'a demandé le 08/10/2026 : « juste au-dessus du
+    ''' numéro de batch, à la place du nom il faut le code de l'agence ». C'est ce code-là qui
+    ''' alimente la colonne ACBRN du fichier core banking, et une pièce doit porter la même
+    ''' agence que l'écriture qu'elle justifie — sans quoi le rapprochement est à refaire.
+    '''
+    ''' Le référentiel des agences n'est donc plus lu du tout pour cette ligne : le code vit
+    ''' sur le CalculWU, il y est déjà, et une lecture SQL de moins est une panne de moins.
+    '''
+    ''' À DÉFAUT DE CODE, L'ACCOUNT : un point de vente dont le code agence n'est pas renseigné
+    ''' reste identifiable, et la pièce sort. Une pièce qu'on n'a pas pu produire, non.
     ''' </summary>
-    Private Shared Function ChargerLesAgences() As Dictionary(Of String, String)
-
-        Dim repertoire As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
-
-        Try
-            Dim messageErreur As String = String.Empty
-            Dim liste As List(Of PointDeVenteEC) = PdvRepository.ListerAgences(String.Empty, messageErreur)
-
-            If liste Is Nothing Then Return repertoire
-
-            For Each agence As PointDeVenteEC In liste
-
-                Dim nom As String = If(agence.Designation, String.Empty).Trim()
-                If nom.Length = 0 Then Continue For
-
-                Dim codeSite As String = If(agence.CodeSite, String.Empty).Trim()
-                If codeSite.Length > 0 Then repertoire(codeSite) = nom
-
-                Dim codeVoyager As String = If(agence.CodeAgenceVoyager, String.Empty).Trim()
-                If codeVoyager.Length > 0 Then repertoire(codeVoyager) = nom
-            Next
-
-        Catch ex As Exception
-            ' Base injoignable ou droits manquants : voir la remarque ci-dessus.
-        End Try
-
-        Return repertoire
-    End Function
-
-    ''' <summary>Agence émettrice d'un point de vente, référentiel lu à la volée.</summary>
     Public Shared Function AgenceDe(calc As CalculWU) As String
-        Return AgenceDe(calc, ChargerLesAgences())
-    End Function
 
-    ''' <summary>
-    ''' Agence émettrice d'une pièce de point de vente, du plus précis au plus vague : le nom de
-    ''' l'agence de rattachement, sinon son code, sinon l'agence par défaut.
-    ''' 
-    ''' Une agence propre est sa propre agence émettrice ; un sous-agent relève de celle qui le
-    ''' porte dans ses livres — la même que la colonne ACBRN du fichier core banking.
-    ''' </summary>
-    Private Shared Function AgenceDe(calc As CalculWU, agences As Dictionary(Of String, String)) As String
+        Dim code As String = If(calc.CodeAgence, String.Empty).Trim()
+        If code.Length > 0 Then Return code
 
-        Dim nom As String = String.Empty
-
-        If agences IsNot Nothing Then
-
-            Dim code As String = If(calc.CodeAgence, String.Empty).Trim()
-            If code.Length > 0 Then agences.TryGetValue(code, nom)
-
-            ' Une agence propre se retrouve aussi par son Account, quand son code agence
-            ' Voyager n'est pas renseigné dans le référentiel.
-            If String.IsNullOrEmpty(nom) Then
-                Dim account As String = If(calc.Account, String.Empty).Trim()
-                If account.Length > 0 Then agences.TryGetValue(account, nom)
-            End If
-        End If
-
-        If Not String.IsNullOrEmpty(nom) Then Return nom
-        If Not String.IsNullOrWhiteSpace(calc.CodeAgence) Then Return calc.CodeAgence.Trim()
+        Dim account As String = If(calc.Account, String.Empty).Trim()
+        If account.Length > 0 Then Return account
 
         Return ConstantesWU.PIECE_AGENCE_DEFAUT
     End Function

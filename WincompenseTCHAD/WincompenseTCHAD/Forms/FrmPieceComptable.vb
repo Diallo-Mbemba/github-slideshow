@@ -80,6 +80,17 @@ Public Class FrmPieceComptable
     ''' </summary>
     Public Property AgencePiece As String = String.Empty
 
+    ''' <summary>
+    ''' Le point de vente de cette pièce, quand elle n'en porte qu'un. Sa RAISON le nomme
+    ''' alors, comme les douze lignes qu'elle résume. Nothing pour la pièce globale.
+    '''
+    ''' SANS LUI, LA RAISON SORTAIT MUETTE. L'écran de contrôle exporte la pièce d'un seul
+    ''' point de vente par le chemin de la pièce globale, qui n'en nomme aucun : la feuille
+    ''' annonçait « LD WU ACTIVITE DU 08 AU 14/09/2026 » au-dessus de douze lignes qui, elles,
+    ''' nommaient leur point de vente. La banque l'a relevé le 08/10/2026.
+    ''' </summary>
+    Public Property PointDeVente As CalculWU = Nothing
+
     ''' <summary>Constructeur sans paramètre requis par le Concepteur Windows Forms.</summary>
     Public Sub New()
         InitializeComponent()
@@ -319,7 +330,7 @@ Public Class FrmPieceComptable
             PieceComptableService.ExporterEtOuvrirPieceExcel(
                 _dtPiece, CalculsAExporter(), DateActivite, chemin,
                 NomPremiereFeuille, IntitulePiece, AgencePiece, avancement.Progression,
-                DerniereJournee)
+                DerniereJournee, PointDeVente)
 
             _exportee = True
             _chemin = chemin
