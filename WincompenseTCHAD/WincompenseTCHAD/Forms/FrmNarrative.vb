@@ -25,8 +25,8 @@ Imports System.Windows.Forms
 '''     « Commission sur Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… C'est ce que
 '''     porte LA PIÈCE COMPTABLE, ligne à ligne, et c'est le mode par défaut. Ni « LD » ni
 '''     période : ils appartiennent à la narrative, en bas de pièce et dans ADDLTEXT.
-'''     CES LIBELLÉS SORTENT TELS QU'ILS SONT ÉCRITS — casse et espaces compris, parce que
-'''     c'est la pièce manuelle de la banque qu'ils doivent reproduire.
+'''     CES LIBELLÉS SORTENT EN MAJUSCULES, et avec LEURS ESPACES — c'est la pièce manuelle
+'''     de la banque qu'ils doivent reproduire, et elle écrit « RECEPTION  DE FONDS ».
 '''
 ''' LA BASCULE NE CONCERNE QUE LA PIÈCE. « Un seul libellé » étend le modèle du point de vente
 ''' aux douze lignes de la pièce, où ce que chaque ligne EST se lit alors dans son seul numéro
@@ -140,10 +140,10 @@ Public Class FrmNarrative
     End Function
 
     ''' <summary>
-    ''' LE LIBELLÉ rendu sur le pire cas du référentiel, tel qu'il sortira sur la PIÈCE : ce
-    ''' que la banque a écrit, sans majuscules ajoutées ni espaces résorbés. L'aperçu d'une
-    ''' nature doit montrer CE rendu-là, sans quoi l'écran promettrait des majuscules que la
-    ''' pièce ne porterait pas.
+    ''' LE LIBELLÉ rendu sur le pire cas du référentiel, tel qu'il sortira sur la PIÈCE : en
+    ''' majuscules, mais sans résorber les espaces. L'aperçu d'une nature doit montrer CE
+    ''' rendu-là, sans quoi l'écran afficherait un double espace que la pièce n'aurait pas —
+    ''' ou l'inverse.
     ''' </summary>
     Private Function RenduPireCasDuLibelle(modele As String) As String
 

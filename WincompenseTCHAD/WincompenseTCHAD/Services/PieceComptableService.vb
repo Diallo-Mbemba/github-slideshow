@@ -237,8 +237,8 @@ Public NotInheritable Class PieceComptableService
             '
             ' CHAQUE LIGNE DE LA PIÈCE PORTE LE LIBELLÉ DE SA NATURE — « COMPTE COURANT
             ' WESTERN UNION ETD », « Commission sur Transfert_Ecobank », « TVA COLLECTEES
-            ' WESTERN UNION »… C'est la pièce manuelle de la banque, au caractère près : ni
-            ' préfixe « LD », ni période, et la casse qu'elle écrit. C'est le mode par défaut.
+            ' WESTERN UNION »… C'est la pièce manuelle de la banque : ni préfixe « LD », ni
+            ' période, en majuscules, et avec ses espaces à elle. C'est le mode par défaut.
             '
             ' SEUL LE FICHIER CORE BANKING porte une seule et même narrative pour les douze
             ' lignes du point de vente (narratifPdv, juste en dessous), et c'est elle aussi

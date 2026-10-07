@@ -165,12 +165,10 @@ Public NotInheritable Class NarrativesWU
     ''' <summary>
     ''' Le libellé d'une ligne de cette nature, prêt à être posé dans la pièce.
     '''
-    ''' RENDU PAR AppliquerAuLibelle, ET NON PAR Appliquer : ce texte va sur la PIÈCE, où la
-    ''' banque veut lire ce qu'elle a écrit — « Commission sur Transfert_Ecobank » en casse
-    ''' mixte, « TTA (TAXE SUR RECEPTION  DE FONDS WU) » avec ses deux espaces. Les majuscules
-    ''' et la résorption des espaces sont des règles de forme de la NARRATIVE, celle de la
-    ''' RAISON et du fichier core banking ; les imposer ici ferait diverger la pièce produite
-    ''' de la pièce manuelle sur chaque ligne.
+    ''' RENDU PAR AppliquerAuLibelle, ET NON PAR Appliquer. Les deux mettent en majuscules —
+    ''' la banque les veut sur la pièce comme sur la narrative — mais celui-ci NE RÉSORBE PAS
+    ''' LES ESPACES : la pièce manuelle écrit « TTA (TAXE SUR RECEPTION  DE FONDS WU) » avec
+    ''' deux espaces, et c'est elle que la Direction Comptable rapproche ligne à ligne.
     ''' </summary>
     Public Function Libelle(nature As NatureMouvementWU, designation As String, account As String,
                             codeAgence As String, periode As String) As String

@@ -207,20 +207,20 @@ Public NotInheritable Class ConstantesWU
     ''' et son export Excel reprennent les libellés détaillés — ce que chaque ligne EST s'y
     ''' lit de nouveau, sans avoir à déchiffrer un numéro de compte.
     '''
-    ''' LES TEXTES SONT CEUX DE LA PIÈCE MANUELLE DE LA BANQUE, AU CARACTÈRE PRÈS — la casse
-    ''' mixte de « Commission sur Transfert_Ecobank » comme le double espace de « RECEPTION  DE
-    ''' FONDS ». C'est ce document-là que la Direction Comptable rapproche ligne à ligne ; un
-    ''' libellé qui n'en diffère que par une majuscule lui coûte une vérification de plus.
+    ''' LES TEXTES SONT CEUX DE LA PIÈCE MANUELLE DE LA BANQUE, y compris le double espace de
+    ''' « RECEPTION  DE FONDS ». C'est ce document-là que la Direction Comptable rapproche
+    ''' ligne à ligne, et le moindre espace y compte.
     '''
     ''' NI PRÉFIXE « LD », NI PÉRIODE. Les deux appartiennent à la NARRATIVE — celle de la
     ''' RAISON, en bas de pièce, et celle de la colonne ADDLTEXT du core banking, qui s'écrit
     ''' « LD WU ACTIVITE &lt;point de vente&gt; &lt;période&gt; ». Un libellé de ligne, lui, dit
     ''' ce que la ligne EST, et la période se lit une fois pour toute la pièce.
     '''
-    ''' LES MAJUSCULES NE SONT PAS POSÉES ICI, ET PAS POSÉES DU TOUT SUR LA PIÈCE : c'est
-    ''' AppliquerAuLibelle qui rend ces gabarits, et il rend ce qui est écrit. La narrative,
-    ''' elle, continue de passer par Appliquer, qui met en majuscules — la banque l'a demandé
-    ''' pour elle, et l'a confirmé.
+    ''' LES MAJUSCULES NE SONT PAS POSÉES ICI, MAIS AU RENDU : AppliquerAuLibelle les applique,
+    ''' comme Appliquer le fait pour la narrative. La banque les veut sur les deux. Les écrire
+    ''' ci-dessous dans la casse de son classeur garde ces gabarits lisibles dans l'écran de
+    ''' paramétrage, où elle les relit — « Commission sur Transfert_Ecobank » sort
+    ''' « COMMISSION SUR TRANSFERT_ECOBANK ».
     '''
     ''' CE SONT DES VALEURS PAR DÉFAUT, PAS DES TEXTES FIGÉS. La banque les réécrit dans
     ''' l'écran « Narrative comptable » ; une nature qu'elle n'a pas touchée suit celle-ci.

@@ -7,13 +7,13 @@ Option Explicit On
 ''' DEUX RENDUS, PARCE QUE DEUX DESTINATIONS. Appliquer produit LA NARRATIVE DU POINT DE
 ''' VENTE — « LD WU ACTIVITE <point de vente> <période> », en majuscules, espaces résorbés —
 ''' que le core banking reçoit dans ADDLTEXT et que la RAISON reprend en bas de pièce.
-''' AppliquerAuLibelle produit LE LIBELLÉ D'UNE LIGNE, et rend ce qui est écrit, casse et
-''' espaces compris : la pièce doit reproduire la pièce manuelle de la banque, qui écrit
-''' « Commission sur Transfert_Ecobank » et « TTA (TAXE SUR RECEPTION  DE FONDS WU) ».
+''' AppliquerAuLibelle produit LE LIBELLÉ D'UNE LIGNE : majuscules elles aussi — la banque
+''' les veut partout — mais LES ESPACES INTACTS, parce que la pièce doit reproduire la pièce
+''' manuelle, qui écrit « TTA (TAXE SUR RECEPTION  DE FONDS WU) » avec deux espaces.
 '''
 ''' LES CONFONDRE, C'ÉTAIT IMPOSER À LA PIÈCE LES RÈGLES DE FORME DU CORE BANKING. Elles ne
 ''' se ressemblent que de loin : l'une est une phrase de système, l'autre un document que la
-''' Direction Comptable rapproche ligne à ligne.
+''' Direction Comptable rapproche ligne à ligne, et dont le moindre espace compte.
 '''
 ''' POURQUOI UN MODÈLE, ET NON UNE CONSTANTE DE PLUS
 '''
@@ -26,10 +26,9 @@ Option Explicit On
 '''
 ''' CE QU'IL NE REND PAS PARAMÉTRABLE, ET C'EST VOULU
 '''
-'''   — LES MAJUSCULES DE LA NARRATIVE sont posées ici, pas laissées à la saisie. C'est une
-'''     règle de forme du core banking, et une saisie en minuscules suffirait à faire sortir
-'''     une journée qui ne ressemble pas aux autres. Les LIBELLÉS, eux, n'en reçoivent
-'''     aucune : ce que la banque écrit est ce que sa pièce porte.
+'''   — LES MAJUSCULES sont posées ici, pas laissées à la saisie, et sur LES DEUX rendus :
+'''     une seule saisie en minuscules suffirait à faire sortir une ligne qui ne ressemble pas
+'''     aux onze autres. Elles sont INVARIANTES — le « i » turc deviendrait « İ ».
 '''   — LA PÉRIODE s'écrit toujours de la même façon (PieceComptableService.SuffixeDePeriode).
 '''     La banque choisit OÙ elle se place dans la phrase, pas comment elle s'écrit : une date
 '''     mal formée dans un narratif comptable ne se rattrape pas après coup.
@@ -147,13 +146,23 @@ Public NotInheritable Class ModeleNarrativeWU
     End Function
 
     ''' <summary>
-    ''' LE LIBELLÉ D'UNE LIGNE DE PIÈCE : jetons remplacés, ET RIEN D'AUTRE.
+    ''' LE LIBELLÉ D'UNE LIGNE DE PIÈCE : jetons remplacés, MAJUSCULES, et les espaces tels
+    ''' que la banque les a écrits.
     '''
-    ''' CE QUE LA BANQUE ÉCRIT EST CE QUE LA PIÈCE PORTE, au caractère près. Sa pièce manuelle
-    ''' — celle que la Direction Comptable rapproche ligne à ligne — écrit « Commission sur
-    ''' Transfert_Ecobank » en casse mixte et « TTA (TAXE SUR RECEPTION  DE FONDS WU) » avec
-    ''' deux espaces. Mettre en majuscules ou résorber les espaces ici ferait diverger les deux
-    ''' documents sur chaque ligne, et c'est le rapprochement qui en pâtirait.
+    ''' LES MAJUSCULES SONT UNE RÈGLE, PAS UNE SAISIE, et la banque les veut sur la pièce comme
+    ''' sur la narrative : « Commission sur Transfert_Ecobank » sort « COMMISSION SUR
+    ''' TRANSFERT_ECOBANK ». Les poser ici plutôt que de les attendre du gabarit évite qu'une
+    ''' seule saisie en minuscules, dans l'écran de paramétrage, fasse sortir une ligne qui ne
+    ''' ressemble pas aux onze autres.
+    '''
+    ''' INVARIANTES, et non celles du poste : le « i » turc deviendrait « İ », et un poste
+    ''' réglé en turc produirait des libellés différents de ceux des autres postes.
+    '''
+    ''' LES ESPACES, EUX, NE SONT PAS TOUCHÉS. La pièce manuelle de la banque — celle que la
+    ''' Direction Comptable rapproche ligne à ligne — écrit « TTA (TAXE SUR RECEPTION  DE FONDS
+    ''' WU) » avec deux espaces. Les résorber ferait diverger les deux documents sur cette
+    ''' ligne, et c'est le rapprochement qui en pâtirait. C'est là toute la différence avec
+    ''' Appliquer, qui les résorbe parce que le core banking n'a pas de pièce à rapprocher.
     '''
     ''' UN JETON VIDE EMPORTE UN ESPACE AVEC LUI, celui qui le précède, à défaut celui qui le
     ''' suit. C'est ce qui évite le trou de « Commission sur Transfert_Sous-agence  » sans
@@ -164,7 +173,8 @@ Public NotInheritable Class ModeleNarrativeWU
                                               account As String, codeAgence As String,
                                               periode As String) As String
 
-        Return Substituer(modele, designation, account, codeAgence, periode, True).Trim()
+        Return Substituer(
+            modele, designation, account, codeAgence, periode, True).Trim().ToUpperInvariant()
     End Function
 
     ''' <summary>
@@ -284,12 +294,12 @@ Public NotInheritable Class ModeleNarrativeWU
     ''' ADDLTEXT : il va dans la colonne Libelle de T_PieceWU, un NVARCHAR(255). Lui imposer
     ''' la limite du core banking ferait refuser à l'écran un libellé que la pièce accepte
     ''' parfaitement. Le paramètre pourLaPiece dit laquelle des deux destinations on contrôle,
-    ''' et il commande AUSSI le rendu : un libellé se mesure tel qu'il sortira, sans majuscules
-    ''' ni espaces résorbés.
+    ''' et il commande AUSSI le rendu : un libellé se mesure tel qu'il sortira, espaces non
+    ''' résorbés.
     ''' </summary>
     ''' <param name="pourLaPiece">
     ''' Vrai pour un libellé de ligne (255 caractères, rendu tel quel), faux pour la narrative
-    ''' du point de vente (150 caractères, rendue en majuscules).
+    ''' du point de vente (150 caractères, espaces résorbés).
     ''' </param>
     Public Shared Function Controler(modele As String,
                                      pireDesignation As String, pireAccount As String,
