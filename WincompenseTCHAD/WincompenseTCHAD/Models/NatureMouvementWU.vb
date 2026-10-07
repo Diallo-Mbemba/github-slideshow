@@ -60,7 +60,8 @@ Public Enum NatureMouvementWU
     ''' Écart d'arrondi, posé en fin de pièce sur le compte inter bancaire.
     '''
     ''' ELLE N'EST PAS COMME LES DOUZE AUTRES, et c'est écrit dans NarrativesWU : elle ne se
-    ''' rattache ni à un point de vente ni à une période, les deux repères du modèle global.
+    ''' rattache à aucun point de vente, le repère principal du modèle global — sa période,
+    ''' elle, est bien celle de la pièce.
     ''' Elle garde donc TOUJOURS son libellé propre, dans les deux modes.
     ''' </summary>
     EcartArrondi = 13

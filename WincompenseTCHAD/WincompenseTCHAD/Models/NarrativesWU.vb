@@ -18,8 +18,9 @@ Public Enum ModeNarrativeWU
     ''' <summary>
     ''' UN LIBELLÉ PAR NATURE DE MOUVEMENT : « COMPTE COURANT WESTERN UNION ETD »,
     ''' « Commission sur Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… C'EST LE MODE
-    ''' PAR DÉFAUT, celui de la pièce manuelle de la banque. Ni préfixe « LD » ni période : ils
-    ''' appartiennent à la narrative. Une nature laissée vide retombe sur ce libellé-là.
+    ''' PAR DÉFAUT, celui de la pièce manuelle de la banque, suivi de la période. Pas de
+    ''' préfixe « LD » : il appartient à la narrative. Une nature laissée vide retombe sur ce
+    ''' libellé-là.
     ''' </summary>
     ParNature = 2
 End Enum
@@ -131,10 +132,10 @@ Public NotInheritable Class NarrativesWU
     ''' Le modèle qui s'applique à cette nature, mode compris.
     '''
     ''' L'ÉCART D'ARRONDI EST TRAITÉ À PART, DANS LES DEUX MODES. Il est posé APRÈS la pièce,
-    ''' pour absorber la différence globale, et ne se rattache ni à un point de vente ni à une
-    ''' période — les deux repères du modèle global. Lui appliquer ce modèle le réduirait à
-    ''' « LD WU ACTIVITE », c'est-à-dire à une ligne qui ne dit plus ce qu'elle est. Il garde
-    ''' donc son texte propre, que la banque peut éditer comme les autres.
+    ''' pour absorber la différence globale, et ne se rattache à AUCUN point de vente — le
+    ''' repère principal du modèle global. Lui appliquer ce modèle le réduirait à « LD WU
+    ''' ACTIVITE », c'est-à-dire à une ligne qui ne dit plus ce qu'elle est. Il garde donc son
+    ''' texte propre, période comprise, que la banque peut éditer comme les autres.
     '''
     ''' UNE NATURE LAISSÉE VIDE RETOMBE SUR SON LIBELLÉ HISTORIQUE, et non sur le modèle
     ''' global. C'est le rectificatif de la banque du 06/10/2026 : la narrative unique ne vaut
@@ -148,8 +149,7 @@ Public NotInheritable Class NarrativesWU
         If _modeles.ContainsKey(nature) Then Return _modeles(nature)
 
         ' L'ÉCART D'ARRONDI NE SUIT JAMAIS LE MODÈLE GLOBAL. Posé après la pièce, il ne se
-        ' rattache ni à un point de vente ni à une période : le modèle global le réduirait à
-        ' « LD WU ACTIVITE ».
+        ' rattache à aucun point de vente : le modèle global le réduirait à « LD WU ACTIVITE ».
         If nature = NatureMouvementWU.EcartArrondi Then Return ConstantesWU.NARRATIVE_ECART_DEFAUT
 
         If _mode = ModeNarrativeWU.ModeleUnique Then Return _modeleGlobal

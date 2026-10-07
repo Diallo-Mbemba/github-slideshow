@@ -31,8 +31,9 @@
     L'ÉCART D'ARRONDI FAIT EXCEPTION, ET DANS LES DEUX MODES
 
     Sa ligne est posée APRÈS la pièce, pour absorber la différence globale : elle ne se
-    rattache ni à un point de vente ni à une période, les deux repères du modèle global. Lui
-    appliquer ce modèle la réduirait à « LD WU ACTIVITE ». Elle garde donc son texte propre —
+    rattache à AUCUN point de vente, le repère principal du modèle global. Lui appliquer ce
+    modèle la réduirait à « LD WU ACTIVITE ». Elle garde donc son texte propre — avec sa
+    période, comme les douze autres, car elle appartient bien à cette pièce-ci —
     « ECART D'ARRONDI - COMPTE INTER BANCAIRE », valeur par défaut du code — que la banque
     peut éditer comme les autres.
 

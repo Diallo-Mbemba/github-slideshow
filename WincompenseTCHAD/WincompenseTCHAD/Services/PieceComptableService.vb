@@ -524,7 +524,9 @@ Public NotInheritable Class PieceComptableService
     ''' <returns>True si la pièce est utilisable (équilibrée ou écart absorbé), False si l'anomalie bloque la génération.</returns>
     Public Shared Function VerifierEquilibrePiece(dtPiece As DataTable, ByRef messageControle As String,
                                                   ByRef ecartAbsorbe As Long,
-                                                  ByRef compteEcart As String) As Boolean
+                                                  ByRef compteEcart As String,
+                                                  Optional debutPeriode As Date? = Nothing,
+                                                  Optional finPeriode As Date? = Nothing) As Boolean
 
         ' Posés AVANT tout contrôle : une pièce vide, ou un écart hors seuil, ne doit pas
         ' laisser l'appelant avec les valeurs d'une génération précédente.
@@ -550,15 +552,24 @@ Public NotInheritable Class PieceComptableService
         Dim compteDAttente As String = ComptesSystemeWU.Actuels.CompteInterBancaire
 
         ' SON LIBELLÉ VIENT DU PARAMÉTRAGE, COMME LES DOUZE AUTRES — mais de SA NATURE, et
-        ' dans les DEUX modes. Cette ligne est posée après la pièce et ne se rattache ni à un
-        ' point de vente ni à une période : le modèle global la réduirait à « LD WU ACTIVITE ».
-        ' La banque peut l'éditer, dans l'onglet des libellés par nature.
+        ' dans les DEUX modes. Cette ligne est posée après la pièce et ne se rattache à aucun
+        ' point de vente : le modèle global la réduirait à « LD WU ACTIVITE ». La banque peut
+        ' l'éditer, dans l'onglet des libellés par nature.
         '
-        ' LES QUATRE REPÈRES SONT VIDES, et c'est exact : il n'y a ici ni désignation, ni
-        ' Account, ni code agence, ni période. Un repère vide ne laisse pas de trou dans la
-        ' phrase — ModeleNarrativeWU résorbe les espaces.
+        ' ELLE PORTE LA PÉRIODE, COMME LES DOUZE AUTRES. Elle n'appartient à aucun point de
+        ' vente, mais elle appartient bien à CETTE pièce-ci, et une ligne d'écart sans date
+        ' serait la seule du bordereau à ne pas dire ce qu'elle couvre.
+        '
+        ' LES TROIS AUTRES REPÈRES SONT VIDES, et c'est exact : il n'y a ici ni désignation,
+        ' ni Account, ni code agence. Un repère vide ne laisse pas de trou dans la phrase — il
+        ' emporte un espace avec lui.
+        '
+        ' PÉRIODE ABSENTE : l'appelant qui ne la fournit pas obtient le libellé sans elle,
+        ' plutôt qu'une pièce qui ne sort pas. C'est le cas des deux écrans qui n'appellent
+        ' pas cette fonction pour poser un écart, mais pour contrôler.
         Dim libelleEcart As String = NarrativeRepository.EnVigueur().Libelle(
-            NatureMouvementWU.EcartArrondi, String.Empty, String.Empty, String.Empty, String.Empty)
+            NatureMouvementWU.EcartArrondi, String.Empty, String.Empty, String.Empty,
+            SuffixeDePeriode(debutPeriode, finPeriode))
 
         If differenceGlobale > 0D AndAlso differenceGlobale <= ConstantesWU.SEUIL_ECART_TOLERE Then
             ' AUCUNE NARRATIVE DE POINT DE VENTE ICI, et c'est voulu : cette ligne

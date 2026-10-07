@@ -211,10 +211,13 @@ Public NotInheritable Class ConstantesWU
     ''' « RECEPTION  DE FONDS ». C'est ce document-là que la Direction Comptable rapproche
     ''' ligne à ligne, et le moindre espace y compte.
     '''
-    ''' NI PRÉFIXE « LD », NI PÉRIODE. Les deux appartiennent à la NARRATIVE — celle de la
-    ''' RAISON, en bas de pièce, et celle de la colonne ADDLTEXT du core banking, qui s'écrit
-    ''' « LD WU ACTIVITE &lt;point de vente&gt; &lt;période&gt; ». Un libellé de ligne, lui, dit
-    ''' ce que la ligne EST, et la période se lit une fois pour toute la pièce.
+    ''' PAS DE PRÉFIXE « LD » : il appartient à la NARRATIVE — celle de la RAISON, en bas de
+    ''' pièce, et celle de la colonne ADDLTEXT du core banking, qui s'écrit « LD WU ACTIVITE
+    ''' &lt;point de vente&gt; &lt;période&gt; ».
+    '''
+    ''' LA PÉRIODE, ELLE, EST SUR LES TREIZE, et la banque y tient : une ligne de grand livre
+    ''' doit dire ce qu'elle couvre sans qu'on ait à remonter à l'en-tête de la pièce. Elle
+    ''' est en FIN de phrase sur les treize, pour que la nature se lise d'abord.
     '''
     ''' LES MAJUSCULES NE SONT PAS POSÉES ICI, MAIS AU RENDU : AppliquerAuLibelle les applique,
     ''' comme Appliquer le fait pour la narrative. La banque les veut sur les deux. Les écrire
@@ -228,28 +231,28 @@ Public NotInheritable Class ConstantesWU
 
     ' La ligne de mouvement porte le NOM DU POINT DE VENTE, et rien d'autre : son compte est
     ' celui de sa compensation, et la pièce le nomme déjà en en-tête.
-    Public Const NARRATIVE_MOUVEMENT_DEFAUT As String = "{AGENCE}"
+    Public Const NARRATIVE_MOUVEMENT_DEFAUT As String = "{AGENCE} {PERIODE}"
 
-    Public Const NARRATIVE_COMPTE_COURANT_DEFAUT As String = "COMPTE COURANT WESTERN UNION ETD"
+    Public Const NARRATIVE_COMPTE_COURANT_DEFAUT As String = "COMPTE COURANT WESTERN UNION ETD {PERIODE}"
 
-    Public Const NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT As String = "Commission sur Transfert_Ecobank"
-    Public Const NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT As String = "Commission sur Paiement_Ecobank"
-    Public Const NARRATIVE_COMMISSION_ENVOI_BANQUE_DEFAUT As String = "Commission sur Envoi_Ecobank"
+    Public Const NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT As String = "Commission sur Transfert_Ecobank {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT As String = "Commission sur Paiement_Ecobank {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_ENVOI_BANQUE_DEFAUT As String = "Commission sur Envoi_Ecobank {PERIODE}"
 
     ' Les trois commissions d'un sous-agent nomment le point de vente : le libellé seul ne
     ' dirait pas DE QUI est la commission, trois sous-agents partageant la même pièce.
-    Public Const NARRATIVE_COMMISSION_TRANSFERT_SA_DEFAUT As String = "Commission sur Transfert_Sous-agence {AGENCE}"
-    Public Const NARRATIVE_COMMISSION_PAIEMENT_SA_DEFAUT As String = "Commission sur Paiement_Sous-agence {AGENCE}"
-    Public Const NARRATIVE_COMMISSION_ENVOI_SA_DEFAUT As String = "Commission sur Envoi_Sous-agence {AGENCE}"
+    Public Const NARRATIVE_COMMISSION_TRANSFERT_SA_DEFAUT As String = "Commission sur Transfert_Sous-agence {AGENCE} {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_PAIEMENT_SA_DEFAUT As String = "Commission sur Paiement_Sous-agence {AGENCE} {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_ENVOI_SA_DEFAUT As String = "Commission sur Envoi_Sous-agence {AGENCE} {PERIODE}"
 
-    Public Const NARRATIVE_IMPOTS_TAXE_ENVOI_DEFAUT As String = "IMPOTS ET TAXE SUR ENVOI"
-    Public Const NARRATIVE_TVA_DEFAUT As String = "TVA COLLECTEES WESTERN UNION"
-    Public Const NARRATIVE_TTA_ENVOI_DEFAUT As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
+    Public Const NARRATIVE_IMPOTS_TAXE_ENVOI_DEFAUT As String = "IMPOTS ET TAXE SUR ENVOI {PERIODE}"
+    Public Const NARRATIVE_TVA_DEFAUT As String = "TVA COLLECTEES WESTERN UNION {PERIODE}"
+    Public Const NARRATIVE_TTA_ENVOI_DEFAUT As String = "TTA (TAXE SUR TRANSFER DE FONDS WU) {PERIODE}"
 
     ' Double espace avant « DE » : reproduit fidèlement le libellé du classeur de référence
     ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception). Il survit
     ' désormais au rendu — AppliquerAuLibelle ne résorbe pas les espaces.
-    Public Const NARRATIVE_TTA_RECEPTION_DEFAUT As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU)"
+    Public Const NARRATIVE_TTA_RECEPTION_DEFAUT As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU) {PERIODE}"
 
     Public Const LIB_TVA As String = "TVA COLLECTEES WESTERN UNION"
     Public Const LIB_TTA_ENVOI As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
@@ -257,13 +260,17 @@ Public NotInheritable Class ConstantesWU
     ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception).
     Public Const LIB_TTA_RECEPTION As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU)"
     ''' <summary>
-    ''' LE LIBELLÉ DE LA LIGNE D'ÉCART D'ARRONDI, préfixe compris.
+    ''' LE LIBELLÉ DE LA LIGNE D'ÉCART D'ARRONDI.
     '''
     ''' IL NE SORT PAS DU MODÈLE DE NARRATIVE, ET DANS AUCUN DES DEUX MODES. Cette ligne est
-    ''' posée APRÈS la pièce, pour absorber la différence globale, et ne se rattache ni à un
-    ''' point de vente ni à une période — les deux repères du modèle. Lui appliquer ce modèle
-    ''' la réduirait à « LD WU ACTIVITE », c'est-à-dire à une écriture qui ne dit plus ce
-    ''' qu'elle est.
+    ''' posée APRÈS la pièce, pour absorber la différence globale, et ne se rattache à AUCUN
+    ''' point de vente — le repère principal du modèle. Lui appliquer ce modèle la réduirait à
+    ''' « LD WU ACTIVITE », c'est-à-dire à une écriture qui ne dit plus ce qu'elle est.
+    '''
+    ''' SA PÉRIODE, ELLE, EST BIEN CELLE DE LA PIÈCE. L'écart n'appartient à aucun point de
+    ''' vente, mais il appartient à CETTE pièce-ci : sans date, il serait la seule ligne du
+    ''' bordereau à ne pas dire ce qu'elle couvre. VerifierEquilibrePiece la reçoit de
+    ''' l'écran, qui la tient des rapports.
     '''
     ''' C'EST UNE VALEUR PAR DÉFAUT, ET NON UNE FATALITÉ : la banque peut l'éditer comme les
     ''' douze autres, dans l'écran « Narrative comptable », onglet des libellés par nature.
@@ -273,7 +280,7 @@ Public NotInheritable Class ConstantesWU
     ''' et la pièce manuelle de la banque n'en préfixe aucun. Le LD appartient à la narrative,
     ''' celle de la RAISON et du core banking.
     ''' </summary>
-    Public Const NARRATIVE_ECART_DEFAUT As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE"
+    Public Const NARRATIVE_ECART_DEFAUT As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE {PERIODE}"
 
     ''' <summary>
     ''' LE MODÈLE DE NARRATIVE APPLIQUÉ TANT QUE LA BANQUE N'EN A SAISI AUCUN.

@@ -1137,8 +1137,11 @@ Public Class FrmCompensationWU
             Dim ecartPose As Long = 0L
             Dim comptePose As String = String.Empty
 
+            ' LA PÉRIODE EST PASSÉE, et c'est la MÊME que celle des douze autres lignes : la
+            ' ligne d'écart d'arrondi appartient à cette pièce-ci, et doit dire ce qu'elle
+            ' couvre comme les autres.
             Dim pieceUtilisable As Boolean = PieceComptableService.VerifierEquilibrePiece(
-                dtPiece, messageControle, ecartPose, comptePose)
+                dtPiece, messageControle, ecartPose, comptePose, _dateActivite, DerniereJournee)
 
             If Not pieceUtilisable Then
                 MessageBox.Show(messageControle, "Anomalie d'équilibrage", MessageBoxButtons.OK, MessageBoxIcon.Error)

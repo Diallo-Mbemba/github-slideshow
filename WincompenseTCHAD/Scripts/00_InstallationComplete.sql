@@ -1479,8 +1479,8 @@ GO
 -- CE MODELE EST CELUI DE LA NARRATIVE, ET NON DES LIBELLES DE LIGNE. Il part dans la colonne
 -- ADDLTEXT du fichier core banking et dans la RAISON, en bas de piece. Les libelles des
 -- lignes, eux, viennent de T_NarrativeNatureWU et de leurs valeurs par defaut -- « COMPTE
--- COURANT WESTERN UNION ETD », « Commission sur Transfert_Ecobank »... --, sans prefixe LD
--- ni periode.
+-- COURANT WESTERN UNION ETD <periode> », « Commission sur Transfert_Ecobank <periode> »... --,
+-- sans prefixe LD.
 --
 -- CETTE LIGNE N'EST PAS INDISPENSABLE : sans elle l'application applique le modele par
 -- defaut de son code, qui est la forme ci-dessous au caractere pres.
