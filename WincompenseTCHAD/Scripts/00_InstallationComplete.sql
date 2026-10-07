@@ -3247,7 +3247,7 @@ FROM (
             N''Application, ecran Agences propres''
     UNION ALL
     SELECT  6, N''Premier administrateur cree'',
-            CASE WHEN EXISTS (SELECT 1 FROM dbo.T_UtilisateurWU WHERE Role = ''''ADMIN'''' AND Actif = 1)
+            CASE WHEN EXISTS (SELECT 1 FROM dbo.T_UtilisateurWU WHERE [Role] = ''ADMIN'' AND Actif = 1)
                  THEN 1 ELSE 0 END,
             N''Se cree au premier demarrage de l''''application''
 ) AS Controles
