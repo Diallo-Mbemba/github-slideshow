@@ -16,10 +16,10 @@ Public Enum ModeNarrativeWU
     ModeleUnique = 1
 
     ''' <summary>
-    ''' UN LIBELLÉ PAR NATURE DE MOUVEMENT : « LD COMPTE COURANT WESTERN UNION ETD », « LD
-    ''' COMMISSION TRANSFERT WU », « LD TVA SUR COMMISSION WU »… C'EST LE MODE PAR DÉFAUT,
-    ''' celui de la pièce manuelle de la banque, rétabli par son rectificatif du 06/10/2026.
-    ''' Une nature laissée vide retombe sur son libellé historique.
+    ''' UN LIBELLÉ PAR NATURE DE MOUVEMENT : « COMPTE COURANT WESTERN UNION ETD »,
+    ''' « Commission sur Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… C'EST LE MODE
+    ''' PAR DÉFAUT, celui de la pièce manuelle de la banque. Ni préfixe « LD » ni période : ils
+    ''' appartiennent à la narrative. Une nature laissée vide retombe sur ce libellé-là.
     ''' </summary>
     ParNature = 2
 End Enum
@@ -162,11 +162,21 @@ Public NotInheritable Class NarrativesWU
         Return _modeles.ContainsKey(nature)
     End Function
 
-    ''' <summary>Le libellé d'une ligne de cette nature, prêt à être posé dans la pièce.</summary>
+    ''' <summary>
+    ''' Le libellé d'une ligne de cette nature, prêt à être posé dans la pièce.
+    '''
+    ''' RENDU PAR AppliquerAuLibelle, ET NON PAR Appliquer : ce texte va sur la PIÈCE, où la
+    ''' banque veut lire ce qu'elle a écrit — « Commission sur Transfert_Ecobank » en casse
+    ''' mixte, « TTA (TAXE SUR RECEPTION  DE FONDS WU) » avec ses deux espaces. Les majuscules
+    ''' et la résorption des espaces sont des règles de forme de la NARRATIVE, celle de la
+    ''' RAISON et du fichier core banking ; les imposer ici ferait diverger la pièce produite
+    ''' de la pièce manuelle sur chaque ligne.
+    ''' </summary>
     Public Function Libelle(nature As NatureMouvementWU, designation As String, account As String,
                             codeAgence As String, periode As String) As String
 
-        Return ModeleNarrativeWU.Appliquer(Modele(nature), designation, account, codeAgence, periode)
+        Return ModeleNarrativeWU.AppliquerAuLibelle(Modele(nature), designation, account,
+                                                    codeAgence, periode)
     End Function
 
     ''' <summary>

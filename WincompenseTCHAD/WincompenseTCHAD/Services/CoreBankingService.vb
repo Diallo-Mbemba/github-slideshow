@@ -282,7 +282,7 @@ Public NotInheritable Class CoreBankingService
     '''
     ''' LA PIÈCE COMPTABLE ET LE FICHIER CORE BANKING NE DISENT PAS LA MÊME CHOSE, et c'est
     ''' la banque qui l'a voulu ainsi : sur la pièce, chaque ligne porte le libellé de SA
-    ''' NATURE (« LD COMPTE COURANT WESTERN UNION ETD », « LD TVA SUR COMMISSION WU »…) ;
+    ''' NATURE (« COMPTE COURANT WESTERN UNION ETD », « TVA COLLECTEES WESTERN UNION »…) ;
     ''' dans le fichier, les douze lignes d'un même point de vente portent UNE SEULE ET MÊME
     ''' narrative, celle du point de vente. La pièce transporte les deux : son libellé dans
     ''' la colonne Libelle, et la narrative du point de vente dans la colonne Narratif.

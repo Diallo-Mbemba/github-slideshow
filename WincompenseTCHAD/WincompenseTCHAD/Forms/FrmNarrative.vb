@@ -21,10 +21,12 @@ Imports System.Windows.Forms
 '''   — LE MODÈLE DU POINT DE VENTE, premier onglet : « LD WU ACTIVITE <point de vente>
 '''     <période> ». C'est TOUJOURS lui que le core banking reçoit dans ADDLTEXT, pour les
 '''     douze lignes du point de vente.
-'''   — LES LIBELLÉS PAR NATURE, deuxième onglet : « LD COMPTE COURANT WESTERN UNION ETD »,
-'''     « LD TVA SUR COMMISSION WU »… C'est ce que porte LA PIÈCE COMPTABLE, ligne à ligne,
-'''     et c'est le mode par défaut — celui de la pièce manuelle de la banque, rétabli par
-'''     son rectificatif du 06/10/2026.
+'''   — LES LIBELLÉS PAR NATURE, deuxième onglet : « COMPTE COURANT WESTERN UNION ETD »,
+'''     « Commission sur Transfert_Ecobank », « TVA COLLECTEES WESTERN UNION »… C'est ce que
+'''     porte LA PIÈCE COMPTABLE, ligne à ligne, et c'est le mode par défaut. Ni « LD » ni
+'''     période : ils appartiennent à la narrative, en bas de pièce et dans ADDLTEXT.
+'''     CES LIBELLÉS SORTENT TELS QU'ILS SONT ÉCRITS — casse et espaces compris, parce que
+'''     c'est la pièce manuelle de la banque qu'ils doivent reproduire.
 '''
 ''' LA BASCULE NE CONCERNE QUE LA PIÈCE. « Un seul libellé » étend le modèle du point de vente
 ''' aux douze lignes de la pièce, où ce que chaque ligne EST se lit alors dans son seul numéro
@@ -127,11 +129,26 @@ Public Class FrmNarrative
         If agence.Length > _pireCodeAgence.Length Then _pireCodeAgence = agence
     End Sub
 
-    ''' <summary>Le modèle rendu sur le pire cas du référentiel, tel qu'il partira au core banking.</summary>
+    ''' <summary>
+    ''' La NARRATIVE rendue sur le pire cas du référentiel, telle qu'elle partira dans la
+    ''' colonne ADDLTEXT du core banking et dans la RAISON : en majuscules, espaces résorbés.
+    ''' </summary>
     Private Function RenduPireCas(modele As String) As String
 
         Return ModeleNarrativeWU.Appliquer(modele, _pireDesignation, _pireAccount,
                                            _pireCodeAgence, _pirePeriode)
+    End Function
+
+    ''' <summary>
+    ''' LE LIBELLÉ rendu sur le pire cas du référentiel, tel qu'il sortira sur la PIÈCE : ce
+    ''' que la banque a écrit, sans majuscules ajoutées ni espaces résorbés. L'aperçu d'une
+    ''' nature doit montrer CE rendu-là, sans quoi l'écran promettrait des majuscules que la
+    ''' pièce ne porterait pas.
+    ''' </summary>
+    Private Function RenduPireCasDuLibelle(modele As String) As String
+
+        Return ModeleNarrativeWU.AppliquerAuLibelle(modele, _pireDesignation, _pireAccount,
+                                                    _pireCodeAgence, _pirePeriode)
     End Function
 
 #End Region
@@ -360,6 +377,24 @@ Public Class FrmNarrative
     End Sub
 
     ''' <summary>
+    ''' Même chose pour un LIBELLÉ DE LIGNE, mais contre SA borne.
+    '''
+    ''' UN LIBELLÉ NE PART PAS DANS ADDLTEXT : il va dans la colonne Libelle de T_PieceWU, un
+    ''' NVARCHAR(255). Lui opposer les 150 caractères du core banking afficherait un rouge que
+    ''' rien ne justifie, et refuserait un libellé que la pièce accepte.
+    ''' </summary>
+    Private Sub MesurerLeLibelle(etiquette As Label, rendu As String)
+
+        Dim tient As Boolean = rendu.Length <= ConstantesWU.NARRATIVE_MODELE_LONGUEUR_MAX
+
+        etiquette.ForeColor = If(tient, Drawing.Color.DarkGreen, Drawing.Color.Firebrick)
+        etiquette.Text =
+            $"{rendu.Length} caractères sur les {ConstantesWU.NARRATIVE_MODELE_LONGUEUR_MAX} " &
+            "que la colonne de la pièce accepte." &
+            If(tient, String.Empty, " Ce libellé ne peut pas être enregistré.")
+    End Sub
+
+    ''' <summary>
     ''' Dit sur quoi l'aperçu a été calculé. Sans cette phrase, l'agent verrait un nom
     ''' d'agence qu'il n'a pas demandé et croirait à une erreur.
     ''' </summary>
@@ -521,10 +556,10 @@ Public Class FrmNarrative
         End If
 
         Dim modele As String = ModeleSaisi(nature.Value)
-        Dim rendu As String = RenduPireCas(modele)
+        Dim rendu As String = RenduPireCasDuLibelle(modele)
 
         lblApercuNature.Text = $"{NaturesMouvementWU.Intitule(nature.Value)} : {rendu}"
-        Mesurer(lblLongueurNature, rendu)
+        MesurerLeLibelle(lblLongueurNature, rendu)
     End Sub
 
     ''' <summary>La nature de la ligne sélectionnée, ou Nothing si la grille est vide.</summary>
@@ -790,8 +825,11 @@ Public Class FrmNarrative
             Dim modele As String = ModeleSaisi(nature).Trim()
             Dim detail As String = String.Empty
 
+            ' POUR LA PIÈCE, et non pour le core banking : un libellé de ligne est borné par
+            ' sa colonne (255), pas par ADDLTEXT (150) où il ne va pas.
             If ModeleNarrativeWU.Controler(modele, _pireDesignation, _pireAccount,
-                                           _pireCodeAgence, _pirePeriode, detail) Then Continue For
+                                           _pireCodeAgence, _pirePeriode, detail,
+                                           pourLaPiece:=True) Then Continue For
 
             messageErreur = $"Nature « {NaturesMouvementWU.Intitule(nature)} » :" &
                             Environment.NewLine & Environment.NewLine & detail

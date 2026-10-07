@@ -235,12 +235,14 @@ Public NotInheritable Class PieceComptableService
 
             ' LES LIBELLÉS DES LIGNES DE CE POINT DE VENTE, un par nature de mouvement.
             '
-            ' CHAQUE LIGNE DE LA PIÈCE PORTE LE LIBELLÉ DE SA NATURE — « LD COMPTE COURANT
-            ' WESTERN UNION ETD », « LD COMMISSION TRANSFERT WU », « LD TVA SUR COMMISSION
-            ' WU »… C'est la forme que la banque lit sur sa pièce manuelle, et c'est le mode
-            ' par défaut. SEUL LE FICHIER CORE BANKING porte une seule et même narrative pour
-            ' les douze lignes du point de vente (narratifPdv, juste en dessous) : la pièce
-            ' comptable et son export Excel ne la voient pas.
+            ' CHAQUE LIGNE DE LA PIÈCE PORTE LE LIBELLÉ DE SA NATURE — « COMPTE COURANT
+            ' WESTERN UNION ETD », « Commission sur Transfert_Ecobank », « TVA COLLECTEES
+            ' WESTERN UNION »… C'est la pièce manuelle de la banque, au caractère près : ni
+            ' préfixe « LD », ni période, et la casse qu'elle écrit. C'est le mode par défaut.
+            '
+            ' SEUL LE FICHIER CORE BANKING porte une seule et même narrative pour les douze
+            ' lignes du point de vente (narratifPdv, juste en dessous), et c'est elle aussi
+            ' que la RAISON reprend en bas de pièce. Les libellés, eux, ne la voient pas.
             '
             ' La banque garde la main : dans l'écran « Narrative comptable » elle personnalise
             ' chacun des treize libellés, et peut au besoin basculer la pièce elle aussi sur un

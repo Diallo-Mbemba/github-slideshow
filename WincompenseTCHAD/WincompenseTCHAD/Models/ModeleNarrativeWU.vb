@@ -2,8 +2,18 @@ Option Strict On
 Option Explicit On
 
 ''' <summary>
-''' LE MODÈLE DE NARRATIVE : la phrase que porte chaque ligne de la pièce comptable, et que
-''' le core banking reçoit dans sa colonne ADDLTEXT.
+''' LE MOTEUR DE RENDU DES TEXTES DE LA PIÈCE : un gabarit, des valeurs, une phrase.
+'''
+''' DEUX RENDUS, PARCE QUE DEUX DESTINATIONS. Appliquer produit LA NARRATIVE DU POINT DE
+''' VENTE — « LD WU ACTIVITE <point de vente> <période> », en majuscules, espaces résorbés —
+''' que le core banking reçoit dans ADDLTEXT et que la RAISON reprend en bas de pièce.
+''' AppliquerAuLibelle produit LE LIBELLÉ D'UNE LIGNE, et rend ce qui est écrit, casse et
+''' espaces compris : la pièce doit reproduire la pièce manuelle de la banque, qui écrit
+''' « Commission sur Transfert_Ecobank » et « TTA (TAXE SUR RECEPTION  DE FONDS WU) ».
+'''
+''' LES CONFONDRE, C'ÉTAIT IMPOSER À LA PIÈCE LES RÈGLES DE FORME DU CORE BANKING. Elles ne
+''' se ressemblent que de loin : l'une est une phrase de système, l'autre un document que la
+''' Direction Comptable rapproche ligne à ligne.
 '''
 ''' POURQUOI UN MODÈLE, ET NON UNE CONSTANTE DE PLUS
 '''
@@ -16,9 +26,10 @@ Option Explicit On
 '''
 ''' CE QU'IL NE REND PAS PARAMÉTRABLE, ET C'EST VOULU
 '''
-'''   — LES MAJUSCULES sont posées ici, pas laissées à la saisie. C'est une règle de forme du
-'''     core banking, et une saisie en minuscules suffirait à faire sortir une journée qui ne
-'''     ressemble pas aux autres.
+'''   — LES MAJUSCULES DE LA NARRATIVE sont posées ici, pas laissées à la saisie. C'est une
+'''     règle de forme du core banking, et une saisie en minuscules suffirait à faire sortir
+'''     une journée qui ne ressemble pas aux autres. Les LIBELLÉS, eux, n'en reçoivent
+'''     aucune : ce que la banque écrit est ce que sa pièce porte.
 '''   — LA PÉRIODE s'écrit toujours de la même façon (PieceComptableService.SuffixeDePeriode).
 '''     La banque choisit OÙ elle se place dans la phrase, pas comment elle s'écrit : une date
 '''     mal formée dans un narratif comptable ne se rattrape pas après coup.
@@ -115,8 +126,49 @@ Public NotInheritable Class ModeleNarrativeWU
 #Region "Application"
 
     ''' <summary>
-    ''' Rend la phrase : les jetons remplacés par leurs valeurs, les espaces résorbés, le tout
-    ''' en majuscules.
+    ''' LA NARRATIVE DU POINT DE VENTE : jetons remplacés, espaces résorbés, le tout en
+    ''' MAJUSCULES. C'est elle que le fichier core banking reçoit dans ADDLTEXT, et c'est elle
+    ''' que la RAISON porte en bas de la pièce.
+    '''
+    ''' CE N'EST PAS LE RENDU DES LIBELLÉS DE LIGNE : ceux-là passent par AppliquerAuLibelle,
+    ''' qui rend ce que la banque a écrit, sans toucher ni à la casse ni aux espaces. Les deux
+    ''' destinations n'ont jamais eu les mêmes règles de forme, et les confondre revenait à
+    ''' imposer à la pièce comptable celles du core banking.
+    '''
+    ''' UN JETON VIDE NE LAISSE PAS DE TROU : la pièce globale ne porte aucun point de vente,
+    ''' et « LD WU ACTIVITE  DU 08 AU 14 09 2026 » afficherait un double espace là où un
+    ''' comptable lit une donnée manquante.
+    ''' </summary>
+    Public Shared Function Appliquer(modele As String, designation As String, account As String,
+                                     codeAgence As String, periode As String) As String
+
+        Return ResorberLesEspaces(
+            Substituer(modele, designation, account, codeAgence, periode, False)).ToUpperInvariant()
+    End Function
+
+    ''' <summary>
+    ''' LE LIBELLÉ D'UNE LIGNE DE PIÈCE : jetons remplacés, ET RIEN D'AUTRE.
+    '''
+    ''' CE QUE LA BANQUE ÉCRIT EST CE QUE LA PIÈCE PORTE, au caractère près. Sa pièce manuelle
+    ''' — celle que la Direction Comptable rapproche ligne à ligne — écrit « Commission sur
+    ''' Transfert_Ecobank » en casse mixte et « TTA (TAXE SUR RECEPTION  DE FONDS WU) » avec
+    ''' deux espaces. Mettre en majuscules ou résorber les espaces ici ferait diverger les deux
+    ''' documents sur chaque ligne, et c'est le rapprochement qui en pâtirait.
+    '''
+    ''' UN JETON VIDE EMPORTE UN ESPACE AVEC LUI, celui qui le précède, à défaut celui qui le
+    ''' suit. C'est ce qui évite le trou de « Commission sur Transfert_Sous-agence  » sans
+    ''' toucher au double espace que la banque a, lui, VOULU écrire — un ResorberLesEspaces ne
+    ''' sait pas distinguer les deux, celui-ci n'a pas à le faire.
+    ''' </summary>
+    Public Shared Function AppliquerAuLibelle(modele As String, designation As String,
+                                              account As String, codeAgence As String,
+                                              periode As String) As String
+
+        Return Substituer(modele, designation, account, codeAgence, periode, True).Trim()
+    End Function
+
+    ''' <summary>
+    ''' Le parcours unique du gabarit, partagé par les deux rendus.
     '''
     ''' UN SEUL PARCOURS, et non quatre Replace successifs. Deux raisons :
     '''
@@ -125,13 +177,15 @@ Public NotInheritable Class ModeleNarrativeWU
     '''   — String.Replace du Framework 4.8 ne connaît pas StringComparison, et un jeton saisi
     '''     « {agence} » doit être reconnu. Un comptable qui tape en minuscules a raison de
     '''     s'attendre à ce que ça marche.
-    '''
-    ''' UN JETON VIDE NE LAISSE PAS DE TROU : la pièce globale ne porte aucun point de vente,
-    ''' et « LD WU ACTIVITE  DU 08 AU 14 09 2026 » afficherait un double espace là où un
-    ''' comptable lit une donnée manquante.
     ''' </summary>
-    Public Shared Function Appliquer(modele As String, designation As String, account As String,
-                                     codeAgence As String, periode As String) As String
+    ''' <param name="mangerLEspaceDunJetonVide">
+    ''' Vrai pour un libellé de pièce : un jeton sans valeur disparaît AVEC un espace, et le
+    ''' reste du texte est rendu tel quel. Faux pour la narrative, dont les espaces sont
+    ''' résorbés ensuite de toute façon.
+    ''' </param>
+    Private Shared Function Substituer(modele As String, designation As String, account As String,
+                                       codeAgence As String, periode As String,
+                                       mangerLEspaceDunJetonVide As Boolean) As String
 
         Dim gabarit As String = If(String.IsNullOrWhiteSpace(modele), ModeleParDefaut, modele)
 
@@ -168,16 +222,28 @@ Public NotInheritable Class ModeleNarrativeWU
 
             Dim jeton As String = gabarit.Substring(debut, fin - debut + 1)
 
-            If valeurs.ContainsKey(jeton) Then
-                rendu &= valeurs(jeton)
-            Else
-                rendu &= jeton
-            End If
+            ' Un jeton inconnu est recopié avec ses accolades : il n'est jamais vide, et ne
+            ' déclenche donc pas la règle de l'espace mangé.
+            Dim valeur As String = jeton
+            If valeurs.ContainsKey(jeton) Then valeur = valeurs(jeton)
 
             position = fin + 1
+
+            If mangerLEspaceDunJetonVide AndAlso valeur.Length = 0 Then
+
+                If rendu.EndsWith(" ", StringComparison.Ordinal) Then
+                    rendu = rendu.Substring(0, rendu.Length - 1)
+                ElseIf position < gabarit.Length AndAlso gabarit.Chars(position) = " "c Then
+                    position += 1
+                End If
+
+                Continue Do
+            End If
+
+            rendu &= valeur
         Loop
 
-        Return ResorberLesEspaces(rendu).ToUpperInvariant()
+        Return rendu
     End Function
 
     ''' <summary>
@@ -213,11 +279,23 @@ Public NotInheritable Class ModeleNarrativeWU
     ''' reste en place et refuse toujours de produire le fichier au-delà de 150 caractères. Un
     ''' point de vente RENOMMÉ après l'enregistrement du modèle peut faire dépasser une phrase
     ''' que cet écran avait validée : il faut alors que quelque chose s'y oppose encore.
+    '''
+    ''' UN LIBELLÉ DE PIÈCE N'EST PAS BORNÉ PAR LES MÊMES 150 CARACTÈRES. Il ne part pas dans
+    ''' ADDLTEXT : il va dans la colonne Libelle de T_PieceWU, un NVARCHAR(255). Lui imposer
+    ''' la limite du core banking ferait refuser à l'écran un libellé que la pièce accepte
+    ''' parfaitement. Le paramètre pourLaPiece dit laquelle des deux destinations on contrôle,
+    ''' et il commande AUSSI le rendu : un libellé se mesure tel qu'il sortira, sans majuscules
+    ''' ni espaces résorbés.
     ''' </summary>
+    ''' <param name="pourLaPiece">
+    ''' Vrai pour un libellé de ligne (255 caractères, rendu tel quel), faux pour la narrative
+    ''' du point de vente (150 caractères, rendue en majuscules).
+    ''' </param>
     Public Shared Function Controler(modele As String,
                                      pireDesignation As String, pireAccount As String,
                                      pireCodeAgence As String, pirePeriode As String,
-                                     ByRef messageErreur As String) As Boolean
+                                     ByRef messageErreur As String,
+                                     Optional pourLaPiece As Boolean = False) As Boolean
 
         messageErreur = String.Empty
 
@@ -247,8 +325,14 @@ Public NotInheritable Class ModeleNarrativeWU
             Return False
         End If
 
-        Dim pireCas As String = Appliquer(gabarit, pireDesignation, pireAccount,
-                                          pireCodeAgence, pirePeriode)
+        Dim pireCas As String
+        If pourLaPiece Then
+            pireCas = AppliquerAuLibelle(gabarit, pireDesignation, pireAccount,
+                                         pireCodeAgence, pirePeriode)
+        Else
+            pireCas = Appliquer(gabarit, pireDesignation, pireAccount,
+                                pireCodeAgence, pirePeriode)
+        End If
 
         If pireCas.Length = 0 Then
             messageErreur = "Ce modèle ne produit aucun texte : il ne contient que des repères, " &
@@ -256,12 +340,19 @@ Public NotInheritable Class ModeleNarrativeWU
             Return False
         End If
 
-        If pireCas.Length > ConstantesWU.CB_NARRATIF_LONGUEUR_MAX Then
+        Dim maximum As Integer = If(pourLaPiece, ConstantesWU.NARRATIVE_MODELE_LONGUEUR_MAX,
+                                    ConstantesWU.CB_NARRATIF_LONGUEUR_MAX)
+
+        If pireCas.Length > maximum Then
             messageErreur = $"Ce modèle produirait {pireCas.Length} caractères dans le cas le plus " &
-                            $"long, alors que le core banking en accepte {ConstantesWU.CB_NARRATIF_LONGUEUR_MAX}." &
+                            If(pourLaPiece,
+                               $"long, alors que la colonne de la pièce en accepte {maximum}.",
+                               $"long, alors que le core banking en accepte {maximum}.") &
                             Environment.NewLine & Environment.NewLine & pireCas & Environment.NewLine &
                             Environment.NewLine &
-                            "Le fichier ne pourrait pas être produit pour ce point de vente. " &
+                            If(pourLaPiece,
+                               "Le libellé serait tronqué en base. ",
+                               "Le fichier ne pourrait pas être produit pour ce point de vente. ") &
                             "Raccourcissez le modèle, ou retirez-en un repère."
             Return False
         End If

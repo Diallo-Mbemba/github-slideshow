@@ -207,41 +207,49 @@ Public NotInheritable Class ConstantesWU
     ''' et son export Excel reprennent les libellés détaillés — ce que chaque ligne EST s'y
     ''' lit de nouveau, sans avoir à déchiffrer un numéro de compte.
     '''
-    ''' LES TEXTES SONT CEUX D'AVANT, À DEUX DÉTAILS PRÈS, ET LES VOICI.
+    ''' LES TEXTES SONT CEUX DE LA PIÈCE MANUELLE DE LA BANQUE, AU CARACTÈRE PRÈS — la casse
+    ''' mixte de « Commission sur Transfert_Ecobank » comme le double espace de « RECEPTION  DE
+    ''' FONDS ». C'est ce document-là que la Direction Comptable rapproche ligne à ligne ; un
+    ''' libellé qui n'en diffère que par une majuscule lui coûte une vérification de plus.
     '''
-    ''' LA CASSE RESTE EN MAJUSCULES. « Mettre les termes en majuscules » était une demande
-    ''' distincte de l'unification, et la banque ne l'a pas retirée — elle l'a confirmée.
-    ''' Elles sont posées par ModeleNarrativeWU.Appliquer, pas ici : écrire ces gabarits dans
-    ''' leur casse d'origine les laisse lisibles à l'écran de paramétrage, où la banque les
-    ''' relit.
+    ''' NI PRÉFIXE « LD », NI PÉRIODE. Les deux appartiennent à la NARRATIVE — celle de la
+    ''' RAISON, en bas de pièce, et celle de la colonne ADDLTEXT du core banking, qui s'écrit
+    ''' « LD WU ACTIVITE &lt;point de vente&gt; &lt;période&gt; ». Un libellé de ligne, lui, dit
+    ''' ce que la ligne EST, et la période se lit une fois pour toute la pièce.
     '''
-    ''' LE DOUBLE ESPACE DE LA TTA SUR RÉCEPTION NE SURVIT PAS. Le référentiel de la banque
-    ''' porte « RECEPTION  DE FONDS », avec deux espaces ; il est écrit tel quel ci-dessous,
-    ''' mais ResorberLesEspaces les ramène à un — c'est elle qui empêche un repère vide de
-    ''' laisser un trou dans la phrase, et elle ne sait pas distinguer les deux cas. Le
-    ''' libellé sort donc « RECEPTION DE FONDS ». Si la banque tient au double espace, c'est
-    ''' ResorberLesEspaces qu'il faut revoir, et les trous reviendront avec.
+    ''' LES MAJUSCULES NE SONT PAS POSÉES ICI, ET PAS POSÉES DU TOUT SUR LA PIÈCE : c'est
+    ''' AppliquerAuLibelle qui rend ces gabarits, et il rend ce qui est écrit. La narrative,
+    ''' elle, continue de passer par Appliquer, qui met en majuscules — la banque l'a demandé
+    ''' pour elle, et l'a confirmé.
+    '''
+    ''' CE SONT DES VALEURS PAR DÉFAUT, PAS DES TEXTES FIGÉS. La banque les réécrit dans
+    ''' l'écran « Narrative comptable » ; une nature qu'elle n'a pas touchée suit celle-ci.
     ''' </summary>
-    Public Const NARRATIVE_MOUVEMENT_DEFAUT As String = "LD WU ACTIVITE {AGENCE} {PERIODE}"
-    Public Const NARRATIVE_COMPTE_COURANT_DEFAUT As String = "LD COMPTE COURANT WESTERN UNION ETD {PERIODE}"
 
-    Public Const NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT As String = "LD Commission sur Transfert_Ecobank {PERIODE}"
-    Public Const NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT As String = "LD Commission sur Paiement_Ecobank {PERIODE}"
-    Public Const NARRATIVE_COMMISSION_ENVOI_BANQUE_DEFAUT As String = "LD Commission sur Envoi_Ecobank {PERIODE}"
+    ' La ligne de mouvement porte le NOM DU POINT DE VENTE, et rien d'autre : son compte est
+    ' celui de sa compensation, et la pièce le nomme déjà en en-tête.
+    Public Const NARRATIVE_MOUVEMENT_DEFAUT As String = "{AGENCE}"
 
-    ' Les trois commissions d'un sous-agent nommaient le point de vente : le libellé seul ne
+    Public Const NARRATIVE_COMPTE_COURANT_DEFAUT As String = "COMPTE COURANT WESTERN UNION ETD"
+
+    Public Const NARRATIVE_COMMISSION_TRANSFERT_BANQUE_DEFAUT As String = "Commission sur Transfert_Ecobank"
+    Public Const NARRATIVE_COMMISSION_PAIEMENT_BANQUE_DEFAUT As String = "Commission sur Paiement_Ecobank"
+    Public Const NARRATIVE_COMMISSION_ENVOI_BANQUE_DEFAUT As String = "Commission sur Envoi_Ecobank"
+
+    ' Les trois commissions d'un sous-agent nomment le point de vente : le libellé seul ne
     ' dirait pas DE QUI est la commission, trois sous-agents partageant la même pièce.
-    Public Const NARRATIVE_COMMISSION_TRANSFERT_SA_DEFAUT As String = "LD Commission sur Transfert_Sous-agence {AGENCE} {PERIODE}"
-    Public Const NARRATIVE_COMMISSION_PAIEMENT_SA_DEFAUT As String = "LD Commission sur Paiement_Sous-agence {AGENCE} {PERIODE}"
-    Public Const NARRATIVE_COMMISSION_ENVOI_SA_DEFAUT As String = "LD Commission sur Envoi_Sous-agence {AGENCE} {PERIODE}"
+    Public Const NARRATIVE_COMMISSION_TRANSFERT_SA_DEFAUT As String = "Commission sur Transfert_Sous-agence {AGENCE}"
+    Public Const NARRATIVE_COMMISSION_PAIEMENT_SA_DEFAUT As String = "Commission sur Paiement_Sous-agence {AGENCE}"
+    Public Const NARRATIVE_COMMISSION_ENVOI_SA_DEFAUT As String = "Commission sur Envoi_Sous-agence {AGENCE}"
 
-    Public Const NARRATIVE_IMPOTS_TAXE_ENVOI_DEFAUT As String = "LD IMPOTS ET TAXE SUR ENVOI {PERIODE}"
-    Public Const NARRATIVE_TVA_DEFAUT As String = "LD TVA COLLECTEES WESTERN UNION {PERIODE}"
-    Public Const NARRATIVE_TTA_ENVOI_DEFAUT As String = "LD TTA (TAXE SUR TRANSFER DE FONDS WU) {PERIODE}"
+    Public Const NARRATIVE_IMPOTS_TAXE_ENVOI_DEFAUT As String = "IMPOTS ET TAXE SUR ENVOI"
+    Public Const NARRATIVE_TVA_DEFAUT As String = "TVA COLLECTEES WESTERN UNION"
+    Public Const NARRATIVE_TTA_ENVOI_DEFAUT As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
 
     ' Double espace avant « DE » : reproduit fidèlement le libellé du classeur de référence
-    ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception).
-    Public Const NARRATIVE_TTA_RECEPTION_DEFAUT As String = "LD TTA (TAXE SUR RECEPTION  DE FONDS WU) {PERIODE}"
+    ' PieceComptabilsationTchad.xlsx (colonne LIBELLES, ligne TTA Réception). Il survit
+    ' désormais au rendu — AppliquerAuLibelle ne résorbe pas les espaces.
+    Public Const NARRATIVE_TTA_RECEPTION_DEFAUT As String = "TTA (TAXE SUR RECEPTION  DE FONDS WU)"
 
     Public Const LIB_TVA As String = "TVA COLLECTEES WESTERN UNION"
     Public Const LIB_TTA_ENVOI As String = "TTA (TAXE SUR TRANSFER DE FONDS WU)"
@@ -261,11 +269,11 @@ Public NotInheritable Class ConstantesWU
     ''' douze autres, dans l'écran « Narrative comptable », onglet des libellés par nature.
     ''' Elle y figure sous « Écart d'arrondi (compte inter bancaire) ».
     '''
-    ''' LE PRÉFIXE EST ÉCRIT ICI, et non posé par du code. Il l'était, du temps où douze
-    ''' libellés distincts devaient tous le recevoir ; il ne reste qu'un libellé à préfixer, et
-    ''' deux lettres au début d'une constante se lisent mieux qu'une fonction qui les ajoute.
+    ''' PAS DE PRÉFIXE « LD » NON PLUS : c'est un libellé de ligne, comme les douze autres,
+    ''' et la pièce manuelle de la banque n'en préfixe aucun. Le LD appartient à la narrative,
+    ''' celle de la RAISON et du core banking.
     ''' </summary>
-    Public Const NARRATIVE_ECART_DEFAUT As String = "LD ECART D'ARRONDI - COMPTE INTER BANCAIRE"
+    Public Const NARRATIVE_ECART_DEFAUT As String = "ECART D'ARRONDI - COMPTE INTER BANCAIRE"
 
     ''' <summary>
     ''' LE MODÈLE DE NARRATIVE APPLIQUÉ TANT QUE LA BANQUE N'EN A SAISI AUCUN.

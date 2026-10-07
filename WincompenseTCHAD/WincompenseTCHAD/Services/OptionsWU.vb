@@ -72,9 +72,9 @@ Public NotInheritable Class OptionsWU
     Public Const CLE_NARRATIVE_MODELE As String = "NARRATIVE_MODELE"
 
     Public Const LIBELLE_NARRATIVE_MODELE As String =
-        "Modèle de la narrative du point de vente : TOUJOURS celle de la colonne ADDLTEXT du " &
-        "fichier core banking, et celle des lignes de la pièce comptable lorsque le mode est " &
-        "GLOBAL. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}."
+        "Modèle de la narrative du point de vente : colonne ADDLTEXT du fichier core banking, " &
+        "et RAISON en bas de pièce. Il devient aussi le libellé des douze lignes lorsque le " &
+        "mode est GLOBAL. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}."
 
     ''' <summary>
     ''' COMMENT LES LIBELLÉS DE LA PIÈCE SONT CHOISIS : un libellé par nature de mouvement

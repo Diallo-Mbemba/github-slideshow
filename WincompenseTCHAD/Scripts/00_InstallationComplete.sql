@@ -1476,13 +1476,19 @@ GO
 -- Un repere inconnu est refuse par l'ecran ; saisi ici en SQL direct, il partirait au grand
 -- livre avec ses accolades.
 --
+-- CE MODELE EST CELUI DE LA NARRATIVE, ET NON DES LIBELLES DE LIGNE. Il part dans la colonne
+-- ADDLTEXT du fichier core banking et dans la RAISON, en bas de piece. Les libelles des
+-- lignes, eux, viennent de T_NarrativeNatureWU et de leurs valeurs par defaut -- « COMPTE
+-- COURANT WESTERN UNION ETD », « Commission sur Transfert_Ecobank »... --, sans prefixe LD
+-- ni periode.
+--
 -- CETTE LIGNE N'EST PAS INDISPENSABLE : sans elle l'application applique le modele par
 -- defaut de son code, qui est la forme ci-dessous au caractere pres.
 IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'NARRATIVE_MODELE')
 BEGIN
     INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
     VALUES (N'NARRATIVE_MODELE', N'LD WU ACTIVITE {AGENCE} {PERIODE}',
-            N'Modèle de la narrative des lignes de la pièce comptable et de la colonne ADDLTEXT du fichier core banking. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}.',
+            N'Modèle de la narrative du point de vente : colonne ADDLTEXT du fichier core banking, et RAISON en bas de pièce. Repères reconnus : {AGENCE}, {ACCOUNT}, {CODE_AGENCE}, {PERIODE}.',
             GETDATE(), N'installation');
 
     PRINT 'Option NARRATIVE_MODELE créée : LD WU ACTIVITE {AGENCE} {PERIODE}.';

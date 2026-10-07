@@ -33,7 +33,7 @@
     Sa ligne est posée APRÈS la pièce, pour absorber la différence globale : elle ne se
     rattache ni à un point de vente ni à une période, les deux repères du modèle global. Lui
     appliquer ce modèle la réduirait à « LD WU ACTIVITE ». Elle garde donc son texte propre —
-    « LD ECART D'ARRONDI - COMPTE INTER BANCAIRE », valeur par défaut du code — que la banque
+    « ECART D'ARRONDI - COMPTE INTER BANCAIRE », valeur par défaut du code — que la banque
     peut éditer comme les autres.
 
     LE JOURNAL NE SE RÉÉCRIT PAS
