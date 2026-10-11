@@ -287,12 +287,6 @@ Public Class FrmParametresConnexion
     End Sub
 
     ''' <summary>
-    ''' Ouvre une connexion sur les valeurs SAISIES — et non sur celles en service — puis vérifie
-    ''' que la base répond. Ouvrir ne suffit pas : SQL Server accepte la connexion avant de dire
-    ''' que la base n'existe pas, et un serveur joignable avec une mauvaise base passerait pour
-    ''' un succès.
-    ''' </summary>
-    ''' <summary>
     ''' La chaîne décrite par l'écran en ce moment, prête à être essayée.
     '''
     ''' Le test et la préparation de la base doivent porter sur EXACTEMENT la même chaîne :
@@ -326,6 +320,12 @@ Public Class FrmParametresConnexion
         Return ConfigurationWU.ChaineDepuis(txtServeur.Text, txtBase.Text, CInt(nudDelai.Value))
     End Function
 
+    ''' <summary>
+    ''' Ouvre une connexion sur les valeurs SAISIES — et non sur celles en service — puis vérifie
+    ''' que la base répond. Ouvrir ne suffit pas : SQL Server accepte la connexion avant de dire
+    ''' que la base n'existe pas, et un serveur joignable avec une mauvaise base passerait pour
+    ''' un succès.
+    ''' </summary>
     Private Function Tester(ByRef message As String) As Boolean
 
         Dim chaine As String = ChaineDeLEcran(message)

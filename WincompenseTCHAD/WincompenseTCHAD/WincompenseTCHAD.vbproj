@@ -100,6 +100,7 @@
     <Compile Include="Models\DemandeWU.vb" />
     <Compile Include="Models\LigneCoreBankingWU.vb" />
     <Compile Include="Models\ModeleNarrativeWU.vb" />
+    <Compile Include="Models\FormatCoreBankingWU.vb" />
     <Compile Include="Models\NatureMouvementWU.vb" />
     <Compile Include="Models\NarrativesWU.vb" />
     <Compile Include="Services\WUFichierService.vb" />
@@ -283,6 +284,12 @@
     <Compile Include="Forms\FrmBordereauJournee.Designer.vb">
       <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
     </Compile>
+    <Compile Include="Forms\FrmFormatCoreBanking.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmFormatCoreBanking.Designer.vb">
+      <DependentUpon>FrmFormatCoreBanking.vb</DependentUpon>
+    </Compile>
     <Compile Include="Forms\FrmNarrative.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -406,6 +413,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmBordereauJournee.resx">
       <DependentUpon>FrmBordereauJournee.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmFormatCoreBanking.resx">
+      <DependentUpon>FrmFormatCoreBanking.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmNarrative.resx">
       <DependentUpon>FrmNarrative.vb</DependentUpon>

@@ -4,7 +4,7 @@
 Scripts\
 ├── 00_InstallationComplete.sql    ← LE SEUL À EXÉCUTER
 ├── 11_AccesUtilisateurs.sql       ← uniquement en authentification Windows
-└── Documentation\                 ← les 22 autres : ils expliquent, ils ne s'exécutent pas
+└── Documentation\                 ← les 23 autres : ils expliquent, ils ne s'exécutent pas
 ```
 
 ---

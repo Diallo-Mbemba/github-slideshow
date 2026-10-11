@@ -96,6 +96,79 @@ Public NotInheritable Class OptionsWU
         "le même libellé. Le fichier core banking porte toujours la narrative unique du point " &
         "de vente, quel que soit ce mode."
 
+    ''' <summary>
+    ''' LES SEPT CODES DU FORMAT CORE BANKING, sortis du code et confiés à la banque.
+    '''
+    ''' Elle en a déjà changé quatre d'un coup — BRN, les deux TXNCD, et COST_CENTER retirée —
+    ''' et chacun a coûté une livraison complète. Ces codes sont les siens ; elle doit pouvoir
+    ''' les corriger sans nous.
+    '''
+    ''' LES CONSTANTES DE ConstantesWU RESTENT, ET SERVENT DE REPLI. Une base où le script n'a
+    ''' pas été rejoué produit exactement le fichier d'aujourd'hui : c'est FormatCoreBankingWU
+    ''' qui s'en charge, valeur vide par valeur vide.
+    ''' </summary>
+    Public Const CLE_CB_DETBSJRNL As String = "CB_DETBSJRNL"
+    Public Const CLE_CB_BRN As String = "CB_BRN"
+    Public Const CLE_CB_SRCCODE As String = "CB_SRCCODE"
+    Public Const CLE_CB_TXNCD_DEBIT As String = "CB_TXNCD_DEBIT"
+    Public Const CLE_CB_TXNCD_CREDIT As String = "CB_TXNCD_CREDIT"
+    Public Const CLE_CB_AGENCE_SIEGE As String = "CB_AGENCE_SIEGE"
+    Public Const CLE_CB_COMPTES_SIEGE As String = "CB_COMPTES_SIEGE"
+
+    Public Const LIBELLE_CB_DETBSJRNL As String =
+        "Colonne DETBSJRNL du fichier core banking, identique sur toutes les lignes."
+
+    Public Const LIBELLE_CB_BRN As String =
+        "Colonne BRN : agence DU LOT, portée à l'identique par toutes ses lignes. Ce n'est pas " &
+        "l'agence du siège, qui s'écrit en ACBRN sur les seuls comptes internes."
+
+    Public Const LIBELLE_CB_SRCCODE As String =
+        "Colonne SRCCODE du fichier core banking, identique sur toutes les lignes."
+
+    Public Const LIBELLE_CB_TXNCD_DEBIT As String =
+        "Colonne TXNCD des lignes au DÉBIT."
+
+    Public Const LIBELLE_CB_TXNCD_CREDIT As String =
+        "Colonne TXNCD des lignes au CRÉDIT."
+
+    Public Const LIBELLE_CB_AGENCE_SIEGE As String =
+        "Agence portée en ACBRN par les comptes du siège, et par les lignes qui ne se " &
+        "rattachent à aucun point de vente — écart d'arrondi, écritures de change."
+
+    Public Const LIBELLE_CB_COMPTES_SIEGE As String =
+        "Comptes rattachés d'office à l'agence du siège en ACBRN, séparés par des virgules. " &
+        "Règle d'aiguillage du format core banking, et non plan comptable : aucune écriture " &
+        "ne leur est passée de ce fait."
+
+    ''' <summary>
+    ''' LE FORMAT EN VIGUEUR, assemblé depuis les sept options.
+    '''
+    ''' À LIRE UNE FOIS PAR FICHIER, et non par ligne : un fichier ne doit jamais mélanger deux
+    ''' paramétrages parce que quelqu'un a enregistré pendant sa production. L'objet rendu est
+    ''' immuable, ce qui rend ce contrat tenable.
+    '''
+    ''' LA LISTE DES COMPTES DU SIÈGE EST LE SEUL CAS DÉLICAT. Une option ABSENTE et une option
+    ''' VIDE ne veulent pas dire la même chose : absente, c'est une base que le script n'a pas
+    ''' encore touchée, et il faut lui rendre les deux comptes du code ; vide, c'est une banque
+    ''' qui n'en rattache aucun, et il faut respecter son choix. D'où le Nothing dans le
+    ''' premier cas, qui seul déclenche le repli.
+    ''' </summary>
+    Public Shared ReadOnly Property FormatCoreBanking As FormatCoreBankingWU
+        Get
+            Dim comptes As String = Lire(CLE_CB_COMPTES_SIEGE)
+
+            Return New FormatCoreBankingWU(
+                Lire(CLE_CB_DETBSJRNL),
+                Lire(CLE_CB_BRN),
+                Lire(CLE_CB_SRCCODE),
+                Lire(CLE_CB_TXNCD_DEBIT),
+                Lire(CLE_CB_TXNCD_CREDIT),
+                Lire(CLE_CB_AGENCE_SIEGE),
+                If(String.IsNullOrWhiteSpace(comptes), Nothing,
+                   FormatCoreBankingWU.ComptesDepuisTexte(comptes)))
+        End Get
+    End Property
+
     ''' <summary>Code d'erreur SQL Server signalant une table absente (« Invalid object name »).</summary>
     Private Const ERREUR_TABLE_ABSENTE As Integer = 208
 

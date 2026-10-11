@@ -118,14 +118,6 @@ Public Class FrmCompensationWU
     End Sub
 
     ''' <summary>
-    ''' Enregistre la journée dans l'historique (tables T_HistoriqueWU et T_HistoriqueMTCN),
-    ''' source des rapports d'activité sur une période.
-    '''
-    ''' L'échec de l'historisation n'annule JAMAIS la pièce comptable : celle-ci est déjà
-    ''' générée et équilibrée, elle reste la priorité. L'utilisateur est simplement averti que
-    ''' la journée ne figurera pas dans les rapports tant qu'elle n'aura pas été regénérée.
-    ''' </summary>
-    ''' <summary>
     ''' L'en-tête du traitement : ce que la pièce comptable ne dit pas.
     '''
     ''' Les rapports Western Union utilisés et leur empreinte, les volumes, le nombre
@@ -220,6 +212,14 @@ Public Class FrmCompensationWU
         entete.CompteEcart = _compteEcartPose
     End Sub
 
+    ''' <summary>
+    ''' Enregistre la journée dans l'historique (tables T_HistoriqueWU et T_HistoriqueMTCN),
+    ''' source des rapports d'activité sur une période.
+    '''
+    ''' L'échec de l'historisation n'annule JAMAIS la pièce comptable : celle-ci est déjà
+    ''' générée et équilibrée, elle reste la priorité. L'utilisateur est simplement averti que
+    ''' la journée ne figurera pas dans les rapports tant qu'elle n'aura pas été regénérée.
+    ''' </summary>
     Private Sub HistoriserLaJournee()
 
         If Not _dateActivite.HasValue Then

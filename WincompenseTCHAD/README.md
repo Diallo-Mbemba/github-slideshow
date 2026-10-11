@@ -185,7 +185,7 @@ Scripts/                                   ' CE DOSSIER NE CONTIENT QUE CE QUI S
 ├── 00_InstallationComplete.sql            ' LE SEUL À EXÉCUTER — il contient tous les autres
 ├── 11_AccesUtilisateurs.sql               ' Comptes Windows : uniquement en authentification AD
 ├── README.md                              ' Quel script exécuter, et quand
-└── Documentation/                         ' Les 22 autres : ils expliquent, ils ne s'exécutent pas
+└── Documentation/                         ' Les 23 autres : ils expliquent, ils ne s'exécutent pas
     ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
     ├── 02_DonneesExemple.sql              ' Jeu de test — jamais en production
     ├── 03_SystemeWU.sql                   ' Comptes comptables paramétrés
@@ -207,7 +207,8 @@ Scripts/                                   ' CE DOSSIER NE CONTIENT QUE CE QUI S
     ├── 20_ProduitsTransfert.sql           ' Western Union, Ria, et les suivants
     ├── 21_EcartsDeChange.sql              ' Parité historisée, écarts, pièce de change
     ├── 22_NarrativeComptable.sql          ' Le modèle de narrative, dans T_ParametreWU
-    └── 23_NarrativeParNature.sql          ' Libellés par nature + journal des modifications
+    ├── 23_NarrativeParNature.sql          ' Libellés par nature + journal des modifications
+    └── 24_FormatCoreBanking.sql           ' Les sept codes du fichier core banking
 
 Installation/
 ├── Wincompense.iss                        ' Script Inno Setup : produit Wincompense_Setup.exe

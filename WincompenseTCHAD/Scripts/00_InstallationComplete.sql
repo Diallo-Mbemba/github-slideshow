@@ -3,7 +3,7 @@
     WINCOMPENSE TCHAD — LE SEUL SCRIPT À EXÉCUTER
 ================================================================================================
 
-    IL N'Y EN A QU'UN. Celui-ci. Les vingt-deux fichiers du sous-dossier Scripts\Documentation
+    IL N'Y EN A QU'UN. Celui-ci. Les vingt-trois fichiers du sous-dossier Scripts\Documentation
     sont la DOCUMENTATION de ce qu'il fait, découpée par sujet — ils expliquent, ils ne
     s'exécutent pas. Tout ce qu'ils créent est repris ici, dans le bon ordre.
 
@@ -1556,6 +1556,79 @@ ELSE
 GO
 
 -- =========================================================================
+-- LES SEPT CODES DU FORMAT CORE BANKING
+--
+--    Ils etaient des constantes du code. La banque en a deja change QUATRE d'un coup --
+--    BRN de N01 a S51, TXNCD debit de U24 a F03, TXNCD credit de F15 a F57, et COST_CENTER
+--    retiree -- et chacun a coute une livraison complete. Ce sont ses codes ; elle doit
+--    pouvoir les corriger depuis l'ecran « Format du fichier core banking ».
+--
+--    LES CONSTANTES RESTENT DANS LE CODE, ET SERVENT DE REPLI : une base ou ces lignes
+--    manquent produit exactement le fichier d'aujourd'hui.
+--
+--    CE QUI N'EST PAS PARAMETRABLE, ET NE LE SERA PAS : DRCR (« D » / « C ») est la
+--    semantique du debit et du credit, pas un code de la banque ; AMOUNT, ACNO, VALDT et
+--    ADDLTEXT sont des donnees ; INSTR_NO est toujours vide ; BATCHNO est une regle.
+--
+--    AUCUNE VALEUR EXISTANTE N'EST ECRASEE : chaque bloc est en IF NOT EXISTS.
+--
+--    Detail et commentaires : Scripts\Documentation\24_FormatCoreBanking.sql.
+-- =========================================================================
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_DETBSJRNL')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_DETBSJRNL', N'BBR',
+            N'Colonne DETBSJRNL du fichier core banking, identique sur toutes les lignes.',
+            GETDATE(), N'installation');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_BRN')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_BRN', N'S51',
+            N'Colonne BRN : agence DU LOT, portée à l''identique par toutes ses lignes. Ce n''est pas l''agence du siège, qui s''écrit en ACBRN sur les seuls comptes internes.',
+            GETDATE(), N'installation');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_SRCCODE')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_SRCCODE', N'ECOSOURCE',
+            N'Colonne SRCCODE du fichier core banking, identique sur toutes les lignes.',
+            GETDATE(), N'installation');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_TXNCD_DEBIT')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_TXNCD_DEBIT', N'F03', N'Colonne TXNCD des lignes au DÉBIT.',
+            GETDATE(), N'installation');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_TXNCD_CREDIT')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_TXNCD_CREDIT', N'F57', N'Colonne TXNCD des lignes au CRÉDIT.',
+            GETDATE(), N'installation');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_AGENCE_SIEGE')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_AGENCE_SIEGE', N'N01',
+            N'Agence portée en ACBRN par les comptes du siège, et par les lignes qui ne se rattachent à aucun point de vente — écart d''arrondi, écritures de change.',
+            GETDATE(), N'installation');
+GO
+
+-- LA LISTE TIENT DANS UNE SEULE OPTION, separee par des virgules. Deux numeros de compte
+-- sans attribut ne justifient pas une table a eux : le journal y gagne une ligne lisible
+-- (« avant : 379100319,379200585 »), et l'ecran l'affiche quand meme en petite grille.
+--
+-- UNE OPTION ABSENTE ET UNE OPTION VIDE NE DISENT PAS LA MEME CHOSE. Absente : une base que
+-- ce script n'a pas encore touchee, et l'application rend les deux comptes du code. Vide :
+-- une banque qui n'en rattache aucun, et l'application respecte son choix.
+IF NOT EXISTS (SELECT 1 FROM dbo.T_ParametreWU WHERE Cle = N'CB_COMPTES_SIEGE')
+    INSERT INTO dbo.T_ParametreWU (Cle, Valeur, Libelle, DateModification, ModifiePar)
+    VALUES (N'CB_COMPTES_SIEGE', N'379100319,379200585',
+            N'Comptes rattachés d''office à l''agence du siège en ACBRN, séparés par des virgules. Règle d''aiguillage du format core banking, et non plan comptable : aucune écriture ne leur est passée de ce fait.',
+            GETDATE(), N'installation');
+GO
+
+-- =========================================================================
 -- T_NarrativeNatureWU — le libelle de chaque nature de mouvement
 --
 -- CREEE VIDE, ET C'EST VOULU. Une nature absente suit SON LIBELLE HISTORIQUE, celui que le
@@ -1576,7 +1649,7 @@ GO
 -- Un entier aurait rendu la table illisible, et renumeroter l'enumeration du code aurait
 -- reaffecte silencieusement les libelles saisis a d'autres lignes de la piece.
 --
--- Detail et commentaires : Scripts_NarrativeParNature.sql.
+-- Detail et commentaires : Scripts\Documentation\23_NarrativeParNature.sql.
 -- =========================================================================
 IF OBJECT_ID(N'dbo.T_NarrativeNatureWU') IS NULL
 BEGIN

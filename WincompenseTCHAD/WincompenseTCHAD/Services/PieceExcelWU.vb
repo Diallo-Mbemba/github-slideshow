@@ -308,20 +308,6 @@ Public NotInheritable Class PieceExcelWU
     End Function
 
     ''' <summary>
-    ''' Supprime les feuilles vides d'un classeur neuf.
-    '''
-    ''' Excel en crée une, deux ou trois selon le réglage du poste. Les laisser donnerait un
-    ''' classeur où les pièces sont noyées entre des « Feuil2 » vides — et le comptable qui
-    ''' imprime tout le classeur sortirait des pages blanches au milieu de ses pièces.
-    ''' </summary>
-    ''' <summary>
-    ''' Dit la période réellement couverte : une journée, ou un intervalle.
-    '''
-    ''' La pièce portait « activité du 09/09/2026 » alors qu'elle totalisait la semaine du 08
-    ''' au 14 : la date venait de la première ligne du rapport, et rien ne disait le reste.
-    ''' Une pièce qui annonce une journée pour une semaine est impossible à rapprocher.
-    ''' </summary>
-    ''' <summary>
     ''' Groupe statistique d'un point de vente, tel qu'il s'emploie partout.
     '''
     ''' UNE SEULE ÉCRITURE DE CETTE RÈGLE, parce que le regroupement et l'intitulé de la
@@ -354,6 +340,14 @@ Public NotInheritable Class PieceExcelWU
 
         Return $"Groupe {nom} : {nombreDePointsDeVente} point(s) de vente"
     End Function
+
+    ''' <summary>
+    ''' Dit la période réellement couverte : une journée, ou un intervalle.
+    '''
+    ''' La pièce portait « activité du 09/09/2026 » alors qu'elle totalisait la semaine du 08
+    ''' au 14 : la date venait de la première ligne du rapport, et rien ne disait le reste.
+    ''' Une pièce qui annonce une journée pour une semaine est impossible à rapprocher.
+    ''' </summary>
     Private Shared Function LibelleDeLaPeriode(debut As Date, fin As Date?) As String
 
         If Not fin.HasValue OrElse fin.Value.Date <= debut.Date Then
@@ -363,6 +357,13 @@ Public NotInheritable Class PieceExcelWU
         Return $"activité du {debut:dd/MM/yyyy} au {fin.Value:dd/MM/yyyy}"
     End Function
 
+    ''' <summary>
+    ''' Supprime les feuilles vides d'un classeur neuf.
+    '''
+    ''' Excel en crée une, deux ou trois selon le réglage du poste. Les laisser donnerait un
+    ''' classeur où les pièces sont noyées entre des « Feuil2 » vides — et le comptable qui
+    ''' imprime tout le classeur sortirait des pages blanches au milieu de ses pièces.
+    ''' </summary>
     Private Shared Sub NeGarderQueLaPremiereFeuille(classeur As Object)
 
         While CInt(classeur.Worksheets.Count) > 1

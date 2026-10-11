@@ -417,6 +417,11 @@ Public Class FrmPiecesArchivees
             Return
         End If
 
+        If Not ConfirmerLeFormatCourant(journee) Then
+            lblStatut.Text = "Fichier core banking abandonné : format à vérifier."
+            Return
+        End If
+
         Dim messageErreur As String = String.Empty
         Dim fichier As DataTable = CoreBankingService.Construire(_piece, journee.DateActivite,
                                                                  dateValeur, messageErreur)
@@ -441,6 +446,45 @@ Public Class FrmPiecesArchivees
             End If
         End Using
     End Sub
+
+    ''' <summary>
+    ''' PRÉVIENT QUE LE FICHIER REJOUÉ NE SERA PAS CELUI QUI A ÉTÉ CHARGÉ, quand les codes du
+    ''' format ont changé depuis.
+    '''
+    ''' LA PIÈCE EST CONSERVÉE, LE FICHIER NON. Son libellé, son narratif et son code agence
+    ''' sont stockés ligne par ligne : une pièce relue est celle de sa génération. Le fichier
+    ''' core banking, lui, est RECONSTRUIT à chaque fois — DETBSJRNL, BRN, SRCCODE, TXNCD et
+    ''' l'agence du siège sont relus dans le paramétrage COURANT.
+    '''
+    ''' Tant que ces codes étaient des constantes, cela n'avait aucune conséquence : une
+    ''' version de l'application produisait toujours le même fichier. Depuis qu'ils se
+    ''' paramètrent, rejouer une journée après un changement produit un fichier DIFFÉRENT de
+    ''' celui qui a été chargé — deux fichiers censés être le même, qui ne le sont pas.
+    '''
+    ''' ON AVERTIT, ON NE BLOQUE PAS. Rejouer avec les codes du jour est souvent exactement ce
+    ''' qu'on veut : c'est le cas d'un lot rejeté que la banque fait recharger après avoir
+    ''' corrigé un code. C'est à celui qui rejoue de savoir lequel des deux cas est le sien.
+    ''' </summary>
+    Private Function ConfirmerLeFormatCourant(journee As PieceRepository.JourneeConservee) As Boolean
+
+        Dim trace As String = OptionsWU.DerniereModification(OptionsWU.CLE_CB_BRN)
+        If trace.Length = 0 Then Return True
+
+        Return MessageBox.Show(Me,
+            "Les codes du format core banking ont été modifiés depuis." & Environment.NewLine &
+            Environment.NewLine & trace & Environment.NewLine & Environment.NewLine &
+            $"La pièce du {journee.DateActivite:dd/MM/yyyy} est conservée telle qu'elle a été " &
+            "produite — ses comptes, ses montants et ses libellés ne bougent pas. Mais le " &
+            "FICHIER, lui, est reconstruit : il portera les codes d'AUJOURD'HUI, et non ceux " &
+            "qui étaient en vigueur le jour du chargement." & Environment.NewLine &
+            Environment.NewLine &
+            "Si vous rejouez ce fichier parce que la banque a fait corriger un code, c'est " &
+            "exactement ce qu'il faut. Si vous le rejouez pour retrouver celui qui a été " &
+            "chargé, ce ne sera pas le même." & Environment.NewLine & Environment.NewLine &
+            "Produire le fichier avec les codes actuels ?",
+            "Les codes du format ont changé", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) = DialogResult.Yes
+    End Function
 
     ''' <summary>
     ''' Fait confirmer une date de valeur chômée ou incertaine. Même contrôle que l'écran de

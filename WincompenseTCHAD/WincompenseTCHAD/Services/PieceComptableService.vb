@@ -567,6 +567,11 @@ Public NotInheritable Class PieceComptableService
         ' dans SystemeWU (colonnes Cpte_attenteDEBIT / Cpte_attenteCREDIT).
         Dim compteDAttente As String = ComptesSystemeWU.Actuels.CompteInterBancaire
 
+        ' L'AGENCE DU SIÈGE VIENT DU PARAMÉTRAGE, comme en ACBRN. Cette ligne n'appartient à
+        ' aucun point de vente : elle est rattachée au siège, et la banque peut changer ce
+        ' code sans nous — elle l'a déjà fait pour BRN.
+        Dim agenceSiege As String = OptionsWU.FormatCoreBanking.AgenceSiege
+
         ' SON LIBELLÉ VIENT DU PARAMÉTRAGE, COMME LES DOUZE AUTRES — mais de SA NATURE, et
         ' dans les DEUX modes. Cette ligne est posée après la pièce et ne se rattache à aucun
         ' point de vente : le modèle global la réduirait à « LD WU ACTIVITE ». La banque peut
@@ -589,7 +594,7 @@ Public NotInheritable Class PieceComptableService
             ' n'appartient à aucun point de vente. Le fichier core banking retombe alors sur
             ' son libellé, qui dit déjà ce qu'elle est.
             AjouterLigne(dtPiece, compteDAttente, libelleEcart, 0L,
-                         CLng(differenceGlobale), ConstantesWU.CB_AGENCE_SIEGE)
+                         CLng(differenceGlobale), agenceSiege)
 
             ecartAbsorbe = CLng(differenceGlobale)
             compteEcart = compteDAttente
@@ -600,7 +605,7 @@ Public NotInheritable Class PieceComptableService
 
         If differenceGlobale < 0D AndAlso differenceGlobale >= -ConstantesWU.SEUIL_ECART_TOLERE Then
             AjouterLigne(dtPiece, compteDAttente, libelleEcart,
-                         CLng(Math.Abs(differenceGlobale)), 0L, ConstantesWU.CB_AGENCE_SIEGE)
+                         CLng(Math.Abs(differenceGlobale)), 0L, agenceSiege)
 
             ' SIGNÉ, et négatif ici : un écart au débit et un écart au crédit ne se compensent
             ' pas dans la tête de celui qui relit le bordereau.

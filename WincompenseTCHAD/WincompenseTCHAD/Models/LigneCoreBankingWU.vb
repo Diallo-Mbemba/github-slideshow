@@ -17,6 +17,9 @@ Public Class LigneCoreBankingWU
 
 #Region "Les douze colonnes, dans l'ordre du fichier"
 
+    ' LES VALEURS PAR DÉFAUT RESTENT CELLES DU CODE, et c'est voulu : une ligne construite
+    ' sans format — un test, un appel oublié — sort comme aujourd'hui plutôt que vide. Le
+    ' format paramétré, lui, est posé par Construire.
     Public Property DETBSJRNL As String = ConstantesWU.CB_DETBSJRNL
     Public Property BRN As String = ConstantesWU.CB_BRN
     Public Property BATCHNO As String = String.Empty
@@ -47,48 +50,36 @@ Public Class LigneCoreBankingWU
     ''' <param name="codeAgence">Code agence du point de vente, ou vide s'il n'y en a pas.</param>
     ''' <param name="dateCompensation">Date de valeur : la date de compensation (J+1).</param>
     ''' <param name="numeroLot">Numéro de lot, commun à toutes les lignes du fichier.</param>
+    ''' <param name="format">
+    ''' Les codes du format, lus UNE FOIS pour tout le fichier. Nothing retombe sur ceux du
+    ''' code : un appelant qui ne les fournit pas obtient le fichier d'aujourd'hui, pas un
+    ''' fichier aux colonnes vides.
+    ''' </param>
     Public Shared Function Construire(compte As String, libelle As String, montant As Long,
                                       auDebit As Boolean, codeAgence As String,
-                                      dateCompensation As Date, numeroLot As String) As LigneCoreBankingWU
+                                      dateCompensation As Date, numeroLot As String,
+                                      format As FormatCoreBankingWU) As LigneCoreBankingWU
 
+        Dim codes As FormatCoreBankingWU = If(format, FormatCoreBankingWU.ParDefaut())
+
+        ' DRCR N'EST PAS PARAMÉTRABLE, et ne le sera pas : « D » et « C » ne sont pas des codes
+        ' de la banque, c'est la sémantique du débit et du crédit. Les rendre modifiables
+        ' offrirait d'inverser tous les sens d'un fichier en une saisie.
         Return New LigneCoreBankingWU() With {
+            .DETBSJRNL = codes.Detbsjrnl,
+            .BRN = codes.Brn,
             .BATCHNO = numeroLot,
+            .SRCCODE = codes.Srccode,
             .AMOUNT = Math.Abs(montant),
             .ACNO = If(compte, String.Empty).Trim(),
             .DRCR = If(auDebit, ConstantesWU.CB_SENS_DEBIT, ConstantesWU.CB_SENS_CREDIT),
-            .ACBRN = AgenceDeLaLigne(compte, codeAgence),
-            .TXNCD = If(auDebit, ConstantesWU.CB_TXNCD_DEBIT, ConstantesWU.CB_TXNCD_CREDIT),
+            .ACBRN = codes.AgenceDeLaLigne(compte, codeAgence),
+            .TXNCD = codes.Txncd(auDebit),
             .VALDT = dateCompensation.Date,
             .ADDLTEXT = If(libelle, String.Empty).Trim()
         }
     End Function
 
-    ''' <summary>
-    ''' Agence à porter dans ACBRN.
-    '''
-    ''' Trois cas, dans cet ordre :
-    '''   — les comptes du siège y sont rattachés d'office, quel que soit le point de vente qui
-    '''     les a mouvementés ;
-    '''   — sinon, le code agence du point de vente, lu dans la base selon l'Account ;
-    '''   — à défaut, le siège : c'est le cas de la ligne d'écart d'arrondi, qui n'appartient à
-    '''     aucun point de vente, et celui d'un point de vente dont le code agence manque encore
-    '''     dans la base. Laisser la colonne vide ferait rejeter le fichier entier.
-    ''' </summary>
-    Public Shared Function AgenceDeLaLigne(compte As String, codeAgence As String) As String
-
-        Dim compteNettoye As String = If(compte, String.Empty).Trim()
-
-        For Each compteSiege As String In ConstantesWU.CB_COMPTES_SIEGE
-            If String.Equals(compteNettoye, compteSiege, StringComparison.OrdinalIgnoreCase) Then
-                Return ConstantesWU.CB_AGENCE_SIEGE
-            End If
-        Next
-
-        Dim agence As String = If(codeAgence, String.Empty).Trim()
-        If agence.Length > 0 Then Return agence
-
-        Return ConstantesWU.CB_AGENCE_SIEGE
-    End Function
 
 #End Region
 

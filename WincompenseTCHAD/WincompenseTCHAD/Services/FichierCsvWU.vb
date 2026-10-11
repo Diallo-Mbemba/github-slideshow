@@ -225,14 +225,6 @@ Public NotInheritable Class FichierCsvWU
 #Region "Empreinte"
 
     ''' <summary>
-    ''' Empreinte SHA-256 d'un texte, en hexadécimal.
-    '''
-    ''' Elle ne protège de rien — qui modifie un fichier peut recalculer son empreinte. Elle
-    ''' sert à RÉPONDRE À UNE QUESTION : « ce fichier est-il celui qui est sorti de
-    ''' l'application, ou quelqu'un l'a-t-il retouché entre-temps ? ». Retoucher est parfois
-    ''' légitime ; l'ignorer ne l'est pas.
-    ''' </summary>
-    ''' <summary>
     ''' Empreinte SHA-256 d'un FICHIER, en hexadécimal. Chaîne vide si le fichier est
     ''' illisible : une empreinte manquante se dit, elle ne fait pas échouer un traitement
     ''' qui a par ailleurs abouti.
@@ -266,6 +258,14 @@ Public NotInheritable Class FichierCsvWU
         End Try
     End Function
 
+    ''' <summary>
+    ''' Empreinte SHA-256 d'un texte, en hexadécimal.
+    '''
+    ''' Elle ne protège de rien — qui modifie un fichier peut recalculer son empreinte. Elle
+    ''' sert à RÉPONDRE À UNE QUESTION : « ce fichier est-il celui qui est sorti de
+    ''' l'application, ou quelqu'un l'a-t-il retouché entre-temps ? ». Retoucher est parfois
+    ''' légitime ; l'ignorer ne l'est pas.
+    ''' </summary>
     Public Shared Function Empreinte(texte As String) As String
 
         Using algorithme As System.Security.Cryptography.SHA256 = System.Security.Cryptography.SHA256.Create()

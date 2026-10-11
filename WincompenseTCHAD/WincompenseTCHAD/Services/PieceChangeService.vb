@@ -466,17 +466,21 @@ Public NotInheritable Class PieceChangeService
 
         piece.Lignes = TableVide()
 
+        ' L'AGENCE DU SIÈGE, LUE UNE FOIS POUR LA PIÈCE. Elle vient du paramétrage, comme en
+        ' ACBRN : la banque peut la changer sans nous.
+        Dim agenceSiege As String = OptionsWU.FormatCoreBanking.AgenceSiege
+
         ' L'ordre : le gain d'abord, la perte ensuite, et dans chaque paire le débit avant le
         ' crédit. C'est l'ordre de lecture d'un comptable, et il est le même sur toutes les
         ' pièces du projet.
         If gains > 0L Then
-            Ajouter(piece.Lignes, comptes.CompteCourant, piece.Libelle, gains, 0L)
-            Ajouter(piece.Lignes, comptes.CompteGainDeChange, piece.Libelle, 0L, gains)
+            Ajouter(piece.Lignes, comptes.CompteCourant, piece.Libelle, gains, 0L, agenceSiege)
+            Ajouter(piece.Lignes, comptes.CompteGainDeChange, piece.Libelle, 0L, gains, agenceSiege)
         End If
 
         If pertes > 0L Then
-            Ajouter(piece.Lignes, comptes.ComptePerteDeChange, piece.Libelle, pertes, 0L)
-            Ajouter(piece.Lignes, comptes.CompteCourant, piece.Libelle, 0L, pertes)
+            Ajouter(piece.Lignes, comptes.ComptePerteDeChange, piece.Libelle, pertes, 0L, agenceSiege)
+            Ajouter(piece.Lignes, comptes.CompteCourant, piece.Libelle, 0L, pertes, agenceSiege)
         End If
 
         Return piece
@@ -496,7 +500,7 @@ Public NotInheritable Class PieceChangeService
     End Function
 
     Private Shared Sub Ajouter(table As DataTable, compte As String, libelle As String,
-                               debit As Long, credit As Long)
+                               debit As Long, credit As Long, agenceSiege As String)
 
         Dim ligne As DataRow = table.NewRow()
         ligne("Compte") = If(compte, String.Empty).Trim()
@@ -508,7 +512,7 @@ Public NotInheritable Class PieceChangeService
         ' il naît de la différence entre ce qu'elle a encaissé en francs et ce que Western Union
         ' lui a réglé en euros. Aucun point de vente n'en est comptable, et le rattacher à l'un
         ' d'eux ferait apparaître dans ses états un résultat qui n'est pas le sien.
-        ligne("CodeAgence") = ConstantesWU.CB_AGENCE_SIEGE
+        ligne("CodeAgence") = agenceSiege
 
         ' LE NARRATIF VAUT LE LIBELLÉ, et ce n'est pas un remplissage : la pièce de change
         ' n'a qu'une phrase, la même pour ses lignes, et elle est déjà de la forme que la

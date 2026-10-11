@@ -217,6 +217,7 @@ Public Class FrmPrincipal
             Case NameOf(FrmEcartsChange) : Return "Pièce des écarts de change"
             Case NameOf(FrmControleChange) : Return "Contrôle des écarts de change"
             Case NameOf(FrmNarrative) : Return "Narrative comptable"
+            Case NameOf(FrmFormatCoreBanking) : Return "Format du fichier core banking"
             Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
             Case NameOf(FrmParametrageFichier) : Return "Paramétrage : fichier de secours"
             Case NameOf(FrmProduits) : Return "Produits de transfert"
@@ -331,17 +332,6 @@ Public Class FrmPrincipal
     End Sub
 
     ''' <summary>
-    ''' Le contrôle des gains et pertes de change.
-    '''
-    ''' RANGÉ DANS LE MENU COMPENSATION, et non dans Paramétrage, parce qu'il parle de la
-    ''' JOURNÉE et non du référentiel : il rejoue sur un rapport de règlement le calcul qui
-    ''' alimentera la pièce de change.
-    '''
-    ''' IL N'ÉCRIT RIEN ET N'EST RÉSERVÉ À PERSONNE. Un agent a le droit de vérifier le
-    ''' calcul qui sera comptabilisé ; c'est même tout l'intérêt de l'écran — voir
-    ''' FrmControleChange.
-    ''' </summary>
-    ''' <summary>
     ''' La pièce comptable des écarts de change.
     '''
     ''' RANGÉE JUSTE AVANT LE CONTRÔLE, et les deux se lisent ensemble : celle-ci PRODUIT et
@@ -352,6 +342,17 @@ Public Class FrmPrincipal
         AfficherEnfant(Of FrmEcartsChange)()
     End Sub
 
+    ''' <summary>
+    ''' Le contrôle des gains et pertes de change.
+    '''
+    ''' RANGÉ DANS LE MENU COMPENSATION, et non dans Paramétrage, parce qu'il parle de la
+    ''' JOURNÉE et non du référentiel : il rejoue sur un rapport de règlement le calcul qui
+    ''' alimentera la pièce de change.
+    '''
+    ''' IL N'ÉCRIT RIEN ET N'EST RÉSERVÉ À PERSONNE. Un agent a le droit de vérifier le
+    ''' calcul qui sera comptabilisé ; c'est même tout l'intérêt de l'écran — voir
+    ''' FrmControleChange.
+    ''' </summary>
     Private Sub mnuControleChange_Click(sender As Object, e As EventArgs) Handles mnuControleChange.Click
         AfficherEnfant(Of FrmControleChange)()
     End Sub
@@ -391,6 +392,10 @@ Public Class FrmPrincipal
     ''' </summary>
     Private Sub mnuNarrative_Click(sender As Object, e As EventArgs) Handles mnuNarrative.Click
         AfficherEnfant(Of FrmNarrative)()
+    End Sub
+
+    Private Sub mnuFormatCoreBanking_Click(sender As Object, e As EventArgs) Handles mnuFormatCoreBanking.Click
+        AfficherEnfant(Of FrmFormatCoreBanking)()
     End Sub
 
     ''' <summary>
@@ -460,6 +465,7 @@ Public Class FrmPrincipal
         mnuTaxes.Image = IconesWU.Obtenir(IconeWU.Pourcentage)
         mnuProduits.Image = IconesWU.Obtenir(IconeWU.Groupe)
         mnuNarrative.Image = IconesWU.Obtenir(IconeWU.Registre)
+        mnuFormatCoreBanking.Image = IconesWU.Obtenir(IconeWU.Registre)
         mnuOptions.Image = IconesWU.Obtenir(IconeWU.Curseurs)
         mnuFichierParametrage.Image = IconesWU.Obtenir(IconeWU.Dossier)
 
@@ -634,6 +640,7 @@ Public Class FrmPrincipal
         mnuGroupes.Available = pointsDeVente
         mnuComptes.Available = comptes
         mnuNarrative.Available = comptes
+        mnuFormatCoreBanking.Available = comptes
         mnuOptions.Available = comptes
         mnuDemandes.Available = pointsDeVente
         SEP5.Available = pointsDeVente

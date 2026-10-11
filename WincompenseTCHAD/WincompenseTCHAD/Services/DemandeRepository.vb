@@ -127,13 +127,6 @@ Public NotInheritable Class DemandeRepository
     End Sub
 
     ''' <summary>
-    ''' Traduit une erreur SQL du dépôt en message lisible.
-    '''
-    ''' Elle ne s'appelle pas « MessageErreur » : le paramètre messageErreur, présent dans
-    ''' presque toutes les méthodes de cette classe, la masquerait — Visual Basic ne distingue
-    ''' pas la casse, et l'appel serait lu comme une indexation de la chaîne.
-    ''' </summary>
-    ''' <summary>
     ''' Traduit les deux échecs d'installation en une consigne, et laisse passer le reste.
     ''' Une table absente et une colonne absente ne se disent pas de la même façon : la
     ''' première veut le script 09, la seconde le script 14.
@@ -145,6 +138,13 @@ Public NotInheritable Class DemandeRepository
         Return parDefaut
     End Function
 
+    ''' <summary>
+    ''' Traduit une erreur SQL du dépôt en message lisible.
+    '''
+    ''' Elle ne s'appelle pas « MessageErreur » : le paramètre messageErreur, présent dans
+    ''' presque toutes les méthodes de cette classe, la masquerait — Visual Basic ne distingue
+    ''' pas la casse, et l'appel serait lu comme une indexation de la chaîne.
+    ''' </summary>
     Private Shared Function TraduireErreurDepot(ex As SqlException, demande As DemandeWU) As String
 
         If ex.Number = ERREUR_TABLE_ABSENTE Then Return MESSAGE_TABLE_ABSENTE

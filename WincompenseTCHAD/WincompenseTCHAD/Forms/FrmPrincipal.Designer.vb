@@ -46,6 +46,7 @@ Partial Class FrmPrincipal
         Me.mnuFichierParametrage = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuOptions = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuNarrative = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuFormatCoreBanking = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuSecurite = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuMonMotDePasse = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP4 = New System.Windows.Forms.ToolStripSeparator()
@@ -147,7 +148,7 @@ Partial Class FrmPrincipal
         '
         'mnuParametrage
         '
-        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.mnuTaxes, Me.mnuNarrative, Me.mnuOptions, Me.mnuProduits, Me.SEP7, Me.mnuFichierParametrage})
+        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.mnuTaxes, Me.mnuNarrative, Me.mnuFormatCoreBanking, Me.mnuOptions, Me.mnuProduits, Me.SEP7, Me.mnuFichierParametrage})
         Me.mnuParametrage.Name = "mnuParametrage"
         Me.mnuParametrage.Size = New System.Drawing.Size(100, 20)
         Me.mnuParametrage.Text = "&Paramétrage"
@@ -203,6 +204,12 @@ Partial Class FrmPrincipal
         Me.mnuNarrative.Name = "mnuNarrative"
         Me.mnuNarrative.Size = New System.Drawing.Size(240, 22)
         Me.mnuNarrative.Text = "&Narrative comptable..."
+        '
+        'mnuFormatCoreBanking
+        '
+        Me.mnuFormatCoreBanking.Name = "mnuFormatCoreBanking"
+        Me.mnuFormatCoreBanking.Size = New System.Drawing.Size(240, 22)
+        Me.mnuFormatCoreBanking.Text = "&Format du fichier core banking..."
         '
         'mnuOptions
         '
@@ -470,6 +477,7 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuFichierParametrage As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuOptions As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuNarrative As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuFormatCoreBanking As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuSecurite As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuMonMotDePasse As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP4 As System.Windows.Forms.ToolStripSeparator

@@ -178,6 +178,11 @@ Public NotInheritable Class CoreBankingService
         Dim numeroLot As String = numeroLotImpose.Trim()
         Dim table As DataTable = TableVide()
 
+        ' LES CODES DU FORMAT, LUS UNE FOIS POUR TOUT LE FICHIER, et pour la même raison que
+        ' le paramétrage de narrative : un fichier ne doit jamais mélanger deux paramétrages
+        ' parce que quelqu'un a enregistré pendant sa production. L'objet rendu est immuable.
+        Dim format As FormatCoreBankingWU = OptionsWU.FormatCoreBanking
+
         For Each ligne As DataRow In dtPiece.Rows
 
             Dim compte As String = Convert.ToString(ligne("Compte"), CultureInfo.InvariantCulture)
@@ -191,11 +196,11 @@ Public NotInheritable Class CoreBankingService
             ' les auxiliaires de la pièce écartent déjà ce cas — mais une telle ligne n'aurait
             ' rien à impacter et n'a pas à encombrer le fichier.
             If debit <> 0L Then
-                Ajouter(table, compte, narratif, debit, True, codeAgence, dateValeur, numeroLot)
+                Ajouter(table, compte, narratif, debit, True, codeAgence, dateValeur, numeroLot, format)
             End If
 
             If credit <> 0L Then
-                Ajouter(table, compte, narratif, credit, False, codeAgence, dateValeur, numeroLot)
+                Ajouter(table, compte, narratif, credit, False, codeAgence, dateValeur, numeroLot, format)
             End If
         Next
 
@@ -328,10 +333,11 @@ Public NotInheritable Class CoreBankingService
 
     Private Shared Sub Ajouter(table As DataTable, compte As String, libelle As String,
                                montant As Long, auDebit As Boolean, codeAgence As String,
-                               dateValeur As Date, numeroLot As String)
+                               dateValeur As Date, numeroLot As String,
+                               format As FormatCoreBankingWU)
 
         Dim ligne As LigneCoreBankingWU = LigneCoreBankingWU.Construire(
-            compte, libelle, montant, auDebit, codeAgence, dateValeur, numeroLot)
+            compte, libelle, montant, auDebit, codeAgence, dateValeur, numeroLot, format)
 
         table.Rows.Add(ligne.DETBSJRNL,
                        ligne.BRN,

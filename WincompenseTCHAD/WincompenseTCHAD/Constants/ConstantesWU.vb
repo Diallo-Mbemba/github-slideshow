@@ -673,6 +673,19 @@ Public NotInheritable Class ConstantesWU
     Public Const CB_NARRATIF_LONGUEUR_MAX As Integer = 150
 
     ''' <summary>
+    ''' Longueur maximale d'un code du format core banking, à la saisie.
+    '''
+    ''' PROVISOIRE, ET ASSUMÉE COMME TELLE. La banque n'a pas encore dit la forme exacte de ses
+    ''' codes — longueur fixe ? jeu de caractères ? casse imposée ? Les cinq que nous
+    ''' connaissons font trois à neuf caractères ; borner à vingt refuse ce qui est absurde
+    ''' sans deviner sa règle à partir d'un échantillon de cinq.
+    '''
+    ''' Quand elle aura répondu, c'est FormatCoreBankingWU.ControlerLeCode qu'on resserre, et
+    ''' lui seul.
+    ''' </summary>
+    Public Const CB_CODE_LONGUEUR_MAX As Integer = 20
+
+    ''' <summary>
     ''' Comptes rattachés d'office à l'agence du siège dans la colonne ACBRN.
     '''
     ''' Ils sont écrits ici et non dans SystemeWU : la banque les a donnés tels quels, et cette
