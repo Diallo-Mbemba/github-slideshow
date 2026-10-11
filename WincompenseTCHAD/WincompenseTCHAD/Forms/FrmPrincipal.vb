@@ -728,6 +728,21 @@ Public Class FrmPrincipal
     ''' <summary>Mot inscrit en fond de la zone de travail.</summary>
     Private Const FILIGRANE As String = "WINCOMPENSE"
 
+    ''' <summary>Côté de l'icône, en multiple de la taille de police du mot.</summary>
+    Private Const PROPORTION_ICONE As Single = 1.6F
+
+    ''' <summary>Écart entre le bas de l'icône et le haut des capitales, en multiple de la police.</summary>
+    Private Const ECART_ICONE As Single = 0.1F
+
+    ''' <summary>
+    ''' Hauteur d'interligne au-dessus des capitales, en multiple de la taille de police.
+    '''
+    ''' La boîte rendue par MeasureString ne commence PAS au sommet des lettres : elle part
+    ''' au-dessus, là où se logeraient les accents. Poser l'icône sur ce haut de boîte la
+    ''' décollerait visiblement du mot, alors que le calcul, lui, serait juste.
+    ''' </summary>
+    Private Const RETRAIT_CAPITALES As Single = 0.18F
+
     ''' <summary>
     ''' Inscrit le nom de l'application en fond de la zone MDI.
     '''
@@ -768,6 +783,85 @@ Public Class FrmPrincipal
         End Get
     End Property
 
+    Private Shared _imageFiligrane As Bitmap
+    Private Shared _imageFiligraneCherchee As Boolean
+
+    ''' <summary>
+    ''' L'icône de l'application en image, dans la plus grande taille qu'elle contient.
+    '''
+    ''' LUE UNE SEULE FOIS, ET GARDÉE. La zone MDI se repeint à chaque déplacement de fenêtre
+    ''' fille : relire l'icône et la convertir à chaque passage coûterait une allocation par
+    ''' repaint pour une image qui ne change jamais. Elle n'est pas libérée, comme le cache
+    ''' d'IconesWU : elle vit le temps de l'application, et la libérer alors que la zone peut
+    ''' encore se repeindre provoquerait une exception.
+    '''
+    ''' New Icon(icone, 256, 256) NE REDIMENSIONNE RIEN : il choisit, parmi les tailles que le
+    ''' fichier .ico contient, celle qui approche le plus les 256 demandés — donc la plus
+    ''' grande. C'est d'elle que part l'agrandissement, et non d'une vignette de 16 pixels.
+    '''
+    ''' Rend Nothing si l'icône est illisible : le filigrane garde alors le seul mot. Une
+    ''' image manquante est un défaut d'habillage, jamais une raison d'empêcher de travailler.
+    ''' </summary>
+    Private Shared Function ImageDuFiligrane() As Bitmap
+
+        If _imageFiligraneCherchee Then Return _imageFiligrane
+        _imageFiligraneCherchee = True
+
+        Dim marque As Icon = IconesWU.IconeApplication()
+        If marque Is Nothing Then Return Nothing
+
+        Try
+            Using grande As New Icon(marque, 256, 256)
+                _imageFiligrane = grande.ToBitmap()
+            End Using
+
+        Catch ex As ArgumentException
+            ' Icône sans image exploitable : le mot suffira.
+            _imageFiligrane = Nothing
+        End Try
+
+        Return _imageFiligrane
+    End Function
+
+    ''' <summary>
+    ''' La teinte de chaque pixel de l'icône, tirée de sa luminosité.
+    '''
+    ''' POURQUOI PAS UNE SILHOUETTE BLANCHE. Peindre l'icône en blanc plein n'en laisserait
+    ''' qu'une tache : les trois cubes se touchent, et sans différence de teinte entre eux, on
+    ''' ne reconnaît plus la marque. Chaque pixel prend donc une teinte tirée de sa luminosité
+    ''' — 0,299 R + 0,587 V + 0,114 B, la pondération de l'œil — éclaircie de 1,17 et relevée
+    ''' de 0,16 pour que l'ensemble lise clair sur le gris de la zone de travail. Les faces des
+    ''' cubes restent distinctes, mais dans un seul camaïeu : le filigrane n'attire pas l'œil
+    ''' plus que le mot qu'il accompagne.
+    '''
+    ''' La transparence d'origine est conservée telle quelle (ligne alpha à 1) : sans cela, le
+    ''' fond carré de l'icône deviendrait un pavé clair autour des cubes.
+    ''' </summary>
+    Private Shared ReadOnly MATRICE_ECLAIRCIE As New Imaging.ColorMatrix(New Single()() {
+        New Single() {0.299F * 1.17F, 0.299F * 1.17F, 0.299F * 1.17F, 0.0F, 0.0F},
+        New Single() {0.587F * 1.17F, 0.587F * 1.17F, 0.587F * 1.17F, 0.0F, 0.0F},
+        New Single() {0.114F * 1.17F, 0.114F * 1.17F, 0.114F * 1.17F, 0.0F, 0.0F},
+        New Single() {0.0F, 0.0F, 0.0F, 1.0F, 0.0F},
+        New Single() {0.16F, 0.16F, 0.16F, 0.0F, 1.0F}})
+
+    ''' <summary>
+    ''' La même image en aplat noir, à l'opacité de l'ombre du mot.
+    '''
+    ''' Les trois premières lignes mettent R, V et B à zéro : la forme est conservée, la
+    ''' couleur non. La quatrième garde la transparence d'origine en la ramenant à 100/255 —
+    ''' exactement l'opacité du pinceau qui porte l'ombre du mot, pour que les deux ombres
+    ''' appartiennent au même objet et non à deux dessins superposés.
+    ''' </summary>
+    Private Shared ReadOnly MATRICE_OMBRE As New Imaging.ColorMatrix(New Single()() {
+        New Single() {0.0F, 0.0F, 0.0F, 0.0F, 0.0F},
+        New Single() {0.0F, 0.0F, 0.0F, 0.0F, 0.0F},
+        New Single() {0.0F, 0.0F, 0.0F, 0.0F, 0.0F},
+        New Single() {0.0F, 0.0F, 0.0F, 100.0F / 255.0F, 0.0F},
+        New Single() {0.0F, 0.0F, 0.0F, 0.0F, 1.0F}})
+
+    ''' <summary>Décalage de l'ombre portée, en pixels, pour l'icône comme pour le mot.</summary>
+    Private Const DECALAGE_OMBRE As Single = 3.0F
+
     Private Sub ZoneMdi_Paint(sender As Object, e As PaintEventArgs)
 
         Dim zone As Control = DirectCast(sender, Control)
@@ -788,13 +882,49 @@ Public Class FrmPrincipal
 
                 e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
 
-                Dim cadre As New RectangleF(0.0F, 0.0F, CSng(largeur), CSng(hauteur))
+                ' LA MESURE VIENT AVANT TOUT DESSIN, et non plus après : c'est elle qui dit où
+                ' commencent les lettres, donc où finit l'icône posée juste au-dessus.
+                Dim mesure As SizeF = e.Graphics.MeasureString(FILIGRANE, police)
+                Dim image As Bitmap = ImageDuFiligrane()
+
+                ' L'ICÔNE POUSSE LE MOT VERS LE BAS, de la moitié de ce qu'elle occupe : le
+                ' bloc des deux reste ainsi centré dans la zone, là où le mot seul l'était.
+                ' Sans icône lisible, les deux valeurs sont nulles et rien ne bouge — le
+                ' filigrane est exactement celui d'avant.
+                Dim cote As Single = If(image Is Nothing, 0.0F, taille * PROPORTION_ICONE)
+                Dim ecart As Single = If(image Is Nothing, 0.0F, taille * ECART_ICONE)
+
+                Dim cadre As New RectangleF(0.0F, (cote + ecart) / 2.0F,
+                                            CSng(largeur), CSng(hauteur))
+
+                ' Haut de la boîte du mot, puis haut de l'icône : on remonte du côté de
+                ' l'icône et de l'écart depuis le sommet des CAPITALES, et non depuis le haut
+                ' de la boîte mesurée, qui comprend la place des accents.
+                Dim hautDeLaBoite As Single = cadre.Y + (CSng(hauteur) - mesure.Height) / 2.0F
+                Dim hautIcone As Single = hautDeLaBoite + taille * RETRAIT_CAPITALES - ecart - cote
+
+                If image IsNot Nothing Then
+
+                    Dim placeIcone As New RectangleF((CSng(largeur) - cote) / 2.0F,
+                                                     hautIcone, cote, cote)
+
+                    ' L'ombre d'abord, l'icône par-dessus : dans l'autre sens, l'ombre
+                    ' mangerait le bord droit et le bas de l'icône.
+                    DessinerLIcone(e.Graphics, image,
+                                   New RectangleF(placeIcone.X + DECALAGE_OMBRE,
+                                                  placeIcone.Y + DECALAGE_OMBRE,
+                                                  placeIcone.Width, placeIcone.Height),
+                                   MATRICE_OMBRE)
+
+                    DessinerLIcone(e.Graphics, image, placeIcone, MATRICE_ECLAIRCIE)
+                End If
 
                 ' Une ombre portée d'abord : du blanc sur le gris de la zone de travail manquerait
                 ' de contraste, et le mot se lirait mal.
                 Using pinceauOmbre As New SolidBrush(Color.FromArgb(100, 0, 0, 0))
                     e.Graphics.DrawString(FILIGRANE, police, pinceauOmbre,
-                                          New RectangleF(cadre.X + 3.0F, cadre.Y + 3.0F,
+                                          New RectangleF(cadre.X + DECALAGE_OMBRE,
+                                                         cadre.Y + DECALAGE_OMBRE,
                                                          cadre.Width, cadre.Height),
                                           alignement)
                 End Using
@@ -803,35 +933,62 @@ Public Class FrmPrincipal
                     e.Graphics.DrawString(FILIGRANE, police, pinceau, cadre, alignement)
                 End Using
 
-                Dim mesure As SizeF = e.Graphics.MeasureString(FILIGRANE, police)
+                ' LES RAYURES TRAVERSENT L'ICÔNE ET LE MOT D'UN SEUL TENANT : deux séries
+                ' calculées séparément se décaleraient l'une par rapport à l'autre, et on
+                ' verrait deux dessins rayés au lieu d'un seul objet.
+                ' La bande déborde un peu du mot : l'ombre portée est décalée de trois pixels,
+                ' et les rayures doivent la traverser elle aussi.
+                Dim hautRaye As Single = Math.Min(hautIcone, hautDeLaBoite - 2.0F)
 
-                RayerLeFiligrane(e.Graphics, zone.BackColor, largeur, hauteur, taille, mesure)
-                EcrireLaVersion(e.Graphics, largeur, hauteur, taille, mesure, alignement)
+                Dim zoneRayee As New RectangleF(
+                    (CSng(largeur) - mesure.Width) / 2.0F - 2.0F,
+                    hautRaye,
+                    mesure.Width + 8.0F,
+                    hautDeLaBoite + mesure.Height + 6.0F - hautRaye)
+
+                RayerLeFiligrane(e.Graphics, zone.BackColor, taille, zoneRayee)
+                EcrireLaVersion(e.Graphics, largeur, taille,
+                                hautDeLaBoite + mesure.Height, alignement)
             End Using
         End Using
     End Sub
 
     ''' <summary>
-    ''' Fait passer des rayures en travers du mot.
+    ''' Dessine l'icône du filigrane dans un cadre, sous une teinte donnée.
+    '''
+    ''' L'INTERPOLATION EST BICUBIQUE DE HAUTE QUALITÉ parce que l'image est AGRANDIE : le
+    ''' fichier .ico ne monte pas au-delà de 64 pixels, là où le filigrane en demande deux à
+    ''' trois cents. Le mode par défaut produirait des escaliers sur les arêtes des cubes.
+    ''' </summary>
+    Private Shared Sub DessinerLIcone(surface As Graphics, image As Bitmap,
+                                      cadre As RectangleF, teinte As Imaging.ColorMatrix)
+
+        surface.InterpolationMode = Drawing2D.InterpolationMode.HighQualityBicubic
+
+        Using attributs As New Imaging.ImageAttributes()
+
+            attributs.SetColorMatrix(teinte)
+
+            surface.DrawImage(image,
+                              New Rectangle(CInt(Math.Round(cadre.X)), CInt(Math.Round(cadre.Y)),
+                                            CInt(Math.Round(cadre.Width)),
+                                            CInt(Math.Round(cadre.Height))),
+                              0, 0, image.Width, image.Height, GraphicsUnit.Pixel, attributs)
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' Fait passer des rayures en travers de l'icône et du mot.
     '''
     ''' Elles reprennent exactement la couleur de fond de la zone MDI : sur le fond, elles sont
-    ''' donc invisibles, et n'apparaissent qu'en travers des lettres blanches, qu'elles découpent
+    ''' donc invisibles, et n'apparaissent qu'en travers des parties claires, qu'elles découpent
     ''' en lames. Peindre par-dessus avec la couleur du fond revient à effacer par bandes.
     '''
-    ''' Elles sont tracées en dernier, après l'ombre et après le mot, faute de quoi l'ombre
-    ''' resterait pleine là où la lettre est coupée.
+    ''' Elles sont tracées en dernier, après les ombres, après l'icône et après le mot, faute
+    ''' de quoi l'ombre resterait pleine là où la lettre est coupée.
     ''' </summary>
     Private Shared Sub RayerLeFiligrane(surface As Graphics, couleurFond As Color,
-                                        largeur As Integer, hauteur As Integer,
-                                        taille As Single, mesure As SizeF)
-
-        ' La bande déborde un peu du mot : l'ombre portée est décalée de trois pixels, et les
-        ' rayures doivent la traverser elle aussi.
-        Dim bande As New RectangleF(
-            (CSng(largeur) - mesure.Width) / 2.0F - 2.0F,
-            (CSng(hauteur) - mesure.Height) / 2.0F - 2.0F,
-            mesure.Width + 8.0F,
-            mesure.Height + 8.0F)
+                                        taille As Single, zoneRayee As RectangleF)
 
         ' Sept rayures environ sur la hauteur des lettres : assez pour que l'effet se voie,
         ' assez peu pour que le mot reste lisible.
@@ -840,10 +997,10 @@ Public Class FrmPrincipal
 
         Using pinceauRayure As New SolidBrush(couleurFond)
 
-            Dim y As Single = bande.Y
+            Dim y As Single = zoneRayee.Y
 
-            While y < bande.Bottom
-                surface.FillRectangle(pinceauRayure, bande.X, y, bande.Width, epaisseur)
+            While y < zoneRayee.Bottom
+                surface.FillRectangle(pinceauRayure, zoneRayee.X, y, zoneRayee.Width, epaisseur)
                 y += periode
             End While
         End Using
@@ -855,9 +1012,13 @@ Public Class FrmPrincipal
     ''' Il est écrit après les rayures, et non avant : elles le hacheraient, alors qu'un numéro
     ''' de version doit rester lisible — c'est ce qu'on demandera à l'agent au téléphone le jour
     ''' où quelque chose ne tournera pas rond.
+    '''
+    ''' Il reçoit le bas du mot plutôt que de le recalculer : le mot descend maintenant de la
+    ''' moitié de l'icône, et une seconde formule aurait dû suivre ce décalage sans oublier.
     ''' </summary>
-    Private Shared Sub EcrireLaVersion(surface As Graphics, largeur As Integer, hauteur As Integer,
-                                       taille As Single, mesure As SizeF, alignement As StringFormat)
+    Private Shared Sub EcrireLaVersion(surface As Graphics, largeur As Integer,
+                                       taille As Single, basDuMot As Single,
+                                       alignement As StringFormat)
 
         Dim texte As String = NumeroDeVersion
         If String.IsNullOrEmpty(texte) Then Return
@@ -871,11 +1032,8 @@ Public Class FrmPrincipal
             ' d'une hauteur de police entre le mot et son numéro : on remonte d'autant.
             Const RETRAIT_INTERLIGNE As Single = 0.22F
 
-            Dim cadre As New RectangleF(
-                0.0F,
-                (CSng(hauteur) + mesure.Height) / 2.0F - taille * RETRAIT_INTERLIGNE,
-                CSng(largeur),
-                tailleVersion * 1.8F)
+            Dim cadre As New RectangleF(0.0F, basDuMot - taille * RETRAIT_INTERLIGNE,
+                                        CSng(largeur), tailleVersion * 1.8F)
 
             ' Moins opaque que le mot : le numéro accompagne le filigrane, il ne rivalise pas
             ' avec lui.
