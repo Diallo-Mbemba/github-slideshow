@@ -829,20 +829,29 @@ Public Class FrmPrincipal
     ''' POURQUOI PAS UNE SILHOUETTE BLANCHE. Peindre l'icône en blanc plein n'en laisserait
     ''' qu'une tache : les trois cubes se touchent, et sans différence de teinte entre eux, on
     ''' ne reconnaît plus la marque. Chaque pixel prend donc une teinte tirée de sa luminosité
-    ''' — 0,299 R + 0,587 V + 0,114 B, la pondération de l'œil — éclaircie de 1,17 et relevée
-    ''' de 0,16 pour que l'ensemble lise clair sur le gris de la zone de travail. Les faces des
+    ''' — 0,299 R + 0,587 V + 0,114 B, la pondération de l'œil — CONTRACTÉE de 0,83 et relevée
+    ''' de 0,22 pour que l'ensemble lise clair sur le gris de la zone de travail. Les faces des
     ''' cubes restent distinctes, mais dans un seul camaïeu : le filigrane n'attire pas l'œil
     ''' plus que le mot qu'il accompagne.
+    '''
+    ''' POURQUOI CONTRACTER PLUTÔT QU'ÉCLAIRCIR, et pourquoi ces deux nombres-là. Un premier
+    ''' réglage multipliait la luminosité par 1,17 avant de la relever de 0,16. Mesuré sur
+    ''' l'icône de la banque, qui est déjà très claire — or, vert, bleu clair, luminosités de
+    ''' 0,40 à 0,94 — cela poussait LA MOITIÉ des pixels opaques au blanc pur : les faces
+    ''' claires fusionnaient, et on retrouvait l'aplat qu'on voulait éviter. 0,83 et 0,22
+    ''' envoient le même intervalle sur 0,55 à 1,00 : plus rien ne sature, et l'écart entre
+    ''' deux faces survit. Une icône plus sombre demanderait d'autres nombres ; c'est ici, et
+    ''' nulle part ailleurs, qu'on les change.
     '''
     ''' La transparence d'origine est conservée telle quelle (ligne alpha à 1) : sans cela, le
     ''' fond carré de l'icône deviendrait un pavé clair autour des cubes.
     ''' </summary>
     Private Shared ReadOnly MATRICE_ECLAIRCIE As New Imaging.ColorMatrix(New Single()() {
-        New Single() {0.299F * 1.17F, 0.299F * 1.17F, 0.299F * 1.17F, 0.0F, 0.0F},
-        New Single() {0.587F * 1.17F, 0.587F * 1.17F, 0.587F * 1.17F, 0.0F, 0.0F},
-        New Single() {0.114F * 1.17F, 0.114F * 1.17F, 0.114F * 1.17F, 0.0F, 0.0F},
+        New Single() {0.299F * 0.83F, 0.299F * 0.83F, 0.299F * 0.83F, 0.0F, 0.0F},
+        New Single() {0.587F * 0.83F, 0.587F * 0.83F, 0.587F * 0.83F, 0.0F, 0.0F},
+        New Single() {0.114F * 0.83F, 0.114F * 0.83F, 0.114F * 0.83F, 0.0F, 0.0F},
         New Single() {0.0F, 0.0F, 0.0F, 1.0F, 0.0F},
-        New Single() {0.16F, 0.16F, 0.16F, 0.0F, 1.0F}})
+        New Single() {0.22F, 0.22F, 0.22F, 0.0F, 1.0F}})
 
     ''' <summary>
     ''' La même image en aplat noir, à l'opacité de l'ombre du mot.
