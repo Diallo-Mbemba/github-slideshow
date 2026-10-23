@@ -37,6 +37,9 @@ Partial Class FrmParametrageFichier
         Me.lblComptes = New System.Windows.Forms.Label()
         Me.dgvComptes = New System.Windows.Forms.DataGridView()
         Me.chkRemplacerComptes = New System.Windows.Forms.CheckBox()
+        Me.lblReglages = New System.Windows.Forms.Label()
+        Me.dgvReglages = New System.Windows.Forms.DataGridView()
+        Me.chkRemplacerReglages = New System.Windows.Forms.CheckBox()
         Me.btnCharger = New System.Windows.Forms.Button()
         Me.lblResultatImport = New System.Windows.Forms.Label()
         Me.btnFermer = New System.Windows.Forms.Button()
@@ -48,6 +51,7 @@ Partial Class FrmParametrageFichier
         CType(Me.dgvContenu, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.dgvAnalyse, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.dgvComptes, System.ComponentModel.ISupportInitialize).BeginInit()
+        CType(Me.dgvReglages, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
         'lblTitre
@@ -154,6 +158,9 @@ Partial Class FrmParametrageFichier
         Me.pageImport.Controls.Add(Me.lblComptes)
         Me.pageImport.Controls.Add(Me.dgvComptes)
         Me.pageImport.Controls.Add(Me.chkRemplacerComptes)
+        Me.pageImport.Controls.Add(Me.lblReglages)
+        Me.pageImport.Controls.Add(Me.dgvReglages)
+        Me.pageImport.Controls.Add(Me.chkRemplacerReglages)
         Me.pageImport.Controls.Add(Me.btnCharger)
         Me.pageImport.Controls.Add(Me.lblResultatImport)
         Me.pageImport.Location = New System.Drawing.Point(4, 22)
@@ -234,8 +241,7 @@ Partial Class FrmParametrageFichier
         '
         Me.dgvComptes.AllowUserToAddRows = False
         Me.dgvComptes.AllowUserToDeleteRows = False
-        Me.dgvComptes.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
-            Or System.Windows.Forms.AnchorStyles.Right)), System.Windows.Forms.AnchorStyles)
+        Me.dgvComptes.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.dgvComptes.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
         Me.dgvComptes.Location = New System.Drawing.Point(586, 126)
         Me.dgvComptes.MultiSelect = False
@@ -243,18 +249,53 @@ Partial Class FrmParametrageFichier
         Me.dgvComptes.ReadOnly = True
         Me.dgvComptes.RowHeadersWidth = 25
         Me.dgvComptes.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
-        Me.dgvComptes.Size = New System.Drawing.Size(348, 296)
+        Me.dgvComptes.Size = New System.Drawing.Size(348, 130)
         Me.dgvComptes.TabIndex = 6
         '
         'chkRemplacerComptes
         '
-        Me.chkRemplacerComptes.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.chkRemplacerComptes.Location = New System.Drawing.Point(586, 428)
+        Me.chkRemplacerComptes.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.chkRemplacerComptes.Location = New System.Drawing.Point(586, 260)
         Me.chkRemplacerComptes.Name = "chkRemplacerComptes"
-        Me.chkRemplacerComptes.Size = New System.Drawing.Size(348, 44)
+        Me.chkRemplacerComptes.Size = New System.Drawing.Size(348, 32)
         Me.chkRemplacerComptes.TabIndex = 7
         Me.chkRemplacerComptes.Text = "Remplacer les comptes comptables de la base par ceux du fichier"
         Me.chkRemplacerComptes.UseVisualStyleBackColor = True
+        '
+        'lblReglages
+        '
+        Me.lblReglages.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.lblReglages.Location = New System.Drawing.Point(586, 300)
+        Me.lblReglages.Name = "lblReglages"
+        Me.lblReglages.Size = New System.Drawing.Size(348, 18)
+        Me.lblReglages.TabIndex = 8
+        Me.lblReglages.Text = "Options de traitement"
+        '
+        'dgvReglages
+        '
+        Me.dgvReglages.AllowUserToAddRows = False
+        Me.dgvReglages.AllowUserToDeleteRows = False
+        Me.dgvReglages.Anchor = CType((((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom) _
+            Or System.Windows.Forms.AnchorStyles.Right)), System.Windows.Forms.AnchorStyles)
+        Me.dgvReglages.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        Me.dgvReglages.Location = New System.Drawing.Point(586, 322)
+        Me.dgvReglages.MultiSelect = False
+        Me.dgvReglages.Name = "dgvReglages"
+        Me.dgvReglages.ReadOnly = True
+        Me.dgvReglages.RowHeadersWidth = 25
+        Me.dgvReglages.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+        Me.dgvReglages.Size = New System.Drawing.Size(348, 106)
+        Me.dgvReglages.TabIndex = 9
+        '
+        'chkRemplacerReglages
+        '
+        Me.chkRemplacerReglages.Anchor = CType((System.Windows.Forms.AnchorStyles.Bottom Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.chkRemplacerReglages.Location = New System.Drawing.Point(586, 432)
+        Me.chkRemplacerReglages.Name = "chkRemplacerReglages"
+        Me.chkRemplacerReglages.Size = New System.Drawing.Size(348, 40)
+        Me.chkRemplacerReglages.TabIndex = 10
+        Me.chkRemplacerReglages.Text = "Remplacer les options de traitement (narratives comprises) par celles du fichier"
+        Me.chkRemplacerReglages.UseVisualStyleBackColor = True
         '
         'btnCharger
         '
@@ -315,6 +356,7 @@ Partial Class FrmParametrageFichier
         CType(Me.dgvContenu, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.dgvAnalyse, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.dgvComptes, System.ComponentModel.ISupportInitialize).EndInit()
+        CType(Me.dgvReglages, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
 
     End Sub
@@ -336,6 +378,9 @@ Partial Class FrmParametrageFichier
     Friend WithEvents lblComptes As System.Windows.Forms.Label
     Friend WithEvents dgvComptes As System.Windows.Forms.DataGridView
     Friend WithEvents chkRemplacerComptes As System.Windows.Forms.CheckBox
+    Friend WithEvents lblReglages As System.Windows.Forms.Label
+    Friend WithEvents dgvReglages As System.Windows.Forms.DataGridView
+    Friend WithEvents chkRemplacerReglages As System.Windows.Forms.CheckBox
     Friend WithEvents btnCharger As System.Windows.Forms.Button
     Friend WithEvents lblResultatImport As System.Windows.Forms.Label
     Friend WithEvents btnFermer As System.Windows.Forms.Button

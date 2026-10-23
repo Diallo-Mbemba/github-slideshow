@@ -4,6 +4,36 @@ Option Explicit On
 Imports System.Globalization
 
 ''' <summary>
+''' Une option de paramétrage : sa clé, sa valeur, et ce qu'elle veut dire.
+'''
+''' LA MÊME FORME SERT AUX DEUX. Les options de T_ParametreWU et les narratives par nature de
+''' T_NarrativeNatureWU sont deux tables différentes, mais le fichier de secours les écrit de
+''' la même façon — une clé, une valeur, un libellé — et l'écran les montre dans la même
+''' grille. Seule l'écriture en base les sépare, chacune passant par son dépôt.
+''' </summary>
+Public Class OptionParametrageWU
+
+    ''' <summary>Clé de l'option, ou code de la nature pour une narrative.</summary>
+    Public Property Cle As String = String.Empty
+
+    ''' <summary>Valeur enregistrée.</summary>
+    Public Property Valeur As String = String.Empty
+
+    ''' <summary>Ce que l'option veut dire, pour qu'un fichier de secours se relise sans le code.</summary>
+    Public Property Libelle As String = String.Empty
+
+    Public Sub New()
+    End Sub
+
+    Public Sub New(cleOption As String, valeurOption As String, libelleOption As String)
+        Cle = If(cleOption, String.Empty).Trim()
+        Valeur = If(valeurOption, String.Empty).Trim()
+        Libelle = If(libelleOption, String.Empty).Trim()
+    End Sub
+
+End Class
+
+''' <summary>
 ''' Le paramétrage d'une base, sorti dans un fichier ou relu depuis un fichier.
 '''
 ''' CE QU'IL CONTIENT, ET POURQUOI CELA S'ARRÊTE LÀ
@@ -56,6 +86,28 @@ Public Class LotParametrageWU
     Public Property SousAgents As New List(Of PointDeVenteSA)()
     Public Property Agences As New List(Of PointDeVenteEC)()
 
+    ''' <summary>
+    ''' Les options de traitement (T_ParametreWU) : visa, narrative, format du fichier core
+    ''' banking.
+    '''
+    ''' POURQUOI ELLES SONT LÀ. Sans elles, une installation remontée depuis ce fichier
+    ''' retrouvait ses sous-agents et ses comptes, mais revenait SILENCIEUSEMENT aux valeurs
+    ''' d'origine pour tout ce que la banque avait réglé : le modèle de narrative, le visa
+    ''' avant core banking, les sept codes du fichier d'interface. Le défaut ne se voyait pas
+    ''' à l'écran — il se voyait au grand livre, un jour de compense.
+    ''' </summary>
+    Public Property Options As New List(Of OptionParametrageWU)()
+
+    ''' <summary>
+    ''' Les narratives par nature (T_NarrativeNatureWU), clé = code de la nature.
+    '''
+    ''' ELLES ACCOMPAGNENT LES OPTIONS, ET NE S'EN SÉPARENT PAS. L'option NARRATIVE_MODE dit
+    ''' « par nature » ; ces quatorze libellés SONT le contenu de ce mode. Restaurer le mode
+    ''' sans les libellés remettrait la base dans un état pire qu'avant : un mode actif,
+    ''' alimenté par des modèles par défaut que personne n'a choisis.
+    ''' </summary>
+    Public Property Narratives As New List(Of OptionParametrageWU)()
+
     ''' <summary>Pour information seulement : cette liste n'est jamais réécrite dans une base.</summary>
     Public Property Utilisateurs As New List(Of UtilisateurWU)()
 
@@ -66,9 +118,15 @@ Public Class LotParametrageWU
     ''' <summary>Ce que le lot contient, en une phrase.</summary>
     Public ReadOnly Property Intitule As String
         Get
-            Return $"{Groupes.Count} groupe(s), {SousAgents.Count} sous-agent(s), " &
-                   $"{Agences.Count} agence(s) propre(s)" &
-                   If(Comptes Is Nothing, String.Empty, ", les comptes comptables")
+            Dim phrase As String =
+                $"{Groupes.Count} groupe(s), {SousAgents.Count} sous-agent(s), " &
+                $"{Agences.Count} agence(s) propre(s)" &
+                If(Comptes Is Nothing, String.Empty, ", les comptes comptables")
+
+            If Options.Count > 0 Then phrase &= $", {Options.Count} option(s)"
+            If Narratives.Count > 0 Then phrase &= $", {Narratives.Count} narrative(s) par nature"
+
+            Return phrase
         End Get
     End Property
 
@@ -89,7 +147,8 @@ Public Class LotParametrageWU
     Public ReadOnly Property EstVide As Boolean
         Get
             Return Comptes Is Nothing AndAlso Groupes.Count = 0 AndAlso
-                   SousAgents.Count = 0 AndAlso Agences.Count = 0
+                   SousAgents.Count = 0 AndAlso Agences.Count = 0 AndAlso
+                   Options.Count = 0 AndAlso Narratives.Count = 0
         End Get
     End Property
 

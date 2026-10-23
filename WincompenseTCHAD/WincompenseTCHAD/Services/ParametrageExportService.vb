@@ -24,7 +24,7 @@ Public NotInheritable Class ParametrageExportService
     End Sub
 
     ''' <summary>Nombre d'étapes annoncées à la barre de progression.</summary>
-    Public Const ETAPES As Integer = 6
+    Public Const ETAPES As Integer = 8
 
 #Region "Lecture de la base"
 
@@ -67,6 +67,14 @@ Public NotInheritable Class ParametrageExportService
         lot.Agences = PdvRepository.ListerAgences(String.Empty, motif)
         If motif.Length > 0 Then soucis.Add("Agences propres : " & PremiereLigne(motif))
 
+        Annoncer(progression, "Lecture des options de traitement")
+        lot.Options = OptionsWU.ListerToutes(motif)
+        If motif.Length > 0 Then soucis.Add("Options de traitement : " & PremiereLigne(motif))
+
+        Annoncer(progression, "Lecture des narratives par nature")
+        lot.Narratives = NarrativesParNature(motif)
+        If motif.Length > 0 Then soucis.Add("Narratives par nature : " & PremiereLigne(motif))
+
         Annoncer(progression, "Lecture des utilisateurs")
         lot.Utilisateurs = UtilisateurRepository.Lister(motif)
         If motif.Length > 0 Then soucis.Add("Utilisateurs : " & PremiereLigne(motif))
@@ -77,6 +85,39 @@ Public NotInheritable Class ParametrageExportService
         End If
 
         Return lot
+    End Function
+
+    ''' <summary>
+    ''' Les narratives par nature, converties en couples clé / valeur pour le fichier.
+    '''
+    ''' LA TABLE ABSENTE N'EST PAS UN INCIDENT. Une base qui n'a jamais joué le script des
+    ''' narratives par nature n'en a aucune, et c'est un état normal : le fichier de secours
+    ''' sort sans cette section, sans se déclarer incomplet pour autant. Signaler un manque
+    ''' là où il n'y a rien à manquer apprendrait à l'administrateur à ignorer les
+    ''' avertissements.
+    ''' </summary>
+    Private Shared Function NarrativesParNature(ByRef messageErreur As String) As List(Of OptionParametrageWU)
+
+        messageErreur = String.Empty
+        Dim lues As New List(Of OptionParametrageWU)
+
+        If Not NarrativeRepository.Disponible() Then Return lues
+
+        Dim modeles As Dictionary(Of NatureMouvementWU, String) =
+            NarrativeRepository.Lire(messageErreur)
+
+        ' L'ordre est celui des natures, et non celui de la base : deux exports de la même
+        ' base doivent donner deux fichiers identiques, sinon l'empreinte ne prouve rien.
+        For Each nature As NatureMouvementWU In NaturesMouvementWU.Toutes()
+
+            If Not modeles.ContainsKey(nature) Then Continue For
+
+            lues.Add(New OptionParametrageWU(NaturesMouvementWU.Code(nature),
+                                             modeles(nature),
+                                             NaturesMouvementWU.Intitule(nature)))
+        Next
+
+        Return lues
     End Function
 
     ''' <summary>

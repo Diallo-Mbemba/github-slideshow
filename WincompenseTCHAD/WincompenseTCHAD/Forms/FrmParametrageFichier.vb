@@ -95,6 +95,8 @@ Public Class FrmParametrageFichier
         table.Rows.Add("Groupes statistiques", lot.Groupes.Count, "oui")
         table.Rows.Add("Sous-agents", lot.SousAgents.Count, "oui")
         table.Rows.Add("Agences propres", lot.Agences.Count, "oui")
+        table.Rows.Add("Options de traitement", lot.Options.Count, "oui, sur demande explicite")
+        table.Rows.Add("Narratives par nature", lot.Narratives.Count, "oui, sur demande explicite")
         table.Rows.Add("Utilisateurs", lot.Utilisateurs.Count,
                        "NON — pour mémoire seulement, aucun mot de passe")
 
@@ -284,6 +286,7 @@ Public Class FrmParametrageFichier
 
         dgvAnalyse.DataSource = Nothing
         dgvComptes.DataSource = Nothing
+        dgvReglages.DataSource = Nothing
 
         ReglerLesBoutons()
     End Sub
@@ -313,6 +316,9 @@ Public Class FrmParametrageFichier
 
         dgvComptes.DataSource = TableDesComptes(_rapport)
         FormaterLesComptes()
+
+        dgvReglages.DataSource = TableDesReglages(_rapport)
+        FormaterLesReglages()
 
         lblResultatImport.ForeColor = Drawing.SystemColors.ControlText
         lblResultatImport.Text = _rapport.Intitule
@@ -388,6 +394,55 @@ Public Class FrmParametrageFichier
         Return table
     End Function
 
+    ''' <summary>
+    ''' Les réglages du fichier en regard de ceux de la base : options de traitement et
+    ''' narratives par nature, dans la même grille.
+    '''
+    ''' DEUX TABLES, UNE SEULE GRILLE, parce que celui qui charge ne décide pas table par
+    ''' table : il décide s'il reprend le paramétrage du fichier, ou s'il garde le sien.
+    ''' </summary>
+    Private Shared Function TableDesReglages(rapport As ParametrageImportService.Rapport) As DataTable
+
+        Dim table As New DataTable("Reglages")
+        table.Columns.Add("Reglage", GetType(String))
+        table.Columns.Add("Actuel", GetType(String))
+        table.Columns.Add("Propose", GetType(String))
+
+        For Each ecart As ParametrageColonnes.Difference In rapport.Reglages
+
+            ' La clé reste visible à côté de son libellé : c'est elle qu'on retrouve dans
+            ' l'archive et dans le journal du paramétrage.
+            Dim intitule As String = If(ecart.Signification.Length = 0, ecart.Ligne,
+                                        $"{ecart.Signification} ({ecart.Ligne})")
+
+            table.Rows.Add(intitule, ecart.Actuel, ecart.Propose)
+        Next
+
+        Return table
+    End Function
+
+    Private Sub FormaterLesReglages()
+
+        dgvReglages.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+
+        Entete(dgvReglages, "Actuel", "Dans la base", 90)
+        Entete(dgvReglages, "Propose", "Dans le fichier", 90)
+
+        If dgvReglages.Columns.Contains("Reglage") Then
+            dgvReglages.Columns("Reglage").HeaderText = "Réglage"
+            dgvReglages.Columns("Reglage").AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+        End If
+
+        If _rapport Is Nothing Then Return
+
+        For rang As Integer = 0 To dgvReglages.Rows.Count - 1
+            If rang >= _rapport.Reglages.Count Then Exit For
+            If Not _rapport.Reglages(rang).Change Then Continue For
+
+            dgvReglages.Rows(rang).DefaultCellStyle.ForeColor = Drawing.Color.Firebrick
+        Next
+    End Sub
+
     Private Sub FormaterLesComptes()
 
         dgvComptes.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
@@ -444,11 +499,12 @@ Public Class FrmParametrageFichier
             ' Le budget d'étapes doit être EXACT : promettre une étape de plus que ce qui sera
             ' annoncé laisserait la barre s'arrêter juste avant la fin, et douter du reste.
             avancement.Progression.Commencer(
-                _rapport.ACreer + If(chkRemplacerComptes.Checked, 1, 0))
+                _rapport.ACreer + If(chkRemplacerComptes.Checked, 1, 0) +
+                If(chkRemplacerReglages.Checked, 1, 0))
 
             Dim charge As Boolean = ParametrageImportService.Appliquer(
-                _lot, _rapport, chkRemplacerComptes.Checked, avancement.Progression,
-                nombreCrees, messageErreur)
+                _lot, _rapport, chkRemplacerComptes.Checked, chkRemplacerReglages.Checked,
+                avancement.Progression, nombreCrees, messageErreur)
 
             avancement.Fermer()
 
@@ -491,6 +547,14 @@ Public Class FrmParametrageFichier
                              "colonne de droite avant de valider.")
         End If
 
+        If chkRemplacerReglages.Checked AndAlso _rapport.ReglagesDifferents Then
+            texte.AppendLine()
+            texte.AppendLine("LES OPTIONS DE TRAITEMENT SERONT REMPLACÉES par celles du fichier,")
+            texte.AppendLine("narratives par nature comprises. Elles commandent les libellés de la " &
+                             "pièce et les codes du fichier core banking.")
+            texte.AppendLine("Chaque remplacement est inscrit au journal du paramétrage.")
+        End If
+
         If _lot.Modifie Then
             texte.AppendLine()
             texte.AppendLine("Le contenu de ce fichier a été MODIFIÉ depuis son export : vous ne " &
@@ -509,15 +573,17 @@ Public Class FrmParametrageFichier
 
         If messageComptes.Length > 0 Then
             lblResultatImport.ForeColor = Drawing.Color.Firebrick
-            lblResultatImport.Text = $"{nombreCrees} ligne(s) créée(s), comptes NON chargés."
-            FrmDiagnostic.Afficher(Me, "Comptes comptables non chargés", messageComptes)
+            lblResultatImport.Text = $"{nombreCrees} ligne(s) créée(s), paramétrage INCOMPLET."
+            FrmDiagnostic.Afficher(Me, "Paramétrage partiellement chargé", messageComptes)
             Return
         End If
 
         lblResultatImport.ForeColor = Drawing.Color.DarkGreen
         lblResultatImport.Text = $"{nombreCrees} ligne(s) créée(s)." &
                                  If(chkRemplacerComptes.Checked AndAlso _rapport.ComptesDifferents,
-                                    " Comptes comptables remplacés.", String.Empty)
+                                    " Comptes comptables remplacés.", String.Empty) &
+                                 If(chkRemplacerReglages.Checked AndAlso _rapport.ReglagesDifferents,
+                                    " Options de traitement remplacées.", String.Empty)
     End Sub
 
 #End Region
@@ -531,17 +597,30 @@ Public Class FrmParametrageFichier
         chkRemplacerComptes.Enabled = analyse AndAlso _rapport.ComptesDifferents
         If Not chkRemplacerComptes.Enabled Then chkRemplacerComptes.Checked = False
 
+        chkRemplacerReglages.Enabled = analyse AndAlso _rapport.ReglagesDifferents
+        If Not chkRemplacerReglages.Enabled Then chkRemplacerReglages.Checked = False
+
         btnCharger.Enabled = analyse AndAlso Not _rapport.RienAFaire
 
         lblComptes.Text = If(analyse AndAlso _rapport.ComptesDifferents,
                              "Comptes comptables — DIFFÉRENTS du fichier",
                              "Comptes comptables")
+
+        lblReglages.Text = If(analyse AndAlso _rapport.ReglagesDifferents,
+                              "Options de traitement — DIFFÉRENTES du fichier",
+                              "Options de traitement")
     End Sub
 
     Private Sub chkRemplacerComptes_CheckedChanged(sender As Object, e As EventArgs) Handles chkRemplacerComptes.CheckedChanged
 
         If _rapport Is Nothing Then Return
         btnCharger.Enabled = Not _rapport.RienAFaire OrElse chkRemplacerComptes.Checked
+    End Sub
+
+    Private Sub chkRemplacerReglages_CheckedChanged(sender As Object, e As EventArgs) Handles chkRemplacerReglages.CheckedChanged
+
+        If _rapport Is Nothing Then Return
+        btnCharger.Enabled = Not _rapport.RienAFaire OrElse chkRemplacerReglages.Checked
     End Sub
 
 #End Region

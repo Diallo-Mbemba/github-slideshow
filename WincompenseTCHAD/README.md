@@ -1928,9 +1928,9 @@ d'essai par trimestre. Une sauvegarde qu'on n'a jamais restaurée n'est pas une 
 ### Ce qu'il est
 
 De quoi remonter une installation **neuve** sans resaisir à la main des centaines de
-sous-agents : les comptes comptables, les groupes statistiques, les sous-agents et les agences
-propres. C'est peu, et c'est exactement ce qu'une application de poste peut promettre sans
-mentir.
+sous-agents : les comptes comptables, les groupes statistiques, les sous-agents, les agences
+propres, **les options de traitement et les narratives par nature**. C'est peu, et c'est
+exactement ce qu'une application de poste peut promettre sans mentir.
 
 ### Le format : une archive de fichiers texte
 
@@ -1944,6 +1944,8 @@ mentir.
 | `groupes-statistiques.csv` | groupe, compte d'activité, compte de commission, taux |
 | `sous-agents.csv` | les sept colonnes de `T_Pdv_SA` |
 | `agences-propres.csv` | les trois colonnes de `T_Pdv_EC` |
+| `options-de-traitement.csv` | tout `T_ParametreWU` : clé, valeur, libellé |
+| `narratives-par-nature.csv` | `T_NarrativeNatureWU` : nature, modèle, intitulé |
 | `utilisateurs-pour-information.csv` | identifiant, nom, rôle, fonction, actif |
 
 **Du CSV, et non un classeur.** Le fichier doit pouvoir être relu sur le poste d'une
@@ -1959,7 +1961,7 @@ personne ne s'en apercevrait avant que le sous-agent correspondant soit mal cré
 eux, sont écrits en **culture invariante** : un taux écrit `0,70` sur un poste français et relu
 `0.70` sur un autre vaudrait soixante-dix fois trop.
 
-**L'empreinte SHA-256** des quatre fichiers de données figure au manifeste. Elle ne protège de
+**L'empreinte SHA-256** des fichiers de données figure au manifeste. Elle ne protège de
 rien — qui modifie un fichier peut recalculer son empreinte — mais elle répond à une question :
 *ce fichier est-il celui qui est sorti de l'application ?* Retoucher un taux avant de recharger
 est parfois la seule façon de s'en sortir ; l'ignorer ne l'est jamais. L'écran affiche
@@ -1997,6 +1999,62 @@ l'écran montre l'**ancienne et la nouvelle valeur ligne à ligne**, en rouge l�
 diffèrent, et l'administrateur doit cocher. Le code de la ligne locale est conservé : celui du
 fichier désigne la ligne de la base d'origine, et viser une ligne inexistante ne toucherait
 rien.
+
+### Les options de traitement, depuis la version 2 du format
+
+**Le fichier les oubliait, et c'était un défaut silencieux.** Une installation remontée depuis
+l'archive retrouvait ses sous-agents et ses comptes, puis revenait **sans rien dire** aux
+valeurs d'origine pour tout ce que la banque avait réglé : le modèle de narrative, le visa
+avant core banking, les sept codes du fichier d'interface. Rien à l'écran ne le signalait — le
+défaut se voyait au grand livre, un jour de compense.
+
+L'archive porte donc deux sections de plus :
+
+| Fichier | Contenu |
+|---|---|
+| `options-de-traitement.csv` | tout `T_ParametreWU` : clé, valeur, libellé |
+| `narratives-par-nature.csv` | `T_NarrativeNatureWU` : nature, modèle, intitulé |
+
+**Les narratives accompagnent les options et ne s'en séparent pas.** L'option `NARRATIVE_MODE`
+dit « par nature » ; ces quatorze libellés *sont* le contenu de ce mode. Restaurer le mode sans
+les libellés remettrait la base dans un état pire qu'avant : un mode actif, alimenté par des
+modèles par défaut que personne n'a choisis.
+
+**Aucune clé n'est écrite en dur dans l'export.** Tout ce que la table porte sort, y compris
+une option ajoutée par une version ultérieure : un fichier de secours qui ne saurait rendre que
+les options d'aujourd'hui serait périmé à la livraison suivante.
+
+### Pourquoi le numéro de version monte à 2
+
+Une application en version 1 qui lirait cette archive chargerait le référentiel et laisserait
+les options de côté **sans rien dire** — et l'administrateur repartirait convaincu d'avoir tout
+remis. Elle la refuse désormais, en nommant la mise à jour à faire. Dans l'autre sens, cette
+version lit sans difficulté les archives version 1 : elles n'ont simplement pas ces sections.
+
+Une subtilité qui n'était pas gratuite : **l'empreinte ne couvre que les fichiers de la version
+lue**. Vérifier une archive version 1 en y comptant deux sections vides donnerait une empreinte
+différente de celle qui y est inscrite, et l'application annoncerait « contenu MODIFIÉ » sur un
+fichier que personne n'a touché.
+
+### Les options sont la seconde exception à « ne jamais remplacer »
+
+Pour la même raison que les comptes comptables : ce ne sont pas des listes mais des réglages
+que l'installation crée d'office. S'en tenir à la règle reviendrait à ne jamais les charger.
+Elles sont donc remplaçables, **jamais en silence** : une seconde grille montre l'ancienne et
+la nouvelle valeur, clé par clé, en rouge là où elles diffèrent, et l'administrateur coche une
+case distincte de celle des comptes — il peut reprendre les comptes du fichier sans ses
+options, ou l'inverse.
+
+**L'écriture passe par les dépôts**, `OptionsWU.Enregistrer` et
+`NarrativeRepository.Enregistrer`, et non par un `UPDATE` écrit dans l'import : ce sont eux qui
+vérifient le droit d'administrateur et qui inscrivent chaque changement au **journal du
+paramétrage**, valeur avant et valeur après. Un chargement qui remplacerait les sept codes du
+core banking sans laisser de trace rendrait le grand livre inexplicable le jour où quelqu'un
+s'en apercevrait.
+
+Une clé présente en base mais **absente du fichier n'est pas touchée** : le fichier n'en parle
+pas, et un chargement ne supprime rien. Une nature de narrative que cette version ne connaît
+pas est signalée plutôt qu'écrite à l'aveugle.
 
 ### Ce que l'analyse refuse, et pourquoi elle le fait avant d'écrire
 

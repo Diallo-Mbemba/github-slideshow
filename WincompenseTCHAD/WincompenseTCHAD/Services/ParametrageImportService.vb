@@ -102,6 +102,22 @@ Public NotInheritable Class ParametrageImportService
             Return total
         End Function
 
+        ''' <summary>
+        ''' Les options de traitement et les narratives du fichier, en regard de celles de la
+        ''' base. Même forme que les comptes : l'écran montre l'ancienne et la nouvelle valeur.
+        ''' </summary>
+        Public Property Reglages As New List(Of ParametrageColonnes.Difference)()
+
+        ''' <summary>Les réglages du fichier diffèrent-ils de ceux de la base ?</summary>
+        Public ReadOnly Property ReglagesDifferents As Boolean
+            Get
+                For Each ecart As ParametrageColonnes.Difference In Reglages
+                    If ecart.Change Then Return True
+                Next
+                Return False
+            End Get
+        End Property
+
         ''' <summary>Les comptes du fichier diffèrent-ils de ceux de la base ?</summary>
         Public ReadOnly Property ComptesDifferents As Boolean
             Get
@@ -115,7 +131,7 @@ Public NotInheritable Class ParametrageImportService
         ''' <summary>Vrai s'il n'y a rien à faire : tout est déjà là, ou tout est refusé.</summary>
         Public ReadOnly Property RienAFaire As Boolean
             Get
-                Return ACreer = 0 AndAlso Not ComptesDifferents
+                Return ACreer = 0 AndAlso Not ComptesDifferents AndAlso Not ReglagesDifferents
             End Get
         End Property
 
@@ -180,6 +196,7 @@ Public NotInheritable Class ParametrageImportService
         AnalyserLesSousAgents(lot, rapport, codesSA, codesEC, nomsGroupes)
 
         AnalyserLesComptes(lot, rapport)
+        AnalyserLesReglages(lot, rapport)
 
         Return rapport
     End Function
@@ -318,6 +335,58 @@ Public NotInheritable Class ParametrageImportService
         rapport.Differences = ParametrageColonnes.Comparer(actuels, lot.Comptes)
     End Sub
 
+    ''' <summary>
+    ''' Met les réglages du fichier en regard de ceux de la base : options de traitement
+    ''' d'abord, narratives par nature ensuite.
+    '''
+    ''' UNE CLÉ ABSENTE DE LA BASE VAUT VALEUR VIDE, et apparaît donc comme un changement :
+    ''' c'est exactement ce qu'elle est. Une clé présente en base mais absente du fichier,
+    ''' elle, n'est pas touchée — le fichier n'en parle pas, et un chargement ne supprime
+    ''' rien.
+    ''' </summary>
+    Private Shared Sub AnalyserLesReglages(lot As LotParametrageWU, rapport As Rapport)
+
+        Dim motif As String = String.Empty
+
+        Dim optionsBase As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+        For Each parametre As OptionParametrageWU In OptionsWU.ListerToutes(motif)
+            optionsBase(parametre.Cle) = parametre.Valeur
+        Next
+
+        For Each parametre As OptionParametrageWU In lot.Options
+            If parametre Is Nothing OrElse parametre.Cle.Length = 0 Then Continue For
+
+            rapport.Reglages.Add(New ParametrageColonnes.Difference() With {
+                .Ligne = parametre.Cle,
+                .Signification = parametre.Libelle,
+                .Actuel = If(optionsBase.ContainsKey(parametre.Cle), optionsBase(parametre.Cle), String.Empty),
+                .Propose = parametre.Valeur
+            })
+        Next
+
+        If lot.Narratives.Count = 0 Then Return
+
+        Dim narrativesBase As Dictionary(Of NatureMouvementWU, String) =
+            NarrativeRepository.Lire(motif)
+
+        For Each narrative As OptionParametrageWU In lot.Narratives
+            If narrative Is Nothing OrElse narrative.Cle.Length = 0 Then Continue For
+
+            Dim nature As NatureMouvementWU? = NaturesMouvementWU.DepuisCode(narrative.Cle)
+            Dim actuel As String = String.Empty
+            If nature.HasValue AndAlso narrativesBase.ContainsKey(nature.Value) Then
+                actuel = narrativesBase(nature.Value)
+            End If
+
+            rapport.Reglages.Add(New ParametrageColonnes.Difference() With {
+                .Ligne = narrative.Cle,
+                .Signification = "Narrative — " & narrative.Libelle,
+                .Actuel = actuel,
+                .Propose = narrative.Valeur
+            })
+        Next
+    End Sub
+
     Private Shared Sub Refuser(ligne As LigneRapport, motif As String)
         ligne.Etat = EtatLigneWU.Refusee
         ligne.Motif = motif
@@ -358,8 +427,13 @@ Public NotInheritable Class ParametrageImportService
     ''' Décision explicite de l'administrateur, prise en voyant l'ancienne et la nouvelle
     ''' valeur de chaque compte.
     ''' </param>
+    ''' <param name="remplacerReglages">
+    ''' Même décision, prise de la même façon, pour les options de traitement et les
+    ''' narratives par nature.
+    ''' </param>
     Public Shared Function Appliquer(lot As LotParametrageWU, rapport As Rapport,
-                                     remplacerComptes As Boolean, progression As ProgressionWU,
+                                     remplacerComptes As Boolean, remplacerReglages As Boolean,
+                                     progression As ProgressionWU,
                                      ByRef nombreCrees As Integer,
                                      ByRef messageErreur As String) As Boolean
 
@@ -415,6 +489,17 @@ Public NotInheritable Class ParametrageImportService
         End Try
 
         If remplacerComptes Then EcrireLesComptes(lot, progression, messageErreur)
+
+        ' Les deux messages se cumulent : celui qui charge doit savoir TOUT ce qui n'est pas
+        ' passé, et non le premier incident seulement.
+        Dim motifReglages As String = String.Empty
+        If remplacerReglages Then EcrireLesReglages(lot, progression, motifReglages)
+
+        If motifReglages.Length > 0 Then
+            messageErreur = If(messageErreur.Length = 0, motifReglages,
+                               messageErreur & Environment.NewLine & Environment.NewLine &
+                               motifReglages)
+        End If
 
         Return True
     End Function
@@ -558,6 +643,71 @@ Public NotInheritable Class ParametrageImportService
                         Environment.NewLine & echec & Environment.NewLine & Environment.NewLine &
                         "Saisissez-les sur l'écran « Comptes systèmes » : ils sont neuf, et la " &
                         "pièce comptable ne s'équilibrera pas sans eux."
+    End Sub
+
+    ''' <summary>
+    ''' Écrit les options de traitement et les narratives par nature.
+    '''
+    ''' CHACUNE PASSE PAR SON DÉPÔT, et non par un UPDATE écrit ici : OptionsWU.Enregistrer
+    ''' pose la valeur ET sa trace dans le journal du paramétrage, dans une seule
+    ''' transaction, et vérifie au passage que celui qui charge est bien administrateur. Un
+    ''' chargement qui remplacerait les sept codes du fichier core banking sans laisser de
+    ''' trace rendrait le grand livre inexplicable le jour où quelqu'un s'en apercevrait.
+    '''
+    ''' ÉCRIT EN DERNIER, hors de la transaction du référentiel, et pour la même raison que
+    ''' les comptes : si le référentiel échoue, les réglages n'auront pas bougé ; si les
+    ''' réglages échouent après, trois cents sous-agents sont en place et une dizaine de
+    ''' réglages se retapent sur un écran.
+    '''
+    ''' CE QUI ÉCHOUE EST NOMMÉ, et le reste continue : une option refusée ne doit pas
+    ''' emporter les douze autres.
+    ''' </summary>
+    Private Shared Sub EcrireLesReglages(lot As LotParametrageWU, progression As ProgressionWU,
+                                         ByRef messageErreur As String)
+
+        Annoncer(progression, "Options de traitement")
+
+        Dim refus As New List(Of String)
+        Dim motif As String = String.Empty
+
+        For Each parametre As OptionParametrageWU In lot.Options
+
+            If parametre Is Nothing OrElse parametre.Cle.Length = 0 Then Continue For
+
+            If Not OptionsWU.Enregistrer(parametre.Cle, parametre.Valeur, parametre.Libelle, motif) Then
+                refus.Add($"{parametre.Cle} : {motif}")
+            End If
+        Next
+
+        For Each narrative As OptionParametrageWU In lot.Narratives
+
+            If narrative Is Nothing OrElse narrative.Cle.Length = 0 Then Continue For
+
+            Dim nature As NatureMouvementWU? = NaturesMouvementWU.DepuisCode(narrative.Cle)
+
+            ' Une nature que cette version ne connaît pas vient d'un fichier plus riche que
+            ' l'application : on la signale plutôt que de l'écrire à l'aveugle.
+            If Not nature.HasValue Then
+                refus.Add($"{narrative.Cle} : nature inconnue de cette version.")
+                Continue For
+            End If
+
+            If Not NarrativeRepository.Enregistrer(nature.Value, narrative.Valeur, motif) Then
+                refus.Add($"{narrative.Cle} : {motif}")
+            End If
+        Next
+
+        ' Les caches sont vidés dans tous les cas : même partiellement écrites, les valeurs
+        ' en base ne sont plus celles que la session avait lues.
+        OptionsWU.Oublier()
+        NarrativeRepository.Oublier()
+
+        If refus.Count = 0 Then Return
+
+        messageErreur = "Le référentiel est chargé, mais " & refus.Count.ToString(
+                            Globalization.CultureInfo.InvariantCulture) &
+                        " réglage(s) n'ont PAS été écrits :" & Environment.NewLine &
+                        " - " & String.Join(Environment.NewLine & " - ", refus)
     End Sub
 
     Private Shared Sub Annoncer(progression As ProgressionWU, libelle As String)

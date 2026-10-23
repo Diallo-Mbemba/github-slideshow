@@ -37,8 +37,13 @@ Public NotInheritable Class ParametrageFichierWU
     ''' Version du format. Un fichier produit par une version PLUS RÉCENTE est refusé : il
     ''' porte peut-être des colonnes que cette application ne saurait pas relire, et charger
     ''' la moitié d'un paramétrage est pire que n'en charger aucun.
+    '''
+    ''' VERSION 2 : les options de traitement et les narratives par nature. Le numéro monte
+    ''' parce qu'une version 1 qui lirait ce fichier chargerait le référentiel et laisserait
+    ''' les options de côté SANS RIEN DIRE — et l'administrateur repartirait convaincu
+    ''' d'avoir tout remis. Mieux vaut un refus qui nomme la mise à jour à faire.
     ''' </summary>
-    Public Const VERSION As String = "1"
+    Public Const VERSION As String = "2"
 
     Private Const MANIFESTE As String = "manifeste.csv"
     Private Const LISEZ_MOI As String = "LISEZ-MOI.txt"
@@ -47,6 +52,8 @@ Public NotInheritable Class ParametrageFichierWU
     Private Const GROUPES As String = "groupes-statistiques.csv"
     Private Const SOUS_AGENTS As String = "sous-agents.csv"
     Private Const AGENCES As String = "agences-propres.csv"
+    Private Const OPTIONS As String = "options-de-traitement.csv"
+    Private Const NARRATIVES As String = "narratives-par-nature.csv"
     Private Const UTILISATEURS As String = "utilisateurs-pour-information.csv"
 
     ''' <summary>Nom proposé pour l'archive : la base et l'instant, pour qu'on s'y retrouve.</summary>
@@ -86,7 +93,9 @@ Public NotInheritable Class ParametrageFichierWU
                 {COMPTES, TexteDesComptes(lot)},
                 {GROUPES, TexteDesGroupes(lot)},
                 {SOUS_AGENTS, TexteDesSousAgents(lot)},
-                {AGENCES, TexteDesAgences(lot)}
+                {AGENCES, TexteDesAgences(lot)},
+                {OPTIONS, TexteDesOptions(lot)},
+                {NARRATIVES, TexteDesNarratives(lot)}
             }
 
             Annoncer(progression, "Écriture de l'archive")
@@ -140,23 +149,42 @@ Public NotInheritable Class ParametrageFichierWU
                                                  lot.DateExport.ToString("yyyy-MM-dd HH:mm:ss",
                                                                          CultureInfo.InvariantCulture)))
         assemblage.AppendLine(FichierCsvWU.Ligne("ExportePar", lot.ExportePar))
-        assemblage.AppendLine(FichierCsvWU.Ligne("Empreinte", EmpreinteDuContenu(contenus)))
+        assemblage.AppendLine(FichierCsvWU.Ligne("Empreinte", EmpreinteDuContenu(contenus, VERSION)))
 
         Return assemblage.ToString()
     End Function
 
     ''' <summary>
-    ''' Empreinte des QUATRE fichiers de données, dans un ordre fixe.
+    ''' Les fichiers de données couverts par l'empreinte, pour une version de format donnée.
     '''
-    ''' Le manifeste et le LISEZ-MOI en sont exclus : le premier la porte, le second ne dit
-    ''' rien de ce qui sera chargé. La liste des utilisateurs aussi : elle n'est jamais
+    ''' LA LISTE DÉPEND DE LA VERSION, et c'est indispensable. Une archive version 1 n'a pas
+    ''' de section d'options : vérifier son empreinte en y comptant deux sections vides
+    ''' donnerait un résultat différent de celui qui a été inscrit, et l'application
+    ''' annoncerait « contenu MODIFIÉ » sur un fichier que personne n'a touché.
+    '''
+    ''' Le manifeste et le LISEZ-MOI en sont exclus : le premier porte l'empreinte, le second
+    ''' ne dit rien de ce qui sera chargé. La liste des utilisateurs aussi : elle n'est jamais
     ''' rechargée, et la retoucher ne change rien à ce qui entrera en base.
     ''' </summary>
-    Private Shared Function EmpreinteDuContenu(contenus As Dictionary(Of String, String)) As String
+    Private Shared Function FichiersCouverts(version As String) As String()
+
+        Dim numero As Integer
+        If Not Integer.TryParse(If(version, String.Empty).Trim(), NumberStyles.Integer,
+                                CultureInfo.InvariantCulture, numero) Then numero = 1
+
+        If numero < 2 Then
+            Return New String() {COMPTES, GROUPES, SOUS_AGENTS, AGENCES}
+        End If
+
+        Return New String() {COMPTES, GROUPES, SOUS_AGENTS, AGENCES, OPTIONS, NARRATIVES}
+    End Function
+
+    Private Shared Function EmpreinteDuContenu(contenus As Dictionary(Of String, String),
+                                               version As String) As String
 
         Dim assemblage As New StringBuilder()
 
-        For Each nom As String In New String() {COMPTES, GROUPES, SOUS_AGENTS, AGENCES}
+        For Each nom As String In FichiersCouverts(version)
             assemblage.Append(nom)
             assemblage.Append(ControlChars.Lf)
             assemblage.Append(If(contenus.ContainsKey(nom), contenus(nom), String.Empty))
@@ -229,6 +257,50 @@ Public NotInheritable Class ParametrageFichierWU
     End Function
 
     ''' <summary>
+    ''' Les options de traitement : une ligne par clé.
+    '''
+    ''' LE LIBELLÉ EST EXPORTÉ AVEC LA VALEUR, et il n'est pas décoratif : il est la seule
+    ''' chose qui permette, en ouvrant l'archive six mois plus tard, de savoir ce que
+    ''' « CB_TXNCD_DEBIT = F03 » veut dire sans ouvrir le code.
+    ''' </summary>
+    Private Shared Function TexteDesOptions(lot As LotParametrageWU) As String
+
+        Dim assemblage As New StringBuilder()
+        assemblage.AppendLine(FichierCsvWU.Ligne("Cle", "Valeur", "Libelle"))
+
+        For Each parametre As OptionParametrageWU In lot.Options
+            If parametre Is Nothing OrElse parametre.Cle.Length = 0 Then Continue For
+            assemblage.AppendLine(FichierCsvWU.Ligne(parametre.Cle, parametre.Valeur,
+                                                     parametre.Libelle))
+        Next
+
+        Return assemblage.ToString()
+    End Function
+
+    ''' <summary>
+    ''' Les narratives par nature : une ligne par nature personnalisée.
+    '''
+    ''' UNE NATURE ABSENTE N'EST PAS UNE NATURE VIDE. L'absence de ligne signifie « cette
+    ''' nature prend le modèle global » ; écrire une ligne vide signifierait au contraire
+    ''' « cette nature n'a pas de libellé », c'est-à-dire des écritures sans intitulé.
+    ''' </summary>
+    Private Shared Function TexteDesNarratives(lot As LotParametrageWU) As String
+
+        Dim assemblage As New StringBuilder()
+        assemblage.AppendLine(FichierCsvWU.Ligne("Nature", "Modele", "Intitule"))
+
+        For Each narrative As OptionParametrageWU In lot.Narratives
+            If narrative Is Nothing OrElse narrative.Cle.Length = 0 Then Continue For
+            If narrative.Valeur.Length = 0 Then Continue For
+
+            assemblage.AppendLine(FichierCsvWU.Ligne(narrative.Cle, narrative.Valeur,
+                                                     narrative.Libelle))
+        Next
+
+        Return assemblage.ToString()
+    End Function
+
+    ''' <summary>
     ''' La liste des utilisateurs, SANS empreinte ni sel. Elle dit qui recréer, pas comment
     ''' se connecter à leur place.
     ''' </summary>
@@ -260,8 +332,15 @@ Public NotInheritable Class ParametrageFichierWU
         assemblage.AppendLine("CE QUE CE FICHIER EST")
         assemblage.AppendLine()
         assemblage.AppendLine("De quoi remettre en marche une installation NEUVE sans tout resaisir :")
-        assemblage.AppendLine("les comptes comptables, les groupes statistiques, les sous-agents et les")
-        assemblage.AppendLine("agences propres.")
+        assemblage.AppendLine("les comptes comptables, les groupes statistiques, les sous-agents, les")
+        assemblage.AppendLine("agences propres, les options de traitement et les narratives par nature.")
+        assemblage.AppendLine()
+        assemblage.AppendLine("LES OPTIONS SONT CE QUE LA BANQUE A RÉGLÉ")
+        assemblage.AppendLine()
+        assemblage.AppendLine("Le modèle de narrative, le visa avant core banking, les sept codes du")
+        assemblage.AppendLine("fichier d'interface. Sans elles, une installation remontée revenait aux")
+        assemblage.AppendLine("valeurs d'origine sans rien dire, et le défaut ne se voyait qu'au grand")
+        assemblage.AppendLine("livre, un jour de compense.")
         assemblage.AppendLine()
         assemblage.AppendLine("CE QUE CE FICHIER N'EST PAS")
         assemblage.AppendLine()
@@ -282,8 +361,12 @@ Public NotInheritable Class ParametrageFichierWU
         assemblage.AppendLine("« Charger ». Choisissez CETTE ARCHIVE .zip, et non un fichier extrait.")
         assemblage.AppendLine()
         assemblage.AppendLine("Le chargement ne remplace JAMAIS une ligne déjà présente : il ne crée que ce")
-        assemblage.AppendLine("qui manque. Seuls les comptes comptables font exception, et l'application le")
-        assemblage.AppendLine("demande alors explicitement, en montrant l'ancienne et la nouvelle valeur.")
+        assemblage.AppendLine("qui manque. Deux ensembles font exception, parce qu'ils ne sont pas des listes")
+        assemblage.AppendLine("mais des réglages que l'installation crée d'office : les COMPTES COMPTABLES et")
+        assemblage.AppendLine("les OPTIONS DE TRAITEMENT (narratives comprises). S'en tenir à « ne jamais")
+        assemblage.AppendLine("remplacer » reviendrait à ne jamais les charger — exactement ce qu'on est venu")
+        assemblage.AppendLine("chercher. L'application le demande donc explicitement, en montrant l'ancienne")
+        assemblage.AppendLine("et la nouvelle valeur, ligne à ligne.")
 
         Return assemblage.ToString()
     End Function
@@ -340,6 +423,8 @@ Public NotInheritable Class ParametrageFichierWU
         LireLesGroupes(Contenu(entrees, GROUPES), lot)
         LireLesSousAgents(Contenu(entrees, SOUS_AGENTS), lot)
         LireLesAgences(Contenu(entrees, AGENCES), lot)
+        lot.Options = LireLesCouples(Contenu(entrees, OPTIONS))
+        lot.Narratives = LireLesCouples(Contenu(entrees, NARRATIVES))
 
         lot.Modifie = Not EmpreinteConforme(entrees, lot)
 
@@ -426,14 +511,39 @@ Public NotInheritable Class ParametrageFichierWU
 
         If inscrite.Length = 0 Then Return False
 
-        Dim contenus As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
-            {COMPTES, Contenu(entrees, COMPTES)},
-            {GROUPES, Contenu(entrees, GROUPES)},
-            {SOUS_AGENTS, Contenu(entrees, SOUS_AGENTS)},
-            {AGENCES, Contenu(entrees, AGENCES)}
-        }
+        Dim contenus As New Dictionary(Of String, String)(StringComparer.Ordinal)
+        For Each nom As String In FichiersCouverts(lot.Version)
+            contenus(nom) = Contenu(entrees, nom)
+        Next
 
-        Return String.Equals(inscrite, EmpreinteDuContenu(contenus), StringComparison.OrdinalIgnoreCase)
+        Return String.Equals(inscrite, EmpreinteDuContenu(contenus, lot.Version),
+                             StringComparison.OrdinalIgnoreCase)
+    End Function
+
+    ''' <summary>
+    ''' Relit une section clé / valeur / libellé. Sert aux options comme aux narratives : les
+    ''' deux ont la même forme, et un second lecteur aurait fini par diverger du premier.
+    ''' </summary>
+    Private Shared Function LireLesCouples(texte As String) As List(Of OptionParametrageWU)
+
+        Dim lus As New List(Of OptionParametrageWU)
+        Dim premiere As Boolean = True
+
+        For Each ligne As List(Of String) In FichierCsvWU.Lire(texte)
+
+            If premiere Then
+                premiere = False
+                Continue For
+            End If
+
+            Dim cle As String = FichierCsvWU.Valeur(ligne, 0)
+            If cle.Length = 0 Then Continue For
+
+            lus.Add(New OptionParametrageWU(cle, FichierCsvWU.Valeur(ligne, 1),
+                                            FichierCsvWU.Valeur(ligne, 2)))
+        Next
+
+        Return lus
     End Function
 
     Private Shared Sub LireLesComptes(texte As String, lot As LotParametrageWU)

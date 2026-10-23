@@ -384,7 +384,56 @@ Public NotInheritable Class OptionsWU
         End Try
     End Function
 
+    ''' <summary>
+    ''' Toutes les options enregistrées, telles qu'elles sont en base, pour le fichier de
+    ''' secours.
+    '''
+    ''' PAS DE CACHE ICI, ET C'EST VOULU : cette lecture sert à constituer un fichier de
+    ''' secours, et un fichier de secours doit porter ce que la base contient à l'instant où
+    ''' on le produit, non ce que la session avait lu en s'ouvrant.
+    '''
+    ''' ELLE NE CONNAÎT AUCUNE CLÉ. Tout ce que la table porte est exporté, y compris une
+    ''' option ajoutée par une version ultérieure : un fichier de secours qui ne saurait
+    ''' rendre que les options d'aujourd'hui serait périmé à la livraison suivante.
+    ''' </summary>
+    Public Shared Function ListerToutes(ByRef messageErreur As String) As List(Of OptionParametrageWU)
+
+        messageErreur = String.Empty
+        Dim lues As New List(Of OptionParametrageWU)
+
+        Const requete As String = "SELECT Cle, Valeur, Libelle FROM " & TABLE & " ORDER BY Cle"
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+
+                            Dim cle As String = Convert.ToString(lecteur.GetValue(0)).Trim()
+                            If cle.Length = 0 Then Continue While
+
+                            lues.Add(New OptionParametrageWU(
+                                cle,
+                                If(lecteur.IsDBNull(1), String.Empty, Convert.ToString(lecteur.GetValue(1))),
+                                If(lecteur.IsDBNull(2), String.Empty, Convert.ToString(lecteur.GetValue(2)))))
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = $"Lecture des options impossible : {ex.Message}"
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return lues
+    End Function
+
 #End Region
+
 
 #Region "Écriture"
 
