@@ -35,6 +35,7 @@ Partial Class FrmPrincipal
         Me.mnuSousAgents = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuAgences = New System.Windows.Forms.ToolStripMenuItem()
         Me.mnuGroupes = New System.Windows.Forms.ToolStripMenuItem()
+        Me.mnuListeReseau = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP5 = New System.Windows.Forms.ToolStripSeparator()
         Me.mnuDemandes = New System.Windows.Forms.ToolStripMenuItem()
         Me.SEP2 = New System.Windows.Forms.ToolStripSeparator()
@@ -148,7 +149,7 @@ Partial Class FrmPrincipal
         '
         'mnuParametrage
         '
-        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.mnuTaxes, Me.mnuNarrative, Me.mnuFormatCoreBanking, Me.mnuOptions, Me.mnuProduits, Me.SEP7, Me.mnuFichierParametrage})
+        Me.mnuParametrage.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.mnuSousAgents, Me.mnuAgences, Me.mnuGroupes, Me.mnuListeReseau, Me.SEP5, Me.mnuDemandes, Me.SEP2, Me.mnuComptes, Me.mnuTaxes, Me.mnuNarrative, Me.mnuFormatCoreBanking, Me.mnuOptions, Me.mnuProduits, Me.SEP7, Me.mnuFichierParametrage})
         Me.mnuParametrage.Name = "mnuParametrage"
         Me.mnuParametrage.Size = New System.Drawing.Size(100, 20)
         Me.mnuParametrage.Text = "&Paramétrage"
@@ -170,6 +171,12 @@ Partial Class FrmPrincipal
         Me.mnuGroupes.Name = "mnuGroupes"
         Me.mnuGroupes.Size = New System.Drawing.Size(240, 22)
         Me.mnuGroupes.Text = "&Groupes statistiques"
+        '
+        'mnuListeReseau
+        '
+        Me.mnuListeReseau.Name = "mnuListeReseau"
+        Me.mnuListeReseau.Size = New System.Drawing.Size(240, 22)
+        Me.mnuListeReseau.Text = "&Liste du réseau (impression)"
         '
         'SEP5
         '
@@ -466,6 +473,7 @@ Partial Class FrmPrincipal
     Friend WithEvents mnuSousAgents As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuAgences As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents mnuGroupes As System.Windows.Forms.ToolStripMenuItem
+    Friend WithEvents mnuListeReseau As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP5 As System.Windows.Forms.ToolStripSeparator
     Friend WithEvents mnuDemandes As System.Windows.Forms.ToolStripMenuItem
     Friend WithEvents SEP2 As System.Windows.Forms.ToolStripSeparator

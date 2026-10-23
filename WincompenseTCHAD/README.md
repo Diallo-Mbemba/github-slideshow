@@ -37,7 +37,7 @@ l'interdisaient.
 | Menu | Écrans |
 |---|---|
 | **Compensation** | Traitement de la compense, Rapport d'activité |
-| **Paramétrage** | Sous-agents, Agences propres, Groupes statistiques, Autorisations du référentiel, Comptes systèmes |
+| **Paramétrage** | Sous-agents, Agences propres, Groupes statistiques, Liste du réseau (impression), Autorisations du référentiel, Comptes systèmes |
 | **Sécurité** | Mon mot de passe, Utilisateurs et connexions |
 | **Fenêtres** | Cascade, mosaïques, fermeture de toutes les fenêtres, et la liste des fenêtres ouvertes |
 
@@ -167,6 +167,7 @@ WincompenseTCHAD/
         ├── FrmSousAgents.vb                ' Gestion des sous-agents (CRUD)
         ├── FrmGroupesStatistiques.vb       ' Gestion des groupes statistiques (CRUD)
         ├── FrmSousAgentsParGroupe.vb       ' Liste des sous-agents par groupe (consultation)
+        ├── FrmListeReseau.vb               ' Liste du réseau par section, pour l'impression
         ├── FrmRapportActivite.vb           ' Rapport d'activité sur une période (4 états)
         ├── FrmAgences.vb                   ' Gestion des agences propres (CRUD)
         ├── FrmConnexion.vb                 ' Écran de connexion, amorçage du premier administrateur
@@ -3237,6 +3238,64 @@ fenêtre à créer ni menu à ajouter — seulement le métier à écrire, et `R
 - Le fichier de secours doit-il aussi porter les jours fériés (`T_JourFerieWU`) ? Ils sont
   regénérés pour 2026-2030 par `Scripts\Documentation\10_JoursFeries.sql` sur une installation neuve,
   d'où leur absence ; les corrections apportées par la banque, elles, ne s'exportent pas.
+
+## La liste du réseau, pour l'impression
+
+*Menu Paramétrage › Liste du réseau (impression)… — même droit que la gestion des points de
+vente.*
+
+Écran de **restitution pure** : il ne crée, ne modifie et ne supprime rien. Il imprime le
+réseau Western Union rangé **par section** — un groupe statistique, une section — avec son
+effectif, ses comptes et son taux en titre.
+
+| | |
+|---|---|
+| Portée | **Tout le réseau** (par défaut) ou **un groupe statistique** |
+| Période | facultative, sur la date de création ; par défaut du 1er janvier de l'année en cours à aujourd'hui |
+| Colonnes | Section, Account, désignation, code agence, créé le, créé par |
+| Sorties | **Imprimer (PDF)** et **Exporter vers Excel** — `Liste-reseau-aaaaMMjj.pdf` / `.xlsx` |
+
+En portée complète, les sections viennent dans cet ordre : les groupes par ordre
+alphabétique, puis les **sous-agents sans groupe statistique** — ce sont ceux qui n'héritent
+d'aucun compte ni d'aucun taux, et qu'il faut voir — puis les **agences propres**. Une section
+vide n'est pas imprimée. À l'intérieur d'une section, le tri va de la date de création la
+plus ancienne à la plus récente, l'Account départageant les ex æquo.
+
+### D'où vient la date de création, et pourquoi elle peut manquer
+
+**Ni `T_Pdv_SA` ni `T_Pdv_EC` ne portent de date de création ni de créateur.** Ces deux tables
+sont le référentiel de la banque et n'ont jamais eu ces colonnes. Les deux valeurs sont donc
+**reconstituées depuis `T_DemandeWU`**, où le circuit à quatre yeux garde trace de chaque
+création autorisée :
+
+- on retient la demande `CREATION` + `AUTORISE` dont l'`IdDemande` est le plus grand — une
+  fiche supprimée puis recréée vient de la dernière ;
+- **« créé le »** est la `DateDecision` : la fiche naît quand la demande est autorisée, pas
+  quand elle est déposée ;
+- **« créé par »** est le `SaisiPar` : celui qui a fait le travail, non celui qui l'a validé.
+
+**Une fiche antérieure au circuit, ou créée directement par un gestionnaire, n'a aucune
+demande.** Sa date est alors **inconnue** et son auteur **(inconnu)** : l'état l'écrit, et ces
+fiches passent en tête de leur section plutôt que d'être reléguées en fin de tableau. Une
+période cochée les **écarte** — on ne peut pas affirmer qu'elles ont été créées dans
+l'intervalle. Sur une base antérieure au circuit des demandes, où `T_DemandeWU` n'existe pas,
+l'écran s'affiche quand même, toutes dates inconnues, et le dit sous la grille comme en tête
+du document.
+
+Rien n'est inventé pour combler ces trous : une date par défaut ou un auteur supposé
+affirmerait dans un document imprimé quelque chose que la base ne dit pas.
+
+### Ce que l'état ne porte pas
+
+- **Le code client** : aucune table du référentiel ne porte cette notion. La colonne a été
+  retirée de l'état plutôt qu'inventée.
+- **Le compte de règlement d'un groupe** : `T_GroupeStatistique` porte un compte d'activité,
+  un compte de commission et un taux, et c'est tout. Le titre de section s'arrête là.
+
+Ce qui s'imprime est exactement ce qui s'affiche : les sections sont construites une seule
+fois par `ListeReseauService`, la grille les met à plat avec une colonne **Section**, le PDF
+et le classeur en font des blocs titrés. À l'impression, la colonne Section disparaît — elle
+est devenue le titre au-dessus de son tableau.
 
 ## Test de référence (section 17)
 

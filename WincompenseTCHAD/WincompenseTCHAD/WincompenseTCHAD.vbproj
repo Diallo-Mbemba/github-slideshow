@@ -93,6 +93,7 @@
     <Compile Include="Models\EcartChangeWU.vb" />
     <Compile Include="Models\ResultatChangeWU.vb" />
     <Compile Include="Models\ProduitTransfert.vb" />
+    <Compile Include="Models\LigneReseauWU.vb" />
     <Compile Include="Models\PointDeVente.vb" />
     <Compile Include="Models\LigneHistoriqueWU.vb" />
     <Compile Include="Models\TransactionWU.vb" />
@@ -107,6 +108,7 @@
     <Compile Include="Services\WUReportService.vb" />
     <Compile Include="Services\WURepository.vb" />
     <Compile Include="Services\ProduitRepository.vb" />
+    <Compile Include="Services\ListeReseauService.vb" />
     <Compile Include="Services\PdvRepository.vb" />
     <Compile Include="Services\WUCalculationService.vb" />
     <Compile Include="Services\PieceComptableService.vb" />
@@ -226,6 +228,12 @@
     </Compile>
     <Compile Include="Forms\FrmGroupesStatistiques.Designer.vb">
       <DependentUpon>FrmGroupesStatistiques.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FrmListeReseau.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FrmListeReseau.Designer.vb">
+      <DependentUpon>FrmListeReseau.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\FrmSousAgentsParGroupe.vb">
       <SubType>Form</SubType>
@@ -389,6 +397,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmGroupesStatistiques.resx">
       <DependentUpon>FrmGroupesStatistiques.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FrmListeReseau.resx">
+      <DependentUpon>FrmListeReseau.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FrmSousAgentsParGroupe.resx">
       <DependentUpon>FrmSousAgentsParGroupe.vb</DependentUpon>

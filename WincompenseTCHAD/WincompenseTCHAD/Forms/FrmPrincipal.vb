@@ -216,6 +216,7 @@ Public Class FrmPrincipal
             Case NameOf(FrmTaxes) : Return "Taxes et barème"
             Case NameOf(FrmEcartsChange) : Return "Pièce des écarts de change"
             Case NameOf(FrmControleChange) : Return "Contrôle des écarts de change"
+            Case NameOf(FrmListeReseau) : Return "Liste du réseau"
             Case NameOf(FrmNarrative) : Return "Narrative comptable"
             Case NameOf(FrmFormatCoreBanking) : Return "Format du fichier core banking"
             Case NameOf(FrmOptionsTraitement) : Return "Options de traitement"
@@ -325,6 +326,17 @@ Public Class FrmPrincipal
 
     Private Sub mnuGroupes_Click(sender As Object, e As EventArgs) Handles mnuGroupes.Click
         AfficherEnfant(Of FrmGroupesStatistiques)()
+    End Sub
+
+    ''' <summary>
+    ''' L'état imprimable du réseau : il se range avec les écrans du référentiel, sous celui
+    ''' des groupes, parce qu'il restitue ce que ces trois écrans paramètrent.
+    '''
+    ''' MÊME DROIT QUE LA GESTION DES POINTS DE VENTE, et non un droit propre : il ne montre
+    ''' rien de plus que les trois écrans au-dessus de lui, il le montre autrement.
+    ''' </summary>
+    Private Sub mnuListeReseau_Click(sender As Object, e As EventArgs) Handles mnuListeReseau.Click
+        AfficherEnfant(Of FrmListeReseau)()
     End Sub
 
     Private Sub mnuComptes_Click(sender As Object, e As EventArgs) Handles mnuComptes.Click
@@ -460,6 +472,7 @@ Public Class FrmPrincipal
         mnuSousAgents.Image = IconesWU.Obtenir(IconeWU.Silhouette)
         mnuAgences.Image = IconesWU.Obtenir(IconeWU.Batiment)
         mnuGroupes.Image = IconesWU.Obtenir(IconeWU.Groupe)
+        mnuListeReseau.Image = IconesWU.Obtenir(IconeWU.Registre)
         mnuDemandes.Image = IconesWU.Obtenir(IconeWU.Coche)
         mnuComptes.Image = IconesWU.Obtenir(IconeWU.Registre)
         mnuTaxes.Image = IconesWU.Obtenir(IconeWU.Pourcentage)
@@ -638,6 +651,7 @@ Public Class FrmPrincipal
         mnuSousAgents.Available = pointsDeVente
         mnuAgences.Available = pointsDeVente
         mnuGroupes.Available = pointsDeVente
+        mnuListeReseau.Available = pointsDeVente
         mnuComptes.Available = comptes
         mnuNarrative.Available = comptes
         mnuFormatCoreBanking.Available = comptes

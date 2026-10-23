@@ -941,6 +941,146 @@ Public NotInheritable Class PdvRepository
 
 #End Region
 
+#Region "Le réseau entier, pour l'état d'impression"
+
+    ''' <summary>
+    ''' Les deux tables du référentiel réunies, avec la date et l'auteur de création quand on
+    ''' peut les retrouver.
+    '''
+    ''' POURQUOI UNE REQUÊTE ET NON DEUX LECTURES RECOLLÉES. L'état imprime le réseau à un
+    ''' instant donné. Lire les sous-agents, puis les agences, puis les demandes, et rapprocher
+    ''' le tout en mémoire laisserait trois photographies prises à trois moments : un
+    ''' sous-agent créé entre la première et la troisième lecture figurerait sans sa date.
+    '''
+    ''' LA DATE DE CRÉATION VIENT DE LA DEMANDE AUTORISÉE, et c'est la seule source qui
+    ''' existe : le référentiel lui-même ne date rien. On retient la demande dont l'IdDemande
+    ''' est le PLUS GRAND, et non la plus ancienne : une fiche supprimée puis recréée porte
+    ''' deux créations autorisées, et celle qui existe aujourd'hui vient de la dernière.
+    ''' L'identité est préférée à la date pour ce départage — elle est strictement croissante
+    ''' et ne peut pas produire d'ex æquo.
+    '''
+    ''' « Créé le » est la DateDecision : la fiche naît quand la demande est autorisée, pas
+    ''' quand elle est déposée. « Créé par » reste le SaisiPar : celui qui a fait le travail,
+    ''' et non celui qui l'a validé.
+    ''' </summary>
+    Public Shared Function ListerLeReseau(ByRef messageErreur As String) As List(Of LigneReseauWU)
+
+        messageErreur = String.Empty
+        Dim resultat As New List(Of LigneReseauWU)
+
+        Dim requete As String = If(HistoriqueDesCreationsDisponible(),
+                                   REQUETE_RESEAU_DATE, REQUETE_RESEAU_SANS_DATE)
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(requete, connexion)
+                    Using lecteur As SqlDataReader = commande.ExecuteReader()
+                        While lecteur.Read()
+                            resultat.Add(New LigneReseauWU() With {
+                                .Account = LireChaine(lecteur, "Account"),
+                                .Designation = LireChaine(lecteur, "Designation"),
+                                .Groupe = LireChaine(lecteur, "Groupe"),
+                                .CodeAgence = LireChaine(lecteur, "CodeAgence"),
+                                .EstSousAgent = LireBooleen(lecteur, "EstSousAgent"),
+                                .DateCreation = LireDateFacultative(lecteur, "DateCreation"),
+                                .CreePar = LireChaine(lecteur, "CreePar")
+                            })
+                        End While
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            messageErreur = $"Lecture du réseau impossible : {ex.Message}"
+        Catch ex As InvalidOperationException
+            messageErreur = $"Connexion SQL Server indisponible : {ex.Message}"
+        End Try
+
+        Return resultat
+    End Function
+
+    ''' <summary>
+    ''' Dit si T_DemandeWU est présente, c'est-à-dire si une date de création peut être
+    ''' retrouvée pour quoi que ce soit.
+    '''
+    ''' Une base installée avant le circuit à quatre yeux n'a pas cette table. L'état doit
+    ''' alors s'afficher quand même, toutes dates inconnues — et le dire, plutôt que de
+    ''' laisser croire à un réseau sans histoire.
+    ''' </summary>
+    Public Shared Function HistoriqueDesCreationsDisponible() As Boolean
+
+        Try
+            Using connexion As SqlConnection = WURepository.CreerConnexion()
+                connexion.Open()
+
+                Using commande As New SqlCommand(
+                    "SELECT CASE WHEN OBJECT_ID(N'dbo.T_DemandeWU', N'U') IS NULL THEN 0 ELSE 1 END",
+                    connexion)
+
+                    Return Convert.ToInt32(commande.ExecuteScalar(),
+                                           Globalization.CultureInfo.InvariantCulture) = 1
+                End Using
+            End Using
+
+        Catch ex As SqlException
+            Return False
+        Catch ex As InvalidOperationException
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Le réseau avec les dates : les deux tables en UNION ALL, chacune rattachée par la
+    ''' gauche à la dernière demande de création autorisée qui la concerne.
+    '''
+    ''' Le rattachement est une jointure EXTERNE : une fiche sans demande doit figurer dans
+    ''' l'état — c'est même celle qu'on veut voir — avec sa date à NULL.
+    ''' </summary>
+    Private Const REQUETE_RESEAU_DATE As String =
+        "WITH Creation AS (" &
+        "   SELECT demande.TypeObjet, demande.Cle, demande.DateDecision, demande.SaisiPar" &
+        "   FROM   dbo.T_DemandeWU AS demande" &
+        "   INNER JOIN (SELECT TypeObjet, Cle, MAX(IdDemande) AS IdDemande" &
+        "               FROM   dbo.T_DemandeWU" &
+        "               WHERE  Operation = N'CREATION' AND Statut = N'AUTORISE'" &
+        "               GROUP BY TypeObjet, Cle) AS derniere" &
+        "           ON derniere.IdDemande = demande.IdDemande)" &
+        " SELECT sa.Code_Pdv AS Account, sa.Designationagence AS Designation," &
+        "        sa.GroupeStatistique AS Groupe, sa.codeagence AS CodeAgence," &
+        "        CAST(1 AS BIT) AS EstSousAgent," &
+        "        creation.DateDecision AS DateCreation, creation.SaisiPar AS CreePar" &
+        " FROM   dbo.T_Pdv_SA AS sa" &
+        " LEFT JOIN Creation AS creation" &
+        "        ON creation.TypeObjet = N'SOUS_AGENT' AND creation.Cle = sa.Code_Pdv" &
+        " UNION ALL" &
+        " SELECT ec.Codesite, ec.Designationagence, N'', ec.[CodeAgenc-Voyager]," &
+        "        CAST(0 AS BIT)," &
+        "        creation.DateDecision, creation.SaisiPar" &
+        " FROM   dbo.T_Pdv_EC AS ec" &
+        " LEFT JOIN Creation AS creation" &
+        "        ON creation.TypeObjet = N'AGENCE' AND creation.Cle = ec.Codesite"
+
+    ''' <summary>
+    ''' Le même réseau sans T_DemandeWU : les colonnes de date et d'auteur sont typées et
+    ''' nulles, pour que la lecture soit exactement la même des deux côtés.
+    ''' </summary>
+    Private Const REQUETE_RESEAU_SANS_DATE As String =
+        "SELECT sa.Code_Pdv AS Account, sa.Designationagence AS Designation," &
+        "       sa.GroupeStatistique AS Groupe, sa.codeagence AS CodeAgence," &
+        "       CAST(1 AS BIT) AS EstSousAgent," &
+        "       CAST(NULL AS DATETIME) AS DateCreation," &
+        "       CAST(NULL AS NVARCHAR(50)) AS CreePar" &
+        " FROM  dbo.T_Pdv_SA AS sa" &
+        " UNION ALL" &
+        " SELECT ec.Codesite, ec.Designationagence, N'', ec.[CodeAgenc-Voyager]," &
+        "        CAST(0 AS BIT)," &
+        "        CAST(NULL AS DATETIME), CAST(NULL AS NVARCHAR(50))" &
+        " FROM  dbo.T_Pdv_EC AS ec"
+
+#End Region
+
 #Region "Utilitaires internes"
 
     ''' <summary>Suppression générique d'une fiche par sa clé, pour les deux tables.</summary>
@@ -1018,6 +1158,22 @@ Public NotInheritable Class PdvRepository
         Dim index As Integer = lecteur.GetOrdinal(colonne)
         If lecteur.IsDBNull(index) Then Return 0D
         Return WUReportService.ToDecimalSafe(lecteur.GetValue(index))
+    End Function
+
+    Private Shared Function LireBooleen(lecteur As SqlDataReader, colonne As String) As Boolean
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return False
+        Return Convert.ToBoolean(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    ''' <summary>
+    ''' Une date qui peut ne pas exister. Nothing n'est pas un échec de lecture : c'est une
+    ''' information, celle d'une fiche dont la création n'a pas laissé de trace.
+    ''' </summary>
+    Private Shared Function LireDateFacultative(lecteur As SqlDataReader, colonne As String) As Date?
+        Dim index As Integer = lecteur.GetOrdinal(colonne)
+        If lecteur.IsDBNull(index) Then Return Nothing
+        Return Convert.ToDateTime(lecteur.GetValue(index), Globalization.CultureInfo.InvariantCulture)
     End Function
 
 #End Region

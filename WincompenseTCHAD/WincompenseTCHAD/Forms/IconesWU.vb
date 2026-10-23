@@ -356,6 +356,7 @@ Public NotInheritable Class IconesWU
         table("btnPieceGroupe") = IconeWU.Groupe
         table("btnParGroupe") = IconeWU.Groupe
         table("btnBordereau") = IconeWU.Registre
+        table("btnImprimer") = IconeWU.Registre
         table("btnCoreBanking") = IconeWU.BaseDeDonnees
         table("btnExporter") = IconeWU.Exporter
         table("btnMois") = IconeWU.Calendrier
