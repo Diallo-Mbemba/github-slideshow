@@ -3190,6 +3190,15 @@ fenêtre à créer ni menu à ajouter — seulement le métier à écrire, et `R
   le reproduit avec `{autopf}` **et** `ArchitecturesInstallIn64BitMode=x64compatible` — les deux
   lignes tiennent ensemble, `{autopf}` seul donnant `Program Files (x86)` sur un poste 64 bits.
 
+- **Ria n'a pas encore de réseau.** La question a été posée à l'occasion de la liste du
+  réseau : la banque n'a aujourd'hui aucun point de vente Ria. Le référentiel reste donc
+  **celui de Western Union**, sans colonne de produit, et rien n'est ajouté au schéma « au
+  cas où ». La liste du réseau est prête pour Ria — son titre et son nom de fichier prennent
+  déjà le produit en cours — il lui manque seulement des données à lister. Les deux chemins
+  étudiés puis écartés pour l'instant : une colonne `Produit` sur `T_Pdv_SA` et `T_Pdv_EC`,
+  ou un jeu de tables propre à Ria. Le jour où le réseau Ria existera, c'est l'un des deux
+  qu'il faudra trancher.
+
 ## Points restant à confirmer
 
 - Mode d'authentification SQL Server réel en production (actuellement : Windows intégré), et
@@ -3305,9 +3314,10 @@ banque ; le traitement de sa compensation reste à écrire »* — et `ProduitTr
 ne contient que Western Union. Dans l'espace Ria, cet écran affiche donc l'avis
 d'indisponibilité, comme les autres écrans métier.
 
-Lui donner des données demande une décision de la banque : soit une colonne `Produit` sur
-les deux tables du référentiel, soit un jeu de tables propre à Ria. Les deux touchent au
-schéma, et aucune n'est prise ici.
+**La banque a tranché : Ria n'a pas encore de réseau**, et rien n'est ajouté au schéma en
+attendant. Le jour où ce réseau existera, il faudra choisir entre une colonne `Produit` sur
+les deux tables du référentiel et un jeu de tables propre à Ria — voir « Règles tranchées
+par la banque ».
 
 Ce qui s'imprime est exactement ce qui s'affiche : les sections sont construites une seule
 fois par `ListeReseauService`, la grille les met à plat avec une colonne **Section**, le PDF
