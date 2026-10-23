@@ -3253,7 +3253,7 @@ effectif, ses comptes et son taux en titre.
 | Portée | **Tout le réseau** (par défaut) ou **un groupe statistique** |
 | Période | facultative, sur la date de création ; par défaut du 1er janvier de l'année en cours à aujourd'hui |
 | Colonnes | Section, Account, désignation, code agence, créé le, créé par |
-| Sorties | **Imprimer (PDF)** et **Exporter vers Excel** — `Liste-reseau-aaaaMMjj.pdf` / `.xlsx` |
+| Sorties | **Imprimer (PDF)** et **Exporter vers Excel** — `Liste-reseau-WU-aaaaMMjj.pdf` / `.xlsx` |
 
 En portée complète, les sections viennent dans cet ordre : les groupes par ordre
 alphabétique, puis les **sous-agents sans groupe statistique** — ce sont ceux qui n'héritent
@@ -3291,6 +3291,23 @@ affirmerait dans un document imprimé quelque chose que la base ne dit pas.
   retirée de l'état plutôt qu'inventée.
 - **Le compte de règlement d'un groupe** : `T_GroupeStatistique` porte un compte d'activité,
   un compte de commission et un taux, et c'est tout. Le titre de section s'arrête là.
+
+### Et pour Ria ?
+
+Le titre du document et le nom du fichier prennent **le produit en cours** : « LISTE DU
+RÉSEAU WESTERN UNION » aujourd'hui, `Liste-reseau-WU-aaaaMMjj.pdf`. Deux produits qui
+exportent le même jour ne proposent donc plus le même nom de fichier.
+
+**Mais il n'y a rien à lister pour Ria, et ce n'est pas un oubli.** `T_Pdv_SA` et `T_Pdv_EC`
+ne portent aucune colonne de produit : elles SONT le référentiel Western Union. Ria est
+déclaré dans `T_ProduitTransfert` — la base le dit elle-même : *« produit en projet à la
+banque ; le traitement de sa compensation reste à écrire »* — et `ProduitTransfert.CodesTraites`
+ne contient que Western Union. Dans l'espace Ria, cet écran affiche donc l'avis
+d'indisponibilité, comme les autres écrans métier.
+
+Lui donner des données demande une décision de la banque : soit une colonne `Produit` sur
+les deux tables du référentiel, soit un jeu de tables propre à Ria. Les deux touchent au
+schéma, et aucune n'est prise ici.
 
 Ce qui s'imprime est exactement ce qui s'affiche : les sections sont construites une seule
 fois par `ListeReseauService`, la grille les met à plat avec une colonne **Section**, le PDF

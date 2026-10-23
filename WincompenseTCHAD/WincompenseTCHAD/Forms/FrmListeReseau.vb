@@ -219,14 +219,14 @@ Public Class FrmListeReseau
         If RienAImprimer() Then Return
 
         sfdEtat.Filter = "Document PDF (*.pdf)|*.pdf"
-        sfdEtat.FileName = $"Liste-reseau-{Date.Today:yyyyMMdd}.pdf"
+        sfdEtat.FileName = ListeReseauService.NomDeFichier("pdf")
         sfdEtat.OverwritePrompt = True
 
         If sfdEtat.ShowDialog(Me) <> DialogResult.OK Then Return
 
         Produire(Sub(progression As ProgressionWU)
                      ExcelExportService.ExporterEnPdf(
-                         ListeReseauService.TITRE_DOCUMENT, SousTitres(),
+                         ListeReseauService.TitreDuDocument(), SousTitres(),
                          ListeReseauService.Blocs(_sections), ListeReseauService.NOM_FEUILLE,
                          sfdEtat.FileName, progression:=progression)
                  End Sub,
@@ -239,14 +239,14 @@ Public Class FrmListeReseau
         If RienAImprimer() Then Return
 
         sfdEtat.Filter = "Classeur Excel (*.xlsx)|*.xlsx"
-        sfdEtat.FileName = $"Liste-reseau-{Date.Today:yyyyMMdd}.xlsx"
+        sfdEtat.FileName = ListeReseauService.NomDeFichier("xlsx")
         sfdEtat.OverwritePrompt = True
 
         If sfdEtat.ShowDialog(Me) <> DialogResult.OK Then Return
 
         Produire(Sub(progression As ProgressionWU)
                      ExcelExportService.ExporterEtOuvrir(
-                         ListeReseauService.TITRE_DOCUMENT, SousTitres(),
+                         ListeReseauService.TitreDuDocument(), SousTitres(),
                          ListeReseauService.Blocs(_sections), ListeReseauService.NOM_FEUILLE,
                          sfdEtat.FileName, progression)
                  End Sub,

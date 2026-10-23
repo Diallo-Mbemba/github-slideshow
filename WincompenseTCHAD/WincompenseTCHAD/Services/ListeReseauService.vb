@@ -21,8 +21,8 @@ Public NotInheritable Class ListeReseauService
     Private Sub New()
     End Sub
 
-    ''' <summary>Titre du document, en tête de l'état imprimé comme du classeur.</summary>
-    Public Const TITRE_DOCUMENT As String = "LISTE DU RÉSEAU WESTERN UNION"
+    ''' <summary>Début du titre, avant le nom du produit.</summary>
+    Private Const TITRE_SANS_PRODUIT As String = "LISTE DU RÉSEAU"
 
     ''' <summary>Nom de l'onglet du classeur Excel.</summary>
     Public Const NOM_FEUILLE As String = "Liste du réseau"
@@ -331,6 +331,46 @@ Public NotInheritable Class ListeReseauService
 #End Region
 
 #Region "En-tête du document"
+
+    ''' <summary>
+    ''' Titre du document : « LISTE DU RÉSEAU » suivi du produit en cours.
+    '''
+    ''' LE PRODUIT N'EST PAS ÉCRIT EN DUR, et ce n'est pas de l'anticipation gratuite :
+    ''' l'application traite plusieurs produits de transfert, et deux états titrés pareil
+    ''' deviennent impossibles à distinguer une fois imprimés et posés sur un bureau. Le jour
+    ''' où Ria aura son référentiel, cet état se nommera tout seul.
+    '''
+    ''' Sans produit en cours — enchaînement anormal — le titre s'en tient à sa première
+    ''' moitié plutôt que de finir sur un blanc.
+    ''' </summary>
+    Public Shared Function TitreDuDocument() As String
+
+        Dim produit As String = If(ProduitTransfert.NomDuProduitActif, String.Empty).Trim()
+        If produit.Length = 0 Then Return TITRE_SANS_PRODUIT
+
+        Return TITRE_SANS_PRODUIT & " " & produit.ToUpperInvariant()
+    End Function
+
+    ''' <summary>
+    ''' Le nom proposé pour le fichier, extension comprise.
+    '''
+    ''' IL PORTE LE CODE DU PRODUIT. Deux produits qui exportent le même jour proposeraient
+    ''' sinon le même nom, et le second écraserait le premier sans que personne ne l'ait
+    ''' voulu. Sans produit en cours, le nom reste celui d'avant.
+    ''' </summary>
+    ''' <param name="extension">« pdf » ou « xlsx », sans le point.</param>
+    Public Shared Function NomDeFichier(extension As String) As String
+
+        Dim code As String = String.Empty
+        If ProduitTransfert.Actif IsNot Nothing Then
+            code = If(ProduitTransfert.Actif.Code, String.Empty).Trim().ToUpperInvariant()
+        End If
+
+        Dim jour As String = Date.Today.ToString("yyyyMMdd", CultureInfo.InvariantCulture)
+        If code.Length = 0 Then Return $"Liste-reseau-{jour}.{extension}"
+
+        Return $"Liste-reseau-{code}-{jour}.{extension}"
+    End Function
 
     ''' <summary>
     ''' Les lignes d'information sous le titre : ce qui a été demandé, et par qui.
