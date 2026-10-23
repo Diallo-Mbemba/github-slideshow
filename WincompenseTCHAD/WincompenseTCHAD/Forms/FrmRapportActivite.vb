@@ -57,6 +57,12 @@ Public Class FrmRapportActivite
     ''' </summary>
     Private _agences As New List(Of PointDeVenteEC)
 
+    ''' <summary>
+    ''' Les sous-agents du référentiel, relus avec la période : un sous-agent créé entre-temps
+    ''' doit figurer au classement, même sans activité.
+    ''' </summary>
+    Private _sousAgents As New List(Of PointDeVenteSA)
+
     ''' <summary>Les cinq états, conservés pour l'export : ce qui part dans Excel est ce qui est à l'écran.</summary>
     Private _synthese As DataTable
     Private _parJour As DataTable
@@ -135,12 +141,17 @@ Public Class FrmRapportActivite
             Text = "Rapport d'activité — Agences propres"
             lblGroupe.Text = "Agence"
             tabParPdv.Text = "Par Account"
+            tabPerformance.Text = "Performance des agences"
             tabRapport.TabPages.Remove(tabParGroupe)
         Else
             Text = "Rapport d'activité — Sous-agents"
             lblGroupe.Text = "Groupe statistique"
             tabParPdv.Text = "Par sous-agent"
-            tabRapport.TabPages.Remove(tabPerformance)
+
+            ' LA PAGE RESTE, ET S'AJOUTE A CELLE DES GROUPES. « Par groupe statistique »
+            ' donne les totaux de chaque groupe ; celle-ci les CLASSE, et descend jusqu'aux
+            ' Accounts. Retirer la premiere ferait perdre une vue que la banque emploie.
+            tabPerformance.Text = "Performance des sous-agents"
         End If
     End Sub
 
@@ -181,6 +192,11 @@ Public Class FrmRapportActivite
             ' entre-temps doit apparaître, même sans activité.
             Dim erreurAgences As String = String.Empty
             _agences = PdvRepository.ListerAgences(String.Empty, erreurAgences)
+
+            ' Et celui des sous-agents, pour la même raison : le classement les fait figurer
+            ' à zéro, et l'historique ne peut pas contenir ce qui n'a pas eu lieu.
+            Dim erreurSousAgents As String = String.Empty
+            _sousAgents = PdvRepository.ListerSousAgents(String.Empty, erreurSousAgents)
 
             If Not String.IsNullOrEmpty(messageErreur) Then
                 lblStatut.Text = "Lecture impossible : voir le message affiché."
@@ -327,17 +343,20 @@ Public Class FrmRapportActivite
 
         _parPdv = RapportActiviteService.ConstruireParPointDeVente(_lignesAffichees, agences, _operations)
         _parGroupe = RapportActiviteService.ConstruireParGroupe(_lignesAffichees)
-        _performance = RapportActiviteService.ConstruirePerformanceAgences(_lignesAffichees, agences)
+        _performance = If(Portee = PorteeRapportWU.AgencesPropres,
+                          RapportActiviteService.ConstruirePerformanceAgences(_lignesAffichees, agences),
+                          RapportActiviteService.ConstruirePerformanceSousAgents(_lignesAffichees,
+                                                                                 SousAgentsDuPerimetre()))
         _commissions = RapportActiviteService.ConstruireEvolutionCommissions(_lignesAffichees)
         _taxes = RapportActiviteService.ConstruireEvolutionTaxes(_lignesAffichees)
 
         AfficherSynthese()
         AfficherDetail(dgvParJour, _parJour, "Date", "Date")
         AfficherDetail(dgvParPdv, _parPdv, "Account", "Account")
-        If Portee = PorteeRapportWU.AgencesPropres Then
-            AfficherDetail(dgvPerformance, _performance, "Rang", "Rang")
-            AfficherLaPerformance()
-        Else
+        AfficherDetail(dgvPerformance, _performance, "Rang", "Rang")
+        AfficherLaPerformance()
+
+        If Portee <> PorteeRapportWU.AgencesPropres Then
             AfficherDetail(dgvParGroupe, _parGroupe, "Groupe", "Groupe")
         End If
         AfficherDetail(dgvCommissions, _commissions, "Date", "Date")
@@ -363,16 +382,63 @@ Public Class FrmRapportActivite
     End Sub
 
     ''' <summary>
-    ''' Habille la liste de performance : en-têtes, part en pourcentage, et les lignes d'agence
-    ''' détachées de leurs Accounts.
-    ''' 
-    ''' Sans cette distinction, un œil pressé additionnerait la ligne d'une agence et celles de
-    ''' ses Accounts, et compterait tout deux fois.
+    ''' Le nom de la colonne de regroupement de la page Performance : l'agence d'un côté, le
+    ''' groupe statistique de l'autre. Les deux tables sont bâties par le même corps, seul cet
+    ''' intitulé change.
+    ''' </summary>
+    Private ReadOnly Property ColonneCategorie As String
+        Get
+            Return If(Portee = PorteeRapportWU.AgencesPropres, "Agence", "Groupe")
+        End Get
+    End Property
+
+    Private ReadOnly Property IntituleCategorie As String
+        Get
+            Return If(Portee = PorteeRapportWU.AgencesPropres, "Agence", "Groupe statistique")
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Les sous-agents du référentiel qui entrent dans le périmètre affiché.
+    '''
+    ''' SANS FILTRE, ce sont tous : le classement doit montrer ceux qui n'ont rien fait. AVEC
+    ''' un filtre par groupe, ce sont ceux de CE groupe — rapporter un sous-agent inactif d'un
+    ''' autre groupe dans un état qui annonce n'en montrer qu'un seul serait un contresens.
+    '''
+    ''' Le groupe retenu est celui du référentiel COURANT : une fiche sans activité n'a aucune
+    ''' ligne d'historique qui puisse dire son groupe d'alors.
+    ''' </summary>
+    Private Function SousAgentsDuPerimetre() As List(Of PointDeVenteSA)
+
+        If String.IsNullOrEmpty(_filtreChoisi) Then Return _sousAgents
+
+        Dim retenus As New List(Of PointDeVenteSA)
+
+        For Each pdv As PointDeVenteSA In _sousAgents
+
+            If pdv Is Nothing Then Continue For
+
+            If String.Equals(RapportActiviteService.LibelleGroupe(pdv.GroupeStatistique),
+                             _filtreChoisi, StringComparison.OrdinalIgnoreCase) Then
+                retenus.Add(pdv)
+            End If
+        Next
+
+        Return retenus
+    End Function
+
+    ''' <summary>
+    ''' Habille la liste de performance : en-têtes, part en pourcentage, et les lignes de
+    ''' catégorie — agence ou groupe statistique — détachées de leurs Accounts.
+    '''
+    ''' Sans cette distinction, un œil pressé additionnerait la ligne d'une catégorie et
+    ''' celles de ses Accounts, et compterait tout deux fois.
     ''' </summary>
     Private Sub AfficherLaPerformance()
 
-        DefinirEntete(dgvPerformance, "Agence", "Agence")
+        DefinirEntete(dgvPerformance, ColonneCategorie, IntituleCategorie)
         DefinirEntete(dgvPerformance, "Account", "Account")
+        DefinirEntete(dgvPerformance, "PartBanque", "Part de la banque")
         DefinirEntete(dgvPerformance, "Part", "Part du réseau")
 
         If dgvPerformance.Columns.Contains("Part") Then
@@ -782,31 +848,40 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Account", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        ' Le quatrième bloc change avec la population : les sous-agents s'analysent par groupe
-        ' statistique, le réseau propre par agence. Les deux ne coexistent pas plus dans le PDF
-        ' qu'à l'écran.
-        Dim quatrieme As BlocExcel
+        ' LE CLASSEMENT EST LE MÊME BLOC POUR LES DEUX POPULATIONS, seule sa colonne de
+        ' regroupement change : l'agence d'un côté, le groupe statistique de l'autre. C'est
+        ' aussi l'ordre de l'écran, où l'onglet Performance précède celui des groupes.
+        '
+        ' Les formats chiffrés sont repris tels quels, les deux parts en plus : ce sont les
+        ' seules colonnes de ce bloc qui ne soient pas des montants ordinaires.
+        Dim formatsPerformance As New Dictionary(Of String, String)(formatsChiffres, StringComparer.OrdinalIgnoreCase)
+        formatsPerformance("Part") = "0,0 %"
+        formatsPerformance("PartBanque") = "# ##0"
 
-        If Portee = PorteeRapportWU.AgencesPropres Then
+        Dim entetesPerformance As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
+            {"Rang", "Rang"}, {ColonneCategorie, IntituleCategorie}, {"Account", "Account"},
+            {"Designation", "Désignation"},
+            {"PartBanque", "Part de la banque"}, {"Part", "Part du réseau"},
+            {"NbEnvois", "Envois"}, {"PrincipalEnvoi", "Principal envoyé"},
+            {"NbPaiements", "Paiements"}, {"PrincipalPaye", "Principal payé"},
+            {"NbAnnulations", "Annulations"}, {"TotalTaxes", "Total taxes"}
+        }
 
-            ' Les formats chiffrés sont repris tels quels, la part en plus : c'est la seule
-            ' colonne de ce bloc qui ne soit pas un montant.
-            Dim formatsPerformance As New Dictionary(Of String, String)(formatsChiffres, StringComparer.OrdinalIgnoreCase)
-            formatsPerformance("Part") = "0,0 %"
+        Dim performance As New BlocExcel(
+            If(Portee = PorteeRapportWU.AgencesPropres,
+               "4. Performance des agences", "4. Performance des sous-agents"), _performance) With {
+            .Entetes = entetesPerformance,
+            .Formats = formatsPerformance,
+            .ExergueColonne = ColonneCategorie, .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
+        }
 
-            quatrieme = New BlocExcel("4. Performance des agences", _performance) With {
-                .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
-                    {"Rang", "Rang"}, {"Agence", "Agence"}, {"Account", "Account"},
-                    {"Designation", "Désignation"}, {"Part", "Part du réseau"},
-                    {"NbEnvois", "Envois"}, {"PrincipalEnvoi", "Principal envoyé"},
-                    {"NbPaiements", "Paiements"}, {"PrincipalPaye", "Principal payé"},
-                    {"NbAnnulations", "Annulations"}, {"TotalTaxes", "Total taxes"}
-                },
-                .Formats = formatsPerformance,
-                .ExergueColonne = "Agence", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
-            }
-        Else
-            quatrieme = New BlocExcel("4. Par groupe statistique", _parGroupe) With {
+        ' La page des groupes suit le classement, et ne le remplace pas : elle donne les
+        ' totaux par groupe sans descendre aux Accounts. Elle n'existe que pour les
+        ' sous-agents — une agence propre n'appartient à aucun groupe statistique.
+        Dim parGroupe As BlocExcel = Nothing
+
+        If Portee <> PorteeRapportWU.AgencesPropres Then
+            parGroupe = New BlocExcel("5. Par groupe statistique", _parGroupe) With {
                 .Entetes = entetes, .Formats = formatsChiffres,
                 .ExergueColonne = "Groupe", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
             }
@@ -818,7 +893,9 @@ Public Class FrmRapportActivite
             {"Cumul", "# ##0"}, {"Variation", "+0,0 %;-0,0 %;0,0 %"}
         }
 
-        Dim commissions As New BlocExcel("5. Évolution des commissions", _commissions) With {
+        Dim numero As Integer = If(Portee = PorteeRapportWU.AgencesPropres, 5, 6)
+
+        Dim commissions As New BlocExcel($"{numero}. Évolution des commissions", _commissions) With {
             .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
                 {"CommissionEnvoi", "Commission Envoi"}, {"CommissionPaiement", "Commission Paiement"},
                 {"CommissionTransfert", "Commission Transfert"}, {"TotalCommissions", "Total commissions"},
@@ -834,7 +911,7 @@ Public Class FrmRapportActivite
             {"Cumul", "# ##0"}, {"Variation", "+0,0 %;-0,0 %;0,0 %"}
         }
 
-        Dim taxes As New BlocExcel("6. Taxes perçues", _taxes) With {
+        Dim taxes As New BlocExcel($"{numero + 1}. Taxes perçues", _taxes) With {
             .Entetes = New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase) From {
                 {"TVA", "TVA collectée"}, {"TTAEnvoi", "TTA sur envoi"},
                 {"TTAReception", "TTA sur paiement"}, {"TaxeEnvoi", "Impôts et taxe sur envoi"},
@@ -845,7 +922,13 @@ Public Class FrmRapportActivite
             .ExergueColonne = "Date", .ExergueValeur = RapportActiviteService.LIBELLE_TOTAL
         }
 
-        Return New List(Of BlocExcel) From {synthese, parJour, parPdv, quatrieme, commissions, taxes}
+        Dim blocs As New List(Of BlocExcel) From {synthese, parJour, parPdv, performance}
+        If parGroupe IsNot Nothing Then blocs.Add(parGroupe)
+
+        blocs.Add(commissions)
+        blocs.Add(taxes)
+
+        Return blocs
     End Function
 
     ''' <summary>

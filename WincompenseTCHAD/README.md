@@ -727,7 +727,7 @@ fonctionner : seul l'export le signale, au moment où il est demandé.
 
 ## Rapport d'activité sur une période
 
-Bouton **« Rapport d'activité… »** de l'écran principal. Cinq états, en cinq onglets, tous
+Bouton **« Rapport d'activité… »** de l'écran principal. Six états, en six onglets, tous
 exportables **en un seul document PDF**.
 
 | Onglet | Contenu |
@@ -735,8 +735,9 @@ exportables **en un seul document PDF**.
 | 1. Synthèse | Volumes, envois, paiements, commissions et taxes, plus la **répartition entre sous-agents, agences propres et Accounts non paramétrés** |
 | 2. Jour par jour | Une ligne par journée comptabilisée : c'est la page qui fait ressortir un jour anormal |
 | 3. Par point de vente | **Sous-agents et agences propres séparés**, chacun avec son sous-total, classés par principal envoyé décroissant. **Chaque Account se déroule** sur le détail de ses transactions, MTCN par MTCN |
-| 4. Par groupe statistique | Une ligne par groupe, les points de vente sans groupe formant une ligne distincte |
-| 5. Évolution des commissions | Jour par jour : les trois commissions, leur total, la variation par rapport à la veille et le cumul de la période |
+| 4. Performance | **Le classement** : rang, catégorie, Accounts, part de la banque et part du réseau. Par **agence** côté réseau propre, par **groupe statistique** côté sous-agents |
+| 5. Par groupe statistique | Une ligne par groupe, les points de vente sans groupe formant une ligne distincte. **Sous-agents seulement** |
+| 6. Évolution des commissions | Jour par jour : les trois commissions, leur total, la variation par rapport à la veille et le cumul de la période |
 
 Les **annulations** figurent dans toutes les pages de détail — et plus seulement en synthèse —
 sous une colonne dédiée : sans elle, il était impossible de savoir *qui* annule, alors que
@@ -747,6 +748,42 @@ groupe ; l'export porte alors sur ce périmètre, le nom du groupe figure en jau
 classeur et dans le nom de fichier proposé. Les groupes proposés sont ceux **présents dans
 l'historique de la période**, et non ceux du paramétrage courant : un groupe supprimé depuis
 reste consultable sur les journées où il existait.
+
+
+### Le classement : qui travaille le mieux
+
+La page **Performance** répond à une question simple — *quel point de vente rapporte le plus
+à la banque sur la période ?* — et elle y répond de la même façon pour les deux populations :
+le même corps la construit, seule la **clé de regroupement** change. Côté réseau propre, c'est
+l'agence ; côté sous-agents, le **groupe statistique**. Trois niveaux de lignes : la catégorie
+en gras, ses Accounts en dessous, puis le total.
+
+**Le classement porte sur ce que la banque GARDE**, et non sur la commission produite. Un
+sous-agent en rétrocède la plus grosse part ; une agence propre n'en rétrocède rien. Classer
+sur le total ferait d'un sous-agent très actif un meilleur élève qu'une agence qui rapporte
+davantage — un sous-agent à 2 000 000 de commissions qui en rétrocède 70 % passerait devant un
+groupe à 900 000 qui n'en rétrocède que 30, alors que le second rapporte 630 000 contre
+600 000. Sur les agences propres, les deux chiffres sont égaux par construction : **leur page
+garde exactement l'ordre qu'elle avait**.
+
+**Une répartition inconnue ne devient pas un zéro.** Sur une base où les colonnes de
+répartition n'ont jamais été créées, la part de la banque n'est pas nulle : elle est ignorée.
+La cellule reste **vide** et la ligne tombe en fin de classement — ce qui se voit, là où un
+zéro se lirait comme un chiffre. Il suffit d'une seule journée non documentée pour qu'un
+cumul se déclare inconnu.
+
+**Les points de vente sans activité figurent à zéro**, lus dans le référentiel : un classement
+qui tait ceux qui n'ont rien fait ne répond pas à la question qu'on lui pose. Quand un groupe
+est choisi dans le filtre, seuls les sous-agents inactifs **de ce groupe** s'y ajoutent.
+
+**Le groupe vient de l'historique**, et non du référentiel courant : un sous-agent qui a changé
+de groupe reste, sur les journées passées, dans celui qu'il portait ce jour-là. S'il en a
+changé en cours de période, il est rangé dans celui de son **dernier jour actif** — il faut
+bien choisir, et le dernier décrit l'état où la période s'achève.
+
+La page des groupes n'a pas été remplacée : elle donne les totaux par groupe sans descendre
+aux Accounts, et la banque s'en sert. Le PDF des sous-agents compte donc **sept blocs** au lieu
+de six, le classement en quatrième position, comme à l'écran.
 
 ### Pourquoi un PDF et non un classeur Excel
 
