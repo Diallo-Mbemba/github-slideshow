@@ -218,6 +218,11 @@ Source: "version.txt.modele"; DestDir: "{app}\Installation"; Flags: ignoreversio
 Source: "Configurer-Connexion.ps1"; DestDir: "{app}\Installation"; Flags: ignoreversion
 Source: "LISEZMOI-Installation.md"; DestDir: "{app}\Installation"; Flags: ignoreversion
 
+; Le manuel d'installation, en PDF. C'est le document que l'administrateur ouvre le
+; jour ou il monte un poste ou un serveur : le livrer AVEC l'application lui evite de
+; le chercher dans une boite aux lettres vieille de six mois.
+Source: "MANUEL-INSTALLATION.pdf"; DestDir: "{app}\Installation"; Flags: ignoreversion
+
 [InstallDelete]
 ; L'ancien executable occupe le meme dossier que le nouveau : la mise a jour
 ; precedente l'y a depose sous le nom WincompenseTCHAD.exe. Le laisser la
