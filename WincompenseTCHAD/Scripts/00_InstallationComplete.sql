@@ -3,7 +3,7 @@
     WINCOMPENSE TCHAD — LE SEUL SCRIPT À EXÉCUTER
 ================================================================================================
 
-    IL N'Y EN A QU'UN. Celui-ci. Les vingt-trois fichiers du sous-dossier Scripts\Documentation
+    IL N'Y EN A QU'UN. Celui-ci. Les vingt-quatre fichiers du sous-dossier Scripts\Documentation
     sont la DOCUMENTATION de ce qu'il fait, découpée par sujet — ils expliquent, ils ne
     s'exécutent pas. Tout ce qu'ils créent est repris ici, dans le bon ordre.
 
@@ -768,7 +768,7 @@ BEGIN
     (
         Identifiant         NVARCHAR(50)    NOT NULL PRIMARY KEY,   -- Nom de connexion
         NomComplet          NVARCHAR(150)   NOT NULL,
-        Role                NVARCHAR(20)    NOT NULL,               -- COMPENSE, COMMERCIAL, ADMIN
+        Role                NVARCHAR(20)    NOT NULL,               -- COMPENSE, COMMERCIAL, ADMIN, CONTROLEUR
 
         -- Empreinte du mot de passe : PBKDF2, en Base64. Le mot de passe n'existe nulle part.
         Empreinte           NVARCHAR(256)   NOT NULL,
@@ -789,7 +789,7 @@ BEGIN
         DateModification    DATETIME        NULL,
         ModifiePar          NVARCHAR(50)    NULL,
 
-        CONSTRAINT CK_T_UtilisateurWU_Role CHECK (Role IN ('COMPENSE', 'COMMERCIAL', 'ADMIN'))
+        CONSTRAINT CK_T_UtilisateurWU_Role CHECK (Role IN ('COMPENSE', 'COMMERCIAL', 'ADMIN', 'CONTROLEUR'))
     );
 
     PRINT 'Table T_UtilisateurWU créée.';
@@ -957,7 +957,7 @@ GO
 -- =========================================================================
 -- 1. Fonction de l'utilisateur dans le dispositif
 --
---    Le rôle dit le domaine (COMMERCIAL, COMPENSE, ADMIN), la fonction dit le pouvoir.
+--    Le rôle dit le domaine (COMMERCIAL, COMPENSE, ADMIN, CONTROLEUR), la fonction dit le pouvoir.
 --    NULL = aucune : l'utilisateur ne peut ni saisir ni autoriser les points de vente.
 -- =========================================================================
 IF NOT EXISTS (SELECT 1 FROM sys.columns
@@ -3025,6 +3025,45 @@ BEGIN
 END
 ELSE
     PRINT 'T_TraitementAnnuleWU : colonnes de période déjà présentes ou table absente.';
+GO
+
+-- ---- Le role CONTROLEUR sur T_UtilisateurWU (origine : script 25) ----
+--
+-- CELUI-CI N'AJOUTE PAS UNE COLONNE, IL ELARGIT UNE CONTRAINTE -- et c'est le seul rattrapage
+-- de cette section a devoir SUPPRIMER quelque chose avant de le reposer. Une contrainte CHECK
+-- ne s'etend pas : la base de production porte encore celle des trois roles, et tant qu'elle
+-- la porte, l'ecran proposera « Controleur » et l'enregistrement sera refuse par SQL Server --
+-- avec un message que l'utilisateur ne saura pas interpreter.
+--
+-- AUCUNE DONNEE N'EST TOUCHEE. La contrainte est elargie, jamais restreinte : toutes les
+-- lignes existantes la satisfont deja, et WITH CHECK le verifie plutot que de le supposer.
+--
+-- REJOUABLE : le premier bloc ne s'execute que si la contrainte en place ignore CONTROLEUR,
+-- le second que si plus aucune contrainte ne porte ce nom. Relancer le script sur une base
+-- deja elargie ne fait donc rien du tout.
+IF EXISTS (SELECT 1 FROM sys.check_constraints
+           WHERE name = N'CK_T_UtilisateurWU_Role'
+             AND OBJECT_NAME(parent_object_id) = N'T_UtilisateurWU'
+             AND definition NOT LIKE N'%CONTROLEUR%')
+BEGIN
+    ALTER TABLE dbo.T_UtilisateurWU DROP CONSTRAINT CK_T_UtilisateurWU_Role;
+    PRINT 'Ancienne contrainte CK_T_UtilisateurWU_Role retirée (trois rôles).';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = N'T_UtilisateurWU')
+   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints
+                   WHERE name = N'CK_T_UtilisateurWU_Role'
+                     AND OBJECT_NAME(parent_object_id) = N'T_UtilisateurWU')
+BEGIN
+    ALTER TABLE dbo.T_UtilisateurWU WITH CHECK
+        ADD CONSTRAINT CK_T_UtilisateurWU_Role
+        CHECK (Role IN ('COMPENSE', 'COMMERCIAL', 'ADMIN', 'CONTROLEUR'));
+
+    PRINT 'Contrainte CK_T_UtilisateurWU_Role posée (quatre rôles, dont CONTROLEUR).';
+END
+ELSE
+    PRINT 'T_UtilisateurWU : le rôle CONTROLEUR est déjà accepté.';
 GO
 
 -- =========================================================================

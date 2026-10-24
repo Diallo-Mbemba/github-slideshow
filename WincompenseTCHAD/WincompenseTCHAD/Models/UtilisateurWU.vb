@@ -11,6 +11,16 @@ Public Enum RoleWU
     Commercial = 2
     ''' <summary>Administrateur : les deux, plus les comptes systèmes et les utilisateurs.</summary>
     Administrateur = 3
+    ''' <summary>
+    ''' Contrôleur : consulte les rapports et administre les comptes utilisateurs, sans aucun
+    ''' accès à la compense ni au référentiel.
+    '''
+    ''' IL N'EST PAS UN ADMINISTRATEUR AU RABAIS. Son pouvoir sur les comptes est volontairement
+    ''' borné : il crée des agents et des commerciaux, il active et désactive, et c'est tout. Il
+    ''' ne touche NI un administrateur, NI un mot de passe, NI le rôle d'un compte existant —
+    ''' chacune de ces trois portes suffirait à lui rendre les droits qu'on ne lui donne pas.
+    ''' </summary>
+    Controleur = 4
 End Enum
 
 ''' <summary>
@@ -43,6 +53,7 @@ Public Class UtilisateurWU
     Public Const ROLE_COMPENSE As String = "COMPENSE"
     Public Const ROLE_COMMERCIAL As String = "COMMERCIAL"
     Public Const ROLE_ADMIN As String = "ADMIN"
+    Public Const ROLE_CONTROLEUR As String = "CONTROLEUR"
 
     Public Const FONCTION_INPUTER As String = "INPUTER"
     Public Const FONCTION_AUTHORIZER As String = "AUTHORIZER"
@@ -124,14 +135,123 @@ Public Class UtilisateurWU
         End Get
     End Property
 
-    ''' <summary>Créer, modifier et désactiver les comptes utilisateurs.</summary>
+    ''' <summary>
+    ''' Ouvrir l'écran des utilisateurs et des connexions.
+    '''
+    ''' CE DROIT N'EST PLUS CELUI DE TOUT FAIRE. L'administrateur et le contrôleur ouvrent le
+    ''' même écran, et n'y disposent pas des mêmes boutons : ce que chacun peut y faire se lit
+    ''' dans les quatre droits ci-dessous, et sur la LIGNE SÉLECTIONNÉE pour l'activation.
+    ''' </summary>
     Public ReadOnly Property PeutGererLesUtilisateurs As Boolean
+        Get
+            Return Role = RoleWU.Administrateur OrElse Role = RoleWU.Controleur
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Changer le serveur et la base de l'application.
+    '''
+    ''' SÉPARÉ DE LA GESTION DES UTILISATEURS, ET CE N'EST PAS UN RAFFINEMENT. Les deux entrées
+    ''' du menu Sécurité partageaient la même condition : ouvrir l'écran des utilisateurs au
+    ''' contrôleur lui aurait donné, du même geste, celui qui déplace la base de TOUTE la
+    ''' banque. Un droit de plus coûte une ligne ; cette porte-là aurait coûté une journée.
+    ''' </summary>
+    Public ReadOnly Property PeutChangerLaConnexion As Boolean
         Get
             Return Role = RoleWU.Administrateur
         End Get
     End Property
 
-    ''' <summary>Consulter les rapports d'activité : les trois rôles y ont accès.</summary>
+    ''' <summary>
+    ''' Modifier un compte existant : son nom, son RÔLE, sa fonction dans le double regard.
+    '''
+    ''' L'administrateur seul. Le contrôleur en est écarté parce que cet écran porte le rôle :
+    ''' le lui ouvrir reviendrait à lui laisser promouvoir quelqu'un administrateur, puis se
+    ''' connecter sous ce compte. Activer et désactiver, qui est son vrai besoin, passe par
+    ''' <see cref="PeutAgirSurLActivite"/> et ne touche à rien d'autre.
+    ''' </summary>
+    Public ReadOnly Property PeutModifierLesComptes As Boolean
+        Get
+            Return Role = RoleWU.Administrateur
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Réinitialiser le mot de passe d'un compte.
+    '''
+    ''' L'administrateur seul. Réinitialiser le mot de passe d'un administrateur, c'est prendre
+    ''' son compte — plus sûrement que le désactiver. Laisser ce bouton au contrôleur viderait
+    ''' de son sens la règle qui lui interdit de toucher aux administrateurs.
+    ''' </summary>
+    Public ReadOnly Property PeutReinitialiserLesMotsDePasse As Boolean
+        Get
+            Return Role = RoleWU.Administrateur
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Activer, désactiver ou déverrouiller le compte désigné.
+    '''
+    ''' LA RÈGLE DU CONTRÔLEUR SE LIT ICI, ET NULLE PART AILLEURS : il agit sur tout compte qui
+    ''' n'est pas administrateur, et sur aucun administrateur — celui qui l'a créé compris.
+    ''' Avoir retenu « aucun administrateur » plutôt que « celui qui m'a créé » n'est pas une
+    ''' sévérité gratuite : la seconde formulation se vérifie en remontant qui a créé qui, et
+    ''' elle perd son objet dès qu'un contrôleur est créé par un contrôleur.
+    '''
+    ''' SON PROPRE COMPTE LUI EST FERMÉ. Se désactiver soi-même n'est pas un droit, c'est une
+    ''' sortie sans retour : il faudrait un administrateur pour rouvrir le compte de celui qui
+    ''' vient de fermer le sien.
+    ''' </summary>
+    ''' <param name="cible">Le compte sur lequel on veut agir. Nothing ne donne aucun droit.</param>
+    Public Function PeutAgirSurLActivite(cible As UtilisateurWU) As Boolean
+
+        If cible Is Nothing Then Return False
+
+        Select Case Role
+            Case RoleWU.Administrateur
+                Return True
+
+            Case RoleWU.Controleur
+                If cible.Role = RoleWU.Administrateur Then Return False
+                Return Not String.Equals(cible.Identifiant, Identifiant,
+                                         StringComparison.OrdinalIgnoreCase)
+
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    ''' <summary>
+    ''' Peut-on créer un compte portant ce rôle ?
+    '''
+    ''' L'ADMINISTRATEUR LES PROPOSE TOUS ; LE CONTRÔLEUR, DEUX. Celui qui crée un compte en
+    ''' choisit le mot de passe initial : un contrôleur autorisé à créer un ADMINISTRATEUR se
+    ''' créerait le sien et s'y connecterait. Et un contrôleur créé par un contrôleur n'aurait
+    ''' plus d'administrateur au-dessus de lui.
+    '''
+    ''' LE PARAMÈTRE NE S'APPELLE PAS « role » : VB ne distingue pas la casse, et il masquerait
+    ''' la propriété Role de l'utilisateur à l'intérieur même de la fonction qui la lit. Le
+    ''' Select Case aurait alors porté sur le rôle DEMANDÉ au lieu du rôle de celui qui demande
+    ''' — et l'administrateur n'aurait plus pu créer personne, sans qu'aucun compilateur ne
+    ''' s'en plaigne.
+    ''' </summary>
+    Public Function PeutCreerLeRole(roleDemande As RoleWU) As Boolean
+
+        If roleDemande = RoleWU.Inconnu Then Return False
+
+        Select Case Role
+            Case RoleWU.Administrateur
+                Return True
+
+            Case RoleWU.Controleur
+                Return roleDemande = RoleWU.Compense OrElse roleDemande = RoleWU.Commercial
+
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    ''' <summary>Consulter les rapports d'activité : tout rôle connu y a accès.</summary>
     Public ReadOnly Property PeutVoirLesRapports As Boolean
         Get
             Return Role <> RoleWU.Inconnu
@@ -149,6 +269,7 @@ Public Class UtilisateurWU
             Case ROLE_COMPENSE : Return RoleWU.Compense
             Case ROLE_COMMERCIAL : Return RoleWU.Commercial
             Case ROLE_ADMIN : Return RoleWU.Administrateur
+            Case ROLE_CONTROLEUR : Return RoleWU.Controleur
             Case Else : Return RoleWU.Inconnu
         End Select
     End Function
@@ -160,6 +281,7 @@ Public Class UtilisateurWU
             Case RoleWU.Compense : Return ROLE_COMPENSE
             Case RoleWU.Commercial : Return ROLE_COMMERCIAL
             Case RoleWU.Administrateur : Return ROLE_ADMIN
+            Case RoleWU.Controleur : Return ROLE_CONTROLEUR
             Case Else : Return String.Empty
         End Select
     End Function
@@ -171,6 +293,7 @@ Public Class UtilisateurWU
             Case RoleWU.Compense : Return "Agent de la compense"
             Case RoleWU.Commercial : Return "Commercial"
             Case RoleWU.Administrateur : Return "Administrateur"
+            Case RoleWU.Controleur : Return "Contrôleur"
             Case Else : Return "Rôle inconnu"
         End Select
     End Function
@@ -182,12 +305,33 @@ Public Class UtilisateurWU
         End Get
     End Property
 
-    ''' <summary>Libellés lisibles des trois rôles, dans l'ordre où ils sont proposés.</summary>
+    ''' <summary>Libellés lisibles des quatre rôles, dans l'ordre où ils sont proposés.</summary>
     Public Shared ReadOnly Property RolesProposes As String()
         Get
-            Return New String() {"Agent de la compense", "Commercial", "Administrateur"}
+            Return New String() {"Agent de la compense", "Commercial", "Administrateur", "Contrôleur"}
         End Get
     End Property
+
+    ''' <summary>
+    ''' Libellés des rôles que CET utilisateur a le droit de créer, dans le même ordre.
+    '''
+    ''' LA LISTE DÉROULANTE NE PROPOSE QUE CE QUI SERA ACCEPTÉ. Afficher à un contrôleur un
+    ''' rôle que le dépôt refusera ensuite lui ferait saisir un compte entier pour s'entendre
+    ''' dire non à l'enregistrement — et laisserait croire que la règle est négociable.
+    ''' </summary>
+    Public Shared Function RolesProposesPar(createur As UtilisateurWU) As String()
+
+        Dim liste As New List(Of String)()
+
+        For Each libelle As String In RolesProposes
+            Dim role As RoleWU = RoleDepuisLibelleLisible(libelle)
+            If createur IsNot Nothing AndAlso createur.PeutCreerLeRole(role) Then
+                liste.Add(libelle)
+            End If
+        Next
+
+        Return liste.ToArray()
+    End Function
 
     ''' <summary>Fonction correspondant au libellé enregistré.</summary>
     Public Shared Function FonctionDepuisLibelle(libelle As String) As FonctionWU
@@ -250,6 +394,7 @@ Public Class UtilisateurWU
             Case "Agent de la compense" : Return RoleWU.Compense
             Case "Commercial" : Return RoleWU.Commercial
             Case "Administrateur" : Return RoleWU.Administrateur
+            Case "Contrôleur" : Return RoleWU.Controleur
             Case Else : Return RoleWU.Inconnu
         End Select
     End Function

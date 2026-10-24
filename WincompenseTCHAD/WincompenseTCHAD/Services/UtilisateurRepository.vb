@@ -283,6 +283,11 @@ Public NotInheritable Class UtilisateurRepository
     ''' Crée un utilisateur avec un mot de passe initial, qu'il devra changer à sa première
     ''' connexion : celui qui crée le compte n'a pas à connaître durablement le mot de passe
     ''' de quelqu'un d'autre.
+    '''
+    ''' LE RÔLE CRÉÉ EST VÉRIFIÉ ICI, ET PAS SEULEMENT DANS L'ÉCRAN. Celui qui crée un compte
+    ''' en choisit le mot de passe initial : un contrôleur qui obtiendrait la création d'un
+    ''' administrateur se créerait le sien et s'y connecterait. La liste déroulante ne le lui
+    ''' propose pas ; cette fonction, elle, le refuse.
     ''' </summary>
     Public Shared Function Ajouter(utilisateur As UtilisateurWU, motDePasseInitial As String,
                                    ByRef messageErreur As String) As Boolean
@@ -291,6 +296,10 @@ Public NotInheritable Class UtilisateurRepository
 
         If utilisateur Is Nothing Then
             messageErreur = "Aucun utilisateur à enregistrer."
+            Return False
+        End If
+
+        If Not CreationAutorisee(utilisateur, messageErreur) Then
             Return False
         End If
 
@@ -338,8 +347,37 @@ Public NotInheritable Class UtilisateurRepository
     End Function
 
     ''' <summary>
+    ''' Le rôle demandé est-il de ceux que l'utilisateur connecté a le droit de créer ?
+    '''
+    ''' AUCUNE SESSION OUVERTE : c'est la création du PREMIER administrateur, qui a lieu avant
+    ''' toute identification — la base ne contient alors personne pour l'autoriser. Ce cas est
+    ''' permis, mais POUR CE RÔLE-LÀ SEULEMENT : une base vide ne doit pas devenir une porte
+    ''' par laquelle on crée n'importe quel compte sans s'être annoncé.
+    ''' </summary>
+    Private Shared Function CreationAutorisee(utilisateur As UtilisateurWU,
+                                              ByRef messageErreur As String) As Boolean
+
+        If SessionWU.Utilisateur Is Nothing Then
+
+            If utilisateur.Role = RoleWU.Administrateur Then Return True
+
+            messageErreur = "Seul un administrateur peut être créé avant toute identification."
+            Return False
+        End If
+
+        If SessionWU.PeutCreerLeRole(utilisateur.Role) Then Return True
+
+        messageErreur = $"Votre rôle ne permet pas de créer un compte « {utilisateur.LibelleRole} »."
+        Return False
+    End Function
+
+    ''' <summary>
     ''' Modifie le nom, le rôle et l'état d'activation. Le mot de passe n'est PAS touché ici :
     ''' le réinitialiser est une opération distincte, qui doit se voir.
+    '''
+    ''' L'ADMINISTRATEUR SEUL, PARCE QUE CETTE FONCTION PORTE LE RÔLE. Un contrôleur qui y
+    ''' aurait accès promouvrait un compte administrateur, puis s'y connecterait. Activer et
+    ''' désactiver, qui est son besoin, passe par DefinirActivite et ne touche à rien d'autre.
     ''' </summary>
     Public Shared Function Modifier(utilisateur As UtilisateurWU, ByRef messageErreur As String) As Boolean
 
@@ -347,6 +385,11 @@ Public NotInheritable Class UtilisateurRepository
 
         If utilisateur Is Nothing Then
             messageErreur = "Aucun utilisateur à enregistrer."
+            Return False
+        End If
+
+        If Not SessionWU.PeutModifierLesComptes Then
+            messageErreur = "Votre rôle ne permet pas de modifier un compte utilisateur."
             Return False
         End If
 
@@ -386,6 +429,22 @@ Public NotInheritable Class UtilisateurRepository
                                              changementExige As Boolean,
                                              ByRef messageErreur As String) As Boolean
 
+        messageErreur = String.Empty
+
+        ' RÉINITIALISER LE MOT DE PASSE D'UN AUTRE, C'EST PRENDRE SON COMPTE — plus sûrement
+        ' que le désactiver. C'est donc un droit, et il n'appartient qu'à l'administrateur.
+        '
+        ' AUCUNE SESSION OUVERTE : c'est le changement imposé à la PREMIÈRE connexion, qui a
+        ' lieu AVANT l'ouverture de la session. Le refuser ici fermerait l'application à tout
+        ' compte dont le mot de passe vient d'être réinitialisé.
+        If SessionWU.Utilisateur IsNot Nothing AndAlso
+           Not String.Equals(identifiant, SessionWU.Identifiant, StringComparison.OrdinalIgnoreCase) AndAlso
+           Not SessionWU.PeutReinitialiserLesMotsDePasse Then
+
+            messageErreur = "Votre rôle ne permet pas de réinitialiser le mot de passe d'un autre compte."
+            Return False
+        End If
+
         Dim sel As String = String.Empty
         Dim iterations As Integer = 0
         Dim empreinte As String = MotDePasseService.Hacher(nouveauMotDePasse, sel, iterations)
@@ -403,6 +462,57 @@ Public NotInheritable Class UtilisateurRepository
                             commande.Parameters.Add("@sel", SqlDbType.NVarChar, 128).Value = sel
                             commande.Parameters.Add("@iterations", SqlDbType.Int).Value = iterations
                             commande.Parameters.Add("@exige", SqlDbType.Bit).Value = changementExige
+                            commande.Parameters.Add("@modifiePar", SqlDbType.NVarChar, 50).Value = ParOuScript()
+                        End Sub)
+    End Function
+
+    ''' <summary>
+    ''' Active ou désactive un compte, et rien d'autre.
+    '''
+    ''' CETTE FONCTION EXISTE POUR LE CONTRÔLEUR. Jusqu'ici, activer un compte passait par
+    ''' l'écran de modification — celui qui porte aussi le NOM et le RÔLE. Donner cet écran à
+    ''' quelqu'un pour qu'il puisse désactiver un compte lui aurait donné, du même geste, le
+    ''' pouvoir de nommer un administrateur.
+    '''
+    ''' LE DROIT SE LIT SUR LA CIBLE, et pas seulement sur le rôle de celui qui agit : un
+    ''' contrôleur n'agit sur aucun administrateur, ni sur son propre compte.
+    '''
+    ''' LE DERNIER ADMINISTRATEUR RESTE PROTÉGÉ, comme dans Modifier : une base sans
+    ''' administrateur actif ne se répare plus depuis l'application.
+    ''' </summary>
+    ''' <param name="cible">Le compte à activer ou désactiver, tel que la liste l'a lu.</param>
+    ''' <param name="actif">Vrai pour activer, faux pour désactiver.</param>
+    Public Shared Function DefinirActivite(cible As UtilisateurWU, actif As Boolean,
+                                           ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If cible Is Nothing Then
+            messageErreur = "Aucun compte sélectionné."
+            Return False
+        End If
+
+        If Not SessionWU.PeutAgirSurLActivite(cible) Then
+            messageErreur = $"Votre rôle ne permet pas d'agir sur le compte « {cible.Identifiant} »."
+            Return False
+        End If
+
+        If Not actif AndAlso cible.Role = RoleWU.Administrateur AndAlso
+           AutresAdministrateursUtilisables(cible.Identifiant) = 0 Then
+
+            messageErreur = "Cette désactivation laisserait la base sans aucun administrateur actif." & Environment.NewLine &
+                            "Créez d’abord un autre administrateur."
+            Return False
+        End If
+
+        Const requete As String =
+            "UPDATE " & TABLE_UTILISATEUR & " SET Actif = @actif, DateModification = GETDATE(), " &
+            "ModifiePar = @modifiePar WHERE Identifiant = @identifiant"
+
+        Return Executer(requete, messageErreur,
+                        Sub(commande)
+                            commande.Parameters.Add("@identifiant", SqlDbType.NVarChar, 50).Value = cible.Identifiant
+                            commande.Parameters.Add("@actif", SqlDbType.Bit).Value = actif
                             commande.Parameters.Add("@modifiePar", SqlDbType.NVarChar, 50).Value = ParOuScript()
                         End Sub)
     End Function
@@ -443,8 +553,26 @@ Public NotInheritable Class UtilisateurRepository
         End Try
     End Function
 
-    ''' <summary>Déverrouille un compte bloqué par des échecs répétés.</summary>
-    Public Shared Function Deverrouiller(identifiant As String, ByRef messageErreur As String) As Boolean
+    ''' <summary>
+    ''' Déverrouille un compte bloqué par des échecs répétés.
+    '''
+    ''' MÊME RÈGLE QUE L'ACTIVATION, et la cible est passée entière pour cela : déverrouiller
+    ''' est de la même famille qu'activer, et un contrôleur ne doit pas rouvrir le compte d'un
+    ''' administrateur que des échecs répétés viennent de bloquer.
+    ''' </summary>
+    Public Shared Function Deverrouiller(cible As UtilisateurWU, ByRef messageErreur As String) As Boolean
+
+        messageErreur = String.Empty
+
+        If cible Is Nothing Then
+            messageErreur = "Aucun compte sélectionné."
+            Return False
+        End If
+
+        If Not SessionWU.PeutAgirSurLActivite(cible) Then
+            messageErreur = $"Votre rôle ne permet pas d'agir sur le compte « {cible.Identifiant} »."
+            Return False
+        End If
 
         Const requete As String =
             "UPDATE " & TABLE_UTILISATEUR & " SET EchecsConsecutifs = 0, DateVerrouillage = NULL, " &
@@ -452,7 +580,7 @@ Public NotInheritable Class UtilisateurRepository
 
         Return Executer(requete, messageErreur,
                         Sub(commande)
-                            commande.Parameters.Add("@identifiant", SqlDbType.NVarChar, 50).Value = identifiant
+                            commande.Parameters.Add("@identifiant", SqlDbType.NVarChar, 50).Value = cible.Identifiant
                             commande.Parameters.Add("@modifiePar", SqlDbType.NVarChar, 50).Value = ParOuScript()
                         End Sub)
     End Function

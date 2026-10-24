@@ -117,11 +117,48 @@ Public NotInheritable Class SessionWU
         End Get
     End Property
 
+    ''' <summary>Ouvrir l'écran des utilisateurs : l'administrateur et le contrôleur.</summary>
     Public Shared ReadOnly Property PeutGererLesUtilisateurs As Boolean
         Get
             Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutGererLesUtilisateurs
         End Get
     End Property
+
+    ''' <summary>Changer le serveur et la base : l'administrateur seul.</summary>
+    Public Shared ReadOnly Property PeutChangerLaConnexion As Boolean
+        Get
+            Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutChangerLaConnexion
+        End Get
+    End Property
+
+    ''' <summary>Modifier le nom, le rôle ou la fonction d'un compte : l'administrateur seul.</summary>
+    Public Shared ReadOnly Property PeutModifierLesComptes As Boolean
+        Get
+            Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutModifierLesComptes
+        End Get
+    End Property
+
+    ''' <summary>Réinitialiser un mot de passe : l'administrateur seul.</summary>
+    Public Shared ReadOnly Property PeutReinitialiserLesMotsDePasse As Boolean
+        Get
+            Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutReinitialiserLesMotsDePasse
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Activer, désactiver ou déverrouiller CE compte-là.
+    '''
+    ''' Le seul droit de cette classe qui dépende d'une cible : un contrôleur n'agit sur aucun
+    ''' administrateur, ni sur son propre compte. Les écrans l'interrogent ligne par ligne.
+    ''' </summary>
+    Public Shared Function PeutAgirSurLActivite(cible As UtilisateurWU) As Boolean
+        Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutAgirSurLActivite(cible)
+    End Function
+
+    ''' <summary>Créer un compte portant ce rôle. Voir UtilisateurWU.PeutCreerLeRole.</summary>
+    Public Shared Function PeutCreerLeRole(role As RoleWU) As Boolean
+        Return Utilisateur IsNot Nothing AndAlso Utilisateur.PeutCreerLeRole(role)
+    End Function
 
     Public Shared ReadOnly Property PeutVoirLesRapports As Boolean
         Get

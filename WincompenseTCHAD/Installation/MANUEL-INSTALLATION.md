@@ -140,9 +140,9 @@ risque, et c'est la façon normale de rattraper une base en retard.
 > Une base en mode `FULL` sans sauvegarde du journal finit par remplir le disque. Ce n'est
 > pas un risque théorique : c'est un arrêt de production, un matin, sans prévenir.
 
-### 2.5 Les vingt-trois autres scripts
+### 2.5 Les vingt-quatre autres scripts
 
-Le dossier `Scripts\Documentation\` porte **23 fichiers**. Ils **expliquent**, ils ne
+Le dossier `Scripts\Documentation\` porte **24 fichiers**. Ils **expliquent**, ils ne
 s'exécutent pas : chacun ouvre sur la règle métier qu'il installe — pourquoi ce compte et
 pas un autre, pourquoi cette contrainte, ce que l'application fait si la table manque. Tout
 ce qu'ils créent est repris par `00`.
@@ -395,7 +395,7 @@ déjà réglé ainsi. Ne pas basculer `#define RacineProgrammes` sur `{autopf32}
 
 | Emplacement | Contenu |
 |---|---|
-| `…\SetupWincompense\` | L'application, plus `Scripts\` (le script `00`, le `11`, et les 23 fichiers de documentation) et `Installation\` |
+| `…\SetupWincompense\` | L'application, plus `Scripts\` (le script `00`, le `11`, et les 24 fichiers de documentation) et `Installation\` |
 | `C:\ProgramData\Wincompense\wincompense.config` | La configuration du poste |
 | Menu Démarrer, Bureau | Les raccourcis |
 | Panneau de configuration | L'entrée de désinstallation |

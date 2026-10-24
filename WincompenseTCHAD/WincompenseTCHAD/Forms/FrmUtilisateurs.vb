@@ -7,9 +7,14 @@ Imports System.Windows.Forms
 ''' <summary>
 ''' Gestion des comptes utilisateurs et consultation du journal des connexions.
 '''
-''' Écran réservé aux administrateurs. Le menu qui y conduit est masqué aux autres rôles, mais
-''' le contrôle est refait ici : un écran qui ne compte que sur le menu pour être protégé n'est
-''' pas protégé.
+''' DEUX RÔLES L'OUVRENT, ET N'Y PEUVENT PAS LA MÊME CHOSE. L'administrateur dispose de tout ;
+''' le contrôleur crée des agents et des commerciaux, active, désactive et déverrouille — et
+''' sur aucun administrateur, ni sur son propre compte. Le menu qui conduit ici est masqué aux
+''' autres rôles, mais le contrôle est refait ici : un écran qui ne compte que sur le menu pour
+''' être protégé n'est pas protégé.
+'''
+''' LES BOUTONS SUIVENT LA LIGNE SÉLECTIONNÉE, et pas seulement le rôle de celui qui regarde :
+''' le même contrôleur peut désactiver un agent et pas l'administrateur de la ligne suivante.
 '''
 ''' Les mots de passe ne sont jamais saisis par l'administrateur pour le compte d'un tiers :
 ''' une réinitialisation tire un mot de passe provisoire, affiché une seule fois, que
@@ -33,7 +38,7 @@ Public Class FrmUtilisateurs
     Private Sub FrmUtilisateurs_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
         If Not SessionWU.PeutGererLesUtilisateurs Then
-            MessageBox.Show("La gestion des utilisateurs est réservée aux administrateurs.",
+            MessageBox.Show("La gestion des utilisateurs est réservée à l'administrateur et au contrôleur.",
                             "Accès refusé", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             BeginInvoke(New Action(AddressOf Close))
             Return
@@ -65,6 +70,51 @@ Public Class FrmUtilisateurs
 
         dgvUtilisateurs.DataSource = ConstruireTable(_utilisateurs)
         AjusterColonnes()
+        AppliquerLesDroits()
+    End Sub
+
+    ''' <summary>
+    ''' Éteint les boutons que le rôle de l'utilisateur connecté, OU la ligne sélectionnée, ne
+    ''' permettent pas.
+    '''
+    ''' CE N'EST PAS LA SERRURE, C'EST LA POLITESSE. Le dépôt refuse de lui-même ce qui n'est
+    ''' pas permis ; ces boutons évitent seulement qu'on saisisse une action pour s'entendre
+    ''' dire non. L'un sans l'autre serait une faute : des boutons seuls se contournent, un
+    ''' refus seul se découvre trop tard.
+    ''' </summary>
+    Private Sub AppliquerLesDroits()
+
+        Dim selectionne As UtilisateurWU = Selectionne()
+
+        btnModifier.Enabled = SessionWU.PeutModifierLesComptes
+        btnReinitialiser.Enabled = SessionWU.PeutReinitialiserLesMotsDePasse
+
+        ' Sans ligne sélectionnée, le bouton reste actif : il affichera « sélectionnez d'abord
+        ' un compte », ce qui est plus parlant qu'un bouton éteint dont on ne sait pas pourquoi.
+        Dim agirPossible As Boolean = selectionne Is Nothing OrElse
+                                      SessionWU.PeutAgirSurLActivite(selectionne)
+
+        btnActiver.Enabled = agirPossible
+        btnDeverrouiller.Enabled = agirPossible
+
+        btnActiver.Text = LibelleDuBoutonActiver(selectionne)
+    End Sub
+
+    ''' <summary>
+    ''' Le bouton dit ce qu'il va faire au compte sélectionné, et non ce qu'il sait faire en
+    ''' général : un bouton « Activer / désactiver » laisse chercher dans quel sens il agit.
+    ''' </summary>
+    Private Shared Function LibelleDuBoutonActiver(selectionne As UtilisateurWU) As String
+
+        If selectionne Is Nothing Then Return "Activer / &désactiver"
+        If selectionne.Actif Then Return "&Désactiver le compte"
+        Return "Activer le &compte"
+    End Function
+
+    Private Sub dgvUtilisateurs_SelectionChanged(sender As Object, e As EventArgs) _
+        Handles dgvUtilisateurs.SelectionChanged
+
+        AppliquerLesDroits()
     End Sub
 
     ''' <summary>
@@ -183,6 +233,14 @@ Public Class FrmUtilisateurs
     Private Sub btnModifier_Click(sender As Object, e As EventArgs) Handles btnModifier.Click
 
         lblMessage.Text = String.Empty
+
+        ' Le double-clic sur une ligne passe par ici : le bouton éteint ne suffirait pas à
+        ' fermer cette porte-là.
+        If Not SessionWU.PeutModifierLesComptes Then
+            lblMessage.Text = "Votre rôle ne permet pas de modifier un compte."
+            Return
+        End If
+
         Dim utilisateur As UtilisateurWU = SelectionneOuMessage()
         If utilisateur Is Nothing Then Return
 
@@ -239,6 +297,47 @@ Public Class FrmUtilisateurs
         ChargerJournal()
     End Sub
 
+    ''' <summary>
+    ''' Active ou désactive le compte sélectionné, et rien d'autre.
+    '''
+    ''' LA CONFIRMATION NOMME LE COMPTE ET LE SENS. Désactiver quelqu'un l'empêche de se
+    ''' connecter le lendemain matin : ce n'est pas un geste à faire en passant sur la mauvaise
+    ''' ligne d'une grille triée autrement qu'on ne croit.
+    ''' </summary>
+    Private Sub btnActiver_Click(sender As Object, e As EventArgs) Handles btnActiver.Click
+
+        lblMessage.Text = String.Empty
+        Dim utilisateur As UtilisateurWU = SelectionneOuMessage()
+        If utilisateur Is Nothing Then Return
+
+        Dim activer As Boolean = Not utilisateur.Actif
+        Dim verbe As String = If(activer, "Activer", "Désactiver")
+
+        Dim reponse As DialogResult = MessageBox.Show(
+            $"{verbe} le compte « {utilisateur.Identifiant} » ({utilisateur.NomComplet}) ?" &
+            Environment.NewLine & Environment.NewLine &
+            If(activer,
+               "Son titulaire pourra de nouveau se connecter avec son mot de passe actuel.",
+               "Son titulaire ne pourra plus se connecter. Son historique et ses écritures sont conservés."),
+            $"{verbe} un compte", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If reponse <> DialogResult.Yes Then Return
+
+        Dim messageErreur As String = String.Empty
+
+        If Not UtilisateurRepository.DefinirActivite(utilisateur, activer, messageErreur) Then
+            lblMessage.Text = messageErreur
+            Return
+        End If
+
+        UtilisateurRepository.Journaliser(utilisateur.Identifiant, True,
+                                          $"Compte {If(activer, "activé", "désactivé")} par {SessionWU.Identifiant}")
+
+        ChargerUtilisateurs()
+        ChargerJournal()
+        lblMessage.Text = $"Compte « {utilisateur.Identifiant} » {If(activer, "activé", "désactivé")}."
+    End Sub
+
     Private Sub btnDeverrouiller_Click(sender As Object, e As EventArgs) Handles btnDeverrouiller.Click
 
         lblMessage.Text = String.Empty
@@ -252,7 +351,7 @@ Public Class FrmUtilisateurs
 
         Dim messageErreur As String = String.Empty
 
-        If Not UtilisateurRepository.Deverrouiller(utilisateur.Identifiant, messageErreur) Then
+        If Not UtilisateurRepository.Deverrouiller(utilisateur, messageErreur) Then
             lblMessage.Text = messageErreur
             Return
         End If

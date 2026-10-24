@@ -186,7 +186,7 @@ Scripts/                                   ' CE DOSSIER NE CONTIENT QUE CE QUI S
 ├── 00_InstallationComplete.sql            ' LE SEUL À EXÉCUTER — il contient tous les autres
 ├── 11_AccesUtilisateurs.sql               ' Comptes Windows : uniquement en authentification AD
 ├── README.md                              ' Quel script exécuter, et quand
-└── Documentation/                         ' Les 23 autres : ils expliquent, ils ne s'exécutent pas
+└── Documentation/                         ' Les 24 autres : ils expliquent, ils ne s'exécutent pas
     ├── 01_CreateTables_GWC_WINCOMPENSE_ETD.sql
     ├── 02_DonneesExemple.sql              ' Jeu de test — jamais en production
     ├── 03_SystemeWU.sql                   ' Comptes comptables paramétrés
@@ -1157,19 +1157,48 @@ laisser l'accès à la compense. Chaque utilisateur a donc son propre mot de pas
 Le compte Windows et le nom de la machine sont néanmoins relevés et journalisés : un identifiant
 utilisé depuis un poste qui n'est pas le sien se repère ainsi.
 
-### Les trois rôles
+### Les quatre rôles
 
-| | Agent de la compense | Commercial | Administrateur |
-|---|---|---|---|
-| Charger les rapports, calculer, générer et historiser les pièces | ✔ | | ✔ |
-| Sous-agents, agences propres, groupes statistiques | | ✔ | ✔ |
-| Comptes comptables de la pièce (table `SystemeWU`) | | | ✔ |
-| Comptes utilisateurs et journal des connexions | | | ✔ |
-| Rapports d'activité | ✔ | ✔ | ✔ |
+| | Agent de la compense | Commercial | Administrateur | Contrôleur |
+|---|---|---|---|---|
+| Charger les rapports, calculer, générer et historiser les pièces | ✔ | | ✔ | |
+| Pièce des écarts de change | ✔ | | ✔ | |
+| Sous-agents, agences propres, groupes statistiques | | ✔ | ✔ | |
+| Comptes comptables de la pièce (table `SystemeWU`) | | | ✔ | |
+| Comptes utilisateurs et journal des connexions | | | ✔ | ✔ |
+| Changer le serveur de la base | | | ✔ | |
+| Rapports d'activité | ✔ | ✔ | ✔ | ✔ |
 
 **L'agent de compense n'a aucun accès au paramétrage, pas même en lecture** : décision de la
 banque. C'est ce paramétrage qui détermine les écritures ; le laisser modifiable par celui qui
 les génère supprimerait le contrôle croisé recherché.
+
+#### Le contrôleur : il administre les comptes, il ne devient pas administrateur
+
+La banque place au siège des contrôleurs chargés de suivre les comptes et l'activité du
+réseau. Le réflexe aurait été de leur donner le rôle `COMMERCIAL` — c'est précisément ce qu'il
+ne fallait pas faire : `COMMERCIAL` ouvre la gestion du référentiel, et on aurait donné au
+contrôleur le pouvoir d'agir sur ce qu'il est chargé de contrôler.
+
+Il crée des comptes `COMPENSE` et `COMMERCIAL`, en active, en désactive et en déverrouille.
+Et rien d'autre. **Trois interdits ferment les trois chemins qui le mèneraient à
+l'administration**, et chacun compte :
+
+| | Interdit | Ce qu'il empêche |
+|---|---|---|
+| 1 | Créer un `ADMIN` ou un autre `CONTROLEUR` | Celui qui crée un compte en choisit le mot de passe initial : il se créerait un administrateur et s'y connecterait. Et un contrôleur créé par un contrôleur n'aurait plus d'administrateur au-dessus de lui |
+| 2 | **Modifier** un compte existant | Cet écran porte le *rôle* : il promouvrait quelqu'un administrateur. Activer et désactiver, qui est son besoin, passe par une opération distincte qui ne touche que la colonne `Actif` |
+| 3 | **Réinitialiser** un mot de passe | Réinitialiser celui d'un administrateur, c'est prendre son compte — plus sûrement que le désactiver |
+
+Il n'agit sur **aucun administrateur**, ni sur **son propre compte**. La banque avait demandé
+« sauf l'administrateur qui l'a créé » ; la règle retenue est plus large, parce que la première
+se vérifie en remontant qui a créé qui, et qu'elle perd son objet dès qu'un contrôleur est créé
+par un contrôleur.
+
+**Un droit a dû être coupé en deux au passage.** Les deux entrées du menu *Sécurité* —
+*Utilisateurs et connexions* et *Connexion à la base de données* — étaient gardées par la même
+condition. Ouvrir la première au contrôleur lui aurait donné, du même geste, l'écran qui
+déplace la base de toute la banque.
 
 Les entrées de menu correspondantes sont **masquées et non grisées** : une entrée grisée invite
 à demander le droit, alors que la question est tranchée. Le contrôle est refait à l'ouverture de

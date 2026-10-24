@@ -26,6 +26,7 @@ Partial Class FrmUtilisateurs
         Me.panelActions = New System.Windows.Forms.Panel()
         Me.btnNouveau = New System.Windows.Forms.Button()
         Me.btnModifier = New System.Windows.Forms.Button()
+        Me.btnActiver = New System.Windows.Forms.Button()
         Me.btnReinitialiser = New System.Windows.Forms.Button()
         Me.btnDeverrouiller = New System.Windows.Forms.Button()
         Me.btnActualiser = New System.Windows.Forms.Button()
@@ -90,6 +91,7 @@ Partial Class FrmUtilisateurs
         Me.panelActions.Controls.Add(Me.btnActualiser)
         Me.panelActions.Controls.Add(Me.btnDeverrouiller)
         Me.panelActions.Controls.Add(Me.btnReinitialiser)
+        Me.panelActions.Controls.Add(Me.btnActiver)
         Me.panelActions.Controls.Add(Me.btnModifier)
         Me.panelActions.Controls.Add(Me.btnNouveau)
         Me.panelActions.Dock = System.Windows.Forms.DockStyle.Bottom
@@ -111,35 +113,44 @@ Partial Class FrmUtilisateurs
         '
         Me.btnModifier.Location = New System.Drawing.Point(162, 6)
         Me.btnModifier.Name = "btnModifier"
-        Me.btnModifier.Size = New System.Drawing.Size(150, 32)
+        Me.btnModifier.Size = New System.Drawing.Size(110, 32)
         Me.btnModifier.TabIndex = 1
         Me.btnModifier.Text = "&Modifier"
         Me.btnModifier.UseVisualStyleBackColor = True
         '
+        'btnActiver
+        '
+        Me.btnActiver.Location = New System.Drawing.Point(280, 6)
+        Me.btnActiver.Name = "btnActiver"
+        Me.btnActiver.Size = New System.Drawing.Size(170, 32)
+        Me.btnActiver.TabIndex = 2
+        Me.btnActiver.Text = "Activer / &désactiver"
+        Me.btnActiver.UseVisualStyleBackColor = True
+        '
         'btnReinitialiser
         '
-        Me.btnReinitialiser.Location = New System.Drawing.Point(320, 6)
+        Me.btnReinitialiser.Location = New System.Drawing.Point(458, 6)
         Me.btnReinitialiser.Name = "btnReinitialiser"
         Me.btnReinitialiser.Size = New System.Drawing.Size(202, 32)
-        Me.btnReinitialiser.TabIndex = 2
+        Me.btnReinitialiser.TabIndex = 3
         Me.btnReinitialiser.Text = "&Réinitialiser le mot de passe"
         Me.btnReinitialiser.UseVisualStyleBackColor = True
         '
         'btnDeverrouiller
         '
-        Me.btnDeverrouiller.Location = New System.Drawing.Point(530, 6)
+        Me.btnDeverrouiller.Location = New System.Drawing.Point(668, 6)
         Me.btnDeverrouiller.Name = "btnDeverrouiller"
-        Me.btnDeverrouiller.Size = New System.Drawing.Size(150, 32)
-        Me.btnDeverrouiller.TabIndex = 3
+        Me.btnDeverrouiller.Size = New System.Drawing.Size(130, 32)
+        Me.btnDeverrouiller.TabIndex = 4
         Me.btnDeverrouiller.Text = "&Déverrouiller"
         Me.btnDeverrouiller.UseVisualStyleBackColor = True
         '
         'btnActualiser
         '
-        Me.btnActualiser.Location = New System.Drawing.Point(688, 6)
+        Me.btnActualiser.Location = New System.Drawing.Point(806, 6)
         Me.btnActualiser.Name = "btnActualiser"
-        Me.btnActualiser.Size = New System.Drawing.Size(150, 32)
-        Me.btnActualiser.TabIndex = 4
+        Me.btnActualiser.Size = New System.Drawing.Size(110, 32)
+        Me.btnActualiser.TabIndex = 5
         Me.btnActualiser.Text = "&Actualiser"
         Me.btnActualiser.UseVisualStyleBackColor = True
         '
@@ -149,7 +160,7 @@ Partial Class FrmUtilisateurs
         Me.lblMessage.Location = New System.Drawing.Point(4, 42)
         Me.lblMessage.Name = "lblMessage"
         Me.lblMessage.Size = New System.Drawing.Size(950, 22)
-        Me.lblMessage.TabIndex = 5
+        Me.lblMessage.TabIndex = 6
         Me.lblMessage.Text = ""
         '
         'pageJournal
@@ -253,6 +264,7 @@ Partial Class FrmUtilisateurs
     Friend WithEvents panelActions As System.Windows.Forms.Panel
     Friend WithEvents btnNouveau As System.Windows.Forms.Button
     Friend WithEvents btnModifier As System.Windows.Forms.Button
+    Friend WithEvents btnActiver As System.Windows.Forms.Button
     Friend WithEvents btnReinitialiser As System.Windows.Forms.Button
     Friend WithEvents btnDeverrouiller As System.Windows.Forms.Button
     Friend WithEvents btnActualiser As System.Windows.Forms.Button

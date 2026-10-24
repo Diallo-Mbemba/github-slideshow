@@ -640,6 +640,11 @@ Public Class FrmPrincipal
         Dim comptes As Boolean = SessionWU.PeutGererLesComptesSystemes
         Dim utilisateurs As Boolean = SessionWU.PeutGererLesUtilisateurs
 
+        ' DEUX DROITS LÀ OÙ IL N'Y EN AVAIT QU'UN. Les deux entrées du menu Sécurité étaient
+        ' gardées par la même condition : ouvrir la gestion des utilisateurs au contrôleur lui
+        ' aurait donné, du même geste, l'écran qui déplace la base de TOUTE la banque.
+        Dim connexion As Boolean = SessionWU.PeutChangerLaConnexion
+
         mnuTraitement.Available = traite
         mnuRapport.Available = rapports
         mnuRapportAgences.Available = rapports
@@ -647,6 +652,15 @@ Public Class FrmPrincipal
         mnuCommissionsBanque.Available = rapports
         SEP1.Available = traite AndAlso rapports
         mnuCompensation.Available = traite OrElse rapports
+
+        ' LA PIÈCE DES ÉCARTS DE CHANGE S'ENREGISTRE : elle appartient donc à la compense, et
+        ' non à la consultation. Elle n'était gardée par aucun droit — sans conséquence tant
+        ' que tous les rôles traitaient la compense, mais le contrôleur, lui, ne la traite pas.
+        ' L'écran de CONTRÔLE des écarts, qui ne conserve rien, reste ouvert à qui lit les
+        ' rapports : c'est précisément son objet.
+        mnuPieceChange.Available = traite
+        mnuControleChange.Available = rapports
+        SEP8.Available = traite OrElse rapports
 
         mnuSousAgents.Available = pointsDeVente
         mnuAgences.Available = pointsDeVente
@@ -671,11 +685,14 @@ Public Class FrmPrincipal
 
         mnuUtilisateurs.Available = utilisateurs
 
-        ' Changer de serveur engage toute la banque : seul l'administrateur, qui gère déjà les
-        ' utilisateurs, peut ouvrir cet écran.
-        mnuConnexionBase.Available = utilisateurs
-        SEP6.Available = utilisateurs
-        SEP4.Available = utilisateurs
+        ' Changer de serveur engage toute la banque : l'administrateur seul, et non le
+        ' contrôleur qui partage pourtant avec lui l'écran des utilisateurs.
+        mnuConnexionBase.Available = connexion
+
+        ' Un séparateur n'a de sens qu'entre deux entrées réellement affichées. SEP6 sépare les
+        ' utilisateurs de la connexion à la base : pour un contrôleur, la seconde n'existe pas.
+        SEP6.Available = utilisateurs AndAlso connexion
+        SEP4.Available = utilisateurs OrElse connexion
 
         AppliquerLesDroitsALaBarre(traite, rapports, pointsDeVente)
     End Sub

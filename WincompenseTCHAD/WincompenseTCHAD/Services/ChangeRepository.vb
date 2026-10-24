@@ -201,6 +201,16 @@ Public NotInheritable Class ChangeRepository
 
         messageErreur = String.Empty
 
+        ' CONSERVER UNE PIÈCE DE CHANGE, C'EST COMPTABILISER : le droit est celui de la
+        ' compense, et il se vérifie ICI, au dernier verrou. Le menu qui mène à cet écran est
+        ' désormais fermé aux rôles qui ne traitent pas la compense — mais un menu est une
+        ' politesse, pas une serrure : l'écran reste atteignable par d'autres chemins, et
+        ' c'est cette fonction-ci qui écrit.
+        If Not SessionWU.PeutTraiterLaCompense Then
+            messageErreur = "Votre rôle ne permet pas de comptabiliser les écarts de change."
+            Return False
+        End If
+
         If resultat Is Nothing OrElse resultat.Ecarts.Count = 0 Then
             messageErreur = "Aucun écart de change à conserver."
             Return False

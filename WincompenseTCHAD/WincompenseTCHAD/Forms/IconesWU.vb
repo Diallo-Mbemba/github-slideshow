@@ -368,6 +368,7 @@ Public NotInheritable Class IconesWU
 
         ' --- Le double regard : ce qui s'autorise et ce qui se vise --------------------------
         table("btnAutoriser") = IconeWU.Coche
+        table("btnActiver") = IconeWU.Coche
         table("btnViser") = IconeWU.Coche
         table("btnDeposer") = IconeWU.Coche
 
@@ -713,13 +714,6 @@ Public NotInheritable Class IconesWU
         Disque(g, 8.0F, 11.0F, 2.5F, TEINTE_OR)
     End Sub
 
-    ''' <summary>Une coche dans une pastille : les autorisations du référentiel.</summary>
-    ''' <summary>
-    ''' Le barème des taxes : un signe pour cent, dessiné à la main plutôt qu'écrit au
-    ''' clavier. Un caractère posé avec DrawString changerait de forme d'un poste à l'autre
-    ''' selon les polices installées, et se placerait mal aux petites tailles ; deux disques
-    ''' et une barre oblique tiennent leur place à seize pixels comme à soixante-quatre.
-    ''' </summary>
     ''' <summary>Disquette : enregistrer. Le volet clair en haut, l'étiquette en bas.</summary>
     Private Shared Sub TracerEnregistrer(g As Graphics)
 
@@ -925,6 +919,12 @@ Public NotInheritable Class IconesWU
         Boite(g, 4.0F, 11.0F, 2.0F, 2.0F, TEINTE_BLEU_CLAIR, False)
     End Sub
 
+    ''' <summary>
+    ''' Le barème des taxes : un signe pour cent, dessiné à la main plutôt qu'écrit au
+    ''' clavier. Un caractère posé avec DrawString changerait de forme d'un poste à l'autre
+    ''' selon les polices installées, et se placerait mal aux petites tailles ; deux disques
+    ''' et une barre oblique tiennent leur place à seize pixels comme à soixante-quatre.
+    ''' </summary>
     Private Shared Sub TracerPourcentage(g As Graphics)
 
         Boite(g, 2.2F, 2.2F, 11.6F, 11.6F, TEINTE_PAPIER)
@@ -941,6 +941,7 @@ Public NotInheritable Class IconesWU
         Disque(g, 10.6F, 10.6F, 1.9F, TEINTE_BLEU)
     End Sub
 
+    ''' <summary>Une coche dans une pastille : les autorisations du référentiel.</summary>
     Private Shared Sub TracerCoche(g As Graphics)
 
         Disque(g, 8.0F, 8.0F, 6.2F, TEINTE_VERT)

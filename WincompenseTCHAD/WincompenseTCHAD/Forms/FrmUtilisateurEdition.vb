@@ -43,7 +43,7 @@ Public Class FrmUtilisateurEdition
 
     Private Sub FrmUtilisateurEdition_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
-        cboRole.Items.AddRange(UtilisateurWU.RolesProposes)
+        cboRole.Items.AddRange(RolesProposables())
         cboFonction.Items.AddRange(UtilisateurWU.FonctionsProposees)
         cboFonction.SelectedIndex = 0
 
@@ -61,6 +61,36 @@ Public Class FrmUtilisateurEdition
         AfficherDroits()
         AccorderLaFonctionAuRole()
     End Sub
+
+    ''' <summary>
+    ''' Les rôles que la liste déroulante propose, selon qui est devant l'écran.
+    '''
+    ''' TROIS CAS, ET CHACUN A SA RAISON :
+    '''
+    '''   - LE PREMIER ADMINISTRATEUR se crée avant toute identification : personne n'est
+    '''     connecté pour autoriser quoi que ce soit, et c'est ce rôle-là, et lui seul, que
+    '''     l'écran impose.
+    '''   - EN CRÉATION, chacun ne propose que ce qu'il a le droit de créer. Un contrôleur ne
+    '''     doit pas saisir un compte entier pour s'entendre refuser le rôle à l'enregistrement.
+    '''   - EN MODIFICATION, le rôle actuel du compte figure dans la liste même si celui qui
+    '''     regarde n'aurait pas le droit de le créer. Sans cela, la liste s'ouvrirait sur un
+    '''     rôle absent, et l'enregistrement changerait le rôle du compte sans que personne
+    '''     l'ait demandé.
+    ''' </summary>
+    Private Function RolesProposables() As String()
+
+        If _premierAdministrateur Then
+            Return New String() {UtilisateurWU.LibelleLisibleDepuisRole(RoleWU.Administrateur)}
+        End If
+
+        Dim liste As New List(Of String)(UtilisateurWU.RolesProposesPar(SessionWU.Utilisateur))
+
+        If _existant IsNot Nothing AndAlso Not liste.Contains(_existant.LibelleRole) Then
+            liste.Insert(0, _existant.LibelleRole)
+        End If
+
+        Return liste.ToArray()
+    End Function
 
     Private Sub PreparerCreation()
 
@@ -131,6 +161,13 @@ Public Class FrmUtilisateurEdition
                 lblDroits.Text = "Tous les droits des deux autres rôles, plus les comptes systèmes " &
                                  "de la pièce comptable et la gestion des utilisateurs. Sur le " &
                                  "référentiel, il est soumis au double regard comme les autres."
+
+            Case RoleWU.Controleur
+                lblDroits.Text = "Consulte les rapports d'activité et le journal des connexions. " &
+                                 "Crée des agents de la compense et des commerciaux, active, " &
+                                 "désactive et déverrouille leurs comptes. Ne touche AUCUN compte " &
+                                 "administrateur, aucun mot de passe, aucun rôle existant. " &
+                                 "Aucun accès à la compense ni au référentiel."
 
             Case Else
                 lblDroits.Text = "Aucun rôle sélectionné : le compte n'aurait accès à rien."
