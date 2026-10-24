@@ -26,6 +26,15 @@ Public NotInheritable Class UtilisateurRepository
     Private Const ERREUR_CLE_DUPLIQUEE As Integer = 2627
     Private Const ERREUR_INDEX_UNIQUE As Integer = 2601
 
+    ''' <summary>
+    ''' Valeur refusée par une contrainte CHECK. Sur cette table, il n'y en a que deux — le
+    ''' rôle et la fonction — et celle du rôle se heurte à une base non migrée.
+    ''' </summary>
+    Private Const ERREUR_CONTRAINTE_VERIFIEE As Integer = 547
+
+    ''' <summary>Nom de la contrainte qui énumère les rôles acceptés par la base.</summary>
+    Private Const CONTRAINTE_ROLE As String = "CK_T_UtilisateurWU_Role"
+
     ''' <summary>Nombre d'échecs consécutifs au-delà duquel le compte est verrouillé.</summary>
     Public Const ECHECS_AVANT_VERROUILLAGE As Integer = 5
 
@@ -40,6 +49,15 @@ Public NotInheritable Class UtilisateurRepository
 
         If ex.Number = ERREUR_TABLE_ABSENTE Then Return MESSAGE_TABLE_ABSENTE
         If ex.Number = ERREUR_COLONNE_ABSENTE Then Return MESSAGE_COLONNE_ABSENTE
+
+        ' LE MESSAGE DU SERVEUR EST EXACT, ET INUTILISABLE. « L'instruction INSERT est en
+        ' conflit avec la contrainte CHECK CK_T_UtilisateurWU_Role » ne dit ni ce qu'il
+        ' fallait faire, ni que l'écran, lui, avait raison de proposer le rôle. L'application
+        ' sait, elle, que la base n'a pas été migrée : elle le dit.
+        If ex.Number = ERREUR_CONTRAINTE_VERIFIEE AndAlso
+           ex.Message.IndexOf(CONTRAINTE_ROLE, StringComparison.OrdinalIgnoreCase) >= 0 Then
+            Return MESSAGE_ROLE_REFUSE
+        End If
 
         Dim diagnostic As String = DiagnosticSqlWU.Expliquer(ex, ConfigurationWU.ChaineDeConnexion())
         If diagnostic.Length > 0 Then Return diagnostic
@@ -57,6 +75,21 @@ Public NotInheritable Class UtilisateurRepository
         "Exécutez Scripts\00_InstallationComplete.sql : il ajoute les colonnes manquantes sans " &
         "toucher aux données, et il peut être rejoué sans risque. C'est lui, en particulier, qui " &
         "pose la colonne Fonction que le double regard sur le référentiel attend."
+
+    ''' <summary>
+    ''' La base refuse le rôle parce qu'elle n'énumère encore que les trois d'origine.
+    '''
+    ''' CE MESSAGE EXISTE POUR UNE RAISON PRÉCISE : l'écran propose le rôle, la base le
+    ''' refuse, et le message du serveur ne dit pas lequel des deux a tort. C'est la base qui
+    ''' est en retard, et ce n'est ni à l'agent ni à l'administrateur de le deviner.
+    ''' </summary>
+    Public Const MESSAGE_ROLE_REFUSE As String =
+        "La base n'accepte pas encore le rôle « Contrôleur » : elle porte toujours la liste " &
+        "des trois rôles d'origine." & vbCrLf & vbCrLf &
+        "Exécutez Scripts\00_InstallationComplete.sql sur cette base, puis recommencez. Il " &
+        "élargit la contrainte sans toucher à aucune donnée, et il peut être rejoué sans " &
+        "risque." & vbCrLf & vbCrLf &
+        "Le détail de l'opération est dans Scripts\Documentation\25_RoleControleur.sql."
 
 #Region "Authentification"
 
