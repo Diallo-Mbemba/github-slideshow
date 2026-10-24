@@ -415,13 +415,19 @@ Wincompense_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES ^
     /PARTAGE="\\SRV-FICHIERS\Wincompense\connexion.config"
 ```
 
-> **Sans ces paramètres, une installation silencieuse ne configure rien** : la page ne
-> s'affiche pas, personne ne saisit rien, et le poste repart sur `.\SQLEXPRESS` —
-> c'est-à-dire sur aucun serveur. Les contrôles de saisie ne s'appliquent pas non plus en
-> mode silencieux : c'est l'informatique qui répond de ce qu'elle passe en paramètre.
+> **Ces deux paramètres sont obligatoires sur un poste NEUF, et à proscrire sur une mise à
+> jour.** Sur un poste neuf, sans eux, personne ne saisit rien et le poste repart sur
+> `.\SQLEXPRESS` — sur aucun serveur. Sur une mise à jour, l'installateur relit ce que le
+> poste porte déjà et le réécrit à l'identique : passer `/SERVEUR` par habitude écraserait un
+> réglage correct sur tout le lot.
+>
+> Les contrôles de saisie ne s'appliquent dans aucun des deux cas : c'est l'informatique qui
+> répond de ce qu'elle passe en paramètre.
 
 Pour éprouver la commande avant de la diffuser, remplacer `/VERYSILENT` par `/SILENT` : la
 barre de progression s'affiche, et les erreurs restent visibles.
+
+Le détail — les commutateurs un par un, l'essai en trois temps, les quatre pièges qui font échouer un lot, la règle de détection pour SCCM et le script de démarrage type — est dans **`PROCEDURE-DEPLOIEMENT-SILENCIEUX.pdf`**, à remettre à l'informatique.
 
 ### 6.5 Donner le mot de passe SQL à un poste
 

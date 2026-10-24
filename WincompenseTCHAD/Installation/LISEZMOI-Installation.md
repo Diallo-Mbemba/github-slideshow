@@ -11,6 +11,7 @@ et pour changer de serveur ensuite sans y revenir.
 | `version.txt.modele` | Modèle du fichier annonçant la version publiée |
 | `MANUEL-INSTALLATION.pdf` | **Le manuel d'installation, étape par étape — à remettre à l'administrateur** |
 | `LISEZMOI-Installation.md` | Ce document — installation technique et changement de serveur |
+| `PROCEDURE-DEPLOIEMENT-SILENCIEUX.pdf` | **Installer et mettre à jour les postes sans tournée — à remettre à l'informatique** |
 | `PLAN-DEPLOIEMENT.md` | Les huit phases du déploiement à la banque, à cocher point par point |
 | `PROCEDURE-SSMS-Acces.md` | À remettre à la banque : donner accès au compte, clic par clic dans SSMS |
 
@@ -238,10 +239,17 @@ Wincompense_Setup.exe /VERYSILENT /SUPPRESSMSGBOXES ^
 `/SERVEUR` accepte indifféremment un nom de serveur ou une **chaîne de connexion complète**,
 comme le champ de l'assistant.
 
-> **Sans ces paramètres, une installation silencieuse ne configure rien** : la page ne s'affiche
-> pas, personne ne saisit rien, et le poste repart sur `.\SQLEXPRESS` — c'est-à-dire sur aucun
-> serveur. Les contrôles de saisie ne s'appliquent pas non plus en mode silencieux : c'est
-> l'informatique qui répond de ce qu'elle passe en paramètre.
+> **Sur un poste NEUF, sans ces paramètres, une installation silencieuse ne configure rien** :
+> la page ne s'affiche pas, personne ne saisit rien, et le poste repart sur `.\SQLEXPRESS` —
+> c'est-à-dire sur aucun serveur.
+>
+> **Sur une MISE À JOUR, c'est l'inverse : il ne faut rien passer.** L'installateur relit ce
+> que le poste porte déjà — serveur, partage, mot de passe chiffré — et le réécrit à
+> l'identique. Passer `/SERVEUR` par habitude sur un lot de mise à jour écraserait un réglage
+> correct sur tous les postes à la fois.
+>
+> Les contrôles de saisie, eux, ne s'appliquent dans aucun des deux cas : c'est l'informatique
+> qui répond de ce qu'elle passe en paramètre.
 
 Pour éprouver la commande avant de la diffuser, remplacer `/VERYSILENT` par `/SILENT` : la barre
 de progression s'affiche, et les messages d'erreur éventuels restent visibles.

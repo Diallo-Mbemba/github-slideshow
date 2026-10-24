@@ -222,6 +222,7 @@ Source: "LISEZMOI-Installation.md"; DestDir: "{app}\Installation"; Flags: ignore
 ; jour ou il monte un poste ou un serveur : le livrer AVEC l'application lui evite de
 ; le chercher dans une boite aux lettres vieille de six mois.
 Source: "MANUEL-INSTALLATION.pdf"; DestDir: "{app}\Installation"; Flags: ignoreversion
+Source: "PROCEDURE-DEPLOIEMENT-SILENCIEUX.pdf"; DestDir: "{app}\Installation"; Flags: ignoreversion
 
 [InstallDelete]
 ; L'ancien executable occupe le meme dossier que le nouveau : la mise a jour
