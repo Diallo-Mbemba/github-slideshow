@@ -84,30 +84,33 @@ Public Class FrmUtilisateurs
     ''' </summary>
     Private Sub AppliquerLesDroits()
 
-        Dim selectionne As UtilisateurWU = Selectionne()
+        ' LA VARIABLE NE S'APPELLE PAS « selectionne » : VB ne distingue pas la casse, et elle
+        ' masquerait la fonction Selectionne() dont elle reçoit le résultat. L'appel se lirait
+        ' alors comme une INDEXATION de la variable, et le compilateur refuse (BC30367).
+        Dim compte As UtilisateurWU = Selectionne()
 
         btnModifier.Enabled = SessionWU.PeutModifierLesComptes
         btnReinitialiser.Enabled = SessionWU.PeutReinitialiserLesMotsDePasse
 
         ' Sans ligne sélectionnée, le bouton reste actif : il affichera « sélectionnez d'abord
         ' un compte », ce qui est plus parlant qu'un bouton éteint dont on ne sait pas pourquoi.
-        Dim agirPossible As Boolean = selectionne Is Nothing OrElse
-                                      SessionWU.PeutAgirSurLActivite(selectionne)
+        Dim agirPossible As Boolean = compte Is Nothing OrElse
+                                      SessionWU.PeutAgirSurLActivite(compte)
 
         btnActiver.Enabled = agirPossible
         btnDeverrouiller.Enabled = agirPossible
 
-        btnActiver.Text = LibelleDuBoutonActiver(selectionne)
+        btnActiver.Text = LibelleDuBoutonActiver(compte)
     End Sub
 
     ''' <summary>
     ''' Le bouton dit ce qu'il va faire au compte sélectionné, et non ce qu'il sait faire en
     ''' général : un bouton « Activer / désactiver » laisse chercher dans quel sens il agit.
     ''' </summary>
-    Private Shared Function LibelleDuBoutonActiver(selectionne As UtilisateurWU) As String
+    Private Shared Function LibelleDuBoutonActiver(compte As UtilisateurWU) As String
 
-        If selectionne Is Nothing Then Return "Activer / &désactiver"
-        If selectionne.Actif Then Return "&Désactiver le compte"
+        If compte Is Nothing Then Return "Activer / &désactiver"
+        If compte.Actif Then Return "&Désactiver le compte"
         Return "Activer le &compte"
     End Function
 
